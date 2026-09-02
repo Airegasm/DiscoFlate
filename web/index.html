@@ -462,15 +462,15 @@
       <div class="hint" style="margin-top:0;margin-bottom:12px">A 2-minute, one-time setup. There's <b>no verification or app review</b> — that only applies to bots in 100+ servers. Each person runs <b>their own</b> bot with their own token; never share a token.</div>
       <ol style="line-height:1.9;padding-left:22px;margin:0;max-width:820px">
         <li>Open the <a href="https://discord.com/developers/applications" target="_blank" rel="noopener">Discord Developer Portal</a> → <b>New Application</b> → give it a name (e.g. your bot's name) → <b>Create</b>.</li>
-        <li>Left sidebar → <b>Bot</b>. Under <b>Privileged Gateway Intents</b>, turn <b>Message Content Intent</b> <b>ON</b> (required so it can read commands) and <b>Save</b>.</li>
-        <li>Still on the Bot page, turn <b>Public Bot</b> <b>OFF</b> — now only you can invite it. This is what makes it a <b>private</b> bot.</li>
-        <li>Left sidebar → <b>Installation</b>. Set <b>Install Link</b> to <b>None</b> — this removes the public add-to-server link, keeping the bot fully private.</li>
-        <li><b>Get the token:</b> on that same <b>Bot</b> page, in the <b>Token</b> section click <b>Reset Token</b> (Discord keeps the token hidden, so this reveals a fresh one) → <b>Copy</b> it immediately — it's only shown once. Keep it secret; it's your bot's password. You'll paste it in step 6. (Lost it? Just Reset Token again — that makes a new one.)</li>
+        <li>Left sidebar → <b>Installation</b>. Set <b>Install Link</b> to <b>None</b> — this removes the public add-to-server link. <b>Do this first:</b> Discord won't let you change the gateway intents (next steps) until Install Link is set to None.</li>
+        <li>Left sidebar → <b>Bot</b>, turn <b>Public Bot</b> <b>OFF</b> — now only you can invite it. This is what makes it a <b>private</b> bot.</li>
+        <li>Still on the <b>Bot</b> page, under <b>Privileged Gateway Intents</b>, turn <b>Message Content Intent</b> <b>ON</b> (required so it can read commands) and <b>Save</b>.</li>
+        <li><b>Get the token:</b> on that same <b>Bot</b> page, in the <b>Token</b> section click <b>Reset Token</b> (Discord keeps the token hidden, so this reveals a fresh one) → <b>Copy</b> it immediately — it's only shown once. Keep it secret; it's your bot's password. You'll paste it into DiscoFlate's <b>Discord</b> tab shortly. (Lost it? Just Reset Token again — that makes a new one.)</li>
         <li>Left sidebar → <b>OAuth2</b> → <b>URL Generator</b>. Tick scope <b>bot</b>; under permissions tick <b>Send Messages</b> (and <b>Attach Files</b> if you'll use images/snapshots). Copy the generated URL at the bottom, open it, and add the bot to <b>your</b> server.</li>
         <li>Back here → <b>Discord</b> tab → paste the token → <b>Save &amp; connect</b> → pick the <b>server</b> and <b>channel</b> to listen on.</li>
         <li>Flip <b>Activation</b> on (top-right) and test from the <b>Dashboard → Controls</b>.</li>
       </ol>
-      <div class="hint" style="max-width:820px">If it connects but doesn't respond to commands, re-check that <b>Message Content Intent</b> is on (step 2) and that you picked the right channel (step 6).</div>
+      <div class="hint" style="max-width:820px">If it connects but doesn't respond to commands, re-check that <b>Message Content Intent</b> is on and that you picked the right channel.</div>
 
       <div style="max-width:820px;border-top:1px solid var(--line);padding-top:14px;margin-top:16px">
         <h3 style="margin:0 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--accent2)">Adding your bot to someone else's server</h3>
