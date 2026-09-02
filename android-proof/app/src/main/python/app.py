@@ -38,8 +38,8 @@ PORT = int(os.getenv("DISCOFLATE_PORT", "8765"))
 HOST = "127.0.0.1"
 
 # App version — keep in sync with android versionCode + version.json in the repo.
-VERSION = "1.2"
-VERSION_CODE = 16
+VERSION = "1.3"
+VERSION_CODE = 17
 VERSION_URL = "https://raw.githubusercontent.com/Airegasm/DiscoFlate/main/version.json"
 
 # Config keys "Restore Default Config" touches (game content). Everything else —
@@ -317,8 +317,8 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
             raise web.HTTPBadRequest(text=f"{vendor} device needs {req}")
         dev["label"] = (b.get("label") or (dev.get(req) if req else None) or vendor).strip()
         _id = dev.get(req) if req else dev.get("id")
-        print(f"[device] ADD vendor={vendor} label={dev['label']!r} target={_id} "
-              f"type={dev['type']} source={dev['source']}", flush=True)
+        device_control._dbg(f"ADD vendor={vendor} label={dev['label']!r} target={_id} "
+                            f"type={dev['type']} source={dev['source']}")
         cfg = config_store.load()
         cfg.setdefault("devices", []).append(dev)
         if cfg.get("active_device_id") is None:

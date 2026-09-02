@@ -67,6 +67,9 @@ class Engine:
         self.end_session_cb = None             # async () -> None : deactivate without the off-message
         self.bot_connected: bool = False
 
+        # Device add/search/use debug flows into the Activity log too (not just stdout).
+        device_control.set_log_sink(lambda m: self._log("device", m))
+
     # -- config / device lookup --------------------------------------------- #
     def set_config(self, cfg: dict) -> None:
         self.cfg = cfg

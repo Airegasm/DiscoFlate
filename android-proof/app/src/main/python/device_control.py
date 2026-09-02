@@ -19,9 +19,23 @@ import kasa_legacy as kasa
 _ALIASES = {"ha": "homeassistant", "home_assistant": "homeassistant", "tplink": "kasa"}
 
 
+_log_sink = None
+
+
+def set_log_sink(fn) -> None:
+    """Also route device debug into the app's Activity log (fn(msg))."""
+    global _log_sink
+    _log_sink = fn
+
+
 def _dbg(msg: str) -> None:
-    """Device debug line to the console (stdout on desktop, logcat on Android)."""
+    """Device debug line → console (stdout/logcat) AND the in-app Activity log."""
     print(f"[device] {msg}", flush=True)
+    if _log_sink is not None:
+        try:
+            _log_sink(msg)
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def _ident(device: dict) -> str:
