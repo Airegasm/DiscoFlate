@@ -121,7 +121,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v1.0 by AireGasm</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v1.1 by AireGasm</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -354,6 +354,7 @@
         <button class="ghost" onclick="addRange()">+ Add range</button>
         <button class="ghost" onclick="addEndSequence()" title="A buildup range that ends & resets the session at its End threshold">+ Add End Sequence</button>
         <button class="ghost" onclick="addEnd()" title="Just the terminal threshold — ends & resets when capacity reaches it (no buildup)">+ Add End</button>
+        <button class="warn" onclick="restoreDefaults()">↻ Restore Default Config</button>
         <div style="flex:1"></div>
         <button onclick="saveRanges()">Save ranges</button>
       </div>
@@ -416,6 +417,7 @@
       <div id="commands"></div>
       <div class="row" style="margin-top:10px">
         <button class="ghost" onclick="addCommand()">+ Add command</button>
+        <button class="warn" onclick="restoreDefaults()">↻ Restore Default Config</button>
         <div style="flex:1"></div>
         <button onclick="saveCommands()">Save commands</button>
       </div>
@@ -457,6 +459,18 @@
     </div>
 
     <!-- help -->
+    <div class="card span" data-tab="help">
+      <h2>Updates</h2>
+      <div class="row" style="gap:10px;align-items:center">
+        <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
+        <span class="muted" id="updMsg">You're on v1.1.</span>
+        <div style="flex:1"></div>
+        <span id="updAction"></span>
+      </div>
+      <div class="hint" id="updHint" style="display:none;white-space:pre-wrap;margin-top:8px"></div>
+      <div class="hint">On the phone app this downloads &amp; installs the new APK; on desktop it pulls the latest code from GitHub (then restart DiscoFlate).</div>
+    </div>
+
     <div class="card span" data-tab="help">
       <h2>Set up your private Discord bot</h2>
       <div class="hint" style="margin-top:0;margin-bottom:12px">A 2-minute, one-time setup. There's <b>no verification or app review</b> — that only applies to bots in 100+ servers. Each person runs <b>their own</b> bot with their own token; never share a token.</div>
@@ -635,6 +649,41 @@ async function controlStop(){ ctl('/api/control/stop', {}); }
 async function controlPump(){ ctl('/api/control/pump', {seconds: parseFloat($('#ctrlPump').value)||5}); }
 async function controlCapacity(){ ctl('/api/control/capacity', {}); }
 async function controlLeaderboard(){ ctl('/api/control/leaderboard', {}); }
+
+// ---- restore defaults + check for updates ----
+async function restoreDefaults(){
+  if(!confirm("Restore the shipped default game config (ranges, commands, prizes, messages) on top of your current setup?\n\nYour token, devices, and server settings are kept, and any custom commands/ranges you added stay too. Continue?")) return;
+  try{ applyState(await api('/api/restore-defaults', {}), true); }
+  catch(e){ alert('Restore failed: '+(e.message||e)); }
+}
+let updApkUrl='';
+async function checkUpdates(){
+  const m=$('#updMsg'), act=$('#updAction'), hint=$('#updHint');
+  m.textContent='checking…'; act.innerHTML=''; hint.style.display='none';
+  try{
+    const r = await api('/api/check-updates', {});
+    if(r.error){ m.textContent=r.error; return; }
+    if(r.update_available){
+      updApkUrl = r.apk_url||'';
+      m.textContent = `Update available: v${r.latest_version} (you have v${r.current_version}).`;
+      if(window.Android && window.Android.openUrl) act.innerHTML = `<button onclick="installUpdate()">⬇ Download &amp; install</button>`;
+      else act.innerHTML = `<button onclick="pullUpdates()">⬇ Pull latest code</button>`;
+      if(r.notes){ hint.textContent=r.notes; hint.style.display=''; }
+    } else {
+      m.textContent = `You're up to date (v${r.current_version}).`;
+    }
+  }catch(e){ m.textContent='check failed: '+(e.message||e); }
+}
+function installUpdate(){ if(window.Android && window.Android.openUrl && updApkUrl) window.Android.openUrl(updApkUrl); }
+async function pullUpdates(){
+  const m=$('#updMsg'), hint=$('#updHint');
+  m.textContent='pulling…';
+  try{
+    const r = await api('/api/pull-updates', {});
+    if(r.output){ hint.textContent=r.output; hint.style.display=''; }
+    m.textContent = r.ok ? '✓ Pulled latest code — restart DiscoFlate to apply.' : 'Pull failed (see below).';
+  }catch(e){ m.textContent='pull failed: '+(e.message||e); }
+}
 
 $('#listener').addEventListener('change', async e => {
   await api('/api/listener', {enabled: e.target.checked}); refresh();

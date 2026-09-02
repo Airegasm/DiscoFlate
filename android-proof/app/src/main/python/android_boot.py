@@ -28,6 +28,10 @@ def start(files_dir):
     os.makedirs(data_dir, exist_ok=True)
     os.environ["DISCOFLATE_DATA_DIR"] = data_dir
     os.environ["DISCOFLATE_WEB_DIR"] = web_dir
+    # pristine shipped default config (Java copies assets/seed/config.json here each
+    # launch) — used by "Restore Default Config"; and a flag so the UI/API know it's Android.
+    os.environ["DISCOFLATE_DEFAULT_CONFIG"] = os.path.join(files_dir, "default_config.json")
+    os.environ["DISCOFLATE_ANDROID"] = "1"
 
     def _run():
         import asyncio

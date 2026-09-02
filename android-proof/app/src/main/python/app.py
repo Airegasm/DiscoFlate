@@ -12,10 +12,13 @@ Start:  python3 app.py     then open http://127.0.0.1:8765
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import signal
+import subprocess
 import uuid
 
+import aiohttp
 from aiohttp import web
 
 import config_store
@@ -28,8 +31,51 @@ from discord_bot import BotManager
 HERE = os.path.dirname(os.path.abspath(__file__))
 WEB_DIR = os.environ.get("DISCOFLATE_WEB_DIR") or os.path.join(HERE, "web")
 IMAGES_DIR = os.path.join(config_store.DATA_DIR, "images")
+# Shipped default game config (for "Restore Default Config"). On Android the host
+# copies the bundled seed to a pristine path and points this env at it.
+DEFAULT_CONFIG_PATH = os.environ.get("DISCOFLATE_DEFAULT_CONFIG") or os.path.join(HERE, "default_config.json")
 PORT = int(os.getenv("DISCOFLATE_PORT", "8765"))
 HOST = "127.0.0.1"
+
+# App version — keep in sync with android versionCode + version.json in the repo.
+VERSION = "1.1"
+VERSION_CODE = 15
+VERSION_URL = "https://raw.githubusercontent.com/Airegasm/DiscoFlate/main/version.json"
+
+# Config keys "Restore Default Config" touches (game content). Everything else —
+# token, devices, listen targets, operator, vendors, etc. — is left untouched.
+_DEFAULT_SCALAR_KEYS = ["roll", "command_names", "capacity_message", "pumptimer_message",
+                        "pump_message", "cooldown_message", "cooldown_reset_message",
+                        "system_buffer_seconds", "cooldown_seconds", "roll_enabled",
+                        "max_roll_prize", "auto_report", "listener_message_on", "listener_message_off"]
+# list key -> identity function (default items win on a key match; user extras kept)
+_DEFAULT_LIST_KEYS = {
+    "commands": lambda c: (c.get("name") or "").strip().lower(),
+    "prizes": lambda p: (p.get("command") or "").strip().lower(),
+    "modes": lambda m: (m.get("name") or "").strip().lower(),
+    "events": lambda e: (e.get("name") or "").strip().lower(),
+    "capacity_ranges": lambda r: f"{r.get('min')}-{r.get('max')}",
+}
+
+
+def _merge_defaults(cur: dict, dflt: dict) -> dict:
+    """Overlay the shipped default game content ON TOP of the current config:
+    scalar/message keys reset to default; list keys become default-items +
+    any user-added items the default doesn't have. Connection/personal keys
+    (not listed) are never touched."""
+    out = dict(cur)
+    for k in _DEFAULT_SCALAR_KEYS:
+        if k in dflt:
+            out[k] = dflt[k]
+    for k, keyfn in _DEFAULT_LIST_KEYS.items():
+        dlist = list(dflt.get(k) or [])
+        seen = {keyfn(x) for x in dlist}
+        extras = [x for x in (cur.get(k) or []) if keyfn(x) not in seen]
+        merged = dlist + extras
+        if k == "capacity_ranges":
+            merged.sort(key=lambda r: (r.get("min", 0), r.get("max", 0)))
+        out[k] = merged
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -400,6 +446,45 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
         await guard(request)
         return web.json_response(await botmgr.operator_broadcast_leaderboard())
 
+    async def restore_defaults(request):
+        await guard(request)
+        try:
+            with open(DEFAULT_CONFIG_PATH, "r", encoding="utf-8") as fh:
+                dflt = json.load(fh)
+        except (FileNotFoundError, ValueError) as e:
+            raise web.HTTPBadRequest(text=f"default config not available: {e}")
+        cfg = config_store.save(_merge_defaults(config_store.load(), dflt))
+        engine.set_config(cfg)
+        return web.json_response(_public_state(engine, botmgr))
+
+    async def check_updates(request):
+        await guard(request)
+        result = {"current_version": VERSION, "current_code": VERSION_CODE,
+                  "android": os.environ.get("DISCOFLATE_DEFAULT_CONFIG") is not None}
+        try:
+            async with aiohttp.ClientSession() as s:
+                async with s.get(VERSION_URL, timeout=aiohttp.ClientTimeout(total=10)) as r:
+                    data = json.loads(await r.text())
+            latest = int(data.get("versionCode", 0))
+            result.update({"latest_version": data.get("version", "?"), "latest_code": latest,
+                           "apk_url": data.get("apk_url", ""), "notes": data.get("notes", ""),
+                           "update_available": latest > VERSION_CODE})
+        except Exception as e:  # noqa: BLE001
+            result["error"] = f"couldn't check: {e}"
+        return web.json_response(result)
+
+    async def pull_updates(request):
+        # Desktop: git pull the latest code. (Android updates via APK install.)
+        await guard(request)
+        try:
+            out = subprocess.run(["git", "-C", HERE, "pull", "--ff-only", "origin", "main"],
+                                 capture_output=True, text=True, timeout=60)
+            ok = out.returncode == 0
+            return web.json_response({"ok": ok, "output": (out.stdout + out.stderr).strip()[:2000],
+                                      "restart_needed": ok})
+        except Exception as e:  # noqa: BLE001
+            return web.json_response({"ok": False, "output": str(e)})
+
     async def session_reset(request):
         await guard(request)
         engine.session_reset()
@@ -515,6 +600,9 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
         web.post("/api/control/stop", control_stop),
         web.post("/api/control/capacity", control_capacity),
         web.post("/api/control/leaderboard", control_leaderboard),
+        web.post("/api/restore-defaults", restore_defaults),
+        web.post("/api/check-updates", check_updates),
+        web.post("/api/pull-updates", pull_updates),
     ])
     return app
 

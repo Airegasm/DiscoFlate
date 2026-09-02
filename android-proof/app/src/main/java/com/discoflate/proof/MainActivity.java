@@ -5,10 +5,12 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
@@ -42,7 +44,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setTitle("DiscoFlate · v1.0 by AireGasm");
+        setTitle("DiscoFlate · v1.1 by AireGasm");
 
         try {
             PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
@@ -68,6 +70,8 @@ public class MainActivity extends Activity {
             } catch (Exception ignored) {
             }
         }
+        // Always refresh the pristine shipped default (for "Restore Default Config").
+        copyAsset("seed/config.json", new File(getFilesDir(), "default_config.json"));
 
         // Notification permission (Android 13+) so the foreground-service notice shows.
         if (Build.VERSION.SDK_INT >= 33
@@ -102,6 +106,7 @@ public class MainActivity extends Activity {
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);   // camera preview autoplay
+        web.addJavascriptInterface(new WebBridge(), "Android");   // update button → open APK url
         web.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
@@ -195,6 +200,23 @@ public class MainActivity extends Activity {
             }
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    /** Exposed to the web UI as window.Android — opens the update APK url in the
+     *  browser so the user can download + install it (Check for Updates). */
+    public class WebBridge {
+        @JavascriptInterface
+        public void openUrl(final String url) {
+            if (url == null || url.isEmpty()) return;
+            runOnUiThread(() -> {
+                try {
+                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
         }
     }
 }
