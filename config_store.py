@@ -186,6 +186,7 @@ DEFAULTS = {
         "govee": {"apiKey": ""},
         "wyze": {"email": "", "password": "", "keyId": "", "apiKey": "", "totpKey": ""},
         "homeassistant": {"baseUrl": "", "token": ""},
+        "kauf": {"web_username": "", "web_password": ""},
     },
 
     # Optional scoping so the bot only reacts where you want it to.

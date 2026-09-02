@@ -38,8 +38,8 @@ PORT = int(os.getenv("DISCOFLATE_PORT", "8765"))
 HOST = "127.0.0.1"
 
 # App version — keep in sync with android versionCode + version.json in the repo.
-VERSION = "1.1"
-VERSION_CODE = 15
+VERSION = "1.2"
+VERSION_CODE = 16
 VERSION_URL = "https://raw.githubusercontent.com/Airegasm/DiscoFlate/main/version.json"
 
 # Config keys "Restore Default Config" touches (game content). Everything else —
@@ -278,7 +278,8 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
 
     # id fields required per vendor (for validation + which key becomes the label)
     _VENDOR_REQ = {"kasa": "host", "tapo": "host", "tuya": "device_id",
-                   "govee": "device_id", "wyze": "mac", "homeassistant": "entity_id"}
+                   "govee": "device_id", "wyze": "mac", "homeassistant": "entity_id",
+                   "kauf": "host"}
 
     async def discover(request):
         await guard(request)
@@ -306,6 +307,7 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
             "mac": (b.get("mac") or None),
             "model": (b.get("model") or None),
             "entity_id": (b.get("entity_id") or None),
+            "entity": (b.get("entity") or None),   # Kauf/ESPHome switch object id
             "calibration_seconds_to_100": _num(b.get("calibration_seconds_to_100")),
             "source": b.get("source") or "manual",
             "type": b.get("type") or "pump",
@@ -314,6 +316,9 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
         if req and not dev.get(req):
             raise web.HTTPBadRequest(text=f"{vendor} device needs {req}")
         dev["label"] = (b.get("label") or (dev.get(req) if req else None) or vendor).strip()
+        _id = dev.get(req) if req else dev.get("id")
+        print(f"[device] ADD vendor={vendor} label={dev['label']!r} target={_id} "
+              f"type={dev['type']} source={dev['source']}", flush=True)
         cfg = config_store.load()
         cfg.setdefault("devices", []).append(dev)
         if cfg.get("active_device_id") is None:

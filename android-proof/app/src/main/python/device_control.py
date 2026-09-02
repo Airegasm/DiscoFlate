@@ -19,6 +19,18 @@ import kasa_legacy as kasa
 _ALIASES = {"ha": "homeassistant", "home_assistant": "homeassistant", "tplink": "kasa"}
 
 
+def _dbg(msg: str) -> None:
+    """Device debug line to the console (stdout on desktop, logcat on Android)."""
+    print(f"[device] {msg}", flush=True)
+
+
+def _ident(device: dict) -> str:
+    for k in ("host", "device_id", "mac", "entity_id", "label", "id"):
+        if device.get(k):
+            return str(device[k])
+    return "?"
+
+
 def normalize_vendor(device: dict) -> str:
     v = (device.get("vendor") or "kasa").strip().lower()
     return _ALIASES.get(v, v)
@@ -41,10 +53,16 @@ def _kasa_outlet(device: dict) -> "kasa.Outlet":
 async def set_state(device: dict, on: bool, creds: dict) -> None:
     """Turn a device on/off, routed by vendor. Raises on failure."""
     vendor = normalize_vendor(device)
-    if vendor == "kasa":
-        await kasa.set_state(_kasa_outlet(device), on)
-        return
-    await _driver(vendor).set_state(device, on, creds or {})
+    _dbg(f"USE  set_state vendor={vendor} target={_ident(device)} on={on}")
+    try:
+        if vendor == "kasa":
+            await kasa.set_state(_kasa_outlet(device), on)
+        else:
+            await _driver(vendor).set_state(device, on, creds or {})
+        _dbg(f"USE  set_state OK  vendor={vendor} target={_ident(device)} on={on}")
+    except Exception as e:  # noqa: BLE001
+        _dbg(f"USE  set_state ERR vendor={vendor} target={_ident(device)}: {e!r}")
+        raise
 
 
 async def get_state(device: dict, creds: dict):
@@ -53,26 +71,35 @@ async def get_state(device: dict, creds: dict):
     if vendor == "kasa":
         try:
             st = await kasa.get_status(_kasa_outlet(device))
-        except Exception:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
+            _dbg(f"USE  get_state ERR vendor=kasa target={_ident(device)}: {e!r}")
             return None
         rs = st.get("relay_state") if isinstance(st, dict) else None
-        return None if rs is None else bool(rs)
-    return await _driver(vendor).get_state(device, creds or {})
+        result = None if rs is None else bool(rs)
+    else:
+        try:
+            result = await _driver(vendor).get_state(device, creds or {})
+        except Exception as e:  # noqa: BLE001
+            _dbg(f"USE  get_state ERR vendor={vendor} target={_ident(device)}: {e!r}")
+            return None
+    _dbg(f"USE  get_state vendor={vendor} target={_ident(device)} -> {result}")
+    return result
 
 
 async def discover(vendor: str, creds: dict) -> list[dict]:
     """Enumerate devices for a vendor. Returns DiscoFlate device dicts."""
     v = _ALIASES.get((vendor or "kasa").strip().lower(), (vendor or "kasa").strip().lower())
-    if v == "kasa":
-        outlets = await kasa.discover()
-        return [
-            {
-                "label": o.alias or o.host,
-                "vendor": "kasa",
-                "host": o.host,
-                "child_id": o.child_id,
-                "model": o.model,
-            }
-            for o in outlets
-        ]
-    return await _driver(v).discover(creds or {})
+    _dbg(f"SEARCH discover vendor={v} …")
+    try:
+        if v == "kasa":
+            outlets = await kasa.discover()
+            found = [{"label": o.alias or o.host, "vendor": "kasa", "host": o.host,
+                      "child_id": o.child_id, "model": o.model} for o in outlets]
+        else:
+            found = await _driver(v).discover(creds or {})
+    except Exception as e:  # noqa: BLE001
+        _dbg(f"SEARCH discover ERR vendor={v}: {e!r}")
+        raise
+    _dbg(f"SEARCH discover vendor={v} found={len(found)}: "
+         + ", ".join(_ident(d) for d in found[:20]))
+    return found

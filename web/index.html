@@ -121,7 +121,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v1.1 by AireGasm</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v1.2 by AireGasm</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -463,7 +463,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v1.1.</span>
+        <span class="muted" id="updMsg">You're on v1.2.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -1244,8 +1244,9 @@ const VENDORS = {
   govee:         {name:'Govee (cloud)',                 add:['device_id','sku'], discover:true,  creds:[['apiKey','Govee API key']]},
   wyze:          {name:'Wyze (cloud · high-risk)',      add:['mac','model'],     discover:true,  creds:[['email','email'],['password','password'],['keyId','key id'],['apiKey','api key'],['totpKey','TOTP secret if 2FA']]},
   tapo:          {name:'Tapo (KLAP · fragile — prefer Home Assistant)', add:['host'], discover:false, creds:[['email','TP-Link email'],['password','TP-Link password']]},
+  kauf:          {name:'Kauf (ESPHome · local)', add:['host','entity'], discover:false, creds:[['web_username','web auth username (optional)'],['web_password','web auth password (optional)']]},
 };
-const FIELD_PH = {host:'192.168.1.50', child_id:'outlet id (strips)', device_id:'device id', sku:'SKU e.g. H7141', mac:'AA:BB:CC:…', model:'e.g. WLPP1', entity_id:'switch.my_plug', label:'name (optional)'};
+const FIELD_PH = {host:'192.168.1.50', child_id:'outlet id (strips)', device_id:'device id', sku:'SKU e.g. H7141', mac:'AA:BB:CC:…', model:'e.g. WLPP1', entity_id:'switch.my_plug', entity:'switch id (default: relay)', label:'name (optional)'};
 let vendorCreds = {};
 let addDraft = {};
 let calTimers = {};       // device id -> {start, interval, btn} during a live calibration

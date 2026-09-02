@@ -1,6 +1,6 @@
 {
-  "version": "1.1",
-  "versionCode": 15,
+  "version": "1.2",
+  "versionCode": 16,
   "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk",
-  "notes": "DiscoFlate v1.1 — Restore Default Config + Check for Updates"
+  "notes": "DiscoFlate v1.2 — Kauf (ESPHome) support + device debug logging"
 }
