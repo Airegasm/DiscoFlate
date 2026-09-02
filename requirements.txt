@@ -1,0 +1,3 @@
+discord.py>=2.3
+aiohttp>=3.9
+pyaes>=1.6   # Tapo KLAP AES (optional; only if you use Tapo)

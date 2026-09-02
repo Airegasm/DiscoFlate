@@ -1,0 +1,26 @@
+# ── Runtime data — contains your Discord token, config backups, uploaded
+#    images. NEVER commit this. The app recreates data/ on first run.
+data/
+
+# ── Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# ── Logs / temp
+*.log
+*.tmp
+
+# ── Android (Chaquopy) build artifacts + machine-specific config
+android-proof/.gradle/
+android-proof/build/
+android-proof/app/build/
+android-proof/local.properties
+android-proof/.idea/
+android-proof/captures/
+
+# ── OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,78 @@
+"""Vendor-agnostic device control.
+
+Routes on/off/status/discovery by a device's ``vendor`` field. Kasa is the
+built-in local driver (kasa_legacy); every other brand lives in ``vendors/<name>.py``
+and is imported lazily, so a missing or broken vendor module never affects Kasa.
+
+Device dicts carry a ``vendor`` (default "kasa") plus the id fields that vendor
+needs (kasa: host[/child_id]; tapo: host; tuya: device_id; govee: device_id+sku;
+wyze: mac+model; homeassistant: entity_id). ``creds`` is that vendor's saved
+credentials (config["vendors"][vendor]).
+"""
+
+from __future__ import annotations
+
+import importlib
+
+import kasa_legacy as kasa
+
+_ALIASES = {"ha": "homeassistant", "home_assistant": "homeassistant", "tplink": "kasa"}
+
+
+def normalize_vendor(device: dict) -> str:
+    v = (device.get("vendor") or "kasa").strip().lower()
+    return _ALIASES.get(v, v)
+
+
+def _driver(vendor: str):
+    """Import vendors/<vendor>.py on demand."""
+    return importlib.import_module(f"vendors.{vendor}")
+
+
+def _kasa_outlet(device: dict) -> "kasa.Outlet":
+    return kasa.Outlet(
+        host=device["host"],
+        alias=device.get("label") or device.get("host") or "",
+        model=device.get("model") or "",
+        child_id=device.get("child_id") or None,
+    )
+
+
+async def set_state(device: dict, on: bool, creds: dict) -> None:
+    """Turn a device on/off, routed by vendor. Raises on failure."""
+    vendor = normalize_vendor(device)
+    if vendor == "kasa":
+        await kasa.set_state(_kasa_outlet(device), on)
+        return
+    await _driver(vendor).set_state(device, on, creds or {})
+
+
+async def get_state(device: dict, creds: dict):
+    """Return True (on) / False (off) / None (unknown), routed by vendor."""
+    vendor = normalize_vendor(device)
+    if vendor == "kasa":
+        try:
+            st = await kasa.get_status(_kasa_outlet(device))
+        except Exception:  # noqa: BLE001
+            return None
+        rs = st.get("relay_state") if isinstance(st, dict) else None
+        return None if rs is None else bool(rs)
+    return await _driver(vendor).get_state(device, creds or {})
+
+
+async def discover(vendor: str, creds: dict) -> list[dict]:
+    """Enumerate devices for a vendor. Returns DiscoFlate device dicts."""
+    v = _ALIASES.get((vendor or "kasa").strip().lower(), (vendor or "kasa").strip().lower())
+    if v == "kasa":
+        outlets = await kasa.discover()
+        return [
+            {
+                "label": o.alias or o.host,
+                "vendor": "kasa",
+                "host": o.host,
+                "child_id": o.child_id,
+                "model": o.model,
+            }
+            for o in outlets
+        ]
+    return await _driver(v).discover(creds or {})

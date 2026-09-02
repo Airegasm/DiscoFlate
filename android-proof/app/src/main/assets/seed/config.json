@@ -1,0 +1,397 @@
+{
+  "discord_token": "",
+  "command_prefix": "!",
+  "listener_enabled": false,
+  "roll_enabled": true,
+  "system_buffer_seconds": 8,
+  "mock_mode": false,
+  "command_names": {
+    "roll": "agroll",
+    "capacity": "capacity",
+    "stop": "stop",
+    "help": "aghelp",
+    "leaderboard": "toppumpers",
+    "pumptimer": "pumptimer"
+  },
+  "pumptimer_message": "\u23f1\ufe0f [timer] seconds left on the pump timer.",
+  "capacity_message": "[announce] - Current Capacity: **[capacity]%**\n[capacity_bar]",
+  "listener_message_on": "**[operator]'s DiscoFlate Inflation Bot is now LIVE!**\n\n[commands]\n",
+  "listener_message_off": "**[operator]'s DiscoFlate Inflation Bot is now OFFLINE.**\n\n**Thanks for pumping!**",
+  "listen_guild_id": "",
+  "listen_channel_id": "",
+  "listen_targets": [],
+  "anon_user_label": "Someone on another server",
+  "allow_dms": false,
+  "server_channels": {},
+  "cooldown_seconds": 120,
+  "cooldown_exempt_user_ids": [],
+  "cooldown_exempt_names": [],
+  "operator_name": "",
+  "cooldown_message": "\u23f3 [mention], [cmd] is on cooldown \u2014 [cooldown]s left until you can use it again.",
+  "cooldown_reset_message": "",
+  "auto_report": {
+    "enabled": true,
+    "seconds": 300,
+    "message": "**[operator]'s DiscoFlate Inflation Bot is now LIVE!**\n\n[announce] - Current Capacity: **[capacity]%**\n[capacity_bar]\n\n**[help_cmd]** for a list of commands.\n\n\n"
+  },
+  "announce_channel_id": "",
+  "roll": {
+    "mode": "value",
+    "factor": 1,
+    "min_seconds": 1,
+    "max_seconds": 100,
+    "disable_at_100": false,
+    "reply": "\ud83c\udfb2 [mention] rolled **[dice]** and they landed on **[result]**\n**[secs]** seconds have been added to the pump timer, and will increase  [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+    "cooldown_reset_message": "\ud83c\udfb2 [mention], your dice are recharged \u2014 roll again with [roll_cmd]!"
+  },
+  "capacity_ranges": [
+    {
+      "min": 0,
+      "max": 20,
+      "dice": 6,
+      "sides": 6,
+      "announce": "\ud83e\udec1 [operator] is barely inflated \u2014 you can do better than that!",
+      "milestone": "",
+      "image": "",
+      "cooldowns": {
+        "fill": {
+          "enabled": true,
+          "max_uses": 3,
+          "seconds": 120,
+          "scope": "user"
+        },
+        "roll": {
+          "seconds": 120,
+          "scope": "user"
+        }
+      },
+      "start_command": "",
+      "start_command_enabled": false,
+      "event_actions": []
+    },
+    {
+      "min": 20,
+      "max": 40,
+      "dice": 4,
+      "sides": 6,
+      "announce": "\ud83d\udca8 [operator] is filling out nicely, the first signs of bloating begin to appear.",
+      "milestone": "**MILESTONE:** \ud83d\udca8 [operator]'s belly starts to round out and press outward slightly. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+      "image": "",
+      "cooldowns": {
+        "inflate": {
+          "enabled": true,
+          "max_uses": 6,
+          "seconds": 195,
+          "scope": "user"
+        },
+        "roll": {
+          "seconds": 195,
+          "scope": "user",
+          "dice": 5
+        }
+      },
+      "start_command": "",
+      "start_command_enabled": false,
+      "event_actions": []
+    },
+    {
+      "min": 40,
+      "max": 60,
+      "dice": 4,
+      "sides": 6,
+      "announce": "\ud83c\udf88 [operator]'s belly is taut and pressurised, curves stretching tighter.",
+      "milestone": "**MILESTONE:** \ud83c\udf88 Halfway there \u2014 [operator]'s middle is firm and noticeably swollen. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+      "image": "",
+      "cooldowns": {
+        "pump": {
+          "enabled": true,
+          "max_uses": 6,
+          "seconds": 220,
+          "scope": "user"
+        },
+        "roll": {
+          "seconds": 220,
+          "scope": "user",
+          "luck": 15
+        }
+      },
+      "start_command": "",
+      "start_command_enabled": false,
+      "event_actions": []
+    },
+    {
+      "min": 60,
+      "max": 80,
+      "dice": 2,
+      "sides": 4,
+      "announce": "\ud83c\udf88 [operator]'s belly is round, tight, and visibly swollen.",
+      "milestone": "**MILESTONE:** \ud83c\udf88 [operator] is seriously swollen now \u2014 the pressure is constant and building. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+      "image": "",
+      "cooldowns": {
+        "squeeze": {
+          "enabled": true,
+          "max_uses": 3,
+          "seconds": 350,
+          "scope": "user"
+        },
+        "roll": {
+          "seconds": 350,
+          "scope": "user",
+          "dice": 3,
+          "sides": 7,
+          "luck": 10
+        }
+      },
+      "start_command": "",
+      "start_command_enabled": false,
+      "event_actions": []
+    },
+    {
+      "min": 80,
+      "max": 90,
+      "dice": 2,
+      "sides": 4,
+      "announce": "\u26a0\ufe0f [operator] 's belly is stretched dangerously tight, groaning under the strain.",
+      "milestone": "**MILESTONE:** \u26a0\ufe0f [operator]'s gut is straining hard \u2014 one bold roll could tip them over! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+      "image": "",
+      "cooldowns": {
+        "tease": {
+          "enabled": true,
+          "max_uses": 5,
+          "seconds": 275,
+          "scope": "user"
+        },
+        "roll": {
+          "seconds": 275,
+          "scope": "user",
+          "luck": 20,
+          "sides": 8
+        }
+      },
+      "start_command": "",
+      "start_command_enabled": false,
+      "event_actions": []
+    },
+    {
+      "min": 90,
+      "max": 100,
+      "dice": 2,
+      "sides": 4,
+      "announce": "\ud83d\udea8 [operator]'s belly is at the absolute brink, creaking and ready to pop''.",
+      "milestone": "**MILESTONE:** \ud83d\udea8 The edge! [operator] has reached maximum capacity and can't take much more! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]\n",
+      "image": "",
+      "cooldowns": {
+        "topup": {
+          "enabled": true,
+          "max_uses": null,
+          "seconds": 300,
+          "scope": "user"
+        },
+        "roll": {
+          "seconds": 300,
+          "scope": "user",
+          "luck": 20,
+          "dice": 3
+        }
+      },
+      "start_command": "",
+      "start_command_enabled": false,
+      "event_actions": []
+    },
+    {
+      "min": 105,
+      "max": 110,
+      "dice": 2,
+      "sides": 4,
+      "announce": "\ud83d\udea8 [operator] is at the absolute brink, creaking and ready to pop. Any minute now! ",
+      "milestone": "**MILESTONE:** \ud83d\udea8 [operator] is going to pop at any second! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+      "image": "",
+      "cooldowns": {
+        "topup": {
+          "enabled": true,
+          "max_uses": null,
+          "seconds": 20,
+          "scope": "user"
+        },
+        "roll": {
+          "seconds": 20,
+          "scope": "user",
+          "luck": 10
+        }
+      },
+      "start_command": "",
+      "start_command_enabled": false,
+      "event_actions": [],
+      "is_end": true,
+      "enabled": true,
+      "end_only": false,
+      "final_message": "\ud83d\udca5 **BOOOOM!!** \nCongradulations! [operator] has popped!"
+    }
+  ],
+  "commands": [
+    {
+      "name": "fill",
+      "type": "fire",
+      "seconds": 35,
+      "dice": null,
+      "sides": null,
+      "reply": "\ud83d\udca8 [mention] used [prefix]fill - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+      "enabled": true,
+      "owner_only": false,
+      "device_id": null,
+      "start_events": [],
+      "range_gate": "0-20",
+      "description": "fill those guts a bit more",
+      "hide_in_list": false,
+      "mention": false
+    },
+    {
+      "name": "inflate",
+      "type": "fire",
+      "seconds": 30,
+      "dice": null,
+      "sides": null,
+      "reply": "\ud83d\udca8 [mention] used [prefix]inflate - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+      "enabled": true,
+      "owner_only": false,
+      "device_id": null,
+      "start_events": [],
+      "range_gate": "20-40",
+      "description": "inflate a little further",
+      "hide_in_list": false,
+      "mention": false
+    },
+    {
+      "name": "pump",
+      "type": "fire",
+      "seconds": 25,
+      "dice": null,
+      "sides": null,
+      "reply": "\ud83d\udca8 [mention] used [prefix]pump - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+      "enabled": true,
+      "owner_only": false,
+      "device_id": null,
+      "start_events": [],
+      "range_gate": "40-60",
+      "description": "a steady pump of air",
+      "hide_in_list": false,
+      "mention": false
+    },
+    {
+      "name": "squeeze",
+      "type": "fire",
+      "seconds": 20,
+      "dice": null,
+      "sides": null,
+      "reply": "\ud83d\udca8 [mention] used [prefix]squeeze - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+      "enabled": true,
+      "owner_only": false,
+      "device_id": null,
+      "start_events": [],
+      "range_gate": "60-80",
+      "description": "a firm squeeze of air",
+      "hide_in_list": false,
+      "mention": false
+    },
+    {
+      "name": "tease",
+      "type": "fire",
+      "seconds": 15,
+      "dice": null,
+      "sides": null,
+      "reply": "\ud83d\udca8 [mention] used [prefix]tease - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+      "enabled": true,
+      "owner_only": false,
+      "device_id": null,
+      "start_events": [],
+      "range_gate": "80-90",
+      "description": "a careful teasing puff",
+      "hide_in_list": false,
+      "mention": false
+    },
+    {
+      "name": "topup",
+      "type": "fire",
+      "seconds": 5,
+      "dice": null,
+      "sides": null,
+      "reply": "\ud83d\udca8 [mention] used [prefix]topup - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+      "enabled": true,
+      "owner_only": false,
+      "device_id": null,
+      "start_events": [],
+      "range_gate": "90-100",
+      "description": "the tiniest top-up",
+      "hide_in_list": false,
+      "mention": false
+    }
+  ],
+  "modes": [],
+  "events": [],
+  "max_roll_prize": {
+    "enabled": false,
+    "goal": 3,
+    "command": "special",
+    "description": "a special reward",
+    "uses": 1,
+    "action": "fire",
+    "seconds": 10,
+    "dice": null,
+    "sides": null,
+    "device_id": null,
+    "reply": "",
+    "progress_message": "[mention] rolled a perfect score [[count]/[goal]] \u2014 [remaining] more will unlock a bonus command!",
+    "unlock_message": "[mention] has unlocked: [prize_cmd] \u2014 [prize_desc]\\nYou can use this command a total of [uses] times."
+  },
+  "prizes": [
+    {
+      "enabled": true,
+      "command": "superpump",
+      "range_gate": "all",
+      "goal": 3,
+      "uses": 1,
+      "action": "fire",
+      "seconds": 40,
+      "dice": null,
+      "sides": null,
+      "device_id": null,
+      "description": "SUPERPUMP - !superpump triggers a 40s burst of air",
+      "reply": "\u2728 [mention] used the prize! [uses_left] uses left\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+      "progress_message": "[mention] rolled a perfect score [[count]/[goal]] \u2014 [remaining] more will unlock a bonus command!",
+      "unlock_message": "[mention] has unlocked: [prize_cmd] \u2014 [prize_desc]\\nYou can use this command a total of [uses] times."
+    }
+  ],
+  "devices": [],
+  "active_device_id": null,
+  "vendors": {
+    "tapo": {
+      "email": "",
+      "password": ""
+    },
+    "tuya": {
+      "accessId": "",
+      "accessSecret": "",
+      "region": "us"
+    },
+    "govee": {
+      "apiKey": ""
+    },
+    "wyze": {
+      "email": "",
+      "password": "",
+      "keyId": "",
+      "apiKey": "",
+      "totpKey": ""
+    },
+    "homeassistant": {
+      "baseUrl": "",
+      "token": ""
+    }
+  },
+  "allow": {
+    "guild_ids": [],
+    "channel_ids": [],
+    "user_ids": []
+  },
+  "pumpdirect_path": ""
+}
