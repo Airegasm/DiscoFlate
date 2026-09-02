@@ -68,7 +68,7 @@ class Engine:
         self.bot_connected: bool = False
 
         # Device add/search/use debug flows into the Activity log too (not just stdout).
-        device_control.set_log_sink(lambda m: self._log("device", m))
+        device_control.set_log_sink(self._device_log)
 
     # -- config / device lookup --------------------------------------------- #
     def set_config(self, cfg: dict) -> None:
@@ -90,13 +90,23 @@ class Engine:
         self._listener_was = now_on
 
     def _device(self, device_id: str | None) -> dict | None:
+        # Mock mode with no real device → a virtual pump so the whole game runs
+        # (rolls, capacity, commands) as a dry run without any hardware.
+        if device_id == "mock:virtual":
+            return {"id": "mock:virtual", "label": "Mock pump", "vendor": "mock",
+                    "host": "mock", "type": "pump", "calibration_seconds_to_100": 60}
         for d in self.cfg.get("devices", []):
             if d.get("id") == device_id:
                 return d
         return None
 
     def _active_id(self) -> str | None:
-        return self.cfg.get("active_device_id")
+        aid = self.cfg.get("active_device_id")
+        if self.cfg.get("mock_mode"):
+            has_real = aid is not None and any(d.get("id") == aid for d in self.cfg.get("devices", []))
+            if not has_real:
+                return "mock:virtual"
+        return aid
 
     def _active_device_dict(self) -> dict | None:
         return self._device(self._active_id())
@@ -122,7 +132,11 @@ class Engine:
         (kasa is local; other brands via device_control) — so mock mode and the
         whole capacity engine behave identically regardless of vendor. In mock
         mode the real device is NOT touched."""
-        if dev is None or self.cfg.get("mock_mode"):
+        if dev is None:
+            return
+        if self.cfg.get("mock_mode"):
+            device_control._dbg(f"USE  set_state vendor={(dev.get('vendor') or 'kasa')} "
+                                f"target={device_control._ident(dev)} on={on} (MOCK — not fired)")
             return
         await device_control.set_state(dev, on, self._vendor_creds(dev))
 
@@ -1200,6 +1214,14 @@ class Engine:
     def _log(self, kind: str, msg: str) -> None:
         self.events.appendleft({"t": _now_hms(), "kind": kind, "msg": msg})
 
+    def _device_log(self, msg: str) -> None:
+        """Sink for device telemetry → Activity log. 'Silence ON/OFF calls'
+        hides the noisy set_state on/off lines here (they still print to console);
+        discover/add/get always show."""
+        if self.cfg.get("silence_onoff_log") and msg.startswith("USE  set_state"):
+            return
+        self._log("device", msg)
+
     def _users_view(self) -> list[dict]:
         now = time.monotonic()
         out = []
@@ -1226,7 +1248,9 @@ class Engine:
             "mock_mode": bool(self.cfg.get("mock_mode")),
             "listener_enabled": bool(self.cfg.get("listener_enabled")),
             "users": self._users_view(),
-            "events": list(self.events)[:40],
+            # Activity LOG — distinct key from the timed-"events" config which
+            # _public_state also exposes (they used to collide on "events").
+            "log": list(self.events)[:60],
         }
 
 

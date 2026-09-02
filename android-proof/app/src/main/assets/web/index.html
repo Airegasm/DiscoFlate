@@ -96,6 +96,12 @@
   .tag{font-size:12px;color:var(--dim)}
   .hint{font-size:13px;color:var(--dim);margin-top:8px;line-height:1.5}
   .discovered{margin-top:8px}
+  details.help > summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:8px}
+  details.help > summary::-webkit-details-marker{display:none}
+  details.help > summary::before{content:'▸';color:var(--accent);font-weight:700;font-size:15px}
+  details.help[open] > summary::before{content:'▾'}
+  details.help > summary h2{margin:0}
+  details.help[open] > summary{margin-bottom:14px}
   /* ---- phone layout: fit any screen (viewport meta is set above) ---- */
   @media(max-width:640px){
     .wrap{padding:10px 12px}
@@ -121,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v1.3 by AireGasm</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v1.4 by AireGasm</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -463,7 +469,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v1.3.</span>
+        <span class="muted" id="updMsg">You're on v1.4.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -472,7 +478,7 @@
     </div>
 
     <div class="card span" data-tab="help">
-      <h2>Set up your private Discord bot</h2>
+      <details class="help"><summary><h2>Set up your private Discord bot</h2></summary>
       <div class="hint" style="margin-top:0;margin-bottom:12px">A 2-minute, one-time setup. There's <b>no verification or app review</b> — that only applies to bots in 100+ servers. Each person runs <b>their own</b> bot with their own token; never share a token.</div>
       <ol style="line-height:1.9;padding-left:22px;margin:0;max-width:820px">
         <li>Open the <a href="https://discord.com/developers/applications" target="_blank" rel="noopener">Discord Developer Portal</a> → <b>New Application</b> → give it a name (e.g. your bot's name) → <b>Create</b>.</li>
@@ -495,10 +501,27 @@
         </ul>
         <div class="hint">Either way it's harmless to be in another server — your bot only fires <b>your</b> devices and only listens in the channel <b>you</b> select; elsewhere it just sits idle.</div>
       </div>
+      </details>
     </div>
 
     <div class="card span" data-tab="help">
-      <h2>Placeholders &amp; examples</h2>
+      <details class="help"><summary><h2>Set up ESPHome (for Kauf plugs)</h2></summary>
+      <div class="hint" style="margin-top:0;margin-bottom:12px">Kauf plugs run <b>ESPHome</b> firmware with a built-in local web interface — that's what DiscoFlate talks to (no cloud, no account). Most stock Kauf plugs have it enabled out of the box.</div>
+      <ol style="line-height:1.9;padding-left:22px;margin:0;max-width:820px">
+        <li>Get the plug on your Wi-Fi: on first power-up it broadcasts a setup hotspot (<code>Kauf Plug XXXX</code>) — connect to it, or use Kauf's captive-portal, and join it to your network.</li>
+        <li>Find its <b>IP address</b> — check your router's device list, or try the hostname (e.g. <code>http://kauf-plug.local</code>).</li>
+        <li>Confirm the web server is on: open <code>http://&lt;plug-ip&gt;</code> in a browser. If you see a page listing switches/sensors, you're good. (If not, you'd need to add <code>web_server:</code> to the plug's ESPHome config and re-flash — advanced.)</li>
+        <li>Note the <b>switch id</b> from that page — it's usually <code>relay</code> (DiscoFlate's default). If yours is named differently, remember it.</li>
+        <li>In DiscoFlate → <b>Devices</b> → Brand = <b>Kauf</b> → enter the plug's <b>host</b> (its IP) and, if it isn't <code>relay</code>, the <b>entity</b> (switch id). Click <b>Add</b>.</li>
+        <li>Select it as the active <b>pump</b> (radio) and <b>Calibrate</b> it (run it, tap Full when done) so capacity tracks.</li>
+        <li>Only if you enabled web-server auth on the plug: fill the <b>Kauf</b> credentials (web username/password) in the collapsible section above the device list.</li>
+      </ol>
+      <div class="hint" style="max-width:820px">If the plug won't respond, open <code>http://&lt;plug-ip&gt;</code> directly and try toggling the switch there — that confirms the web server is reachable and gives you the exact switch id.</div>
+      </details>
+    </div>
+
+    <div class="card span" data-tab="help">
+      <details class="help"><summary><h2>Placeholders &amp; examples</h2></summary>
       <div class="cols2">
         <div class="colsec">
           <h3>Message placeholders</h3>
@@ -538,13 +561,17 @@
             <code>*italic*</code>, <code>`code`</code>. A literal <code>\n</code> also becomes a newline.</div>
         </div>
       </div>
+      </details>
     </div>
 
     <!-- log -->
     <div class="card span" data-tab="dashboard">
       <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:14px">
         <h2 style="margin:0">Activity</h2>
-        <button class="ghost" onclick="copyLog(this)" style="padding:6px 12px">Copy Output</button>
+        <div class="row" style="gap:14px;align-items:center">
+          <label class="row" style="gap:6px" title="Hide the noisy device on/off telemetry from this log (still prints to the console)"><input type="checkbox" id="silenceOnOff" onchange="setSilence(this.checked)"> Silence ON/OFF calls</label>
+          <button class="ghost" onclick="copyLog(this)" style="padding:6px 12px">Copy Output</button>
+        </div>
       </div>
       <div class="log" id="log"></div>
     </div>
@@ -1448,7 +1475,8 @@ function applyState(st, full){
   if(document.activeElement!==$('#mock')) $('#mock').checked = !!st.mock_mode;
   $('#mockPill').style.display = st.mock_mode ? 'inline-flex' : 'none';
   renderUsers(st.users||[]);
-  renderLog(st.events||[]);
+  renderLog(st.log||[]);
+  if($('#silenceOnOff') && document.activeElement!==$('#silenceOnOff')) $('#silenceOnOff').checked = !!st.silence_onoff_log;
   // auto-load the server list once the bot is connected
   if(st.bot_connected && !guildsLoaded){ loadGuilds(); }
 
@@ -1543,6 +1571,7 @@ function copyLog(btn){
     navigator.clipboard.writeText(text).then(done).catch(()=>fallbackCopy(text,done));
   } else { fallbackCopy(text,done); }
 }
+function setSilence(v){ api('/api/config', {silence_onoff_log: !!v}); }
 function fallbackCopy(text,done){
   try{
     const ta=document.createElement('textarea'); ta.value=text;

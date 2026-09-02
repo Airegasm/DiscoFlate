@@ -37,6 +37,10 @@ DEFAULTS = {
     # actually toggle a real device — a safe dry run.
     "mock_mode": False,
 
+    # Hide the noisy device on/off (set_state) telemetry from the Activity log
+    # (it still prints to the console). Discover/add/get always show.
+    "silence_onoff_log": False,
+
     # Names of the three built-in commands (rename to avoid clashing with other
     # bots — e.g. another dice bot already using !roll).
     "command_names": {"roll": "agroll", "capacity": "capacity", "stop": "stop",
