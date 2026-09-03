@@ -38,8 +38,8 @@ PORT = int(os.getenv("DISCOFLATE_PORT", "8765"))
 HOST = "127.0.0.1"
 
 # App version — keep in sync with android versionCode + version.json in the repo.
-VERSION = "3.6.2"
-VERSION_CODE = 59
+VERSION = "3.6.3"
+VERSION_CODE = 60
 VERSION_URL = "https://raw.githubusercontent.com/Airegasm/DiscoFlate/main/version.json"
 
 # Scalar/message keys that "Restore Default Config" RESETS to the shipped default.

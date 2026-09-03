@@ -1,6 +1,6 @@
 {
-  "version": "3.6.2",
-  "versionCode": 59,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=59",
-  "notes": "DiscoFlate v3.6.2 — bugfix: a command that only triggers an event (e.g. !pumproulette) no longer spends a user's use when the event is blocked (already running / on cooldown)"
+  "version": "3.6.3",
+  "versionCode": 60,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=60",
+  "notes": "DiscoFlate v3.6.3 — deleting a command, event, or range now asks for confirmation first"
 }

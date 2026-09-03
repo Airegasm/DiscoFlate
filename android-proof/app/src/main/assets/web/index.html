@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.6.2</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.6.3</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -542,7 +542,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v3.6.2.</span>
+        <span class="muted" id="updMsg">You're on v3.6.3.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -1284,7 +1284,7 @@ function renderRanges(){
           `<div class="name">🏁 ${endOnly?'End':'End Sequence'} <span class="muted">(terminates &amp; resets the session)</span></div>`+
           `<div style="flex:1"></div>`+
           (endOnly?'':`<button class="ghost" onclick="toggleRangeExpand(${i})">⚙ Buildup settings ${open?'▾':'▸'}</button>`)+
-          `<button class="ghost" onclick="rangeRows.splice(${i},1);renderRanges();scheduleSave()">✕</button>`+
+          `<button class="ghost" onclick="delRange(${i})">✕</button>`+
         `</div>`+
         `<div class="row" style="gap:12px;align-items:flex-end">`+
           (endOnly
@@ -1315,7 +1315,7 @@ function renderRanges(){
         `<button class="ghost" title="Duplicate" onclick="copyRange(${i})">📋</button>`+
         `<button class="ghost" title="Save as template" onclick="saveTemplate('ranges',${i})">💾</button>`+
         `<button class="ghost" title="${open?'Collapse':'Edit'}" onclick="toggleRangeExpand(${i})">${open?'▾':'✏️'}</button>`+
-        `<button class="ghost" title="Delete" onclick="rangeRows.splice(${i},1);renderRanges();scheduleSave()">✕</button>`+
+        `<button class="ghost" title="Delete" onclick="delRange(${i})">✕</button>`+
       `</div>`;
       if(open){
         html +=
@@ -1655,7 +1655,7 @@ function renderCommands(){
         `<button class="ghost" title="Duplicate" onclick="copyCommand(${i})">📋</button>`+
         `<button class="ghost" title="Save as template" onclick="saveTemplate('commands',${i})">💾</button>`+
         `<button class="ghost" title="${open?'Collapse':'Edit'}" onclick="toggleCmdOpen(${i})">${open?'▾':'✏️'}</button>`+
-        `<button class="ghost" title="Delete" onclick="commandRows.splice(${i},1);cmdOpen.delete(${i});renderCommands();renderRanges();scheduleSave()">✕</button>`+
+        `<button class="ghost" title="Delete" onclick="delCommand(${i})">✕</button>`+
       `</div>`;
     if(open){
       const typ=(c.type||'fire'), isGame=typ.indexOf('game-')===0;
@@ -1824,7 +1824,7 @@ function renderEvents(){
         `<button class="ghost" title="Duplicate" onclick="copyEvent(${i})">📋</button>`+
         `<button class="ghost" title="Save as template" onclick="saveTemplate('events',${i})">💾</button>`+
         `<button class="ghost" title="${open?'Collapse':'Edit'}" onclick="toggleEvtOpen(${i})">${open?'▾':'✏️'}</button>`+
-        `<button class="ghost" title="Delete" onclick="eventRows.splice(${i},1);evtOpen.delete(${i});renderEvents();scheduleSave()">✕</button>`+
+        `<button class="ghost" title="Delete" onclick="delEvent(${i})">✕</button>`+
       `</div>`;
     if(open){
       const deviceField = `<label class="field">Device <select onchange="eventRows[${i}].device_id=this.value||null">${cmdDeviceOpts(e.device_id)}</select></label>`;
@@ -1911,6 +1911,10 @@ function copyEvent(i){
   eventRows.splice(i+1,0,src); renderEvents(); scheduleSave();
 }
 function copyRange(i){ rangeRows.splice(i+1,0,clone(rangeRows[i])); renderRanges(); scheduleSave(); }
+// deletes require a confirmation popup (easy to fat-finger the ✕)
+function delCommand(i){ const c=commandRows[i]||{}; if(!confirm(`Delete command "${c.name||'(unnamed)'}"? This can't be undone.`)) return; commandRows.splice(i,1); cmdOpen.delete(i); renderCommands(); renderRanges(); scheduleSave(); }
+function delEvent(i){ const e=eventRows[i]||{}; if(!confirm(`Delete event "${e.name||'(unnamed)'}"? This can't be undone.`)) return; eventRows.splice(i,1); evtOpen.delete(i); renderEvents(); scheduleSave(); }
+function delRange(i){ const r=rangeRows[i]||{}; const lbl = r.is_end ? (r.end_only?'the End point':'the End Sequence') : `the ${r.min}–${r.max}% range`; if(!confirm(`Delete ${lbl}? This can't be undone.`)) return; rangeRows.splice(i,1); renderRanges(); scheduleSave(); }
 function saveTemplate(kind, i){
   const src = kind==='commands'?commandRows[i] : kind==='events'?eventRows[i] : rangeRows[i];
   if(!src) return;
