@@ -1,6 +1,6 @@
 {
-  "version": "1.4",
-  "versionCode": 18,
+  "version": "1.5",
+  "versionCode": 19,
   "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk",
-  "notes": "DiscoFlate v1.4 \u2014 Activity log fix + Silence ON/OFF + mock virtual device + ESPHome/collapsible Help"
+  "notes": "DiscoFlate v1.5 \u2014 settable Mock pump calibration"
 }

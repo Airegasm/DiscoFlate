@@ -94,7 +94,8 @@ class Engine:
         # (rolls, capacity, commands) as a dry run without any hardware.
         if device_id == "mock:virtual":
             return {"id": "mock:virtual", "label": "Mock pump", "vendor": "mock",
-                    "host": "mock", "type": "pump", "calibration_seconds_to_100": 60}
+                    "host": "mock", "type": "pump",
+                    "calibration_seconds_to_100": self.cfg.get("mock_calibration_seconds_to_100") or 60}
         for d in self.cfg.get("devices", []):
             if d.get("id") == device_id:
                 return d

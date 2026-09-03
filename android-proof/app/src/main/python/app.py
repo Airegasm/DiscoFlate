@@ -38,8 +38,8 @@ PORT = int(os.getenv("DISCOFLATE_PORT", "8765"))
 HOST = "127.0.0.1"
 
 # App version — keep in sync with android versionCode + version.json in the repo.
-VERSION = "1.4"
-VERSION_CODE = 18
+VERSION = "1.5"
+VERSION_CODE = 19
 VERSION_URL = "https://raw.githubusercontent.com/Airegasm/DiscoFlate/main/version.json"
 
 # Config keys "Restore Default Config" touches (game content). Everything else —
@@ -124,6 +124,8 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "has_token": bool(cfg.get("discord_token")),
         "bot_error": botmgr.last_error,
         "silence_onoff_log": cfg.get("silence_onoff_log", False),
+        "mock_mode": cfg.get("mock_mode", False),
+        "mock_calibration_seconds_to_100": cfg.get("mock_calibration_seconds_to_100", 60),
     }
 
 
@@ -175,6 +177,7 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
                     "announce_channel_id", "listen_guild_id", "listen_channel_id",
                     "listen_targets", "anon_user_label",
                     "allow_dms", "server_channels", "vendors", "silence_onoff_log",
+                    "mock_calibration_seconds_to_100",
                     "listener_message_on", "listener_message_off"):
             if key in body:
                 patch[key] = body[key]

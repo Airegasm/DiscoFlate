@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v1.4 by AireGasm</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v1.5 by AireGasm</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -469,7 +469,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v1.4.</span>
+        <span class="muted" id="updMsg">You're on v1.5.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -1320,7 +1320,20 @@ function setCred(v,f,val){ vendorCreds[v]=vendorCreds[v]||{}; vendorCreds[v][f]=
 function renderDevices(st){
   if(Object.keys(calTimers).length) return;   // don't clobber a live calibration
   const box=$('#devices'); box.innerHTML='';
-  if(!st.devices.length){ box.innerHTML='<div class="muted">No devices yet — pick a brand above, then Discover or Add.</div>'; return; }
+  // immutable Mock pump — always present; drives capacity in Mock mode when no real device is active
+  const mock=document.createElement('div'); mock.className='dev'; mock.style.flexWrap='wrap';
+  mock.innerHTML =
+    `<span style="width:18px;text-align:center">🧪</span>`+
+    `<div class="grow"><div class="name">Mock pump <span class="pill" style="padding:2px 8px;font-size:11px">mock</span></div>`+
+    `<div class="tag">virtual · used in Mock mode when no real device is active</div></div>`+
+    `<label class="field" style="flex-direction:row;align-items:center;gap:6px">secs→100%`+
+      `<input type="number" value="${st.mock_calibration_seconds_to_100??60}" min="1" step="0.5" style="width:78px" onchange="setMockCal(this.value)"></label>`;
+  box.appendChild(mock);
+  if(!st.devices.length){
+    const d=document.createElement('div'); d.className='muted'; d.style.marginTop='10px';
+    d.textContent='No real devices yet — pick a brand above, then Discover or Add. (The Mock pump above works in Mock mode.)';
+    box.appendChild(d); return;
+  }
   st.devices.forEach(d=>{
     const active = d.id===st.active_device_id;
     const vendor = d.vendor||'kasa';
@@ -1572,6 +1585,7 @@ function copyLog(btn){
   } else { fallbackCopy(text,done); }
 }
 function setSilence(v){ api('/api/config', {silence_onoff_log: !!v}); }
+function setMockCal(v){ api('/api/config', {mock_calibration_seconds_to_100: parseFloat(v)||60}); }
 function fallbackCopy(text,done){
   try{
     const ta=document.createElement('textarea'); ta.value=text;

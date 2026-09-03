@@ -36,6 +36,9 @@ DEFAULTS = {
     # Mock mode: run everything (capacity, timers, messages, logs) but never
     # actually toggle a real device — a safe dry run.
     "mock_mode": False,
+    # Calibration (seconds-to-100%) for the virtual Mock pump used in mock mode
+    # when no real device is active. Editable in the Devices list.
+    "mock_calibration_seconds_to_100": 60,
 
     # Hide the noisy device on/off (set_state) telemetry from the Activity log
     # (it still prints to the console). Discover/add/get always show.
