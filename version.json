@@ -1,6 +1,6 @@
 {
-  "version": "3.2.0",
-  "versionCode": 44,
+  "version": "3.2.1",
+  "versionCode": 45,
   "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk",
-  "notes": "DiscoFlate v3.2.0 \u2014 minigames: game-pushluck & game-simon (Discord button/ephemeral games, tiered broadcast payoff credited to the player)"
+  "notes": "DiscoFlate v3.2.1 \u2014 default !agpushluck & !agsimon minigames, always-on"
 }

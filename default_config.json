@@ -374,6 +374,120 @@
       "success_reply": "",
       "failure_reply": "",
       "range_gate": "all"
+    },
+    {
+      "name": "agpushluck",
+      "type": "game-pushluck",
+      "description": "push-your-luck minigame \u2014 pump for points, bank before you bust",
+      "enabled": true,
+      "owner_only": false,
+      "mention": false,
+      "hide_in_list": false,
+      "range_gate": "all",
+      "start_events": [],
+      "reply": "",
+      "seconds": null,
+      "dice": null,
+      "sides": null,
+      "device_id": null,
+      "fires": [],
+      "fail_fires": [],
+      "chance": null,
+      "luck": null,
+      "success_reply": "",
+      "failure_reply": "",
+      "pl_bust_start": 12,
+      "pl_bust_step": 13,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "game_intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it!",
+      "game_tiers": [
+        {
+          "min": 0,
+          "message": "\ud83d\udca5 **[user]** busted out with **[score]**. Womp womp.",
+          "fires": []
+        },
+        {
+          "min": 3,
+          "message": "\ud83d\ude05 **[user]** banked **[score]** \u2014 a little reward: **+[secs]s**",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 6
+            }
+          ]
+        },
+        {
+          "min": 6,
+          "message": "\ud83d\udd25 **[user]** cashed out a huge **[score]**! **+[secs]s** pump!",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 18
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "agsimon",
+      "type": "game-simon",
+      "description": "memory minigame \u2014 repeat the growing emoji sequence",
+      "enabled": true,
+      "owner_only": false,
+      "mention": false,
+      "hide_in_list": false,
+      "range_gate": "all",
+      "start_events": [],
+      "reply": "",
+      "seconds": null,
+      "dice": null,
+      "sides": null,
+      "device_id": null,
+      "fires": [],
+      "fail_fires": [],
+      "chance": null,
+      "luck": null,
+      "success_reply": "",
+      "failure_reply": "",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "game_intro": "\ud83e\udde0 **[user]** takes on **Simon** \u2014 memorize the sequence, then repeat it!",
+      "game_tiers": [
+        {
+          "min": 0,
+          "message": "\u274c **[user]** fumbled at round **[score]**.",
+          "fires": []
+        },
+        {
+          "min": 3,
+          "message": "\ud83d\udc4f **[user]** reached round **[score]** \u2014 nice: **+[secs]s**",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 6
+            }
+          ]
+        },
+        {
+          "min": 6,
+          "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**! **+[secs]s** pump!",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 18
+            }
+          ]
+        }
+      ]
     }
   ],
   "modes": [],
@@ -491,6 +605,16 @@
       "name": "pumproulette",
       "cooldown": 300,
       "max_uses": 1
+    },
+    {
+      "name": "agpushluck",
+      "cooldown": 300,
+      "max_uses": null
+    },
+    {
+      "name": "agsimon",
+      "cooldown": 300,
+      "max_uses": null
     }
   ],
   "event_in_process_message": "\u23f3 [event] is already running.",
