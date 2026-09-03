@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v2.6 by AireGasm</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v2.7 by AireGasm</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -357,8 +357,9 @@
         <button class="ghost" onclick="controlLeaderboard()">🏆 Broadcast Users</button>
         <div style="flex:1"></div>
         <button class="ghost" onclick="act('/api/reset-users')">Reset tracking</button>
+        <button class="warn" onclick="if(confirm('Wipe the ALL-TIME leaderboard? This can\'t be undone.')) act('/api/reset-lifetime')">Reset lifetime</button>
       </div>
-      <div class="hint">Broadcast Users posts the leaderboard to your channel (same as the <code>leaderboard</code> command). Needs Activation on + a channel selected.</div>
+      <div class="hint">Broadcast Users posts the leaderboard to your channel (same as the <code>leaderboard</code> command). Needs Activation on + a channel selected. <b>Reset tracking</b> clears this session's users; <b>Reset lifetime</b> wipes the persistent all-time leaderboard (the <code>toppumpers-life</code> command).</div>
     </div>
 
     <!-- capacity ranges -->
@@ -392,10 +393,11 @@
         <label class="field">Capacity <input id="cmdCapacity" value="capacity" style="width:120px"></label>
         <label class="field">Help <input id="cmdHelp" value="aghelp" style="width:120px"></label>
         <label class="field">Leaderboard <input id="cmdLeaderboard" value="leaderboard" style="width:130px"></label>
+        <label class="field">Lifetime leaderboard <input id="cmdLeaderboardLife" value="toppumpers-life" style="width:150px"></label>
         <label class="field">Pump timer <input id="cmdPumptimer" value="pumptimer" style="width:130px"></label>
         <label class="field">Anti-spam buffer <span class="muted">(s)</span> <input type="number" id="systemBuffer" value="8" min="0" step="1" style="width:70px"></label>
       </div>
-      <div class="hint" style="margin-top:4px">Only the dice roll can be turned off. Help (DMs the command list) &amp; Leaderboard (top pumpers) output isn't editable.
+      <div class="hint" style="margin-top:4px">Only the dice roll can be turned off. Help (DMs the command list), Leaderboard (top pumpers this session) &amp; Lifetime leaderboard (all-time top pumpers, persists across sessions &amp; restarts) output isn't editable.
         The <b>anti-spam buffer</b> quietly ignores back-to-back uses of the same command within that many seconds (0 = off).</div>
       <!-- the four editable messages: two rows of two -->
       <div class="row" style="gap:16px;align-items:flex-start;margin-top:12px">
@@ -478,7 +480,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v2.6.</span>
+        <span class="muted" id="updMsg">You're on v2.7.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -900,6 +902,7 @@ async function saveDiscord(){
       capacity: ($('#cmdCapacity').value||'capacity').trim().toLowerCase(),
       help: ($('#cmdHelp').value||'aghelp').trim().toLowerCase(),
       leaderboard: ($('#cmdLeaderboard').value||'leaderboard').trim().toLowerCase(),
+      leaderboard_life: ($('#cmdLeaderboardLife').value||'toppumpers-life').trim().toLowerCase(),
       pumptimer: ($('#cmdPumptimer').value||'pumptimer').trim().toLowerCase(),
     },
     listen_targets: listenTargets,
@@ -1305,6 +1308,20 @@ function renameCommand(i, val){
     });
   }
   renderCommands(); renderRanges(); scheduleSave();
+}
+// Remove range memberships / start-commands pointing at a command that no longer
+// exists (e.g. a rename done before propagation, like an old !fill left behind).
+// Returns true if anything was pruned.
+function pruneOrphanMemberships(){
+  const names = new Set(commandRows.map(c=>(c.name||'').trim().toLowerCase()).filter(Boolean));
+  let changed=false;
+  rangeRows.forEach(r=>{
+    if(r.cooldowns) Object.keys(r.cooldowns).forEach(k=>{
+      if(k!=='roll' && !names.has(k)){ delete r.cooldowns[k]; changed=true; }
+    });
+    if(r.start_command && !names.has(r.start_command.toLowerCase())){ r.start_command=''; r.start_command_enabled=false; changed=true; }
+  });
+  return changed;
 }
 // "Add Device Fire" rows — multiple devices, each on for its own seconds, independently.
 function firesEditor(i, c){
@@ -1716,6 +1733,7 @@ function applyState(st, full){
     $('#cmdCapacity').value = cn.capacity||'capacity';
     $('#cmdHelp').value = cn.help||'aghelp';
     $('#cmdLeaderboard').value = cn.leaderboard||'leaderboard';
+    $('#cmdLeaderboardLife').value = cn.leaderboard_life||'toppumpers-life';
     $('#cmdPumptimer').value = cn.pumptimer||'pumptimer';
     const rl = st.roll||{};
     $('#rollEnabled').checked = st.roll_enabled !== false;
@@ -1759,6 +1777,7 @@ function applyState(st, full){
     rangeRows = JSON.parse(JSON.stringify(st.capacity_ranges||[]));
     commandRows = JSON.parse(JSON.stringify(st.commands||[]));
     savedCmdNames = new Set(commandRows.map(c=>(c.name||'').trim().toLowerCase()));
+    if(pruneOrphanMemberships()) api('/api/config', {capacity_ranges: rangeRows});  // clean up stale renamed-command leftovers
     modeRows = JSON.parse(JSON.stringify(st.modes||[]));
     savedModeNames = new Set(modeRows.map(m=>(m.name||'').trim().toLowerCase()));
     eventRows = JSON.parse(JSON.stringify(st.events||[]));
@@ -1823,6 +1842,7 @@ function gatherConfig(){
       capacity:($('#cmdCapacity').value||'capacity').trim().toLowerCase(),
       help:($('#cmdHelp').value||'aghelp').trim().toLowerCase(),
       leaderboard:($('#cmdLeaderboard').value||'leaderboard').trim().toLowerCase(),
+      leaderboard_life:($('#cmdLeaderboardLife').value||'toppumpers-life').trim().toLowerCase(),
       pumptimer:($('#cmdPumptimer').value||'pumptimer').trim().toLowerCase() },
     capacity_message:$('#capacityMsg').value, pumptimer_message:$('#pumptimerMsg').value,
     listen_targets:listenTargets, anon_user_label:$('#anonLabel').value,

@@ -10,6 +10,7 @@
     "capacity": "capacity",
     "help": "aghelp",
     "leaderboard": "toppumpers",
+    "leaderboard_life": "toppumpers-life",
     "pumptimer": "pumptimer"
   },
   "pumptimer_message": "\u23f1\ufe0f [timer] seconds left on the pump timer.",

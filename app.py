@@ -38,8 +38,8 @@ PORT = int(os.getenv("DISCOFLATE_PORT", "8765"))
 HOST = "127.0.0.1"
 
 # App version — keep in sync with android versionCode + version.json in the repo.
-VERSION = "2.6"
-VERSION_CODE = 30
+VERSION = "2.7"
+VERSION_CODE = 31
 VERSION_URL = "https://raw.githubusercontent.com/Airegasm/DiscoFlate/main/version.json"
 
 # Config keys "Restore Default Config" touches (game content). Everything else —
@@ -431,6 +431,11 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
         engine.reset_users()
         return web.json_response({"ok": True})
 
+    async def reset_lifetime(request):
+        await guard(request)
+        engine.reset_lifetime()
+        return web.json_response({"ok": True})
+
     # ---- operator controls (act as the owner, posting into the channel) -----
     async def control_roll(request):
         await guard(request)
@@ -605,6 +610,7 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
         web.post("/api/reset", reset),
         web.post("/api/capacity", set_capacity),
         web.post("/api/reset-users", reset_users),
+        web.post("/api/reset-lifetime", reset_lifetime),
         web.post("/api/session-reset", session_reset),
         web.post("/api/control/roll", control_roll),
         web.post("/api/control/pump", control_pump),

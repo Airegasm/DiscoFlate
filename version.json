@@ -1,6 +1,6 @@
 {
-  "version": "2.6",
-  "versionCode": 30,
+  "version": "2.7",
+  "versionCode": 31,
   "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk",
-  "notes": "DiscoFlate v2.6 \u2014 chance command type (with luck), multi-device fires (Add Device Fire), and renaming a command follows it into its ranges"
+  "notes": "DiscoFlate v2.7 \u2014 lifetime (all-time) leaderboard system command; auto-cleanup of stale renamed-command range memberships"
 }

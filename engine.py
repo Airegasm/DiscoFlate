@@ -22,12 +22,15 @@ Rolling:
 from __future__ import annotations
 
 import asyncio
+import json
+import os
 import random
 import time
 from collections import deque
 
 import kasa_legacy as kasa
 import device_control
+import config_store
 
 
 class Engine:
@@ -57,7 +60,10 @@ class Engine:
         # Max Roll Prize tracking (in-memory; resets on session reset / restart).
         self._perfect: dict[str, int] = {}       # uid -> perfect-roll count
         self._prize_uses: dict[str, int] = {}    # uid -> remaining uses (present = unlocked)
-        self._pump_time: dict[str, dict] = {}    # uid -> {name, seconds, capacity} (leaderboard)
+        self._pump_time: dict[str, dict] = {}    # uid -> {name, seconds, capacity} (session leaderboard)
+        # Lifetime (all-time) leaderboard — persisted to data/, survives session
+        # resets AND app restarts. Separate from the per-session _pump_time above.
+        self._pump_life: dict[str, dict] = self._load_lifetime()
         self._cmd_uses: dict[str, dict] = {}     # uid -> {cmdname: times used this session}
         self._last_fired: dict[str, float] = {}  # cmdkey -> last-fired monotonic (anti-spam buffer)
         self._current_range_key = None           # (min,max) of the range we're in, for entry detection
@@ -632,6 +638,7 @@ class Engine:
                 "capacity": (n.get("capacity") or "capacity").strip().lower(),
                 "help": (n.get("help") or "aghelp").strip().lower(),
                 "leaderboard": (n.get("leaderboard") or "leaderboard").strip().lower(),
+                "leaderboard_life": (n.get("leaderboard_life") or "toppumpers-life").strip().lower(),
                 "pumptimer": (n.get("pumptimer") or "pumptimer").strip().lower()}
 
     # -- pump-time leaderboard (per session) --------------------------------- #
@@ -663,23 +670,60 @@ class Engine:
             pct = seconds / float(cal) * 100.0 if cal else 0.0
         except (TypeError, ValueError):
             pct = 0.0
-        rec = self._pump_time.setdefault(str(uid), {"name": who, "seconds": 0.0, "capacity": 0.0})
-        rec["name"] = who
-        rec["seconds"] += float(seconds)
-        rec["capacity"] += pct
+        for board in (self._pump_time, self._pump_life):
+            rec = board.setdefault(str(uid), {"name": who, "seconds": 0.0, "capacity": 0.0})
+            rec["name"] = who
+            rec["seconds"] += float(seconds)
+            rec["capacity"] += pct
+        self._save_lifetime()
 
-    def leaderboard_text(self) -> str:
-        rows = sorted(self._pump_time.values(), key=lambda r: r["seconds"], reverse=True)
+    # -- leaderboards (session + lifetime) ----------------------------------- #
+    def _lifetime_path(self) -> str:
+        return os.path.join(config_store.DATA_DIR, "pumpers_lifetime.json")
+
+    def _load_lifetime(self) -> dict:
+        try:
+            with open(self._lifetime_path(), "r", encoding="utf-8") as fh:
+                data = json.load(fh)
+            return data if isinstance(data, dict) else {}
+        except (FileNotFoundError, ValueError, OSError):
+            return {}
+
+    def _save_lifetime(self) -> None:
+        try:
+            os.makedirs(config_store.DATA_DIR, exist_ok=True)
+            tmp = self._lifetime_path() + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump(self._pump_life, fh, indent=2)
+            os.replace(tmp, self._lifetime_path())
+        except OSError as e:  # noqa: BLE001
+            self._log("error", f"couldn't save lifetime stats: {e}")
+
+    def reset_lifetime(self) -> None:
+        self._pump_life.clear()
+        self._save_lifetime()
+        self._log("bot", "LIFETIME leaderboard reset")
+
+    @staticmethod
+    def _format_board(rows, header: str, empty: str) -> str:
+        rows = sorted(rows, key=lambda r: r["seconds"], reverse=True)
         if not rows:
-            return "***TOP PUMPERS***\nNobody has pumped yet this session."
+            return f"{header}\n{empty}"
         namew = max(4, min(20, max(len(r["name"]) for r in rows)))
-        lines = ["***TOP PUMPERS***", "```"]
-        lines.append(f"{'NAME'.ljust(namew)}   {'SECONDS':>9}   {'CAPACITY':>9}")
+        lines = [header, "```", f"{'NAME'.ljust(namew)}   {'SECONDS':>9}   {'CAPACITY':>9}"]
         for r in rows:
             nm = (r["name"] or "?")[:namew].ljust(namew)
             lines.append(f"{nm}   {r['seconds']:>8.1f}s   {r['capacity']:>8.1f}%")
         lines.append("```")
         return "\n".join(lines)
+
+    def leaderboard_text(self) -> str:
+        return self._format_board(self._pump_time.values(), "***TOP PUMPERS***",
+                                  "Nobody has pumped yet this session.")
+
+    def leaderboard_life_text(self) -> str:
+        return self._format_board(self._pump_life.values(), "***ALL-TIME TOP PUMPERS***",
+                                  "Nobody has pumped yet.")
 
     def help_text(self, prefix: str) -> str:
         return "Available commands:\n" + self._commands_str(prefix)
@@ -1247,7 +1291,8 @@ class Engine:
         if self.cfg.get("roll_enabled", True) and self.cmd_enabled_in_range("roll"):
             lines.append(f"**{prefix}{bn['roll']}** - roll the dice")
         lines.append(f"**{prefix}{bn['capacity']}** - check capacity")
-        lines.append(f"**{prefix}{bn['leaderboard']}** - show the leaderboard")
+        lines.append(f"**{prefix}{bn['leaderboard']}** - show the leaderboard (this session)")
+        lines.append(f"**{prefix}{bn['leaderboard_life']}** - all-time top pumpers")
         lines.append(f"**{prefix}{bn['pumptimer']}** - time left on the pump")
         return lines
 

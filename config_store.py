@@ -47,7 +47,8 @@ DEFAULTS = {
     # Names of the three built-in commands (rename to avoid clashing with other
     # bots — e.g. another dice bot already using !roll).
     "command_names": {"roll": "agroll", "capacity": "capacity",
-                      "help": "aghelp", "leaderboard": "leaderboard", "pumptimer": "pumptimer"},
+                      "help": "aghelp", "leaderboard": "leaderboard",
+                      "leaderboard_life": "toppumpers-life", "pumptimer": "pumptimer"},
     # The !pumptimer built-in reply (always available). Placeholders: [timer]/[total_secs].
     "pumptimer_message": "⏱️ [timer] seconds left on the pump timer.",
 

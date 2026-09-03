@@ -393,6 +393,10 @@ class BotManager:
             await _reply(message, self.engine.leaderboard_text())
             return
 
+        if action == "leaderboard_life":
+            await _reply(message, self.engine.leaderboard_life_text())
+            return
+
         if action == "pumptimer":
             tmpl = cfg.get("pumptimer_message") or "⏱️ [timer] seconds left on the pump timer."
             await _reply(message, self.engine.render(tmpl))
