@@ -299,6 +299,13 @@ DEFAULTS = {
     # Optional scoping so the bot only reacts where you want it to.
     "allow": {"guild_ids": [], "channel_ids": [], "user_ids": []},
 
+    # Remote access (System tab): OFF = the server binds loopback only (the
+    # default, nothing else on the network can even connect). ON = binds
+    # 0.0.0.0, and ONLY clients whose IP is in allowed_ips may talk to it
+    # (empty list = nobody remote — fail closed). Entries: exact IPs
+    # ("192.168.1.23"), wildcards ("192.168.1.*"), or CIDR ("192.168.1.0/24").
+    "remote_access": {"enabled": False, "allowed_ips": []},
+
     "pumpdirect_path": DEFAULT_PUMPDIRECT_PATH,
 }
 

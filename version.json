@@ -1,6 +1,6 @@
 {
-  "version": "3.7.0",
-  "versionCode": 61,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.7.0/discoflate.apk",
-  "notes": "DiscoFlate v3.7.0 — STOP now truly stops (and pauses the whole session with a RESUME button); failsafe OFF watchdog; automatic config backups + corrupt-config recovery; stale-tab save protection; security hardening (credential masking, host pinning, local auth); dozens of correctness fixes. First release-signed APK: this ONE update requires uninstall/reinstall (export your config first via Help → Export config!)."
+  "version": "3.8.0",
+  "versionCode": 62,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.8.0/discoflate.apk",
+  "notes": "DiscoFlate v3.8.0 \u2014 Remote Access (System tab): control DiscoFlate from another device on your Wi-Fi (e.g. an iPhone as the remote) with a strict IP whitelist. Off by default; changes apply live with no restart."
 }

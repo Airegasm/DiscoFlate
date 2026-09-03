@@ -12,9 +12,12 @@ Start:  python3 app.py     then open http://127.0.0.1:8765
 from __future__ import annotations
 
 import asyncio
+import fnmatch
+import ipaddress
 import json
 import os
 import signal
+import socket
 import subprocess
 import uuid
 
@@ -160,6 +163,9 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "config_rev": cfg.get("config_rev", 0),
         "recovered_config": config_store.RECOVERED_FROM,
         "version": VERSION,
+        "remote_access": cfg.get("remote_access", {"enabled": False, "allowed_ips": []}),
+        "lan_ips": _lan_ips(),
+        "port": PORT,
         "silence_onoff_log": cfg.get("silence_onoff_log", False),
         "mock_mode": cfg.get("mock_mode", False),
         "mock_calibration_seconds_to_100": cfg.get("mock_calibration_seconds_to_100", 60),
@@ -173,13 +179,119 @@ async def _json(request: web.Request) -> dict:
         return {}
 
 
+# ---- remote access (System tab) — same model as SwellDreams: client-IP
+# whitelist, loopback always allowed, empty list fails closed ------------------
+def _clean_ip(ip: str | None) -> str:
+    """Normalize a peer address (strip the IPv4-mapped ::ffff: prefix)."""
+    return str(ip or "").strip().removeprefix("::ffff:")
+
+
+def _is_loopback(ip: str | None) -> bool:
+    a = _clean_ip(ip)
+    if a in ("::1", "localhost"):
+        return True
+    return a.startswith("127.")
+
+
+def _ip_whitelisted(ip: str | None, cfg: dict) -> bool:
+    """True if this client IP may talk to the server. Loopback always may.
+    Remote clients need remote_access.enabled AND a whitelist match — exact IP,
+    wildcard pattern (192.168.1.*), or CIDR (192.168.1.0/24)."""
+    a = _clean_ip(ip)
+    if _is_loopback(a):
+        return True
+    ra = cfg.get("remote_access") or {}
+    if not ra.get("enabled"):
+        return False
+    for entry in (ra.get("allowed_ips") or []):
+        e = str(entry or "").strip()
+        if not e:
+            continue
+        if a == e:
+            return True
+        if "/" in e:
+            try:
+                if ipaddress.ip_address(a) in ipaddress.ip_network(e, strict=False):
+                    return True
+            except ValueError:
+                continue
+        elif "*" in e or "?" in e:
+            if fnmatch.fnmatch(a, e):
+                return True
+    return False
+
+
+def _valid_ip_entry(e: str) -> bool:
+    """A whitelist entry must be an IP, a CIDR block, or a *-wildcard pattern."""
+    e = (e or "").strip()
+    if not e:
+        return False
+    if "/" in e:
+        try:
+            ipaddress.ip_network(e, strict=False)
+            return True
+        except ValueError:
+            return False
+    if "*" in e or "?" in e:
+        # crude shape check: dotted quads with wildcards, e.g. 192.168.1.*
+        return all(p == "*" or p == "?" or p.isdigit() for p in e.replace("?", "*").split("."))
+    try:
+        ipaddress.ip_address(e)
+        return True
+    except ValueError:
+        return False
+
+
+def _host_ok(host: str) -> bool:
+    """Host-header pinning that still allows LAN clients: localhost forms, or
+    any IP-LITERAL host (DNS rebinding needs a domain name, so requiring a
+    literal kills it while http://192.168.x.y:8765 keeps working)."""
+    h = (host or "").lower()
+    if h.startswith("[") and "]" in h:          # [ipv6]:port
+        h = h[1:h.index("]")]
+    elif h.count(":") == 1:                     # host:port
+        h = h.split(":", 1)[0]
+    if h in ("localhost", ""):
+        return bool(h)
+    try:
+        ipaddress.ip_address(h)
+        return True
+    except ValueError:
+        return False
+
+
+def _lan_ips() -> list[str]:
+    """This machine's non-loopback IPs (for the 'open this on your phone' hint)."""
+    ips = []
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("8.8.8.8", 80))          # no traffic sent — just routes
+            ips.append(s.getsockname()[0])
+        finally:
+            s.close()
+    except OSError:
+        pass
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = info[4][0]
+            if not ip.startswith("127.") and ip not in ips:
+                ips.append(ip)
+    except OSError:
+        pass
+    return ips
+
+
 def _origin_ok(request: web.Request) -> bool:
-    # Loopback bind already blocks remote hosts; also reject cross-origin POSTs
-    # so a malicious page in the user's browser can't drive the API via CSRF.
+    # Reject cross-origin POSTs so a malicious page in a browser can't drive
+    # the API via CSRF. Same-origin is judged against the Host actually used,
+    # so whitelisted LAN clients (http://<lan-ip>:8765) pass too.
     origin = request.headers.get("Origin")
     if origin is None:
         return True
-    return origin in (f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}")
+    if origin in (f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}"):
+        return True
+    return origin == f"http://{request.headers.get('Host', '')}"
 
 
 # Endpoints that reveal or replace secrets: beyond the origin check they need
@@ -209,15 +321,22 @@ def _web_secret() -> str:
 # --------------------------------------------------------------------------- #
 # route factory
 # --------------------------------------------------------------------------- #
-def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
+def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> web.Application:
     secret = _web_secret()
+    net = net if net is not None else {}
 
     @web.middleware
     async def security_mw(request, handler):
-        # Host-header pinning kills DNS rebinding: a page on attacker.com whose
-        # DNS flips to 127.0.0.1 still arrives with Host: attacker.com.
-        host = (request.headers.get("Host") or "").lower()
-        if host not in (f"127.0.0.1:{PORT}", f"localhost:{PORT}", "127.0.0.1", "localhost"):
+        # 1. Client-IP gate (the remote-access whitelist). Loopback always
+        #    passes; with remote access off, the 127.0.0.1 bind means nothing
+        #    else can even connect — this check is the enforcement layer once
+        #    the bind is 0.0.0.0. Judged on the SOCKET peer, never a header.
+        if not _ip_whitelisted(request.remote, engine.cfg):
+            raise web.HTTPForbidden(text="your IP is not whitelisted for remote access")
+        # 2. Host-header pinning kills DNS rebinding: a page on attacker.com
+        #    whose DNS flips to this server still arrives with Host:
+        #    attacker.com — only localhost / IP-literal hosts are served.
+        if not _host_ok(request.headers.get("Host") or ""):
             raise web.HTTPForbidden(text="bad host")
         if request.path in SENSITIVE_PATHS:
             token = request.cookies.get("df_auth") or request.headers.get("X-DiscoFlate-Auth")
@@ -287,6 +406,42 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
                 patch[key] = body[key]
         cfg = config_store.update(patch)
         engine.set_config(cfg)
+        return web.json_response(_public_state(engine, botmgr))
+
+    async def set_remote_access(request):
+        """Toggle LAN remote access + edit the IP whitelist. Rebinds the web
+        server live: ON → 0.0.0.0 (whitelist enforced per request), OFF → back
+        to loopback-only. Only reachable from loopback OR an already-whitelisted
+        client (the middleware) — a stranger can't whitelist themselves."""
+        await guard(request)
+        b = await _json(request)
+        enabled = bool(b.get("enabled"))
+        ips = [str(x).strip() for x in (b.get("allowed_ips") or []) if str(x).strip()]
+        bad = [x for x in ips if not _valid_ip_entry(x)]
+        if bad:
+            raise web.HTTPBadRequest(text=f"not a valid IP / CIDR / wildcard: {', '.join(bad)}")
+        cfg = config_store.update({"remote_access": {"enabled": enabled, "allowed_ips": ips}})
+        engine.set_config(cfg)
+        # Rebind if the desired interface changed (0.0.0.0 covers loopback, so
+        # the swap is stop-old → start-new; revert to loopback on failure).
+        want = "0.0.0.0" if enabled else "127.0.0.1"
+        runner, site = net.get("runner"), net.get("site")
+        if runner is not None and net.get("host") != want:
+            try:
+                if site is not None:
+                    await site.stop()
+                new_site = web.TCPSite(runner, want, PORT)
+                await new_site.start()
+                net["site"], net["host"] = new_site, want
+                engine._log("bot", f"REMOTE ACCESS {'ON — listening on the LAN (whitelist enforced)' if enabled else 'off — loopback only'}")
+            except OSError as e:
+                fallback = web.TCPSite(runner, "127.0.0.1", PORT)
+                await fallback.start()
+                net["site"], net["host"] = fallback, "127.0.0.1"
+                cfg = config_store.update({"remote_access": {"enabled": False, "allowed_ips": ips}})
+                engine.set_config(cfg)
+                engine._log("error", f"couldn't bind the LAN interface: {e} — remote access stayed OFF")
+                raise web.HTTPBadRequest(text=f"couldn't open the LAN port: {e}")
         return web.json_response(_public_state(engine, botmgr))
 
     async def set_vendors(request):
@@ -738,6 +893,7 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
         web.get("/images/{name}", serve_image),
         web.post("/api/config", set_config),
         web.post("/api/vendors", set_vendors),
+        web.post("/api/remote-access", set_remote_access),
         web.post("/api/listener", set_listener),
         web.post("/api/mock", set_mock),
         web.post("/api/reconnect", reconnect),
@@ -809,12 +965,28 @@ async def main() -> None:
     if cfg.get("discord_token"):
         await botmgr.ensure(cfg["discord_token"])
 
-    app = build_app(engine, botmgr)
+    net: dict = {}
+    app = build_app(engine, botmgr, net)
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, HOST, PORT)
-    await site.start()
-    print(f"DiscoFlate UI  →  http://{HOST}:{PORT}   (loopback only)")
+    ra = cfg.get("remote_access") or {}
+    bind = "0.0.0.0" if ra.get("enabled") else HOST
+    try:
+        site = web.TCPSite(runner, bind, PORT)
+        await site.start()
+    except OSError as e:
+        if bind == HOST:
+            raise
+        print(f"!! couldn't bind {bind}:{PORT} ({e}) — falling back to loopback only")
+        bind = HOST
+        site = web.TCPSite(runner, bind, PORT)
+        await site.start()
+    net.update({"runner": runner, "site": site, "host": bind})
+    if bind == HOST:
+        print(f"DiscoFlate UI  →  http://{HOST}:{PORT}   (loopback only)")
+    else:
+        lan = ", ".join(f"http://{ip}:{PORT}" for ip in _lan_ips()) or "(no LAN address found)"
+        print(f"DiscoFlate UI  →  http://{HOST}:{PORT}   + LAN: {lan}  (IP whitelist enforced)")
 
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()

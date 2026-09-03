@@ -924,5 +924,9 @@
     "events": [],
     "ranges": []
   },
-  "broadcasts": []
+  "broadcasts": [],
+  "remote_access": {
+    "enabled": false,
+    "allowed_ips": []
+  }
 }
