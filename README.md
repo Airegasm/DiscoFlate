@@ -133,6 +133,15 @@ away.
 
 ## Updates
 
+> **Cloned before Sept 2026?** The repo's history was rewritten (old APK blobs
+> purged — it shrank from ~1 GB to ~20 MB), so a plain `git pull` on an old
+> clone refuses. One-time fix from your DiscoFlate folder (your `data/` —
+> token, config, leaderboard — is untouched):
+> `curl -fsSL https://raw.githubusercontent.com/Airegasm/DiscoFlate/main/scripts/fix-clone.sh | bash`
+> (or on Windows, download and run
+> [`scripts/fix-clone.bat`](https://raw.githubusercontent.com/Airegasm/DiscoFlate/main/scripts/fix-clone.bat);
+> it's just `git fetch origin && git reset --hard origin/main`).
+
 The app checks for a newer release on launch and shows a banner on the Dashboard.
 **Help → Updates** applies it: on desktop it `git pull`s the latest code (then
 restart DiscoFlate); on the phone it opens the new APK's download link in your

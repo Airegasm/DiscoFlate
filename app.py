@@ -801,8 +801,26 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         try:
             out = subprocess.run(["git", "-C", HERE, "pull", "--ff-only", "origin", "main"],
                                  capture_output=True, text=True, timeout=60)
-            ok = out.returncode == 0
-            return web.json_response({"ok": ok, "output": (out.stdout + out.stderr).strip()[:2000],
+            if out.returncode == 0:
+                return web.json_response({"ok": True, "output": (out.stdout + out.stderr).strip()[:2000],
+                                          "restart_needed": True})
+            # A fast-forward can fail when upstream history was rewritten (e.g.
+            # the 2026-09 APK purge). Self-heal: fetch succeeded is implied by
+            # the pull attempt reaching the ff check, so adopt origin/main.
+            # data/ is untracked and untouched; local edits to app source are
+            # discarded (the updater's job is "run the latest code").
+            fetch = subprocess.run(["git", "-C", HERE, "fetch", "origin", "main"],
+                                   capture_output=True, text=True, timeout=60)
+            if fetch.returncode != 0:
+                return web.json_response({"ok": False,
+                                          "output": (out.stdout + out.stderr + fetch.stderr).strip()[:2000]})
+            reset = subprocess.run(["git", "-C", HERE, "reset", "--hard", "origin/main"],
+                                   capture_output=True, text=True, timeout=60)
+            ok = reset.returncode == 0
+            note = ("history diverged (upstream was rewritten) — adopted the latest code\n"
+                    if ok else "")
+            return web.json_response({"ok": ok,
+                                      "output": (note + reset.stdout + reset.stderr).strip()[:2000],
                                       "restart_needed": ok})
         except Exception as e:  # noqa: BLE001
             return web.json_response({"ok": False, "output": str(e)})
