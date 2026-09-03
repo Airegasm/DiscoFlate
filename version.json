@@ -1,6 +1,6 @@
 {
-  "version": "3.2.1",
-  "versionCode": 45,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk",
-  "notes": "DiscoFlate v3.2.1 \u2014 default !agpushluck & !agsimon minigames, always-on"
+  "version": "3.2.2",
+  "versionCode": 46,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=46",
+  "notes": "DiscoFlate v3.2.2 \u2014 fix stuck updates (cache-busted per-version download URL); config Backup/Restore"
 }

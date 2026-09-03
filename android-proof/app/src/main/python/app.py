@@ -38,8 +38,8 @@ PORT = int(os.getenv("DISCOFLATE_PORT", "8765"))
 HOST = "127.0.0.1"
 
 # App version — keep in sync with android versionCode + version.json in the repo.
-VERSION = "3.2.1"
-VERSION_CODE = 45
+VERSION = "3.2.2"
+VERSION_CODE = 46
 VERSION_URL = "https://raw.githubusercontent.com/Airegasm/DiscoFlate/main/version.json"
 
 # Config keys "Restore Default Config" touches (game content). Everything else —
@@ -486,6 +486,21 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
         engine.set_config(cfg)
         return web.json_response(_public_state(engine, botmgr))
 
+    async def export_config(request):
+        # Full config (incl. token) for backup — loopback-only, so it never leaves the device.
+        await guard(request)
+        return web.json_response(config_store.load())
+
+    async def import_config(request):
+        await guard(request)
+        body = await _json(request)
+        if not isinstance(body, dict) or not body.get("command_prefix") and "command_names" not in body:
+            raise web.HTTPBadRequest(text="that doesn't look like a DiscoFlate config backup")
+        cfg = config_store.save(config_store._deep_merge(config_store.DEFAULTS, body))
+        engine.set_config(cfg)
+        await botmgr.ensure(cfg.get("discord_token"), force=True)
+        return web.json_response({"ok": True})
+
     async def check_updates(request):
         await guard(request)
         result = {"current_version": VERSION, "current_code": VERSION_CODE,
@@ -632,6 +647,8 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
         web.post("/api/control/leaderboard", control_leaderboard),
         web.post("/api/control/broadcast", control_broadcast),
         web.post("/api/restore-defaults", restore_defaults),
+        web.post("/api/config/export", export_config),
+        web.post("/api/config/import", import_config),
         web.post("/api/check-updates", check_updates),
         web.post("/api/pull-updates", pull_updates),
     ])
