@@ -1,6 +1,6 @@
 {
-  "version": "3.2.5",
-  "versionCode": 49,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=49",
-  "notes": "DiscoFlate v3.2.5 \u2014 minigame announcements use the full game name (Rock Paper Scissors, Do not Pop It, \u2026) from the command type"
+  "version": "3.2.6",
+  "versionCode": 50,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=50",
+  "notes": "DiscoFlate v3.2.6 \u2014 config Backup exports a FILE (Downloads on phone) and Restore takes a file upload"
 }

@@ -39,7 +39,10 @@ GAME_DISPLAY_NAMES = {
     "game-simon": "Simon",
     "game-balloon": "Don't Pop It",
     "game-rps": "Rock Paper Scissors",
+    "game-slots": "Slots",
+    "game-blackjack": "Blackjack",
 }
+SLOT_SYMBOLS = ["🍒", "🍋", "🔔", "⭐", "💎", "7️⃣", "🎰", "🍀"]
 
 
 class Engine:

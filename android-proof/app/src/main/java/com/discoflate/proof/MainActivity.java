@@ -2,20 +2,25 @@ package com.discoflate.proof;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.MediaStore;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.Toast;
 
 import com.chaquo.python.PyObject;
 import com.chaquo.python.Python;
@@ -39,14 +44,16 @@ public class MainActivity extends Activity {
     private static final String URL = "http://127.0.0.1:8765/?android=1";
     private static final int REQ_CAM = 202;
     private static final int REQ_NOTIF = 103;
+    private static final int REQ_FILE = 305;
     private WebView web;
     private PermissionRequest pendingCamRequest;
+    private ValueCallback<Uri[]> filePathCallback;   // for <input type=file> (config restore)
     private String versionLabel = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setTitle("DiscoFlate · v3.2.5");
+        setTitle("DiscoFlate · v3.2.6");
 
         try {
             PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
@@ -139,6 +146,26 @@ public class MainActivity extends Activity {
                     }
                 });
             }
+
+            @Override
+            public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> cb,
+                                             FileChooserParams params) {
+                // Lets the config-restore <input type=file> open a picker.
+                if (filePathCallback != null) {
+                    filePathCallback.onReceiveValue(null);
+                }
+                filePathCallback = cb;
+                try {
+                    Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+                    i.addCategory(Intent.CATEGORY_OPENABLE);
+                    i.setType("*/*");
+                    startActivityForResult(Intent.createChooser(i, "Select backup file"), REQ_FILE);
+                } catch (Exception e) {
+                    filePathCallback = null;
+                    return false;
+                }
+                return true;
+            }
         });
         setContentView(web);
         web.loadData("<html><body style='font-family:sans-serif;padding:24px'>"
@@ -184,6 +211,21 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_FILE) {
+            Uri[] result = null;
+            if (resultCode == Activity.RESULT_OK && data != null && data.getData() != null) {
+                result = new Uri[]{data.getData()};
+            }
+            if (filePathCallback != null) {
+                filePathCallback.onReceiveValue(result);
+                filePathCallback = null;
+            }
+        }
+    }
+
+    @Override
     public void onBackPressed() {
         if (web != null && web.canGoBack()) {
             web.goBack();
@@ -217,6 +259,35 @@ public class MainActivity extends Activity {
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
                 } catch (Exception e) {
                     e.printStackTrace();
+                }
+            });
+        }
+
+        /** Save a config backup to the public Downloads folder (survives uninstall). */
+        @JavascriptInterface
+        public void saveConfig(final String json) {
+            if (json == null) return;
+            runOnUiThread(() -> {
+                String name = "discoflate-backup.json";
+                try {
+                    if (Build.VERSION.SDK_INT >= 29) {
+                        ContentValues v = new ContentValues();
+                        v.put(MediaStore.Downloads.DISPLAY_NAME, name);
+                        v.put(MediaStore.Downloads.MIME_TYPE, "application/json");
+                        Uri uri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, v);
+                        try (OutputStream os = getContentResolver().openOutputStream(uri)) {
+                            os.write(json.getBytes("UTF-8"));
+                        }
+                    } else {
+                        File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                        dir.mkdirs();
+                        try (OutputStream os = new FileOutputStream(new File(dir, name))) {
+                            os.write(json.getBytes("UTF-8"));
+                        }
+                    }
+                    Toast.makeText(MainActivity.this, "Backup saved to Downloads/" + name, Toast.LENGTH_LONG).show();
+                } catch (Exception e) {
+                    Toast.makeText(MainActivity.this, "Backup save failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 }
             });
         }
