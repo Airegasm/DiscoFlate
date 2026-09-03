@@ -89,6 +89,9 @@ class Engine:
         # for the poll's whole duration and resumes its remaining actions after.
         self._poll: dict | None = None                   # {def, opts, votes:{uid:idx}, voters:{uid:name}}
         self._poll_task: asyncio.Task | None = None      # command-started (background) polls
+        # Winning option (0-based) of the most recent poll, or None. Lets a
+        # post-event action be gated on which option won (if_option, 1-based).
+        self._last_poll_winner: int | None = None
         # Post-event action blocks: run AFTER an event completes, detached — the
         # event has already cleared (effects lifted, marked done), so these are
         # NOT part of it. Session-scoped: cancelled on pause / reset / off.
@@ -912,6 +915,17 @@ class Engine:
         for a in (actions or []):
             if self._paused or self._end_triggered:
                 break
+            # Optional poll-winner gate: an action tied to option N (if_option,
+            # 1-based) runs only if the most recent poll's winner was option N.
+            cond = (a or {}).get("if_option")
+            if cond not in (None, 0, ""):
+                try:
+                    want = int(cond)
+                except (TypeError, ValueError):
+                    want = None
+                have = None if self._last_poll_winner is None else self._last_poll_winner + 1
+                if want != have:
+                    continue
             typ = ((a or {}).get("type") or "message").lower()
             try:
                 if typ == "wait":
@@ -1119,6 +1133,8 @@ class Engine:
             raise
         finally:
             self._poll = None
+        # Remember the winner so post-event commands can gate on it.
+        self._last_poll_winner = winner_idx
         if winner_idx is not None:
             await self._run_action_block(opts[winner_idx].get("actions"), f"poll {name}")
 
@@ -2311,6 +2327,7 @@ class Engine:
         self._pump_time.clear()
         self._cmd_uses.clear()
         self._last_fired.clear()
+        self._last_poll_winner = None
         self._current_range_key = None
         self._end_triggered = False
         # Uptime restarts with the session — but only ticks if a session is
