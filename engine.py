@@ -89,6 +89,10 @@ class Engine:
         # for the poll's whole duration and resumes its remaining actions after.
         self._poll: dict | None = None                   # {def, opts, votes:{uid:idx}, voters:{uid:name}}
         self._poll_task: asyncio.Task | None = None      # command-started (background) polls
+        # Post-event action blocks: run AFTER an event completes, detached — the
+        # event has already cleared (effects lifted, marked done), so these are
+        # NOT part of it. Session-scoped: cancelled on pause / reset / off.
+        self._post_tasks: set = set()
         # Max Roll Prize tracking (in-memory; resets on session reset / restart).
         self._perfect: dict[str, int] = {}       # uid -> perfect-roll count
         self._prize_uses: dict[str, int] = {}    # uid -> remaining uses (present = unlocked)
@@ -827,12 +831,32 @@ class Engine:
             return self._capev_effect("disable_ao")
         return self._capev_effect("disable_range")
 
+    def _spawn_post_actions(self, actions, label: str) -> None:
+        """Queue a post-event action block as a DETACHED task — the event is
+        already complete and its effects lifted, so this runs independently
+        (e.g. 'wait 5 min, then do X'). Cancelled on pause / reset / off."""
+        if not actions:
+            return
+
+        async def _run():
+            try:
+                await self._run_action_block(actions, label)
+                self._log("bot", f"{label} complete")
+            except asyncio.CancelledError:
+                pass
+        t = asyncio.create_task(_run())
+        self._post_tasks.add(t)
+        t.add_done_callback(self._post_tasks.discard)
+
     def _capev_cancel_all(self, clear_session: bool) -> None:
         for t in self._capev_tasks.values():
             t.cancel()
         self._capev_tasks.clear()
         self._capev_fx.clear()
         self._capev_enable.clear()
+        for t in list(self._post_tasks):
+            t.cancel()
+        self._post_tasks.clear()
         if clear_session:
             self._capev_session_fx.clear()
             self._capev_done.clear()
@@ -954,9 +978,12 @@ class Engine:
 
     async def _run_capev(self, ev: dict, key: str, name: str) -> None:
         """Execute the event's action block sequentially. The event counts as
-        'running' (its effects active) until the block finishes."""
+        'running' (its effects active) until the block finishes; then any
+        Post Event Commands are queued detached (not part of the event)."""
+        completed = False
         try:
             await self._run_action_block(ev.get("actions"), f"capacity event {name}")
+            completed = True
         except asyncio.CancelledError:
             pass
         finally:
@@ -964,6 +991,10 @@ class Engine:
             self._capev_enable.pop(key, None)
             self._capev_tasks.pop(key, None)
             self._log("bot", f"CAPACITY EVENT '{name}' complete")
+        # Effects are lifted and the event is cleared — NOW queue post-event
+        # commands (unless we were cancelled or the session is ending).
+        if completed and not self._paused and not self._end_triggered:
+            self._spawn_post_actions(ev.get("post_actions"), f"capacity event {name} (post)")
 
     async def end_session(self, source: str = "end_session") -> None:
         """End the session like the OFF switch (posts the off-message), but
@@ -1234,6 +1265,10 @@ class Engine:
                     await self._emit(self._evt_hdr(name) + self.render(em, loop_ctx), sink, replace_key=replace_key)
                 except Exception as e:  # noqa: BLE001
                     self._log("error", f"event {name} end msg failed: {e}")
+            # The event has ended and cleared — queue its post-event commands
+            # detached (they run on their own timeline, not part of the event).
+            if not self._paused and not self._end_triggered:
+                self._spawn_post_actions(ev.get("post_actions"), f"event {name} (post)")
 
     async def _run_event(self, ev: dict, extra: dict | None = None, sink: list | None = None,
                          replace_key: str | None = None) -> None:

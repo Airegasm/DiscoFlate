@@ -2120,6 +2120,7 @@ function renderEvents(){
           `<label class="field">🔴 Failure message<textarea rows="2" onchange="eventRows[${i}].failure_message=this.value">${esc(e.failure_message||'')}</textarea></label>`+
           evtFiresEditor(i, e, 'fail_fires', '🔴 Fires on FAILURE')
         : `<label class="field">Message <span class="muted">(optional · [capacity] [announce] [current_loop] [total_loops] [loop_timer] [next_round] …)</span><textarea rows="3" onchange="eventRows[${i}].message=this.value">${esc(e.message||'')}</textarea></label>`);
+      html += postActionsSection(`eventRows[${i}].post_actions`, 'renderEvents', e.post_actions);
     }
     el.innerHTML=html; box.appendChild(el);
   });
@@ -2147,6 +2148,7 @@ function cleanEvents(){
     chance:(e.chance==null||e.chance==='')?null:+e.chance, luck:(e.luck==null||e.luck==='')?null:+e.luck,
     fires:cleanFires(e.fires), fail_fires:cleanFires(e.fail_fires),
     success_message:e.success_message||'', failure_message:e.failure_message||'',
+    post_actions:cleanActionRows(e.post_actions),
   }));
 }
 async function saveEvents(){
@@ -2216,6 +2218,17 @@ function actionRow(base, rr, j, a){
     `<div style="flex:1"></div><button class="ghost" onclick="${base}.splice(${j},1);${rr}();scheduleSave()">✕</button></div>`+msg+`</div>`;
 }
 function capEvActionRow(i, j, a){ return actionRow(`capEvRows[${i}].actions`, 'renderCapEvents', j, a); }
+// A collapsible "Post Event Commands" block: actions that run AFTER the event
+// completes, detached (not part of it). Reused by capacity + timed events.
+function postActionsSection(base, rr, arr){
+  arr = arr || [];
+  return `<details class="help" style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px" ${arr.length?'open':''}>`+
+    `<summary><b>📮 Post Event Commands</b> <span class="muted">(${arr.length} — run AFTER the event completes &amp; clears; not part of it, e.g. “wait 5m → do X”)</span></summary>`+
+    `<div style="margin-top:6px">`+
+    (arr.map((a,j)=>actionRow(base, rr, j, a)).join('')||'<div class="muted">none yet</div>')+
+    `<button class="ghost" style="margin-top:6px" onclick="${base}=${base}||[];${base}.push({type:'message',message:''});${rr}();scheduleSave()">+ Add post-event action</button>`+
+    `</div></details>`;
+}
 function renderCapEvents(){
   const box=$('#capEvents'); if(!box) return; box.innerHTML='';
   if(!capEvRows.length){ box.innerHTML='<div class="muted">No capacity events yet.</div>'; return; }
@@ -2262,7 +2275,8 @@ function renderCapEvents(){
         `<div class="muted" style="margin-bottom:6px"><b>During the Event</b> — the action block runs in order; the event's restrictions hold until it finishes.</div>`+
         ((e.actions||[]).map((a,j)=>capEvActionRow(i,j,a)).join('')||'<div class="muted" style="margin-bottom:6px">no actions yet</div>')+
         `<button class="ghost" style="margin-top:6px" onclick="capEvRows[${i}].actions=capEvRows[${i}].actions||[];capEvRows[${i}].actions.push({type:'message',message:''});renderCapEvents();scheduleSave()">+ Add action</button>`+
-      `</div>`;
+      `</div>`+
+      postActionsSection(`capEvRows[${i}].post_actions`, 'renderCapEvents', e.post_actions);
     }
     el.innerHTML=html; box.appendChild(el);
   });
@@ -2378,6 +2392,7 @@ function cleanCapEvents(){
     enable_commands_on:!!e.enable_commands_on,
     enable_commands:(e.enable_commands||[]).map(x=>String(x).trim()).filter(Boolean),
     actions:cleanActionRows(e.actions),
+    post_actions:cleanActionRows(e.post_actions),
   }));
 }
 

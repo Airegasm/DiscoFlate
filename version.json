@@ -1,6 +1,6 @@
 {
-  "version": "3.13.1",
-  "versionCode": 76,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.13.1/discoflate.apk",
-  "notes": "DiscoFlate v3.13.1 \u2014 fix: a timed event that starts a poll no longer freezes the capacity engine for the poll's duration (capacity/milestones/events kept stalling). Timed-event polls now run in the background; capacity-event action blocks still sequence correctly."
+  "version": "3.14.0",
+  "versionCode": 77,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.14.0/discoflate.apk",
+  "notes": "DiscoFlate v3.14.0 \u2014 Post Event Commands: a collapsible action block on each capacity/timed event that runs AFTER the event completes and clears (not part of it), on its own timeline \u2014 e.g. 'wait 5 minutes, then fire'. The event's restrictions lift immediately; the queued actions run detached (cancelled by pause/reset)."
 }
