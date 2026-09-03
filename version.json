@@ -1,6 +1,6 @@
 {
-  "version": "1.7",
-  "versionCode": 21,
+  "version": "1.8",
+  "versionCode": 22,
   "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk",
-  "notes": "DiscoFlate v1.7 \u2014 ESPHome troubleshooting guides in Help (where the YAML lives, fixing connection refused)"
+  "notes": "DiscoFlate v1.8 \u2014 ESPHome flashing guide in Help (OTA via standalone dashboard, USB web-flash, Kauf shortcut)"
 }

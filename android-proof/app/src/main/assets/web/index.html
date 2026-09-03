@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v1.7 by AireGasm</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v1.8 by AireGasm</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -469,7 +469,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v1.7.</span>
+        <span class="muted" id="updMsg">You're on v1.8.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -540,6 +540,37 @@
         <li><b>Flashed from the web installer</b> (web.esphome.io) with no dashboard — there's <b>no persistent YAML file</b>; config only exists at flash time. Re-create it in a dashboard (option 1 or 2) to change anything.</li>
       </ol>
       <div class="hint" style="max-width:820px"><b>Kauf plugs specifically:</b> Kauf ships adoptable stock firmware. In the ESPHome dashboard the plug appears via mDNS with an <b>ADOPT / TAKE CONTROL</b> button — adopting it generates a small local <code>&lt;name&gt;.yaml</code> in <code>/config/esphome/</code> that references Kauf's published package (github.com/KaufHA). That generated file is where you add <code>web_server:</code>, then Install.</div>
+      </details>
+
+      <details class="help"><summary><b>Flashing / enabling <code>web_server</code> (web &amp; OTA)</b></summary>
+      <div class="hint" style="margin-top:8px;max-width:820px">If the plug is already on ESPHome and your Wi-Fi (it is, if you set it up before), you almost never need a USB cable — do it <b>over the air</b>. USB web-flashing is a last resort, and a Kauf <i>mains</i> plug has no external USB port, so it means opening the case.</div>
+
+      <h4 style="margin:14px 0 6px">Route 1 — OTA via the standalone ESPHome dashboard (no cable)</h4>
+      <div class="hint" style="margin-top:0;max-width:820px">Set up the dashboard (either one runs as a local web app in your browser):</div>
+      <div class="hint" style="margin:6px 0 2px;max-width:820px"><b>pip</b> (Python 3.9+; a venv is cleanest):</div>
+      <pre style="background:#0a0d12;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow:auto;max-width:820px;font-size:13px;line-height:1.5"><code>pip install esphome
+esphome dashboard config/</code></pre>
+      <div class="hint" style="margin:0 0 2px;max-width:820px">Serves the dashboard at <code>http://localhost:6052</code>, storing each device's YAML in <code>config/</code>. Or <b>Docker</b> (same LAN as the plug):</div>
+      <pre style="background:#0a0d12;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow:auto;max-width:820px;font-size:13px;line-height:1.5"><code>docker run --rm --net=host -v "$PWD/config:/config" -it ghcr.io/esphome/esphome</code></pre>
+      <div class="hint" style="margin:6px 0 4px;max-width:820px">Then flash it OTA:</div>
+      <ol style="line-height:1.9;padding-left:22px;margin:0;max-width:820px">
+        <li>Open <code>http://localhost:6052</code>. The plug appears under <b>Discovered</b> (via mDNS) since it's already on ESPHome + your Wi-Fi.</li>
+        <li>Click <b>ADOPT / TAKE CONTROL</b> → name it → the dashboard writes <code>config/&lt;name&gt;.yaml</code> (referencing Kauf's package).</li>
+        <li>Open that device's <b>⋮ → Edit</b> (or edit <code>config/&lt;name&gt;.yaml</code>) and add <code>web_server: { port: 80 }</code> (as two lines).</li>
+        <li><b>Save → Install → Wirelessly (OTA)</b>. It compiles and pushes over Wi-Fi — no cable. (First compile downloads the toolchain and is slow; later ones are quick.)</li>
+        <li>After the plug reboots, <code>http://&lt;plug-ip&gt;</code> loads → add it in DiscoFlate → Devices.</li>
+      </ol>
+      <div class="hint" style="max-width:820px">⚠️ Run the dashboard on the <b>same network</b> as the plug or mDNS/OTA won't reach it. Kauf stock firmware may prompt for an <b>OTA password</b> during install — default documented on github.com/KaufHA.</div>
+
+      <h4 style="margin:16px 0 6px">Route 2 — USB web-flash via web.esphome.io (only if OTA is impossible)</h4>
+      <div class="hint" style="margin-top:0;max-width:820px">Needs a <b>Chromium</b> browser (Chrome/Edge — WebSerial isn't in Firefox/Safari), a <b>3.3 V USB-to-UART adapter</b>, and access to the ESP's pads. ⚠️ A Kauf mains plug has <b>no external USB</b> — you must open the case and wire an adapter with the plug <b>unplugged from mains</b>. Advanced; use Route 1 if you're not comfortable.</div>
+      <ol style="line-height:1.9;padding-left:22px;margin:6px 0 0;max-width:820px">
+        <li>Plug unplugged from mains. Open it; wire USB-UART: <b>TX↔RX, RX↔TX, GND↔GND, 3V3↔3V3</b>. Pull GPIO0 low / hold the button to enter flash mode.</li>
+        <li>Open <b>https://web.esphome.io</b> in Chrome/Edge → <b>Connect</b> → pick the serial port.</li>
+        <li>Either <b>Prepare for first use</b> (installs base ESPHome, then adopt it in the dashboard and add <code>web_server:</code> as in Route 1), or <b>Install</b> a <code>.bin</code> you exported from the dashboard that already includes <code>web_server</code>.</li>
+      </ol>
+
+      <div class="hint" style="max-width:820px;margin-top:14px"><b>Kauf shortcut:</b> Kauf ships a browser-based installer (ESP Web Tools) and their <b>latest stock firmware already has <code>web_server</code> enabled</b>. Flashing current Kauf firmware — via their web updater or OTA — re-enables it without hand-editing YAML. See <b>kaufha.com</b> / <b>github.com/KaufHA</b> for current steps.</div>
       </details>
       </details>
     </div>
