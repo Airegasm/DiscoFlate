@@ -980,27 +980,6 @@ class Engine:
                     "reply": self.render(cmd.get("reply") or "", {"user": who, "mention": self._mention(uid, who), "cmd_remain": _remain()}) or f"{name}!",
                     "reply_anon": self.render(cmd.get("reply") or "", {"user": anon, "mention": anon, "cmd_remain": _remain()}) or f"{name}!"}
 
-        if typ == "game-slots":
-            # Public one-shot: spin, fire the winning tier, reply in-channel (echoed
-            # cross-server with anonymity via the normal command reply path).
-            cmdkey = name.lower()
-            cd, scope = self._range_cd_scope(self.range_for(self.capacity), cmdkey)
-            key_uid = str(uid) if scope == "user" else "*"
-            if uid is not None and not owner_exempt:
-                remaining = self.cooldown_remaining(key_uid, cmdkey)
-                if remaining > 0:
-                    return {"ok": False, "cooldown": True, "error": self._cooldown_reply(who, remaining, uid, cmdkey)}
-            if uid is not None:
-                self._track_user(uid, who)
-                if scope == "command" or not owner_exempt:
-                    self._touch_cooldown(key_uid, cmdkey, cd)
-            _spend_use()
-            reels, score = self.slots_spin(cmd)
-            res = await self.game_result(cmd, score, who, uid)   # fires the tier + real/anon text
-            reel = "🎰  " + "  ".join(reels) + "\n"
-            return {"ok": True, "device": True, "started": True,
-                    "reply": reel + res["real"], "reply_anon": reel + res["anon"]}
-
         if typ.startswith("game-"):
             # Minigames run interactively via Discord buttons — here we only gate
             # them (membership already checked; now cooldown + per-person budget)

@@ -1,6 +1,6 @@
 {
-  "version": "3.2.8",
-  "versionCode": 52,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=52",
-  "notes": "DiscoFlate v3.2.8 \u2014 minigame tiers use a comparison operator (>= > = != < <=) instead of hardcoded >="
+  "version": "3.2.9",
+  "versionCode": 53,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=53",
+  "notes": "DiscoFlate v3.2.9 \u2014 Slots now posts its intro + a public Pull button (was silently a direct command)"
 }

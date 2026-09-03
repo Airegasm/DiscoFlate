@@ -21,7 +21,46 @@ SIMON_SYMBOLS = ["🔴", "🟢", "🔵", "🟡", "🟣", "🟠"]
 
 
 def make_play_view(bot, cmd, who, uid):
+    # Slots plays out publicly (pull → reels shown in-channel); the rest open an
+    # ephemeral game behind the ▶ Play button.
+    if (cmd.get("type") or "").lower() == "game-slots":
+        return SlotsView(bot, cmd, who, uid)
     return PlayView(bot, cmd, who, uid)
+
+
+class SlotsView(discord.ui.View):
+    """Public one-pull slot machine — the 🎰 Pull button spins in the channel."""
+
+    def __init__(self, bot, cmd, who, uid):
+        super().__init__(timeout=180)
+        self.bot = bot
+        self.cmd = cmd
+        self.who = who
+        self.uid = uid
+        try:
+            self.starter_id = int(uid) if uid else None
+        except (TypeError, ValueError):
+            self.starter_id = None
+
+    @discord.ui.button(label="🎰 Pull", style=discord.ButtonStyle.danger)
+    async def pull(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.starter_id is not None and interaction.user.id != self.starter_id:
+            await interaction.response.send_message(
+                "This isn't your pull — run the command yourself to play.", ephemeral=True)
+            return
+        reels, score = self.bot.engine.slots_spin(self.cmd)
+        for c in self.children:
+            c.disabled = True
+        self.stop()
+        try:
+            await interaction.response.edit_message(content="🎰 " + " ".join(reels), view=self)
+        except Exception:
+            pass
+        await self.bot.game_payoff(self.cmd, score, self.who, self.uid)
+
+    async def on_timeout(self):
+        for c in self.children:
+            c.disabled = True
 
 
 class PlayView(discord.ui.View):
