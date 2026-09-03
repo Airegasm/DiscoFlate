@@ -5,6 +5,12 @@ cd "$(dirname "$0")"
 
 PORT="${DISCOFLATE_PORT:-8765}"
 
+if ! python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 9) else 1)' 2>/dev/null; then
+  echo "!! DiscoFlate needs Python 3.9 or newer (found: $(python3 -V 2>&1 || echo 'no python3'))."
+  echo "   Install a newer Python 3 and try again."
+  exit 1
+fi
+
 if [ ! -d .venv ]; then
   echo "→ creating virtualenv (.venv) …"
   python3 -m venv .venv

@@ -13,7 +13,7 @@
     "leaderboard_life": "toppumpers-life",
     "pumptimer": "pumptimer"
   },
-  "pumptimer_message": "\u23f1\ufe0f [timer] seconds left on the pump timer.",
+  "pumptimer_message": "⏱️ [timer] seconds left on the pump timer.",
   "capacity_message": "[announce] - Current Capacity: **[capacity]%**\n[capacity_bar]",
   "listener_message_on": "**[operator]'s DiscoFlate Inflation Bot is now LIVE!**\n\n[commands]\n",
   "listener_message_off": "**[operator]'s DiscoFlate Inflation Bot is now OFFLINE.**\n\n**Thanks for pumping!**",
@@ -27,8 +27,8 @@
   "cooldown_exempt_user_ids": [],
   "cooldown_exempt_names": [],
   "operator_name": "",
-  "cooldown_message": "\u23f3 [mention], [cmd] is on cooldown \u2014 [cooldown]s left until you can use it again.",
-  "cooldown_reset_message": "",
+  "cooldown_message": "⏳ [mention], [cmd] is on cooldown — [cooldown]s left until you can use it again.",
+  "cooldown_reset_message": "🎲 [mention], your dice are recharged — roll again with [roll_cmd]!",
   "auto_report": {
     "enabled": true,
     "seconds": 300,
@@ -41,8 +41,7 @@
     "min_seconds": 1,
     "max_seconds": 100,
     "disable_at_100": false,
-    "reply": "\ud83c\udfb2 [mention] rolled **[dice]** and they landed on **[result]**\n**[secs]** seconds have been added to the pump timer, and will increase  [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
-    "cooldown_reset_message": "\ud83c\udfb2 [mention], your dice are recharged \u2014 roll again with [roll_cmd]!"
+    "reply": "🎲 [mention] rolled **[dice]** and they landed on **[result]**\n**[secs]** seconds have been added to the pump timer, and will increase  [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
   },
   "capacity_ranges": [
     {
@@ -50,7 +49,7 @@
       "max": 20,
       "dice": 6,
       "sides": 6,
-      "announce": "\ud83e\udec1 [operator] is barely inflated \u2014 you can do better than that!",
+      "announce": "🫁 [operator] is barely inflated — you can do better than that!",
       "milestone": "",
       "image": "",
       "cooldowns": {
@@ -74,8 +73,8 @@
       "max": 40,
       "dice": 4,
       "sides": 6,
-      "announce": "\ud83d\udca8 [operator] is filling out nicely, the first signs of bloating begin to appear.",
-      "milestone": "**MILESTONE:** \ud83d\udca8 [operator]'s belly starts to round out and press outward slightly. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+      "announce": "💨 [operator] is filling out nicely, the first signs of bloating begin to appear.",
+      "milestone": "**MILESTONE:** 💨 [operator]'s belly starts to round out and press outward slightly. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
       "image": "",
       "cooldowns": {
         "inflate": {
@@ -99,8 +98,8 @@
       "max": 60,
       "dice": 4,
       "sides": 6,
-      "announce": "\ud83c\udf88 [operator]'s belly is taut and pressurised, curves stretching tighter.",
-      "milestone": "**MILESTONE:** \ud83c\udf88 Halfway there \u2014 [operator]'s middle is firm and noticeably swollen. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+      "announce": "🎈 [operator]'s belly is taut and pressurised, curves stretching tighter.",
+      "milestone": "**MILESTONE:** 🎈 Halfway there — [operator]'s middle is firm and noticeably swollen. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
       "image": "",
       "cooldowns": {
         "pump": {
@@ -124,8 +123,8 @@
       "max": 80,
       "dice": 2,
       "sides": 4,
-      "announce": "\ud83c\udf88 [operator]'s belly is round, tight, and visibly swollen.",
-      "milestone": "**MILESTONE:** \ud83c\udf88 [operator] is seriously swollen now \u2014 the pressure is constant and building. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+      "announce": "🎈 [operator]'s belly is round, tight, and visibly swollen.",
+      "milestone": "**MILESTONE:** 🎈 [operator] is seriously swollen now — the pressure is constant and building. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
       "image": "",
       "cooldowns": {
         "squeeze": {
@@ -151,8 +150,8 @@
       "max": 90,
       "dice": 2,
       "sides": 4,
-      "announce": "\u26a0\ufe0f [operator] 's belly is stretched dangerously tight, groaning under the strain.",
-      "milestone": "**MILESTONE:** \u26a0\ufe0f [operator]'s gut is straining hard \u2014 one bold roll could tip them over! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+      "announce": "⚠️ [operator] 's belly is stretched dangerously tight, groaning under the strain.",
+      "milestone": "**MILESTONE:** ⚠️ [operator]'s gut is straining hard — one bold roll could tip them over! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
       "image": "",
       "cooldowns": {
         "tease": {
@@ -177,8 +176,8 @@
       "max": 100,
       "dice": 2,
       "sides": 4,
-      "announce": "\ud83d\udea8 [operator]'s belly is at the absolute brink, creaking and ready to pop''.",
-      "milestone": "**MILESTONE:** \ud83d\udea8 The edge! [operator] has reached maximum capacity and can't take much more! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]\n",
+      "announce": "🚨 [operator]'s belly is at the absolute brink, creaking and ready to pop''.",
+      "milestone": "**MILESTONE:** 🚨 The edge! [operator] has reached maximum capacity and can't take much more! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]\n",
       "image": "",
       "cooldowns": {
         "topup": {
@@ -203,8 +202,8 @@
       "max": 110,
       "dice": 2,
       "sides": 4,
-      "announce": "\ud83d\udea8 [operator] is at the absolute brink, creaking and ready to pop. Any minute now! ",
-      "milestone": "**MILESTONE:** \ud83d\udea8 [operator] is going to pop at any second! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+      "announce": "🚨 [operator] is at the absolute brink, creaking and ready to pop. Any minute now! ",
+      "milestone": "**MILESTONE:** 🚨 [operator] is going to pop at any second! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
       "image": "",
       "cooldowns": {
         "topup": {
@@ -225,7 +224,7 @@
       "is_end": true,
       "enabled": true,
       "end_only": false,
-      "final_message": "\ud83d\udca5 **BOOOOM!!** \nCongradulations! [operator] has popped!"
+      "final_message": "💥 **BOOOOM!!** \nCongradulations! [operator] has popped!"
     }
   ],
   "commands": [
@@ -235,7 +234,7 @@
       "seconds": 35,
       "dice": null,
       "sides": null,
-      "reply": "\ud83d\udca8 [mention] used [prefix]fill - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+      "reply": "💨 [mention] used [prefix]fill - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
       "enabled": true,
       "owner_only": false,
       "device_id": null,
@@ -251,7 +250,7 @@
       "seconds": 30,
       "dice": null,
       "sides": null,
-      "reply": "\ud83d\udca8 [mention] used [prefix]inflate - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+      "reply": "💨 [mention] used [prefix]inflate - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
       "enabled": true,
       "owner_only": false,
       "device_id": null,
@@ -267,7 +266,7 @@
       "seconds": 25,
       "dice": null,
       "sides": null,
-      "reply": "\ud83d\udca8 [mention] used [prefix]pump - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+      "reply": "💨 [mention] used [prefix]pump - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
       "enabled": true,
       "owner_only": false,
       "device_id": null,
@@ -283,7 +282,7 @@
       "seconds": 20,
       "dice": null,
       "sides": null,
-      "reply": "\ud83d\udca8 [mention] used [prefix]squeeze - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+      "reply": "💨 [mention] used [prefix]squeeze - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
       "enabled": true,
       "owner_only": false,
       "device_id": null,
@@ -299,7 +298,7 @@
       "seconds": 15,
       "dice": null,
       "sides": null,
-      "reply": "\ud83d\udca8 [mention] used [prefix]tease - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+      "reply": "💨 [mention] used [prefix]tease - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
       "enabled": true,
       "owner_only": false,
       "device_id": null,
@@ -315,7 +314,7 @@
       "seconds": 5,
       "dice": null,
       "sides": null,
-      "reply": "\ud83d\udca8 [mention] used [prefix]topup - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+      "reply": "💨 [mention] used [prefix]topup - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
       "enabled": true,
       "owner_only": false,
       "device_id": null,
@@ -354,7 +353,7 @@
     {
       "name": "pumproulette",
       "type": "say",
-      "reply": "\ud83c\udfb0 **[user]** pulls the trigger on **[prefix]pumproulette**\u2026",
+      "reply": "🎰 **[user]** pulls the trigger on **[prefix]pumproulette**…",
       "start_events": [
         "PumpRoulette"
       ],
@@ -362,7 +361,7 @@
       "owner_only": false,
       "mention": false,
       "hide_in_list": false,
-      "description": "spin the pump roulette \u2014 3 rounds of 50/50 +5s or +20s",
+      "description": "spin the pump roulette — 3 rounds of 50/50 +5s or +20s",
       "seconds": null,
       "dice": null,
       "sides": null,
@@ -378,7 +377,7 @@
     {
       "name": "agpushluck",
       "type": "game-pushluck",
-      "description": "push-your-luck minigame \u2014 pump for points, bank before you bust",
+      "description": "push-your-luck minigame — pump for points, bank before you bust",
       "enabled": true,
       "owner_only": false,
       "mention": false,
@@ -403,17 +402,17 @@
       "sm_symbols": 4,
       "sm_max_rounds": 8,
       "sm_reveal": 3,
-      "game_intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it!",
+      "game_intro": "🎰 **[user]** steps up to **Push Your Luck** — 💨 Pump for points or 🏦 Bank it!",
       "game_tiers": [
         {
           "min": 0,
-          "message": "\ud83d\udca5 **[user]** busted out with **[score]**. Womp womp.",
+          "message": "💥 **[user]** busted out with **[score]**. Womp womp.",
           "fires": [],
           "op": ">="
         },
         {
           "min": 3,
-          "message": "\ud83d\ude05 **[user]** banked **[score]** \u2014 a little reward: **+[secs]s**",
+          "message": "😅 **[user]** banked **[score]** — a little reward: **+[secs]s**",
           "fires": [
             {
               "device_id": null,
@@ -424,7 +423,7 @@
         },
         {
           "min": 6,
-          "message": "\ud83d\udd25 **[user]** cashed out a huge **[score]**! **+[secs]s** pump!",
+          "message": "🔥 **[user]** cashed out a huge **[score]**! **+[secs]s** pump!",
           "fires": [
             {
               "device_id": null,
@@ -438,7 +437,7 @@
     {
       "name": "agsimon",
       "type": "game-simon",
-      "description": "memory minigame \u2014 repeat the growing emoji sequence",
+      "description": "memory minigame — repeat the growing emoji sequence",
       "enabled": true,
       "owner_only": false,
       "mention": false,
@@ -463,17 +462,17 @@
       "sm_symbols": 4,
       "sm_max_rounds": 8,
       "sm_reveal": 3,
-      "game_intro": "\ud83e\udde0 **[user]** takes on **Simon** \u2014 memorize the sequence, then repeat it!",
+      "game_intro": "🧠 **[user]** takes on **Simon** — memorize the sequence, then repeat it!",
       "game_tiers": [
         {
           "min": 0,
-          "message": "\u274c **[user]** fumbled at round **[score]**.",
+          "message": "❌ **[user]** fumbled at round **[score]**.",
           "fires": [],
           "op": ">="
         },
         {
           "min": 3,
-          "message": "\ud83d\udc4f **[user]** reached round **[score]** \u2014 nice: **+[secs]s**",
+          "message": "👏 **[user]** reached round **[score]** — nice: **+[secs]s**",
           "fires": [
             {
               "device_id": null,
@@ -484,7 +483,7 @@
         },
         {
           "min": 6,
-          "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**! **+[secs]s** pump!",
+          "message": "🏆 **[user]** crushed it to round **[score]**! **+[secs]s** pump!",
           "fires": [
             {
               "device_id": null,
@@ -498,7 +497,7 @@
     {
       "name": "agpopit",
       "type": "game-balloon",
-      "description": "don't-pop-it minigame \u2014 reveal safe cells, avoid the balloons",
+      "description": "don't-pop-it minigame — reveal safe cells, avoid the balloons",
       "enabled": true,
       "owner_only": false,
       "mention": false,
@@ -527,17 +526,17 @@
       "bl_pops": 3,
       "bl_points": 1,
       "rps_wins": 3,
-      "game_intro": "\ud83c\udf88 **[user]** plays **Don't Pop It** \u2014 reveal safe cells for points, or cash out before you hit a balloon!",
+      "game_intro": "🎈 **[user]** plays **Don't Pop It** — reveal safe cells for points, or cash out before you hit a balloon!",
       "game_tiers": [
         {
           "min": 0,
-          "message": "\ud83d\udca5 **[user]** popped a balloon and walked away with nothing.",
+          "message": "💥 **[user]** popped a balloon and walked away with nothing.",
           "fires": [],
           "op": ">="
         },
         {
           "min": 3,
-          "message": "\ud83c\udf88 **[user]** cashed out **[score]** \u2014 nice haul: **+[secs]s**",
+          "message": "🎈 **[user]** cashed out **[score]** — nice haul: **+[secs]s**",
           "fires": [
             {
               "device_id": null,
@@ -548,7 +547,7 @@
         },
         {
           "min": 5,
-          "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**! **+[secs]s** pump!",
+          "message": "🎉 **[user]** cleaned up with **[score]**! **+[secs]s** pump!",
           "fires": [
             {
               "device_id": null,
@@ -591,23 +590,23 @@
       "bl_pops": 3,
       "bl_points": 1,
       "rps_wins": 3,
-      "game_intro": "\u270a\u270b\u270c\ufe0f **[user]** challenges the bot to **Rock-Paper-Scissors** \u2014 first to 3!",
+      "game_intro": "✊✋✌️ **[user]** challenges the bot to **Rock-Paper-Scissors** — first to 3!",
       "game_tiers": [
         {
           "min": 0,
-          "message": "\ud83d\udc80 **[user]** got swept by the bot.",
+          "message": "💀 **[user]** got swept by the bot.",
           "fires": [],
           "op": ">="
         },
         {
           "min": 1,
-          "message": "\ud83d\ude05 **[user]** fought to **[score]** round(s) but lost the match.",
+          "message": "😅 **[user]** fought to **[score]** round(s) but lost the match.",
           "fires": [],
           "op": ">="
         },
         {
           "min": 3,
-          "message": "\ud83c\udfc6 **[user]** BEAT the bot! **+[secs]s** pump!",
+          "message": "🏆 **[user]** BEAT the bot! **+[secs]s** pump!",
           "fires": [
             {
               "device_id": null,
@@ -621,7 +620,7 @@
     {
       "name": "agpull",
       "type": "game-slots",
-      "description": "public slot machine \u2014 one pull, tiered payout",
+      "description": "public slot machine — one pull, tiered payout",
       "enabled": true,
       "owner_only": false,
       "mention": false,
@@ -651,17 +650,17 @@
       "bl_points": 1,
       "rps_wins": 3,
       "sl_symbols": 6,
-      "game_intro": "\ud83c\udfb0 **[user]** pulls the lever\u2026",
+      "game_intro": "🎰 **[user]** pulls the lever…",
       "game_tiers": [
         {
           "min": 0,
-          "message": "\ud83c\udfb0 no match \u2014 better luck next pull, **[user]**.",
+          "message": "🎰 no match — better luck next pull, **[user]**.",
           "fires": [],
           "op": ">="
         },
         {
           "min": 1,
-          "message": "\ud83c\udfb0 **[user]** hit a pair \u2014 small win! **+[secs]s**",
+          "message": "🎰 **[user]** hit a pair — small win! **+[secs]s**",
           "fires": [
             {
               "device_id": null,
@@ -672,7 +671,7 @@
         },
         {
           "min": 3,
-          "message": "\ud83c\udfb0\ud83c\udf89 **JACKPOT!** **[user]** hit three of a kind! **+[secs]s** pump!",
+          "message": "🎰🎉 **JACKPOT!** **[user]** hit three of a kind! **+[secs]s** pump!",
           "fires": [
             {
               "device_id": null,
@@ -686,7 +685,7 @@
     {
       "name": "agblackjack",
       "type": "game-blackjack",
-      "description": "blackjack (21) vs the bot \u2014 hit or stand",
+      "description": "blackjack (21) vs the bot — hit or stand",
       "enabled": true,
       "owner_only": false,
       "mention": false,
@@ -716,23 +715,23 @@
       "bl_points": 1,
       "rps_wins": 3,
       "sl_symbols": 6,
-      "game_intro": "\ud83c\udccf **[user]** sits down at the blackjack table\u2026",
+      "game_intro": "🃏 **[user]** sits down at the blackjack table…",
       "game_tiers": [
         {
           "min": 0,
-          "message": "\ud83c\udccf **[user]** lost the hand.",
+          "message": "🃏 **[user]** lost the hand.",
           "fires": [],
           "op": ">="
         },
         {
           "min": 1,
-          "message": "\ud83c\udccf **[user]** pushed \u2014 a wash.",
+          "message": "🃏 **[user]** pushed — a wash.",
           "fires": [],
           "op": ">="
         },
         {
           "min": 2,
-          "message": "\ud83c\udccf **[user]** beat the dealer! **+[secs]s**",
+          "message": "🃏 **[user]** beat the dealer! **+[secs]s**",
           "fires": [
             {
               "device_id": null,
@@ -743,7 +742,7 @@
         },
         {
           "min": 3,
-          "message": "\ud83c\udccf\ud83c\udca1 **BLACKJACK!** **[user]** \u2014 **+[secs]s** pump!",
+          "message": "🃏🂡 **BLACKJACK!** **[user]** — **+[secs]s** pump!",
           "fires": [
             {
               "device_id": null,
@@ -778,10 +777,10 @@
           "seconds": 5
         }
       ],
-      "success_message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udd34 **BIG HIT!** +20s pump! (Capacity now [capacity]%)\n[next_round]",
-      "failure_message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udfe2 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]",
-      "activation_message": "\ud83c\udfb0 **PumpRoulette** begins \u2014 [total_loops] spins, each a 50/50 gamble between **+5s** and **+20s**. Hold on!",
-      "end_message": "\ud83c\udfb0 **PumpRoulette** complete!",
+      "success_message": "🎰 **Round [current_loop]/[total_loops]** — 🔴 **BIG HIT!** +20s pump! (Capacity now [capacity]%)\n[next_round]",
+      "failure_message": "🎰 **Round [current_loop]/[total_loops]** — 🟢 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]",
+      "activation_message": "🎰 **PumpRoulette** begins — [total_loops] spins, each a 50/50 gamble between **+5s** and **+20s**. Hold on!",
+      "end_message": "🎰 **PumpRoulette** complete!",
       "cooldown": 30,
       "message": "",
       "seconds": null,
@@ -806,8 +805,8 @@
     "sides": null,
     "device_id": null,
     "reply": "",
-    "progress_message": "[mention] rolled a perfect score [[count]/[goal]] \u2014 [remaining] more will unlock a bonus command!",
-    "unlock_message": "[mention] has unlocked: [prize_cmd] \u2014 [prize_desc]\\nYou can use this command a total of [uses] times."
+    "progress_message": "[mention] rolled a perfect score [[count]/[goal]] — [remaining] more will unlock a bonus command!",
+    "unlock_message": "[mention] has unlocked: [prize_cmd] — [prize_desc]\\nYou can use this command a total of [uses] times."
   },
   "prizes": [
     {
@@ -822,9 +821,9 @@
       "sides": null,
       "device_id": null,
       "description": "SUPERPUMP - !superpump triggers a 40s burst of air",
-      "reply": "\u2728 [mention] used the prize! [uses_left] uses left\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
-      "progress_message": "[mention] rolled a perfect score [[count]/[goal]] \u2014 [remaining] more will unlock a bonus command!",
-      "unlock_message": "[mention] has unlocked: [prize_cmd] \u2014 [prize_desc]\\nYou can use this command a total of [uses] times."
+      "reply": "✨ [mention] used the prize! [uses_left] uses left\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+      "progress_message": "[mention] rolled a perfect score [[count]/[goal]] — [remaining] more will unlock a bonus command!",
+      "unlock_message": "[mention] has unlocked: [prize_cmd] — [prize_desc]\\nYou can use this command a total of [uses] times."
     }
   ],
   "devices": [],
@@ -852,6 +851,10 @@
     "homeassistant": {
       "baseUrl": "",
       "token": ""
+    },
+    "kauf": {
+      "web_username": "",
+      "web_password": ""
     }
   },
   "allow": {
@@ -903,6 +906,23 @@
       "max_uses": null
     }
   ],
-  "event_in_process_message": "\u23f3 [event] is already running.",
-  "event_cooldown_message": "\u23f3 [event] is on cooldown \u2014 [cooldown]s left."
+  "event_in_process_message": "⏳ [event] is already running.",
+  "event_cooldown_message": "⏳ [event] is on cooldown — [cooldown]s left.",
+  "config_version": 1,
+  "mock_calibration_seconds_to_100": 60,
+  "silence_onoff_log": false,
+  "pump_message": "**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+  "session_paused": false,
+  "session_paused_by": "",
+  "pause_message": "⏸️ **Session paused** by [user] — pumps are off and commands are disabled until the operator resumes.",
+  "resume_message": "▶️ **Session resumed** by [user] — pump away!",
+  "paused_notice_message": "⏸️ [mention], the session is paused — hang tight until the operator resumes.",
+  "output_headers": false,
+  "rich_output": false,
+  "templates": {
+    "commands": [],
+    "events": [],
+    "ranges": []
+  },
+  "broadcasts": []
 }

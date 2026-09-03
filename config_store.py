@@ -32,8 +32,13 @@ DEFAULT_PUMPDIRECT_PATH = os.path.normpath(
     os.path.join(HERE, "..", "PumpDirect", "data", "devices.json")
 )
 
+# Schema version of the stored config. Bump it + add a _migrate step whenever a
+# key is renamed/moved, so old configs upgrade instead of silently stranding data.
+CONFIG_VERSION = 1
+
 DEFAULTS = {
     "discord_token": "",
+    "config_version": CONFIG_VERSION,
     # Bumped on every save; the UI sends the rev it last saw with each config
     # write so a stale tab's snapshot is rejected instead of clobbering.
     "config_rev": 0,
@@ -59,7 +64,7 @@ DEFAULTS = {
     # Names of the three built-in commands (rename to avoid clashing with other
     # bots — e.g. another dice bot already using !roll).
     "command_names": {"roll": "agroll", "capacity": "capacity",
-                      "help": "aghelp", "leaderboard": "leaderboard",
+                      "help": "aghelp", "leaderboard": "toppumpers",
                       "leaderboard_life": "toppumpers-life", "pumptimer": "pumptimer"},
     # The !pumptimer built-in reply (always available). Placeholders: [timer]/[total_secs].
     "pumptimer_message": "⏱️ [timer] seconds left on the pump timer.",
@@ -365,7 +370,21 @@ def load() -> dict:
         RECOVERED_FROM = aside
         print(f"!! config.json is corrupt ({e}) — moved to {aside}; check data/backups/ to restore")
         stored = {}
-    return _coerce_numbers(_deep_merge(DEFAULTS, stored))
+    return _migrate(_coerce_numbers(_deep_merge(DEFAULTS, stored)))
+
+
+def _migrate(cfg: dict) -> dict:
+    """Ordered upgrades for configs written by older versions. Each step bumps
+    config_version; unknown future keys always pass through untouched."""
+    v = int(cfg.get("config_version") or 0)
+    if v < 1:
+        # v1: roll.cooldown_reset_message was a dead nested key (nothing ever
+        # read it) — hoist it to the live top-level key if that one is blank.
+        nested = (cfg.get("roll") or {}).pop("cooldown_reset_message", None)
+        if nested and not cfg.get("cooldown_reset_message"):
+            cfg["cooldown_reset_message"] = nested
+    cfg["config_version"] = CONFIG_VERSION
+    return cfg
 
 
 def _prune(paths: list[str], keep: int) -> None:

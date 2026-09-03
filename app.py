@@ -49,6 +49,7 @@ _DEFAULT_SCALAR_KEYS = ["roll", "capacity_message", "pumptimer_message",
                         "pump_message", "cooldown_message", "cooldown_reset_message",
                         "system_buffer_seconds", "cooldown_seconds", "roll_enabled",
                         "max_roll_prize", "auto_report", "listener_message_on", "listener_message_off",
+                        "pause_message", "resume_message", "paused_notice_message",
                         "always_on_enabled"]
 # list key -> identity function. Restore KEEPS everything you already have (edited
 # defaults + customs) and only ADDS shipped items whose key is missing.
