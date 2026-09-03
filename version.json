@@ -1,6 +1,6 @@
 {
-  "version": "3.14.0",
-  "versionCode": 77,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.14.0/discoflate.apk",
-  "notes": "DiscoFlate v3.14.0 \u2014 Post Event Commands: a collapsible action block on each capacity/timed event that runs AFTER the event completes and clears (not part of it), on its own timeline \u2014 e.g. 'wait 5 minutes, then fire'. The event's restrictions lift immediately; the queued actions run detached (cancelled by pause/reset)."
+  "version": "3.14.1",
+  "versionCode": 78,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.14.1/discoflate.apk",
+  "notes": "DiscoFlate v3.14.1 \u2014 each capacity event's whole header is now click-to-collapse (chevron), so they collapse independently at a glance instead of via the small pencil."
 }

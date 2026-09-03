@@ -2239,13 +2239,14 @@ function renderCapEvents(){
               e.pause_events?'pause events':'', (e.enable_commands_on&&(e.enable_commands||[]).length)?`enable ${(e.enable_commands||[]).length}`:'',
               `${(e.actions||[]).length} action${(e.actions||[]).length===1?'':'s'}`].filter(Boolean).join(' · ');
     let html =
-      `<div class="row" style="gap:10px">`+
-        `<label class="row" style="gap:5px" title="enabled"><input type="checkbox" ${e.enabled!==false?'checked':''} onchange="capEvRows[${i}].enabled=this.checked;scheduleSave()"></label>`+
+      // whole header toggles this event open/closed (checkbox + delete are guarded)
+      `<div class="row" style="gap:10px;cursor:pointer" onclick="toggleCapEvOpen(${i})" title="${open?'Collapse':'Expand'}">`+
+        `<span class="muted" style="width:14px;text-align:center">${open?'▾':'▸'}</span>`+
+        `<label class="row" style="gap:5px" title="enabled" onclick="event.stopPropagation()"><input type="checkbox" ${e.enabled!==false?'checked':''} onchange="capEvRows[${i}].enabled=this.checked;scheduleSave()"></label>`+
         `<b style="min-width:120px">${esc(e.name||'(unnamed)')}</b>`+
         `<span class="pill" style="padding:2px 10px;font-size:11px">at ${esc(String(e.at??'?'))}%</span>`+
         `<span class="muted" style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(fx)}</span>`+
-        `<button class="ghost" title="${open?'Collapse':'Edit'}" onclick="toggleCapEvOpen(${i})">${open?'▾':'✏️'}</button>`+
-        `<button class="ghost" title="Delete" onclick="delCapEvent(${i})">✕</button>`+
+        `<button class="ghost" title="Delete" onclick="event.stopPropagation();delCapEvent(${i})">✕</button>`+
       `</div>`;
     if(open){
       html +=
