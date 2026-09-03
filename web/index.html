@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v1.9 by AireGasm</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v2.0 by AireGasm</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -152,6 +152,7 @@
   <div class="grid">
     <!-- capacity -->
     <div class="card" data-tab="dashboard">
+      <div id="updBanner" onclick="showTab('help')" title="Go to Help → Updates" style="display:none;cursor:pointer;background:var(--warn);color:#3a2a00;font-weight:700;border-radius:8px;padding:10px 14px;margin-bottom:14px;text-align:center">⬆️ Update available! (Click on the Help tab to update)</div>
       <h2>Capacity</h2>
       <div class="row" style="justify-content:space-between">
         <span class="big"><span id="capVal">0</span>%</span>
@@ -470,7 +471,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v1.9.</span>
+        <span class="muted" id="updMsg">You're on v2.0.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -653,7 +654,15 @@ function showTab(name){
 document.querySelectorAll('.tab-btn').forEach(b=>{
   b.addEventListener('click', ()=>showTab(b.getAttribute('data-go')));
 });
-(function(){ let t='dashboard'; try{ t=localStorage.getItem('df_tab')||'dashboard'; }catch(e){} showTab(t); })();
+// Android (WebView loads with ?android=1) always homes to the Dashboard on
+// startup; desktop restores the last tab you were on.
+let IS_ANDROID=false;
+try{ IS_ANDROID = new URLSearchParams(location.search).has('android') || !!(window.Android && window.Android.openUrl); }catch(e){}
+(function(){
+  let t='dashboard';
+  if(!IS_ANDROID){ try{ t=localStorage.getItem('df_tab')||'dashboard'; }catch(e){} }
+  showTab(t);
+})();
 let allDevices = [];        // device list (for command targeting dropdowns)
 let allCommandKeys = ['roll'];  // 'roll' + custom command names (for range cooldowns)
 
@@ -758,7 +767,19 @@ async function checkUpdates(){
     } else {
       m.textContent = `You're up to date (v${r.current_version}).`;
     }
+    showUpdateBanner(!!r.update_available);
   }catch(e){ m.textContent='check failed: '+(e.message||e); }
+}
+// Dashboard banner shown above Capacity when a newer version exists.
+function showUpdateBanner(available){
+  const b=$('#updBanner'); if(b) b.style.display = available ? '' : 'none';
+}
+// Fire once on startup: silently check for updates, surface the banner if any.
+async function autoCheckUpdates(){
+  try{
+    const r = await api('/api/check-updates', {});
+    if(r && !r.error) showUpdateBanner(!!r.update_available);
+  }catch(e){}
 }
 function installUpdate(){ if(window.Android && window.Android.openUrl && updApkUrl) window.Android.openUrl(updApkUrl); }
 async function pullUpdates(){
@@ -1694,6 +1715,7 @@ async function refresh(){
   try{ const st = await (await fetch('/api/state')).json(); applyState(st, false); }catch(e){}
 }
 refresh(); setInterval(refresh, 1000);
+autoCheckUpdates();
 </script>
 </body>
 </html>

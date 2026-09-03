@@ -34,7 +34,9 @@ import java.io.OutputStream;
  */
 public class MainActivity extends Activity {
 
-    private static final String URL = "http://127.0.0.1:8765";
+    // ?android=1 tells the web UI it's running in the APK: always home to the
+    // Dashboard on startup (desktop instead restores the last tab).
+    private static final String URL = "http://127.0.0.1:8765/?android=1";
     private static final int REQ_CAM = 202;
     private static final int REQ_NOTIF = 103;
     private WebView web;
@@ -44,7 +46,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setTitle("DiscoFlate · v1.9 by AireGasm");
+        setTitle("DiscoFlate · v2.0 by AireGasm");
 
         try {
             PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
