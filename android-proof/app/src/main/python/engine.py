@@ -834,7 +834,7 @@ class Engine:
             return self._capev_effect("disable_ao")
         return self._capev_effect("disable_range")
 
-    def _spawn_post_actions(self, actions, label: str) -> None:
+    def _spawn_post_actions(self, actions, label: str, hdr: str | None = None) -> None:
         """Queue a post-event action block as a DETACHED task — the event is
         already complete and its effects lifted, so this runs independently
         (e.g. 'wait 5 min, then do X'). Cancelled on pause / reset / off."""
@@ -843,7 +843,7 @@ class Engine:
 
         async def _run():
             try:
-                await self._run_action_block(actions, label)
+                await self._run_action_block(actions, label, hdr=hdr)
                 self._log("bot", f"{label} complete")
             except asyncio.CancelledError:
                 pass
@@ -907,11 +907,14 @@ class Engine:
                 await self.abort(reason=f"capacity event {name}")
             self._capev_tasks[key] = asyncio.create_task(self._run_capev(ev, key, name))
 
-    async def _run_action_block(self, actions, name: str) -> None:
+    async def _run_action_block(self, actions, name: str, hdr: str | None = None) -> None:
         """Execute an ordered action block: message | fire | roll | capacity |
         wait | poll. Shared by capacity events and poll winner outcomes. A poll
         action BLOCKS the caller until the poll (and its winner's actions)
-        finish — that's what keeps a surrounding event 'running' throughout."""
+        finish — that's what keeps a surrounding event 'running' throughout.
+        `name` labels logs; `hdr` (default = name) is the output-header tag."""
+        if hdr is None:
+            hdr = name
         for a in (actions or []):
             if self._paused or self._end_triggered:
                 break
@@ -934,7 +937,7 @@ class Engine:
                 if typ == "message":
                     msg = (a.get("message") or "").strip()
                     if msg:
-                        await self._announce(self._evt_hdr(name) + self.render(msg), None)
+                        await self._announce(self._evt_hdr(hdr) + self.render(msg), None)
                     continue
                 if typ == "capacity":
                     op = (a.get("capacity_op") or "add").lower()
@@ -949,7 +952,7 @@ class Engine:
                     if row is None:
                         self._log("error", f"{name}: no broadcast named '{a.get('broadcast')}'")
                     elif (row.get("message") or "").strip():
-                        await self._announce(self._evt_hdr(name) + self.render(row["message"].strip()), None)
+                        await self._announce(self._evt_hdr(hdr) + self.render(row["message"].strip()), None)
                     continue
                 if typ == "poll":
                     pd = self.find_poll(a.get("poll"))
@@ -964,7 +967,7 @@ class Engine:
                     # Ends the block — nothing after end_session runs.
                     extra = (a.get("message") or "").strip()
                     if extra:
-                        await self._announce(self._evt_hdr(name) + self.render(extra), None)
+                        await self._announce(self._evt_hdr(hdr) + self.render(extra), None)
                     await self.end_session(source=name)
                     break
                 if typ in ("fire", "roll"):
@@ -983,7 +986,7 @@ class Engine:
                     self._begin_or_extend(target, dur, name)
                     msg = (a.get("message") or "").strip()
                     if msg:
-                        await self._announce(self._evt_hdr(name) + self.render(
+                        await self._announce(self._evt_hdr(hdr) + self.render(
                             msg, {"secs": f"{dur:.1f}", "seconds": f"{dur:.1f}"}), None)
             except asyncio.CancelledError:
                 raise
@@ -996,7 +999,7 @@ class Engine:
         Post Event Commands are queued detached (not part of the event)."""
         completed = False
         try:
-            await self._run_action_block(ev.get("actions"), f"capacity event {name}")
+            await self._run_action_block(ev.get("actions"), f"capacity event {name}", hdr="CAPACITY EVENT")
             completed = True
         except asyncio.CancelledError:
             pass
@@ -1008,7 +1011,8 @@ class Engine:
         # Effects are lifted and the event is cleared — NOW queue post-event
         # commands (unless we were cancelled or the session is ending).
         if completed and not self._paused and not self._end_triggered:
-            self._spawn_post_actions(ev.get("post_actions"), f"capacity event {name} (post)")
+            self._spawn_post_actions(ev.get("post_actions"), f"capacity event {name} (post)",
+                                     hdr="CAPACITY EVENT")
 
     async def end_session(self, source: str = "end_session") -> None:
         """End the session like the OFF switch (posts the off-message), but
@@ -1284,7 +1288,7 @@ class Engine:
             # The event has ended and cleared — queue its post-event commands
             # detached (they run on their own timeline, not part of the event).
             if not self._paused and not self._end_triggered:
-                self._spawn_post_actions(ev.get("post_actions"), f"event {name} (post)")
+                self._spawn_post_actions(ev.get("post_actions"), f"event {name} (post)", hdr=name)
 
     async def _run_event(self, ev: dict, extra: dict | None = None, sink: list | None = None,
                          replace_key: str | None = None) -> None:

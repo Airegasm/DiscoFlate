@@ -1,6 +1,6 @@
 {
-  "version": "3.15.0",
-  "versionCode": 80,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.15.0/discoflate.apk",
-  "notes": "DiscoFlate v3.15.0 \u2014 post-event commands can be gated on which poll option won: when an event runs a poll, each Post Event Command gets a 'Run: Always / If option N won' dropdown, so delayed follow-ups can be outcome-specific."
+  "version": "3.15.1",
+  "versionCode": 81,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.15.1/discoflate.apk",
+  "notes": "DiscoFlate v3.15.1 \u2014 capacity-event messages now tag as [CAPACITY EVENT] (when output headers are on) instead of the internal '[capacity event <name>]'."
 }
