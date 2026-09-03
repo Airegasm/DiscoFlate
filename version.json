@@ -1,6 +1,6 @@
 {
-  "version": "3.2.9",
-  "versionCode": 53,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=53",
-  "notes": "DiscoFlate v3.2.9 \u2014 Slots now posts its intro + a public Pull button (was silently a direct command)"
+  "version": "3.3.0",
+  "versionCode": 54,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=54",
+  "notes": "DiscoFlate v3.3.0 — minigames now take a luck modifier (a flat ± on the score) per range or on their Always-On entry; a range the game is in overrides Always-On"
 }

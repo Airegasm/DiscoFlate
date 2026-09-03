@@ -1124,6 +1124,24 @@ class Engine:
             step = 12.0
         return max(0.0, min(100.0, start + step * max(0, int(pumps))))
 
+    def game_luck(self, cmd: dict) -> float:
+        """Luck modifier for a minigame (a flat ± added to the final score). A range
+        the command is a member of wins; otherwise its Always-On entry; else 0."""
+        key = (cmd.get("name") or "").strip().lower()
+        entry = (self.range_for(self.capacity).get("cooldowns") or {}).get(key)
+        if entry is not None and entry.get("luck") not in (None, ""):
+            try:
+                return float(entry.get("luck"))
+            except (TypeError, ValueError):
+                pass
+        ao = self._always_on_map().get(key)
+        if ao and ao.get("luck") not in (None, ""):
+            try:
+                return float(ao.get("luck"))
+            except (TypeError, ValueError):
+                pass
+        return 0.0
+
     def game_display_name(self, cmd: dict) -> str:
         """The full game name from the command type (e.g. 'Rock Paper Scissors'),
         falling back to the command's own name for non-game commands."""
@@ -1175,11 +1193,18 @@ class Engine:
         public broadcast for a finished minigame. Always labels which game it was
         and returns both a real (named) and an anonymized version so the bot can
         respect cross-server anonymity (real name only where the player is a member)."""
+        luck = self.game_luck(cmd)
+        if luck:
+            try:
+                score = max(0, round(float(score) + luck))   # luck nudges the effective score
+            except (TypeError, ValueError):
+                pass
         tier = self.game_tier_for(cmd, score)
         fired = await self._run_fires(tier.get("fires"), who, uid)
         total = round(sum(f["duration"] for f in fired), 1)
         name = self.game_display_name(cmd)   # full game name (Rock Paper Scissors, …)
-        base = {"score": score, "secs": f"{total:.1f}", "seconds": f"{total:.1f}",
+        base = {"score": score, "luck": f"{luck:+.0f}" if luck else "0",
+                "secs": f"{total:.1f}", "seconds": f"{total:.1f}",
                 "secs2capacity": (self._secs_to_capacity(total, self._active_id()) if fired else "0"),
                 "game": name}
         header = f"🎮 **{name}**\n"   # every result says which game it was for
