@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v1.8 by AireGasm</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v1.9 by AireGasm</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -334,6 +334,7 @@
             <textarea id="listenerOn" rows="4" placeholder="blank = say nothing"></textarea></label>
           <label class="field">OFF message
             <textarea id="listenerOff" rows="4" placeholder="blank = say nothing"></textarea></label>
+          <div class="hint" style="margin-top:6px">Both auto-append a fixed footer — <code>DiscoFlate v[version] by AireGasm</code> — as small subtext (not editable, only shown when the message isn't blank).</div>
         </div>
       </div>
       <div class="row" style="margin-top:12px"><button onclick="saveAutomation()">Save</button>
@@ -469,7 +470,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v1.8.</span>
+        <span class="muted" id="updMsg">You're on v1.9.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>

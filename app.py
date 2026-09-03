@@ -38,8 +38,8 @@ PORT = int(os.getenv("DISCOFLATE_PORT", "8765"))
 HOST = "127.0.0.1"
 
 # App version — keep in sync with android versionCode + version.json in the repo.
-VERSION = "1.8"
-VERSION_CODE = 22
+VERSION = "1.9"
+VERSION_CODE = 23
 VERSION_URL = "https://raw.githubusercontent.com/Airegasm/DiscoFlate/main/version.json"
 
 # Config keys "Restore Default Config" touches (game content). Everything else —
@@ -202,7 +202,9 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
         msg = (cfg.get("listener_message_on") if cfg["listener_enabled"]
                else cfg.get("listener_message_off")) or ""
         if msg.strip():
-            await botmgr.announce(engine.render(msg.strip()), None)
+            # Always append a non-editable attribution footer (Discord subtext).
+            footer = f"-# DiscoFlate v{VERSION} by AireGasm"
+            await botmgr.announce(f"{engine.render(msg.strip())}\n{footer}", None)
         return web.json_response(_public_state(engine, botmgr))
 
     async def command_toggle(request):
