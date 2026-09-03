@@ -21,6 +21,8 @@ import os
 import time
 import discord
 
+import minigames
+
 
 class BotManager:
     def __init__(self, engine, get_config) -> None:
@@ -331,6 +333,16 @@ class BotManager:
         await self.broadcast(self.engine.leaderboard_text(), None)
         return {"ok": True}
 
+    async def game_payoff(self, cmd: dict, score, who: str, uid) -> None:
+        """A minigame finished — fire the tier's devices (credited to the player)
+        and broadcast the tiered result to the channels."""
+        try:
+            msg = await self.engine.game_result(cmd, score, who, uid)
+            if msg:
+                await self.broadcast(msg, None)
+        except Exception as e:  # noqa: BLE001
+            self.engine._log("error", f"game payoff failed: {e}")
+
     async def operator_broadcast_custom(self, message: str) -> dict:
         cfg = self.get_config()
         err = self._operator_ready(cfg)
@@ -431,6 +443,16 @@ class BotManager:
                 # cooldown + out-of-uses messages go through as-is; other errors get a ⚠️
                 await _reply(message, res["error"] if (res.get("cooldown") or res.get("used_up"))
                              else f"⚠️ {res.get('error', 'could not run')}")
+                return
+            if res.get("game"):
+                # Minigame: post the public Play button (locked to the author). The
+                # game itself runs ephemerally; the result is broadcast at the end.
+                intro = (res.get("reply") or "").strip() or f"🎮 **{who}** started **{custom.get('name')}** — press Play!"
+                view = minigames.make_play_view(self, custom, who, str(message.author.id))
+                try:
+                    await message.channel.send(intro, view=view)
+                except Exception as e:  # noqa: BLE001
+                    await _reply(message, f"⚠️ couldn't start the game: {e}")
                 return
             line = res["reply"]
             tail = "\n⏳ (a fire is already running — ignored)" if (res.get("device") and not res.get("started")) else ""

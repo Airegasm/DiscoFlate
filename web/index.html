@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.1.3</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.2.0</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -462,6 +462,7 @@
       <div class="hint"><b>fire</b> = active device on for fixed seconds (+ optional <b>Add Device Fire</b> rows for extra devices). <b>roll</b> = roll dice (blank dice/sides
         uses the current capacity range) and fire for the total. <b>say</b> = text-only reply, no device.
         <b>chance</b> = a gamble: roll vs a <b>Chance %</b> (nudged by <b>Luck</b>); a win posts the success message and fires its device rows, a miss posts the failure message.
+        <b>game-pushluck</b> / <b>game-simon</b> = interactive Discord minigames: the command posts a <b>▶ Play</b> button, the player plays privately (only they see it), and the final <b>score → tier</b> is broadcast (with an optional pump fire credited to the player).
         See the <b>Help</b> tab for reply placeholders. <b>Starts events</b> = names of (off-by-default) events this command
         switches on temporarily (they revert on Session reset or app restart).</div>
     </div>
@@ -523,7 +524,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v3.1.3.</span>
+        <span class="muted" id="updMsg">You're on v3.2.0.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -555,12 +556,14 @@
     <div class="card span" data-tab="help">
       <details class="help"><summary><h2>Custom commands — how to set them up</h2></summary>
       <div class="hint" style="max-width:820px;margin-top:8px">A custom command is a chat trigger you invent (e.g. <code>!spin</code>). You build it once on the <b>Commands</b> tab, then switch it on for the capacity ranges where it should work.</div>
-      <h3 style="margin:14px 0 6px">The four types</h3>
+      <h3 style="margin:14px 0 6px">The command types</h3>
       <ul style="line-height:1.7;padding-left:22px;margin:0;max-width:820px">
         <li><b>fire</b> — turns the device on for a fixed number of <b>Seconds</b>. (Drives capacity if the device is a pump.) Add <b>+ Add Device Fire</b> rows to also fire other devices, each for its own seconds, independently.</li>
         <li><b>roll</b> — rolls dice and fires for the total. Leave <b>Dice/Sides</b> on <code>rng</code> to use the <i>current range's</i> dice, or pin specific dice (e.g. 2 d 6).</li>
         <li><b>say</b> — text-only reply, no device. Good for lore, hints, or status.</li>
         <li><b>chance</b> — a gamble. Rolls 1–100 against your <b>Chance %</b>; <b>Luck %</b> is a ± chance to force the outcome (positive = force a win, negative = force a miss). A <b>win</b> posts the <b>Success message</b> and fires the <b>🟢 win</b> device rows; a <b>miss</b> posts the <b>Failure message</b> and fires the separate <b>🔴 failure</b> device rows (leave them empty to fire nothing on a miss). Placeholders <code>[roll]</code>, <code>[chance]</code>, <code>[luck]</code>, <code>[secs]</code> work in both. Like every command it's range-gated, cooldownable, and <b>exhaustable</b> (Max/person, set per range).</li>
+        <li><b>game-pushluck</b> — a private button minigame: the player presses <b>💨 Pump</b> for points at a rising bust chance (starts at <b>Bust start %</b>, <b>+% / pump</b>) or <b>🏦 Bank</b> to lock in. Bust = 0. You set max pumps + points/pump and the <b>outcome tiers</b> (score → broadcast message + optional pump fire credited to the player).</li>
+        <li><b>game-simon</b> — a private memory minigame: the bot shows a growing emoji sequence for <b>Reveal (s)</b>, hides it, and the player repeats it with buttons. Score = rounds survived. Set # symbols + max rounds and the same <b>outcome tiers</b>. Both games post a public <b>▶ Play</b> button locked to whoever ran the command; everything else is private (ephemeral) until the tiered result broadcasts. Placeholders <code>[score]</code>, <code>[secs]</code> work in tier messages.</li>
       </ul>
       <h3 style="margin:14px 0 6px">Per-command options</h3>
       <ul style="line-height:1.7;padding-left:22px;margin:0;max-width:820px">
@@ -1508,6 +1511,41 @@ function firesEditor(i, c, arr, label){
 function addFire(i, arr){ arr=arr||'fires'; commandRows[i][arr] = commandRows[i][arr]||[]; commandRows[i][arr].push({device_id:null, seconds:3}); renderCommands(); scheduleSave(); }
 function removeFire(i, arr, j){ arr=arr||'fires'; (commandRows[i][arr]||[]).splice(j,1); renderCommands(); scheduleSave(); }
 function setFire(i, arr, j, key, val){ const f=(commandRows[i][arr]||[])[j]; if(!f) return; f[key] = (key==='seconds') ? (val===''?null:+val) : (val||null); scheduleSave(); }
+
+// ---- minigame outcome tiers (score → message + device fires) ----
+function gameTiersEditor(i, c){
+  const tiers = c.game_tiers||[];
+  const rows = tiers.map((t,j)=>
+    `<div class="dev" style="flex-direction:column;align-items:stretch;gap:6px">`+
+      `<div class="row" style="gap:8px;align-items:center">`+
+        `<span class="muted">when score ≥</span><input type="number" value="${t.min??0}" style="width:80px" onchange="setTier(${i},${j},'min',this.value)">`+
+        `<div style="flex:1"></div>`+
+        `<button class="ghost" onclick="removeTier(${i},${j})">✕</button>`+
+      `</div>`+
+      `<textarea rows="2" placeholder="broadcast on this tier · [user] [score] [secs] [secs2capacity] …" onchange="setTier(${i},${j},'message',this.value)">${esc(t.message||'')}</textarea>`+
+      tierFiresEditor(i,j,t)+
+    `</div>`).join('');
+  return `<div class="muted" style="margin:8px 0 4px">Outcome tiers <span class="muted">— the highest “score ≥” the final score reaches wins (add a <b>score ≥ 0</b> tier as the floor/loss).</span></div>`+
+    (rows||'<div class="muted" style="margin-bottom:4px">no tiers yet</div>')+
+    `<button class="ghost" style="margin-top:6px" onclick="addTier(${i})">+ Add tier</button>`;
+}
+function tierFiresEditor(i,j,t){
+  const fires=t.fires||[];
+  const rows=fires.map((f,k)=>
+    `<div class="row" style="gap:8px;align-items:center">`+
+      `<span class="muted">Device</span><select onchange="setTierFire(${i},${j},${k},'device_id',this.value)">${cmdDeviceOpts(f.device_id)}</select>`+
+      `<span class="muted">for</span><input type="number" value="${f.seconds??''}" min="0" step="0.5" style="width:70px" onchange="setTierFire(${i},${j},${k},'seconds',this.value)"><span class="muted">s</span>`+
+      `<button class="ghost" onclick="removeTierFire(${i},${j},${k})">✕</button>`+
+    `</div>`).join('');
+  return `<div style="border-top:1px solid var(--line);padding-top:4px"><div class="muted" style="margin-bottom:4px">Fires on this tier (credited to the player)</div>${rows}`+
+    `<button class="ghost" style="margin-top:4px" onclick="addTierFire(${i},${j})">+ Add Device Fire</button></div>`;
+}
+function setTier(i,j,field,val){ const t=(commandRows[i].game_tiers||[])[j]; if(!t) return; t[field]=(field==='min')?(val===''?0:+val):val; scheduleSave(); }
+function addTier(i){ commandRows[i].game_tiers=commandRows[i].game_tiers||[]; commandRows[i].game_tiers.push({min:0,message:'',fires:[]}); renderCommands(); scheduleSave(); }
+function removeTier(i,j){ (commandRows[i].game_tiers||[]).splice(j,1); renderCommands(); scheduleSave(); }
+function setTierFire(i,j,k,field,val){ const f=(((commandRows[i].game_tiers||[])[j]||{}).fires||[])[k]; if(!f) return; f[field]=(field==='seconds')?(val===''?null:+val):(val||null); scheduleSave(); }
+function addTierFire(i,j){ const t=(commandRows[i].game_tiers||[])[j]; if(!t) return; t.fires=t.fires||[]; t.fires.push({device_id:null,seconds:5}); renderCommands(); scheduleSave(); }
+function removeTierFire(i,j,k){ const t=(commandRows[i].game_tiers||[])[j]; if(!t) return; (t.fires||[]).splice(k,1); renderCommands(); scheduleSave(); }
 function renderCommands(){
   const box = $('#commands'); box.innerHTML='';
   if(!commandRows.length){ box.innerHTML='<div class="muted">No custom commands yet.</div>'; return; }
@@ -1528,17 +1566,24 @@ function renderCommands(){
         `<button class="ghost" onclick="commandRows.splice(${i},1);cmdOpen.delete(${i});renderCommands();renderRanges();scheduleSave()">✕</button>`+
       `</div>`;
     if(open){
-      const typ=(c.type||'fire');
+      const typ=(c.type||'fire'), isGame=typ.indexOf('game-')===0;
       html +=
       `<div class="row" style="gap:10px">`+
         `<label class="field">Name <input value="${esc(c.name||'')}" placeholder="spin" style="width:140px" onchange="renameCommand(${i}, this.value)"></label>`+
         `<label class="field">Type <select onchange="commandRows[${i}].type=this.value;renderCommands()">`+
-          ['fire','roll','say','chance'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`+
+          ['fire','roll','say','chance','game-pushluck','game-simon'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`+
         (typ==='fire'?`<label class="field">Seconds <input type="number" value="${c.seconds??''}" min="0" step="0.5" style="width:80px" onchange="commandRows[${i}].seconds=+this.value"></label>`:'')+
         (typ==='roll'?`<label class="field">Dice <select onchange="commandRows[${i}].dice=+this.value"><option value="">rng</option>${d20Options(c.dice)}</select></label>`+
           `<label class="field">Sides <select onchange="commandRows[${i}].sides=+this.value"><option value="">rng</option>${d20Options(c.sides)}</select></label>`:'')+
         (typ==='chance'?`<label class="field">Chance % <input type="number" value="${c.chance??50}" min="0" max="100" step="1" style="width:80px" onchange="commandRows[${i}].chance=Math.max(0,Math.min(100,+this.value||0))"></label>`+
           `<label class="field">Luck % <span class="muted">(±force)</span> <input type="number" value="${c.luck??''}" min="-100" max="100" step="1" style="width:80px" placeholder="0" onchange="commandRows[${i}].luck=(this.value===''?null:+this.value)"></label>`:'')+
+        (typ==='game-pushluck'?`<label class="field">Bust start % <input type="number" min="0" max="100" value="${c.pl_bust_start??15}" style="width:80px" onchange="commandRows[${i}].pl_bust_start=+this.value"></label>`+
+          `<label class="field">+% / pump <input type="number" min="0" max="100" value="${c.pl_bust_step??12}" style="width:80px" onchange="commandRows[${i}].pl_bust_step=+this.value"></label>`+
+          `<label class="field">Max pumps <input type="number" min="1" value="${c.pl_max_pumps??8}" style="width:80px" onchange="commandRows[${i}].pl_max_pumps=+this.value"></label>`+
+          `<label class="field">Points/pump <input type="number" min="0" step="0.5" value="${c.pl_points??1}" style="width:90px" onchange="commandRows[${i}].pl_points=+this.value"></label>`:'')+
+        (typ==='game-simon'?`<label class="field">Symbols <input type="number" min="2" max="6" value="${c.sm_symbols??4}" style="width:70px" onchange="commandRows[${i}].sm_symbols=+this.value"></label>`+
+          `<label class="field">Max rounds <input type="number" min="1" value="${c.sm_max_rounds??8}" style="width:80px" onchange="commandRows[${i}].sm_max_rounds=+this.value"></label>`+
+          `<label class="field">Reveal (s) <input type="number" min="1" step="0.5" value="${c.sm_reveal??3}" style="width:80px" onchange="commandRows[${i}].sm_reveal=+this.value"></label>`:'')+
         ((typ==='fire'||typ==='roll')?`<label class="field">Device <select style="width:140px" onchange="commandRows[${i}].device_id=this.value||null">${cmdDeviceOpts(c.device_id)}</select></label>`:'')+
       `</div>`+
       `<div class="muted" style="font-size:12px">${cmdRangeSummary(c.name)}</div>`+
@@ -1548,19 +1593,22 @@ function renderCommands(){
         `<label class="row" style="gap:6px"><input type="checkbox" ${c.hide_in_list?'checked':''} onchange="commandRows[${i}].hide_in_list=this.checked"> hide from command list</label>`+
       `</div>`+
       `<label class="field">Description <input value="${esc(c.description||'')}" placeholder="what it does (shown in the command list)" onchange="commandRows[${i}].description=this.value"></label>`+
-      (typ==='chance'
-        ? `<label class="field">Success message <span class="muted">([roll] [chance] [luck] [secs] work here)</span><textarea rows="3" onchange="commandRows[${i}].success_reply=this.value">${esc(c.success_reply||'')}</textarea></label>`+
-          `<label class="field">Failure message <span class="muted">(on a miss)</span><textarea rows="3" onchange="commandRows[${i}].failure_reply=this.value">${esc(c.failure_reply||'')}</textarea></label>`
-        : `<label class="field">Reply <textarea rows="4" onchange="commandRows[${i}].reply=this.value">${esc(c.reply||'')}</textarea></label>`)+
-      (typ==='fire' ? firesEditor(i, c, 'fires', 'Device fires') : '')+
-      (typ==='chance' ? firesEditor(i, c, 'fires', '🟢 Fires on WIN') + firesEditor(i, c, 'fail_fires', '🔴 Fires on FAILURE') : '')+
+      (isGame
+        ? `<label class="field">Intro message <span class="muted">(shown with the ▶ Play button · [user] [mention])</span><input value="${esc(c.game_intro||'')}" onchange="commandRows[${i}].game_intro=this.value"></label>`+
+          gameTiersEditor(i, c)
+        : (typ==='chance'
+            ? `<label class="field">Success message <span class="muted">([roll] [chance] [luck] [secs] work here)</span><textarea rows="3" onchange="commandRows[${i}].success_reply=this.value">${esc(c.success_reply||'')}</textarea></label>`+
+              `<label class="field">Failure message <span class="muted">(on a miss)</span><textarea rows="3" onchange="commandRows[${i}].failure_reply=this.value">${esc(c.failure_reply||'')}</textarea></label>`
+            : `<label class="field">Reply <textarea rows="4" onchange="commandRows[${i}].reply=this.value">${esc(c.reply||'')}</textarea></label>`)+
+          (typ==='fire' ? firesEditor(i, c, 'fires', 'Device fires') : '')+
+          (typ==='chance' ? firesEditor(i, c, 'fires', '🟢 Fires on WIN') + firesEditor(i, c, 'fail_fires', '🔴 Fires on FAILURE') : ''))+
       `<label class="field">Starts events <input value="${esc((c.start_events||[]).join(', '))}" placeholder="event names, comma-separated" onchange="commandRows[${i}].start_events=idList(this.value)"></label>`;
     }
     el.innerHTML = html;
     box.appendChild(el);
   });
 }
-function addCommand(){ commandRows.push({name:'',type:'fire',seconds:5,dice:'',sides:'',reply:'',enabled:true,owner_only:false,device_id:null,start_events:[],range_gate:'all',description:'',hide_in_list:false,mention:false,fires:[],fail_fires:[],chance:50,luck:null,success_reply:'',failure_reply:''}); renderCommands(); renderRanges(); }
+function addCommand(){ commandRows.push({name:'',type:'fire',seconds:5,dice:'',sides:'',reply:'',enabled:true,owner_only:false,device_id:null,start_events:[],range_gate:'all',description:'',hide_in_list:false,mention:false,fires:[],fail_fires:[],chance:50,luck:null,success_reply:'',failure_reply:'',pl_bust_start:15,pl_bust_step:12,pl_max_pumps:8,pl_points:1,sm_symbols:4,sm_max_rounds:8,sm_reveal:3,game_intro:'',game_tiers:[]}); renderCommands(); renderRanges(); }
 function cleanFires(arr){
   return (arr||[]).filter(f=>f && (f.seconds!=null && f.seconds!=='' || f.device_id!=null))
     .map(f=>({device_id: f.device_id||null, seconds: (f.seconds===''||f.seconds==null)?null:+f.seconds}));
@@ -1581,6 +1629,11 @@ function cleanCommands(){
     chance: (c.chance==null||c.chance==='')?null:+c.chance,
     luck: (c.luck==null||c.luck==='')?null:+c.luck,
     success_reply: c.success_reply||'', failure_reply: c.failure_reply||'',
+    // minigames
+    pl_bust_start:c.pl_bust_start??15, pl_bust_step:c.pl_bust_step??12, pl_max_pumps:c.pl_max_pumps??8, pl_points:c.pl_points??1,
+    sm_symbols:c.sm_symbols??4, sm_max_rounds:c.sm_max_rounds??8, sm_reveal:c.sm_reveal??3,
+    game_intro:c.game_intro||'',
+    game_tiers:(c.game_tiers||[]).map(t=>({min:+t.min||0, message:t.message||'', fires:cleanFires(t.fires)})),
   }));
 }
 async function saveCommands(){ applyState(await api('/api/config', {commands: cleanCommands()}), true); }

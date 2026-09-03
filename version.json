@@ -1,6 +1,6 @@
 {
-  "version": "3.1.3",
-  "versionCode": 43,
+  "version": "3.2.0",
+  "versionCode": 44,
   "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk",
-  "notes": "DiscoFlate v3.1.3 \u2014 fix: APK bundled the wrong app.py version (kept prompting to update)"
+  "notes": "DiscoFlate v3.2.0 \u2014 minigames: game-pushluck & game-simon (Discord button/ephemeral games, tiered broadcast payoff credited to the player)"
 }

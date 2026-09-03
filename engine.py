@@ -968,6 +968,26 @@ class Engine:
                     "reply": self.render(cmd.get("reply") or "", {"user": who, "mention": self._mention(uid, who), "cmd_remain": _remain()}) or f"{name}!",
                     "reply_anon": self.render(cmd.get("reply") or "", {"user": anon, "mention": anon, "cmd_remain": _remain()}) or f"{name}!"}
 
+        if typ.startswith("game-"):
+            # Minigames run interactively via Discord buttons — here we only gate
+            # them (membership already checked; now cooldown + per-person budget)
+            # and hand a signal back so the bot posts the public "Play" button.
+            cmdkey = name.lower()
+            cd, scope = self._range_cd_scope(self.range_for(self.capacity), cmdkey)
+            key_uid = str(uid) if scope == "user" else "*"
+            if uid is not None and not owner_exempt:
+                remaining = self.cooldown_remaining(key_uid, cmdkey)
+                if remaining > 0:
+                    return {"ok": False, "cooldown": True, "error": self._cooldown_reply(who, remaining, uid, cmdkey)}
+            if uid is not None:
+                self._track_user(uid, who)
+                if scope == "command" or not owner_exempt:
+                    self._touch_cooldown(key_uid, cmdkey, cd)
+            _spend_use()
+            intro = self.render(cmd.get("game_intro") or "",
+                                {"user": who, "mention": self._mention(uid, who), "cmd_remain": _remain()})
+            return {"ok": True, "game": True, "game_type": typ, "reply": intro}
+
         if typ == "chance":
             # A gamble: roll 1–100 vs the chance%. Win → post success + fire the
             # optional device rows; miss → post failure, no fire. Same cooldown /
@@ -1078,6 +1098,46 @@ class Engine:
             reply += tail; reply_anon += tail
         return {"ok": True, "device": True, "started": True, "extended": extended,
                 "events_posted": ev_posts, "reply": reply, "reply_anon": reply_anon}
+
+    # -- minigames (button/ephemeral games; the Views live in minigames.py) ---- #
+    def pushluck_bust_pct(self, cmd: dict, pumps: int) -> float:
+        """Bust chance for the next pump: starts at pl_bust_start, +pl_bust_step each pump."""
+        try:
+            start = float(cmd.get("pl_bust_start") if cmd.get("pl_bust_start") is not None else 15)
+        except (TypeError, ValueError):
+            start = 15.0
+        try:
+            step = float(cmd.get("pl_bust_step") if cmd.get("pl_bust_step") is not None else 12)
+        except (TypeError, ValueError):
+            step = 12.0
+        return max(0.0, min(100.0, start + step * max(0, int(pumps))))
+
+    def game_tier_for(self, cmd: dict, score) -> dict:
+        """The highest score→outcome tier whose `min` the score reaches."""
+        best = None
+        for t in (cmd.get("game_tiers") or []):
+            try:
+                m = float(t.get("min", 0))
+            except (TypeError, ValueError):
+                m = 0.0
+            if score >= m and (best is None or m >= best[0]):
+                best = (m, t)
+        return best[1] if best else {}
+
+    async def game_result(self, cmd: dict, score, who: str, uid) -> str:
+        """Fire the winning tier's devices (credited to the player) and return the
+        public broadcast message for a finished minigame."""
+        tier = self.game_tier_for(cmd, score)
+        fired = await self._run_fires(tier.get("fires"), who, uid)
+        total = round(sum(f["duration"] for f in fired), 1)
+        ctx = {"user": who, "mention": self._mention(uid, who), "score": score,
+               "secs": f"{total:.1f}", "seconds": f"{total:.1f}",
+               "secs2capacity": (self._secs_to_capacity(total, self._active_id()) if fired else "0"),
+               "game": cmd.get("name", "game")}
+        self._log("roll", f"{who} finished {cmd.get('name')} — score {score}"
+                  + (f", fired {total}s" if fired else ""))
+        return self.render(tier.get("message") or "", ctx) or \
+            f"🎮 **{who}** scored **{score}** in {cmd.get('name', 'the game')}."
 
     async def _run_fires(self, fires, who: str, uid: str | None) -> list:
         """Fire each {device_id, seconds} row independently and concurrently.
