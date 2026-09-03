@@ -1,6 +1,6 @@
 {
-  "version": "1.6",
-  "versionCode": 20,
+  "version": "1.7",
+  "versionCode": 21,
   "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk",
-  "notes": "DiscoFlate v1.6 \u2014 clearer Kauf/ESPHome connection errors (refused = web_server off)"
+  "notes": "DiscoFlate v1.7 \u2014 ESPHome troubleshooting guides in Help (where the YAML lives, fixing connection refused)"
 }

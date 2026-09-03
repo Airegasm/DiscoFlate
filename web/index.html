@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v1.6 by AireGasm</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v1.7 by AireGasm</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -469,7 +469,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v1.6.</span>
+        <span class="muted" id="updMsg">You're on v1.7.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -517,6 +517,30 @@
         <li>Only if you enabled web-server auth on the plug: fill the <b>Kauf</b> credentials (web username/password) in the collapsible section above the device list.</li>
       </ol>
       <div class="hint" style="max-width:820px">If the plug won't respond, open <code>http://&lt;plug-ip&gt;</code> directly and try toggling the switch there — that confirms the web server is reachable and gives you the exact switch id.</div>
+
+      <h3 style="margin:18px 0 8px">Troubleshooting</h3>
+
+      <details class="help" style="margin-bottom:8px"><summary><b>"Connection refused" / plug won't respond</b></summary>
+      <div class="hint" style="margin-top:8px;max-width:820px"><b>Connection refused</b> (in the Activity log, or in a browser at <code>http://&lt;plug-ip&gt;</code>) means <b>nothing is serving HTTP at that address+port</b> — it's not a wrong switch id (that gives a 404) and not the plug being offline (that times out). The plug answered and said "no listener here." Work through these in order:</div>
+      <ol style="line-height:1.9;padding-left:22px;margin:0;max-width:820px">
+        <li><b>Right IP?</b> Confirm <code>192.168.x.x</code> is actually the plug (router device list / <code>http://kauf-plug.local</code>). A refusal from the wrong device looks identical.</li>
+        <li><b>Different port?</b> Some builds put the web server on <code>:8080</code>. Try <code>http://&lt;plug-ip&gt;:8080</code> in a browser — if that loads, just enter <code>&lt;plug-ip&gt;:8080</code> as the <b>host</b> in Devices. No re-flash needed.</li>
+        <li><b>No web server at all?</b> If neither port loads, the ESPHome <code>web_server:</code> component isn't running (it's <b>off by default</b> in ESPHome). Add it to the plug's config and re-flash — see <b>"Where is the ESPHome YAML?"</b> below.</li>
+      </ol>
+      <div class="hint" style="max-width:820px">Add this to the device's YAML, then Install/flash (OTA — no USB needed since it's already on ESPHome):</div>
+      <pre style="background:#0a0d12;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow:auto;max-width:820px;font-size:13px;line-height:1.5"><code>web_server:
+  port: 80</code></pre>
+      </details>
+
+      <details class="help"><summary><b>Where is the ESPHome YAML?</b></summary>
+      <div class="hint" style="margin-top:8px;max-width:820px">Depends on how the plug was set up:</div>
+      <ol style="line-height:1.9;padding-left:22px;margin:0;max-width:820px">
+        <li><b>Home Assistant + the ESPHome add-on</b> (most common) — files live on the HA host at <code>/config/esphome/&lt;device-name&gt;.yaml</code>. Easiest: <b>ESPHome dashboard → the device's card → EDIT</b>. Or open the file via the <i>File editor</i> / <i>Samba</i> / <i>SSH</i> add-on. Shared secrets are in <code>/config/esphome/secrets.yaml</code>.</li>
+        <li><b>Standalone ESPHome</b> (Docker, or <code>pip install esphome</code> on a PC) — the <code>.yaml</code> files sit in whatever directory you run <code>esphome</code> from, typically <code>~/esphome/</code> or a mounted <code>config/</code> dir. One <code>&lt;name&gt;.yaml</code> per device plus a shared <code>secrets.yaml</code>.</li>
+        <li><b>Flashed from the web installer</b> (web.esphome.io) with no dashboard — there's <b>no persistent YAML file</b>; config only exists at flash time. Re-create it in a dashboard (option 1 or 2) to change anything.</li>
+      </ol>
+      <div class="hint" style="max-width:820px"><b>Kauf plugs specifically:</b> Kauf ships adoptable stock firmware. In the ESPHome dashboard the plug appears via mDNS with an <b>ADOPT / TAKE CONTROL</b> button — adopting it generates a small local <code>&lt;name&gt;.yaml</code> in <code>/config/esphome/</code> that references Kauf's published package (github.com/KaufHA). That generated file is where you add <code>web_server:</code>, then Install.</div>
+      </details>
       </details>
     </div>
 
