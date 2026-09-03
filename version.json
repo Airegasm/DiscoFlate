@@ -1,6 +1,6 @@
 {
-  "version": "3.12.1",
-  "versionCode": 71,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.12.1/discoflate.apk",
-  "notes": "DiscoFlate v3.12.1 \u2014 one vote per person: ballots are final (a second vote gets 'you already voted', privately for buttons//vote)."
+  "version": "3.12.2",
+  "versionCode": 72,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.12.2/discoflate.apk",
+  "notes": "DiscoFlate v3.12.2 \u2014 fix: selecting a poll in a capacity event's action block now saves (the serializer was dropping the field, so it looked like it cleared itself)."
 }
