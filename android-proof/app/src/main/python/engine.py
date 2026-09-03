@@ -1072,6 +1072,8 @@ class Engine:
             return {"reply": f"🗳 Vote with `{prefix}{vote} 1`–`{prefix}{vote} {len(opts)}`"}
         if not (1 <= n <= len(opts)):
             return {"reply": f"🗳 That poll has options 1–{len(opts)}."}
+        if str(uid) in self._poll["votes"]:
+            return {"reply": f"🗳 {who}, you already voted in this poll — one vote per person!"}
         self._poll["votes"][str(uid)] = n - 1
         self._poll["voters"][str(uid)] = who
         # `label` is for the voter's PRIVATE confirmation (ephemeral button/

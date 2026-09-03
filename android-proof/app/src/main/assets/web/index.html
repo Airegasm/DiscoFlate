@@ -564,7 +564,7 @@
       <div class="row" style="gap:10px;align-items:flex-end;margin-top:8px">
         <label class="field">Poll vote command <span class="muted">(only active while a poll runs)</span>
           <input id="cmdVote" value="agvote" style="width:130px"></label>
-        <span class="muted">People vote with <code>!agvote 1</code>, <code>!agvote 2</code>, …</span>
+        <span class="muted">People vote with <code>!agvote 1</code>, <code>/vote</code>, or the embed's buttons — <b>one vote per person</b>, no take-backs.</span>
       </div>
       <div class="hint" style="max-width:860px">A poll is an <b>action</b>: reference it from a command (type <b>poll</b>), a timed event (action <b>poll</b>), a capacity event's block, or even a winning option of another poll. It posts as a rich embed — <b>Poll: &lt;title&gt;</b> with the body and numbered options — runs for its duration (optionally reposting every N seconds), then the <b>winning option's actions execute</b>. Ties break at random; with no votes the <b>Fallback</b> option wins (none marked = nothing happens). One poll at a time. A poll inside an event's action block keeps that event <b>running</b> until the poll completes, then the event's remaining actions resolve.</div>
       <div id="polls" style="margin-top:10px"></div>
