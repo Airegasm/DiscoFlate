@@ -1,6 +1,6 @@
 {
-  "version": "2.2",
-  "versionCode": 26,
+  "version": "2.3",
+  "versionCode": 27,
   "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk",
-  "notes": "DiscoFlate v2.2 \u2014 removed the stop chat command; [commands] now lists leaderboard + pumptimer under System Commands"
+  "notes": "DiscoFlate v2.3 \u2014 About DiscoFlate section in Help; README refreshed"
 }

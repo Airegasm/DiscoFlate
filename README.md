@@ -37,7 +37,9 @@ dice, cooldowns, announcements, custom commands, images, and one-time milestones
 - **Snapshot** — capture a webcam frame and post it to the channel.
 - **Operator Controls** — dashboard buttons (Roll, Stop, Pump, Broadcast
   Capacity/Users) that fire real in-channel actions *as the owner*, exactly as if
-  they'd typed the command.
+  they'd typed the command. The **owner name** is set right at the top of the Dashboard.
+- **Mock mode** — run the entire game (capacity, timers, messages, leaderboard)
+  with **no hardware at all**; set the virtual pump's calibration on the Devices tab.
 
 Fully templated messages via `[placeholders]` — `[capacity]`, `[capacity_bar]`,
 `[dice]`, `[result]`, `[secs2capacity]`, `[timer]`, `[commands]`,
@@ -55,10 +57,15 @@ Fully templated messages via `[placeholders]` — `[capacity]`, `[capacity_bar]`
 | **Govee** | Govee Developer Cloud API | ported |
 | **Wyze** | Wyze cloud login | ported |
 | **Tapo** (TP-Link, KLAP) | Local KLAP handshake — fragile; prefer Home Assistant | ported |
+| **Kauf** (ESPHome) | Local ESPHome web-server REST (`web_server`), no account | ported |
 
 Only **Kasa** is verified against real hardware. The others are faithful ports of
 their documented protocols but **unverified** — a user with that hardware confirms
 them. Each device is a **pump** (drives capacity) or **other** (just fires).
+
+> **Recommended hardware:** for the least hassle, get a **Kasa HS103** — local, no
+> account, and verified. **Do not update its firmware** — newer firmware can break
+> local control. The Devices tab links straight to it.
 
 **Calibration:** on the Devices tab, hit **Calibrate**, let the pump run until
 full, and tap **Full** — the elapsed seconds become that device's
@@ -69,8 +76,8 @@ full, and tap **Full** — the elapsed seconds become that device's
 ## Run it (desktop)
 
 ```bash
-git clone https://github.com/AireGasm/discoflate.git
-cd discoflate
+git clone https://github.com/Airegasm/DiscoFlate.git
+cd DiscoFlate
 ./start.sh          # Linux/macOS — creates the venv on first run, then serves
                     # → http://127.0.0.1:8765   (Ctrl-C to stop)
 ```
@@ -118,6 +125,16 @@ cd android-proof
 A Wi-Fi `MulticastLock` handles Kasa discovery on Android; a foreground service
 keeps the bot alive and forces devices **off** if the app is stopped or swiped
 away.
+
+---
+
+## Updates
+
+The app checks for a newer release on launch and shows a banner on the Dashboard.
+**Help → Updates** applies it: on desktop it `git pull`s the latest code (then
+restart DiscoFlate); on the phone it downloads and installs the new APK. Every APK
+is signed with the same key, so the phone updates **in place** and keeps your
+config and token.
 
 ---
 
