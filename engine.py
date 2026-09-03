@@ -969,11 +969,20 @@ class Engine:
                 self._log("error", f"poll embed failed: {e}")
         await self._announce(f"**{title}**\n{text}", None)
 
-    def _poll_text(self, pd: dict, opts: list) -> str:
+    def _poll_counts(self, opts: list) -> list[int]:
+        counts = [0] * len(opts)
+        for idx in (self._poll or {}).get("votes", {}).values():
+            if 0 <= idx < len(opts):
+                counts[idx] += 1
+        return counts
+
+    def _poll_text(self, pd: dict, opts: list, counts: list | None = None) -> str:
         prefix = self.cfg.get("command_prefix", "!")
         vote = self.builtin_names()["vote"]
         body = self.render((pd.get("body") or "").strip())
-        lines = [f"**{i + 1}.** {o.get('label', '')}" for i, o in enumerate(opts)]
+        lines = [f"**{i + 1}.** {o.get('label', '')}"
+                 + (f" — {counts[i]} vote{'s' if counts[i] != 1 else ''}" if counts else "")
+                 for i, o in enumerate(opts)]
         return ((body + "\n\n") if body else "") + "\n".join(lines) + \
             f"\n\nVote with `{prefix}{vote} 1`–`{prefix}{vote} {len(opts)}`"
 
@@ -1014,12 +1023,10 @@ class Engine:
                     break
                 await asyncio.sleep(min(remaining, repeat) if repeat else remaining)
                 if repeat and time.monotonic() < end - 1:
-                    await self._announce_poll(title, text)
+                    # reposts carry the live tally next to each option
+                    await self._announce_poll(title, self._poll_text(pd, opts, self._poll_counts(opts)))
             # tally
-            counts = [0] * len(opts)
-            for idx in self._poll["votes"].values():
-                if 0 <= idx < len(opts):
-                    counts[idx] += 1
+            counts = self._poll_counts(opts)
             total = sum(counts)
             if total == 0:
                 winner_idx = next((i for i, o in enumerate(opts) if o.get("fallback")), None)
@@ -1044,9 +1051,12 @@ class Engine:
         if winner_idx is not None:
             await self._run_action_block(opts[winner_idx].get("actions"), f"poll {name}")
 
-    def cast_vote(self, uid, who: str, arg: str) -> str | None:
+    def cast_vote(self, uid, who: str, arg: str) -> dict | None:
         """Handle the vote system command. None = no poll running (stay silent
-        — the command only exists during a poll). Otherwise a reply string."""
+        — the command only exists during a poll). Otherwise a dict: `reply`
+        (to the voter, for usage errors) or `broadcast` (a QUIET vote notice —
+        the ballot itself stays secret; the channel only learns THAT they
+        voted, never what for)."""
         if self._poll is None:
             return None
         opts = self._poll["opts"]
@@ -1055,14 +1065,12 @@ class Engine:
         try:
             n = int(str(arg).strip())
         except (TypeError, ValueError):
-            return f"🗳 Vote with `{prefix}{vote} 1`–`{prefix}{vote} {len(opts)}`"
+            return {"reply": f"🗳 Vote with `{prefix}{vote} 1`–`{prefix}{vote} {len(opts)}`"}
         if not (1 <= n <= len(opts)):
-            return f"🗳 That poll has options 1–{len(opts)}."
-        changed = str(uid) in self._poll["votes"]
+            return {"reply": f"🗳 That poll has options 1–{len(opts)}."}
         self._poll["votes"][str(uid)] = n - 1
         self._poll["voters"][str(uid)] = who
-        label = opts[n - 1].get("label", "")
-        return f"🗳 **{who}** {'changed their vote to' if changed else 'voted for'} **{label}**!"
+        return {"broadcast": f"🗳 **[Poll]** {who} has voted in the poll!"}
 
     def _cancel_poll_task(self) -> None:
         if self._poll_task is not None:

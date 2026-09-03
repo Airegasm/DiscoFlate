@@ -580,9 +580,13 @@ class BotManager:
             # only live during a poll — cast_vote returns None otherwise (silent)
             parts = content[len(prefix):].split(None, 1)
             arg = parts[1].strip() if len(parts) > 1 else ""
-            reply = self.engine.cast_vote(str(message.author.id), who, arg)
-            if reply:
-                await _reply(message, reply)
+            res = self.engine.cast_vote(str(message.author.id), who, arg)
+            if not res:
+                return
+            if res.get("reply"):                       # usage errors → just the voter's channel
+                await _reply(message, res["reply"])
+            if res.get("broadcast"):                   # quiet vote notice → everywhere
+                await self.broadcast(res["broadcast"], None)
             return
 
         if action == "help":

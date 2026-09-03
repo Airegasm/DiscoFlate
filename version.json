@@ -1,6 +1,6 @@
 {
-  "version": "3.11.0",
-  "versionCode": 68,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.11.0/discoflate.apk",
-  "notes": "DiscoFlate v3.11.0 \u2014 Polls: named chat polls posted as rich embeds (Poll: <title> + up to 4 options), started by commands (type 'poll'), timed events, capacity-event blocks, or even a winning option of another poll. Vote with !agvote N (renameable; only active during a poll). Winner's action block executes on completion; fallback option wins when nobody votes; a poll inside an event keeps that event running until it completes."
+  "version": "3.11.1",
+  "versionCode": 69,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.11.1/discoflate.apk",
+  "notes": "DiscoFlate v3.11.1 \u2014 secret-ballot polls: votes broadcast only '[Poll] <name> has voted in the poll!' (never the choice), and repeated poll messages show the live tally next to each option."
 }
