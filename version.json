@@ -1,6 +1,6 @@
 {
-  "version": "3.2.7",
-  "versionCode": 51,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=51",
-  "notes": "DiscoFlate v3.2.7 \u2014 two more minigames: Slots (public !agpull) and Blackjack (ephemeral !agblackjack), always-on defaults"
+  "version": "3.2.8",
+  "versionCode": 52,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=52",
+  "notes": "DiscoFlate v3.2.8 \u2014 minigame tiers use a comparison operator (>= > = != < <=) instead of hardcoded >="
 }

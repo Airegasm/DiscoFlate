@@ -408,7 +408,8 @@
         {
           "min": 0,
           "message": "\ud83d\udca5 **[user]** busted out with **[score]**. Womp womp.",
-          "fires": []
+          "fires": [],
+          "op": ">="
         },
         {
           "min": 3,
@@ -418,7 +419,8 @@
               "device_id": null,
               "seconds": 6
             }
-          ]
+          ],
+          "op": ">="
         },
         {
           "min": 6,
@@ -428,7 +430,8 @@
               "device_id": null,
               "seconds": 18
             }
-          ]
+          ],
+          "op": ">="
         }
       ]
     },
@@ -465,7 +468,8 @@
         {
           "min": 0,
           "message": "\u274c **[user]** fumbled at round **[score]**.",
-          "fires": []
+          "fires": [],
+          "op": ">="
         },
         {
           "min": 3,
@@ -475,7 +479,8 @@
               "device_id": null,
               "seconds": 6
             }
-          ]
+          ],
+          "op": ">="
         },
         {
           "min": 6,
@@ -485,7 +490,8 @@
               "device_id": null,
               "seconds": 18
             }
-          ]
+          ],
+          "op": ">="
         }
       ]
     },
@@ -526,7 +532,8 @@
         {
           "min": 0,
           "message": "\ud83d\udca5 **[user]** popped a balloon and walked away with nothing.",
-          "fires": []
+          "fires": [],
+          "op": ">="
         },
         {
           "min": 3,
@@ -536,7 +543,8 @@
               "device_id": null,
               "seconds": 6
             }
-          ]
+          ],
+          "op": ">="
         },
         {
           "min": 5,
@@ -546,7 +554,8 @@
               "device_id": null,
               "seconds": 18
             }
-          ]
+          ],
+          "op": ">="
         }
       ]
     },
@@ -587,12 +596,14 @@
         {
           "min": 0,
           "message": "\ud83d\udc80 **[user]** got swept by the bot.",
-          "fires": []
+          "fires": [],
+          "op": ">="
         },
         {
           "min": 1,
           "message": "\ud83d\ude05 **[user]** fought to **[score]** round(s) but lost the match.",
-          "fires": []
+          "fires": [],
+          "op": ">="
         },
         {
           "min": 3,
@@ -602,7 +613,8 @@
               "device_id": null,
               "seconds": 12
             }
-          ]
+          ],
+          "op": ">="
         }
       ]
     },
@@ -644,7 +656,8 @@
         {
           "min": 0,
           "message": "\ud83c\udfb0 no match \u2014 better luck next pull, **[user]**.",
-          "fires": []
+          "fires": [],
+          "op": ">="
         },
         {
           "min": 1,
@@ -654,7 +667,8 @@
               "device_id": null,
               "seconds": 6
             }
-          ]
+          ],
+          "op": ">="
         },
         {
           "min": 3,
@@ -664,7 +678,8 @@
               "device_id": null,
               "seconds": 20
             }
-          ]
+          ],
+          "op": ">="
         }
       ]
     },
@@ -706,12 +721,14 @@
         {
           "min": 0,
           "message": "\ud83c\udccf **[user]** lost the hand.",
-          "fires": []
+          "fires": [],
+          "op": ">="
         },
         {
           "min": 1,
           "message": "\ud83c\udccf **[user]** pushed \u2014 a wash.",
-          "fires": []
+          "fires": [],
+          "op": ">="
         },
         {
           "min": 2,
@@ -721,7 +738,8 @@
               "device_id": null,
               "seconds": 8
             }
-          ]
+          ],
+          "op": ">="
         },
         {
           "min": 3,
@@ -731,7 +749,8 @@
               "device_id": null,
               "seconds": 18
             }
-          ]
+          ],
+          "op": ">="
         }
       ]
     }

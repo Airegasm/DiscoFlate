@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.2.7</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.2.8</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -524,7 +524,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v3.2.7.</span>
+        <span class="muted" id="updMsg">You're on v3.2.8.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -1563,14 +1563,17 @@ function gameTiersEditor(i, c){
   const rows = tiers.map((t,j)=>
     `<div class="dev" style="flex-direction:column;align-items:stretch;gap:6px">`+
       `<div class="row" style="gap:8px;align-items:center">`+
-        `<span class="muted">when score ≥</span><input type="number" value="${t.min??0}" style="width:80px" onchange="setTier(${i},${j},'min',this.value)">`+
+        `<span class="muted">when score</span>`+
+        `<select onchange="setTier(${i},${j},'op',this.value)">`+
+          ['>=','>','=','!=','<','<='].map(o=>`<option value="${o}" ${(t.op||'>=')===o?'selected':''}>${o}</option>`).join('')+`</select>`+
+        `<input type="number" value="${t.min??0}" style="width:80px" onchange="setTier(${i},${j},'min',this.value)">`+
         `<div style="flex:1"></div>`+
         `<button class="ghost" onclick="removeTier(${i},${j})">✕</button>`+
       `</div>`+
       `<textarea rows="2" placeholder="broadcast on this tier · [user] [score] [secs] [secs2capacity] …" onchange="setTier(${i},${j},'message',this.value)">${esc(t.message||'')}</textarea>`+
       tierFiresEditor(i,j,t)+
     `</div>`).join('');
-  return `<div class="muted" style="margin:8px 0 4px">Outcome tiers <span class="muted">— the highest “score ≥” the final score reaches wins (add a <b>score ≥ 0</b> tier as the floor/loss).</span></div>`+
+  return `<div class="muted" style="margin:8px 0 4px">Outcome tiers <span class="muted">— pick an operator (≥, &gt;, =, ≠, &lt;, ≤) &amp; value; among all tiers that match the final score, the <b>highest value</b> wins (add a <b>≥ 0</b> tier as the floor/loss).</span></div>`+
     (rows||'<div class="muted" style="margin-bottom:4px">no tiers yet</div>')+
     `<button class="ghost" style="margin-top:6px" onclick="addTier(${i})">+ Add tier</button>`;
 }
@@ -1586,7 +1589,7 @@ function tierFiresEditor(i,j,t){
     `<button class="ghost" style="margin-top:4px" onclick="addTierFire(${i},${j})">+ Add Device Fire</button></div>`;
 }
 function setTier(i,j,field,val){ const t=(commandRows[i].game_tiers||[])[j]; if(!t) return; t[field]=(field==='min')?(val===''?0:+val):val; scheduleSave(); }
-function addTier(i){ commandRows[i].game_tiers=commandRows[i].game_tiers||[]; commandRows[i].game_tiers.push({min:0,message:'',fires:[]}); renderCommands(); scheduleSave(); }
+function addTier(i){ commandRows[i].game_tiers=commandRows[i].game_tiers||[]; commandRows[i].game_tiers.push({op:'>=',min:0,message:'',fires:[]}); renderCommands(); scheduleSave(); }
 function removeTier(i,j){ (commandRows[i].game_tiers||[]).splice(j,1); renderCommands(); scheduleSave(); }
 function setTierFire(i,j,k,field,val){ const f=(((commandRows[i].game_tiers||[])[j]||{}).fires||[])[k]; if(!f) return; f[field]=(field==='seconds')?(val===''?null:+val):(val||null); scheduleSave(); }
 function addTierFire(i,j){ const t=(commandRows[i].game_tiers||[])[j]; if(!t) return; t.fires=t.fires||[]; t.fires.push({device_id:null,seconds:5}); renderCommands(); scheduleSave(); }
@@ -1684,7 +1687,7 @@ function cleanCommands(){
     sm_symbols:c.sm_symbols??4, sm_max_rounds:c.sm_max_rounds??8, sm_reveal:c.sm_reveal??3,
     bl_cells:c.bl_cells??9, bl_pops:c.bl_pops??3, bl_points:c.bl_points??1, rps_wins:c.rps_wins??3, sl_symbols:c.sl_symbols??6,
     game_intro:c.game_intro||'',
-    game_tiers:(c.game_tiers||[]).map(t=>({min:+t.min||0, message:t.message||'', fires:cleanFires(t.fires)})),
+    game_tiers:(c.game_tiers||[]).map(t=>({op:t.op||'>=', min:+t.min||0, message:t.message||'', fires:cleanFires(t.fires)})),
   }));
 }
 async function saveCommands(){ applyState(await api('/api/config', {commands: cleanCommands()}), true); }

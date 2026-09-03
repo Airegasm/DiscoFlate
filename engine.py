@@ -1163,16 +1163,32 @@ class Engine:
             score = 0
         return reels, score
 
+    @staticmethod
+    def _tier_match(score, op, val) -> bool:
+        try:
+            v = float(val)
+        except (TypeError, ValueError):
+            v = 0.0
+        op = (op or ">=").strip()
+        if op == ">":  return score > v
+        if op == "<":  return score < v
+        if op == "<=": return score <= v
+        if op in ("=", "=="): return score == v
+        if op == "!=": return score != v
+        return score >= v   # default / ">="
+
     def game_tier_for(self, cmd: dict, score) -> dict:
-        """The highest score→outcome tier whose `min` the score reaches."""
+        """The matching score→outcome tier with the highest value. Each tier is a
+        comparison (op value) against the score; with all ops ">=" this is the
+        classic 'highest threshold reached' behaviour."""
         best = None
         for t in (cmd.get("game_tiers") or []):
             try:
-                m = float(t.get("min", 0))
+                v = float(t.get("min", 0))
             except (TypeError, ValueError):
-                m = 0.0
-            if score >= m and (best is None or m >= best[0]):
-                best = (m, t)
+                v = 0.0
+            if self._tier_match(score, t.get("op"), v) and (best is None or v >= best[0]):
+                best = (v, t)
         return best[1] if best else {}
 
     async def game_result(self, cmd: dict, score, who: str, uid) -> dict:
