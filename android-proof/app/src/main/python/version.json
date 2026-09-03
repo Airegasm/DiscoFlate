@@ -1,6 +1,6 @@
 {
-  "version": "3.12.4",
-  "versionCode": 74,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.12.4/discoflate.apk",
-  "notes": "DiscoFlate v3.12.4 \u2014 new 'broadcast' action type in action blocks: pick one of your saved Broadcast presets from a dropdown and it posts (placeholders rendered) as part of the sequence."
+  "version": "3.13.0",
+  "versionCode": 75,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.13.0/discoflate.apk",
+  "notes": "DiscoFlate v3.13.0 \u2014 new 'end_session' action: ends the session (stops devices, deactivates, posts your OFF message) with an optional extra line posted first. Nothing after it in the block runs."
 }

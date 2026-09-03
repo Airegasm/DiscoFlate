@@ -920,6 +920,15 @@ class Engine:
                     else:
                         await self._run_poll(pd, source=name)
                     continue
+                if typ == "end_session":
+                    # End the session like the OFF switch: post an optional
+                    # extra line, then the normal off-message + deactivate.
+                    # Ends the block — nothing after end_session runs.
+                    extra = (a.get("message") or "").strip()
+                    if extra:
+                        await self._announce(self._evt_hdr(name) + self.render(extra), None)
+                    await self.end_session(source=name)
+                    break
                 if typ in ("fire", "roll"):
                     target = a.get("device_id") or self._active_id()
                     if self._device(target) is None:
@@ -955,6 +964,17 @@ class Engine:
             self._capev_enable.pop(key, None)
             self._capev_tasks.pop(key, None)
             self._log("bot", f"CAPACITY EVENT '{name}' complete")
+
+    async def end_session(self, source: str = "end_session") -> None:
+        """End the session like the OFF switch (posts the off-message), but
+        stop all devices first — it's an explicit end, not just a mute."""
+        await self.abort(reason=source)
+        self._log("bot", f"SESSION ENDED ({source})")
+        if self.end_session_cb:
+            try:
+                await self.end_session_cb(post_off_message=True)
+            except Exception as e:  # noqa: BLE001
+                self._log("error", f"end session failed: {e}")
 
     # -- polls ---------------------------------------------------------------- #
     def find_poll(self, name) -> dict | None:

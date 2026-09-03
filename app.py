@@ -987,10 +987,17 @@ async def main() -> None:
     engine.cancel_games_cb = botmgr.cancel_all_games  # session pause kills live games
     engine.embed_cb = botmgr.post_embed               # polls post as rich embeds
 
-    async def _end_session():
-        # Deactivate WITHOUT posting the activation-off message (End Sequence).
+    async def _end_session(post_off_message: bool = False):
+        # Deactivate. End Sequence calls this WITHOUT the off-message;
+        # the end_session action calls it WITH (same text + footer as the
+        # manual OFF switch). Deactivate first so [uptime] renders frozen.
         cfg2 = config_store.update({"listener_enabled": False})
         engine.set_config(cfg2)
+        if post_off_message:
+            msg = (cfg2.get("listener_message_off") or "")
+            if msg.strip():
+                footer = f"-# DiscoFlate v{VERSION} by AireGasm"
+                await botmgr.announce(f"{engine.render(msg.strip())}\n{footer}", None)
     engine.end_session_cb = _end_session
     if cfg.get("discord_token"):
         await botmgr.ensure(cfg["discord_token"])
