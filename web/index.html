@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.1.1</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.1.2</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -300,26 +300,36 @@
     <!-- snapshot -->
     <div class="card span" data-tab="snapshot">
       <h2>Snapshot</h2>
-      <div class="row" style="gap:12px;align-items:flex-end">
-        <label class="field" style="min-width:240px">Camera
+      <div class="row" style="gap:12px;align-items:flex-end;flex-wrap:wrap">
+        <label class="field" style="min-width:220px">Camera
           <select id="camSelect" onchange="startCamera(this.value)"><option value="">— start camera to list —</option></select>
         </label>
         <button class="ghost" onclick="startCamera()">▶ Start / allow camera</button>
         <button class="ghost" onclick="stopCamera()">■ Stop</button>
-        <label class="row" style="gap:6px"><input type="checkbox" id="camMirror" onchange="applyMirror()"> mirror preview</label>
+        <label class="row" style="gap:6px"><input type="checkbox" id="camMirror" onchange="applyPreviewTransform()"> mirror</label>
+        <label class="row" style="gap:6px">zoom <input type="range" id="camZoomSlider" min="1" max="5" step="0.1" value="1" style="width:120px" oninput="camZoom=+this.value;applyPreviewTransform()"></label>
         <span class="muted" id="camMsg"></span>
       </div>
-      <div style="margin-top:12px;background:#000;border:1px solid var(--line);border-radius:10px;overflow:hidden;width:100%;max-width:300px;aspect-ratio:9/16">
-        <video id="camPreview" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;display:block"></video>
+      <div id="camWrap" style="margin-top:12px;position:relative;background:#000;border:1px solid var(--line);border-radius:10px;overflow:hidden;width:100%;max-width:300px;aspect-ratio:9/16;touch-action:none">
+        <video id="camPreview" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;display:block;transform-origin:center center"></video>
+        <button id="snapBtn" onclick="snapPhoto()" title="Snap photo" style="position:absolute;bottom:14px;left:50%;transform:translateX(-50%);width:60px;height:60px;border-radius:50%;background:#fff;border:4px solid rgba(0,0,0,.4);cursor:pointer;padding:0;box-shadow:0 2px 10px rgba(0,0,0,.5)"></button>
       </div>
-      <label class="field" style="margin-top:12px;max-width:720px">Caption <span class="muted">(optional — placeholders work)</span>
-        <input id="snapCaption" placeholder="e.g. [operator] is at [capacity]% [capacity_bar]"></label>
-      <div class="row" style="margin-top:10px">
-        <button onclick="sendSnapshot()">📸 Send Snapshot</button>
-        <span class="muted" id="snapMsg"></span>
+      <div class="hint" style="margin-top:6px">Pinch (or the zoom slider) to zoom · tap the white button to snap. <span id="snapMsg" style="color:var(--accent2)"></span></div>
+
+      <!-- captured photo → review, then send or discard -->
+      <div id="snapReview" style="display:none;margin-top:14px;border-top:1px solid var(--line);padding-top:14px">
+        <div class="muted" style="margin-bottom:6px">Snapshot — send it or discard</div>
+        <div style="background:#000;border:1px solid var(--line);border-radius:10px;overflow:hidden;width:100%;max-width:300px;aspect-ratio:9/16">
+          <img id="snapImg" alt="snapshot" style="width:100%;height:100%;object-fit:cover;display:block">
+        </div>
+        <label class="field" style="margin-top:10px;max-width:480px">Caption <span class="muted">(optional — placeholders work)</span>
+          <input id="snapCaption" placeholder="e.g. [operator] is at [capacity]% [capacity_bar]"></label>
+        <div class="row" style="margin-top:10px">
+          <button onclick="sendSnapshot()">📤 Send to server</button>
+          <button class="warn" onclick="discardSnap()">🗑 Discard</button>
+        </div>
       </div>
-      <div class="hint">Lists this machine's cameras (onboard + attached). <b>Send Snapshot</b> captures the current frame
-        and posts it to every channel the bot is listening in. Grant camera permission when the browser asks.</div>
+      <div class="hint">Lists this machine's cameras. Snapshots post to every channel the bot is listening in. Grant camera permission when the browser asks.</div>
       <canvas id="snapCanvas" style="display:none"></canvas>
     </div>
 
@@ -513,7 +523,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v3.1.1.</span>
+        <span class="muted" id="updMsg">You're on v3.1.2.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -810,7 +820,8 @@ async function api(path, body){
 async function act(path){ await api(path); refresh(); }
 
 // ---- snapshot / camera (uses this machine's cameras via the browser) ----
-let camStream = null;
+let camStream = null, camZoom = 1, snapBlob = null, snapBlobUrl = null;
+function setSnapMsg(t){ const m=$('#snapMsg'); if(m) m.textContent=t; }
 async function listCameras(selected){
   try{
     const devs = await navigator.mediaDevices.enumerateDevices();
@@ -823,14 +834,14 @@ async function listCameras(selected){
 async function startCamera(deviceId){
   stopCamera();
   try{
-    // Default to the FRONT camera at a decent square-ish resolution (phones);
-    // an explicit deviceId (desktop multi-cam picker) overrides. facingMode is
-    // best-effort and ignored on desktop, so this stays cross-platform.
+    // Default to the FRONT camera on phones (portrait); an explicit deviceId
+    // (desktop multi-cam picker) overrides. facingMode is best-effort.
     const constraints = { audio:false, video: deviceId
       ? {deviceId:{exact:deviceId}}
       : {facingMode:{ideal:'user'}, width:{ideal:1280}, height:{ideal:1280}} };
     camStream = await navigator.mediaDevices.getUserMedia(constraints);
     $('#camPreview').srcObject = camStream;
+    camZoom = 1; const zs=$('#camZoomSlider'); if(zs) zs.value = 1; applyPreviewTransform();
     $('#camMsg').textContent = 'camera on';
     await listCameras(deviceId || (camStream.getVideoTracks()[0]?.getSettings?.().deviceId));
   }catch(e){
@@ -842,22 +853,63 @@ function stopCamera(){
   const v=$('#camPreview'); if(v) v.srcObject=null;
   const m=$('#camMsg'); if(m) m.textContent='';
 }
-function applyMirror(){ $('#camPreview').style.transform = $('#camMirror').checked ? 'scaleX(-1)' : 'none'; }
-async function sendSnapshot(){
-  if(!camStream){ $('#snapMsg').textContent='start the camera first'; return; }
-  const v=$('#camPreview'), cv=$('#snapCanvas');
-  cv.width=v.videoWidth||1280; cv.height=v.videoHeight||720;
+function applyPreviewTransform(){
+  const v=$('#camPreview'); if(!v) return;
+  const mir=($('#camMirror')&&$('#camMirror').checked)?' scaleX(-1)':'';
+  v.style.transform = `scale(${camZoom})${mir}`;
+}
+function applyMirror(){ applyPreviewTransform(); }   // legacy alias
+// Pinch-to-zoom on the preview (touch). Slider handles desktop.
+(function(){
+  const wrap=$('#camWrap'); if(!wrap) return;
+  let startDist=0, startZoom=1;
+  const D=t=>Math.hypot(t[0].clientX-t[1].clientX, t[0].clientY-t[1].clientY);
+  wrap.addEventListener('touchstart', e=>{ if(e.touches.length===2){ startDist=D(e.touches); startZoom=camZoom; e.preventDefault(); } }, {passive:false});
+  wrap.addEventListener('touchmove', e=>{ if(e.touches.length===2 && startDist>0){
+    camZoom=Math.max(1,Math.min(5, startZoom*(D(e.touches)/startDist)));
+    const zs=$('#camZoomSlider'); if(zs) zs.value=camZoom.toFixed(1);
+    applyPreviewTransform(); e.preventDefault();
+  } }, {passive:false});
+  wrap.addEventListener('touchend', e=>{ if(e.touches.length<2) startDist=0; });
+})();
+// Snap the CURRENT view to a portrait (9:16) image matching the preview + zoom,
+// then show it below for review before sending.
+function snapPhoto(){
+  const v=$('#camPreview'); if(!camStream || !v.videoWidth){ setSnapMsg('start the camera first'); return; }
+  const vw=v.videoWidth, vh=v.videoHeight, arT=9/16;
+  // object-fit:cover crop of the video into 9:16 (what the preview shows)…
+  let sw, sh;
+  if(vw/vh > arT){ sh=vh; sw=vh*arT; } else { sw=vw; sh=vw/arT; }
+  // …then centre-crop by the zoom factor.
+  const z=Math.max(1, camZoom||1); sw/=z; sh/=z;
+  const sx=(vw-sw)/2, sy=(vh-sh)/2;
+  const OUT_W=720, OUT_H=Math.round(OUT_W*16/9);   // 720×1280 portrait
+  const cv=$('#snapCanvas'); cv.width=OUT_W; cv.height=OUT_H;
   const ctx=cv.getContext('2d');
-  if($('#camMirror').checked){ ctx.translate(cv.width,0); ctx.scale(-1,1); }
-  ctx.drawImage(v,0,0,cv.width,cv.height);
-  $('#snapMsg').textContent='sending…';
-  cv.toBlob(async blob=>{
-    const fd=new FormData(); fd.append('file', blob, 'snapshot.jpg'); fd.append('caption', $('#snapCaption').value||'');
-    try{
-      const r=await (await fetch('/api/snapshot',{method:'POST',body:fd})).json();
-      $('#snapMsg').textContent = r.ok ? `sent to ${r.channels} channel${r.channels===1?'':'s'} ✓` : 'send failed';
-    }catch(e){ $('#snapMsg').textContent='send failed'; }
+  if($('#camMirror').checked){ ctx.translate(OUT_W,0); ctx.scale(-1,1); }
+  ctx.drawImage(v, sx, sy, sw, sh, 0, 0, OUT_W, OUT_H);
+  cv.toBlob(blob=>{
+    if(!blob){ setSnapMsg('snap failed'); return; }
+    if(snapBlobUrl) URL.revokeObjectURL(snapBlobUrl);
+    snapBlob=blob; snapBlobUrl=URL.createObjectURL(blob);
+    $('#snapImg').src=snapBlobUrl; $('#snapReview').style.display=''; setSnapMsg('📸 snapped — review below');
+    $('#snapReview').scrollIntoView({behavior:'smooth', block:'nearest'});
   }, 'image/jpeg', 0.9);
+}
+function discardSnap(){
+  if(snapBlobUrl){ URL.revokeObjectURL(snapBlobUrl); snapBlobUrl=null; }
+  snapBlob=null; const im=$('#snapImg'); if(im) im.src=''; $('#snapReview').style.display='none'; setSnapMsg('');
+}
+async function sendSnapshot(){
+  if(!snapBlob){ setSnapMsg('snap a photo first'); return; }
+  setSnapMsg('sending…');
+  const fd=new FormData(); fd.append('file', snapBlob, 'snapshot.jpg'); fd.append('caption', ($('#snapCaption')&&$('#snapCaption').value)||'');
+  try{
+    const r=await (await fetch('/api/snapshot',{method:'POST',body:fd})).json();
+    if(r.ok){ setSnapMsg(`sent to ${r.channels} channel${r.channels===1?'':'s'} ✓`);
+      if(snapBlobUrl) URL.revokeObjectURL(snapBlobUrl); snapBlob=null; snapBlobUrl=null; $('#snapReview').style.display='none'; }
+    else setSnapMsg('send failed');
+  }catch(e){ setSnapMsg('send failed'); }
 }
 let capT=null;
 function setCapacity(v){ clearTimeout(capT); capT=setTimeout(()=>api('/api/capacity',{value:parseFloat(v)||0}), 120); }
