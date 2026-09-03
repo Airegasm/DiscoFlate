@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.4.0</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.5.0</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -337,6 +337,8 @@
     <!-- automation: cooldown + auto-report + activation messages -->
     <div class="card span" data-tab="game">
       <h2>Limits &amp; announcements</h2>
+      <label class="row" style="gap:8px;margin-bottom:12px"><input type="checkbox" id="outputHeaders" style="width:auto"> <b>Display output headers</b>
+        <span class="muted">— prefix each command / minigame / event message with a <code>[label · user]</code> tag so interleaved output stays readable (cross-server shows <code>ANON</code>).</span></label>
       <div class="row" style="gap:24px;align-items:flex-start">
         <div class="colsec" style="min-width:240px;max-width:320px;flex:1">
           <h3>Owner ID &amp; cooldown</h3>
@@ -524,7 +526,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v3.4.0.</span>
+        <span class="muted" id="updMsg">You're on v3.5.0.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -586,6 +588,7 @@
       <ul style="line-height:1.7;padding-left:22px;margin:0;max-width:820px">
         <li><b>Device</b> — <i>(active pump)</i> or a specific device you've added.</li>
         <li><b>owner-only</b> — only the Owner can use it. <b>reply pings user</b> — the reply @-mentions the caller. <b>hide from command list</b> — keep it out of <code>[commands]</code>.</li>
+        <li><b>react only</b> (non-game) — instead of posting a text reply, the bot adds a reaction (the emoji box, default 💨) to the caller's message. The fire/roll/credit still happen — only the reply text is suppressed — so rapid-fire commands stop flooding the channel. Cross-server echo is skipped (a reaction is local to the origin channel); falls back to a normal reply if the emoji can't be added.</li>
         <li><b>Description</b> — shown next to the command in <code>[commands]</code>. <b>Reply</b> — the templated message it posts (see <b>Placeholders</b> below).</li>
         <li><b>Starts events</b> — comma-separated names of (off-by-default) timed events this command switches on temporarily. They revert on Session reset / app restart.</li>
       </ul>
@@ -757,6 +760,8 @@ esphome dashboard config/</code></pre>
             <tr><td><code>[announce]</code></td><td>the current range's Announce text</td></tr>
             <tr><td><code>[commands]</code></td><td>all commands usable right now — <b>Capacity Range Commands</b> (this range's customs) on top, <b>System Commands</b> below</td></tr>
             <tr><td><code>[custom_commands]</code></td><td>just the <b>Capacity Range Commands (start%–stop%)</b> header + this range's custom commands (no system commands)</td></tr>
+            <tr><td><code>[toppump]</code> / <code>[toppump-all]</code></td><td>the leaderboard blocks — same output as the session / all-time top-pumpers commands, so you can embed a board inside any message</td></tr>
+            <tr><td><code>[on_message]</code> / <code>[off_message]</code></td><td>the configured Activation ON / OFF message text (rendered), for reuse in other messages</td></tr>
             <tr><td><code>[prefix]</code> <code>[roll_cmd]</code> <code>[capacity_cmd]</code> <code>[leaderboard_cmd]</code> <code>[pumptimer_cmd]</code></td><td>the command names (e.g. <code>!agroll</code>)</td></tr>
             <tr><td><code>[max_roll_goal]</code> <code>[max_roll_command]</code> <code>[max_roll_desc]</code></td><td>the active prize's goal / command / description</td></tr>
           </tbody></table>
@@ -784,6 +789,8 @@ esphome dashboard config/</code></pre>
           <h3 style="margin-top:14px">Formatting</h3>
           <div class="hint" style="margin-top:0">Press <b>Enter</b> for a new line. Discord markdown works: <code>**bold**</code>,
             <code>*italic*</code>, <code>`code`</code>. A literal <code>\n</code> also becomes a newline.</div>
+          <h3 style="margin-top:14px">Readability — Display output headers</h3>
+          <div class="hint" style="margin-top:0">When several people fire commands and multi-stage minigames at once, the lines braid together. Turn on <b>Display output headers</b> (Game → <b>Limits &amp; announcements</b>, at the top) and every command / minigame / event message is prefixed with a <code>**[label · user]**</code> tag, so each line is traceable to who and what it belongs to. The user portion respects cross-server anonymity — servers where the actor isn't a member see <code>ANON</code> instead of the name.</div>
         </div>
       </div>
       </details>
@@ -1189,6 +1196,7 @@ async function saveAutomation(){
                   message: $('#autoMessage').value},
     listener_message_on: $('#listenerOn').value,
     listener_message_off: $('#listenerOff').value,
+    output_headers: $('#outputHeaders').checked,
   });
   applyState(s, true);
 }
@@ -1267,14 +1275,14 @@ function renderRanges(){
           (endOnly?'':`<span class="muted">(${prevMax}%–[start]% uses your last range; [start]%–[end]% is the buildup)</span>`)+
         `</div>`+
         `<div class="row" style="gap:12px;align-items:flex-start">`+
-          `<label class="field" style="flex:1">Final message <span class="muted">(posted once, then session ends &amp; resets — no activation-off message)</span>`+
+          `<label class="field" style="flex:1;min-width:260px">Final message <span class="muted">(posted once, then session ends &amp; resets — no activation-off message)</span>`+
             `<textarea rows="4" placeholder="💥 Session complete!" onchange="rangeRows[${i}].final_message=this.value">${esc(r.final_message||'')}</textarea></label>`+
           imagePicker(i, 'final_image', 'Final image', '(with the final message)')+
         `</div>`;
       if(!endOnly && open){
         html += `<div class="row" style="gap:12px;align-items:flex-start">`+
-          `<label class="field" style="flex:1">Announce <span class="muted">(ongoing in the sequence)</span><textarea rows="4" onchange="rangeRows[${i}].announce=this.value">${esc(r.announce||'')}</textarea></label>`+
-          `<label class="field" style="flex:1">Milestone <span class="muted">(once on entry)</span><textarea rows="4" onchange="rangeRows[${i}].milestone=this.value">${esc(r.milestone||'')}</textarea></label>`+
+          `<label class="field" style="flex:1;min-width:260px">Announce <span class="muted">(ongoing in the sequence)</span><textarea rows="4" onchange="rangeRows[${i}].announce=this.value">${esc(r.announce||'')}</textarea></label>`+
+          `<label class="field" style="flex:1;min-width:260px">Milestone <span class="muted">(once on entry)</span><textarea rows="4" onchange="rangeRows[${i}].milestone=this.value">${esc(r.milestone||'')}</textarea></label>`+
           imagePicker(i, 'image', 'Milestone image', '(when the sequence is entered)')+
         `</div>`;
       }
@@ -1657,6 +1665,10 @@ function renderCommands(){
         `<label class="row" style="gap:6px"><input type="checkbox" ${c.owner_only?'checked':''} onchange="commandRows[${i}].owner_only=this.checked"> owner-only</label>`+
         `<label class="row" style="gap:6px"><input type="checkbox" ${c.mention?'checked':''} onchange="commandRows[${i}].mention=this.checked"> reply pings user</label>`+
         `<label class="row" style="gap:6px"><input type="checkbox" ${c.hide_in_list?'checked':''} onchange="commandRows[${i}].hide_in_list=this.checked"> hide from command list</label>`+
+        (!isGame
+          ? `<label class="row" style="gap:6px" title="acknowledge on the caller's message with a reaction instead of a text reply — cuts chat spam for rapid-fire commands (cross-server echo is skipped)"><input type="checkbox" ${c.react_only?'checked':''} onchange="commandRows[${i}].react_only=this.checked"> react only</label>`+
+            `<input value="${esc(c.react_emoji||'')}" placeholder="💨" maxlength="16" style="width:70px" title="emoji to react with (default 💨)" onchange="commandRows[${i}].react_emoji=this.value">`
+          : '')+
       `</div>`+
       `<label class="field">Description <input value="${esc(c.description||'')}" placeholder="what it does (shown in the command list)" onchange="commandRows[${i}].description=this.value"></label>`+
       (isGame
@@ -1674,7 +1686,7 @@ function renderCommands(){
     box.appendChild(el);
   });
 }
-function addCommand(){ commandRows.push({name:'',type:'fire',seconds:5,dice:'',sides:'',reply:'',enabled:true,owner_only:false,device_id:null,start_events:[],range_gate:'all',description:'',hide_in_list:false,mention:false,fires:[],fail_fires:[],chance:50,luck:null,success_reply:'',failure_reply:'',pl_bust_start:15,pl_bust_step:12,pl_max_pumps:8,pl_points:1,sm_symbols:4,sm_max_rounds:8,sm_reveal:3,bl_cells:9,bl_pops:3,bl_points:1,rps_wins:3,sl_symbols:6,game_intro:'',game_tiers:[]}); renderCommands(); renderRanges(); }
+function addCommand(){ commandRows.push({name:'',type:'fire',seconds:5,dice:'',sides:'',reply:'',enabled:true,owner_only:false,device_id:null,start_events:[],range_gate:'all',description:'',hide_in_list:false,mention:false,react_only:false,react_emoji:'',fires:[],fail_fires:[],chance:50,luck:null,success_reply:'',failure_reply:'',pl_bust_start:15,pl_bust_step:12,pl_max_pumps:8,pl_points:1,sm_symbols:4,sm_max_rounds:8,sm_reveal:3,bl_cells:9,bl_pops:3,bl_points:1,rps_wins:3,sl_symbols:6,game_intro:'',game_tiers:[]}); renderCommands(); renderRanges(); }
 function cleanFires(arr){
   return (arr||[]).filter(f=>f && (f.seconds!=null && f.seconds!=='' || f.device_id!=null))
     .map(f=>({device_id: f.device_id||null, seconds: (f.seconds===''||f.seconds==null)?null:+f.seconds}));
@@ -1689,6 +1701,7 @@ function cleanCommands(){
     start_events: (c.start_events||[]).map(x=>x.trim()).filter(Boolean),
     range_gate: c.range_gate||'all',
     description: c.description||'', hide_in_list: !!c.hide_in_list, mention: !!c.mention,
+    react_only: !!c.react_only, react_emoji: (c.react_emoji||'').trim(),
     // chance + multi-device fire
     fires: cleanFires(c.fires),
     fail_fires: cleanFires(c.fail_fires),
@@ -2121,6 +2134,7 @@ function applyState(st, full){
     $('#autoMessage').value = ar.message||'';
     $('#listenerOn').value = st.listener_message_on||'';
     $('#listenerOff').value = st.listener_message_off||'';
+    if($('#outputHeaders')) $('#outputHeaders').checked = !!st.output_headers;
     $('#tokenState').textContent = st.has_token ? '✓ token saved' : 'no token yet';
     allDevices = st.devices||[];
     allCommandKeys = ['roll', ...(st.commands||[]).map(c=>(c.name||'').trim().toLowerCase()).filter(Boolean)];

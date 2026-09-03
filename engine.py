@@ -102,7 +102,10 @@ class Engine:
         now_on = bool(cfg.get("listener_enabled"))
         if now_on and not self._listener_was:
             # Activation: re-arm all event timers so loops/once start fresh, and
-            # re-trigger range entry for the current range.
+            # re-trigger range entry for the current range. Arming also (re)starts
+            # the session uptime clock; muting leaves it intact so the OFF message
+            # can still report the full run.
+            self._session_start = time.monotonic()
             self._event_last.clear()
             self._events_done.clear()
             self._event_fires.clear()
@@ -251,6 +254,14 @@ class Engine:
         ctx["max_roll_desc"] = pz.get("description") or ""
         if extra:
             ctx.update(extra)
+        # Embeddable blocks: [toppump] / [toppump-all] = the leaderboard command
+        # output; [on_message] / [off_message] = the configured listener on/off text.
+        # Each is rendered against the ctx built so far, so their own token stays
+        # literal inside themselves (no recursion), same rule as [announce].
+        ctx["toppump"] = self.leaderboard_text()
+        ctx["toppump-all"] = self.leaderboard_life_text()
+        ctx["on_message"] = self._render((self.cfg.get("listener_message_on") or ""), ctx)
+        ctx["off_message"] = self._render((self.cfg.get("listener_message_off") or ""), ctx)
         # [announce] = the current range's announce text (its own placeholders
         # resolved; [announce] inside it stays literal to avoid recursion).
         ann = (self.range_for(self.capacity).get("announce") or "").strip()
@@ -260,6 +271,11 @@ class Engine:
     def session_uptime(self) -> float:
         """Seconds the current session has been running (since start / last reset)."""
         return max(0.0, time.monotonic() - self._session_start)
+
+    def _evt_hdr(self, name: str) -> str:
+        """Output-header prefix for an event message (no user — events broadcast the
+        same text everywhere). Empty unless output_headers is on."""
+        return f"**[{name}]** " if (self.cfg.get("output_headers") and name) else ""
 
     @staticmethod
     def _fmt_duration(secs) -> str:
@@ -732,7 +748,7 @@ class Engine:
                 try:
                     # Same replace_key: the end message deletes the final round and
                     # stays put (the next run uses a new run id, so it's never wiped).
-                    await self._emit(self.render(em, loop_ctx), sink, replace_key=replace_key)
+                    await self._emit(self._evt_hdr(name) + self.render(em, loop_ctx), sink, replace_key=replace_key)
                 except Exception as e:  # noqa: BLE001
                     self._log("error", f"event {name} end msg failed: {e}")
 
@@ -771,7 +787,7 @@ class Engine:
                     **(extra or {})}
             tmpl = (ev.get("success_message") if win else ev.get("failure_message")) or msg
             if tmpl:
-                await self._emit(self.render(tmpl, base), sink, replace_key=replace_key)
+                await self._emit(self._evt_hdr(name) + self.render(tmpl, base), sink, replace_key=replace_key)
             return
 
         if action == "capacity":
@@ -804,7 +820,7 @@ class Engine:
             self._log("bot", f"event '{name}': message")
 
         if msg:
-            await self._emit(self.render(msg, extra), sink, replace_key=replace_key)
+            await self._emit(self._evt_hdr(name) + self.render(msg, extra), sink, replace_key=replace_key)
 
     def _cooldown_reply(self, who: str, remaining: float, uid=None, cmdkey: str = "") -> str:
         tmpl = self.cfg.get("cooldown_message") or "⏳ [mention], [cmd] is on cooldown — [cooldown]s left"
@@ -1442,17 +1458,18 @@ class Engine:
                 self._event_last.pop(key, None)
                 self._events_done.discard(key)
                 continue
+            hdr = self._evt_hdr(ev.get("name", ""))
             active = bool(ev.get("enabled")) or key in self._runtime_events_on
             if active and key not in self._events_done:
                 msg = (self.cfg.get("event_in_process_message") or "").strip()
                 if msg:
-                    posts.append(self.render(msg, self._event_ctx(ev)))
+                    posts.append(hdr + self.render(msg, self._event_ctx(ev)))
                 continue
             cd_until = self._event_cooldown_until.get(key, 0.0)
             if now < cd_until:
                 msg = (self.cfg.get("event_cooldown_message") or "").strip()
                 if msg:
-                    posts.append(self.render(msg, {**self._event_ctx(ev), "cooldown": f"{cd_until - now:.0f}"}))
+                    posts.append(hdr + self.render(msg, {**self._event_ctx(ev), "cooldown": f"{cd_until - now:.0f}"}))
                 continue
             self._runtime_events_on.add(key)
             self._event_last.pop(key, None)    # re-arm the timer from now
@@ -1462,7 +1479,7 @@ class Engine:
                 self._event_activator[key] = (uid, who)   # credit this person for the event's pumps
             am = (ev.get("activation_message") or "").strip()
             if am:
-                posts.append(self.render(am, self._event_ctx(ev)))
+                posts.append(hdr + self.render(am, self._event_ctx(ev)))
             if ev.get("fire_immediately"):
                 # Fire round 1 right now, in order (after the activation line),
                 # instead of racing the async tick loop. The tick then waits `every`.

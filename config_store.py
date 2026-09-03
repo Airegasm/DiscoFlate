@@ -81,6 +81,13 @@ DEFAULTS = {
     # and origin server are hidden behind this label.
     "anon_user_label": "Someone on another server",
 
+    # Prefix every command/minigame/event output with a **[label · user]** tag so
+    # that, when several players' commands and multi-stage minigames interleave in
+    # chat, each line is traceable to who/what it belongs to. The user portion of
+    # the tag respects cross-server anonymity (shows the anon label where the body
+    # would). Events tag with just the event name (no user).
+    "output_headers": False,
+
     # Also accept commands via DM to the bot (opt-in). Anyone who shares a
     # server with the bot can DM it, so pair this with the user allowlist.
     "allow_dms": False,
@@ -135,7 +142,13 @@ DEFAULTS = {
 
     # User-defined commands, created in the web UI on the fly. Each:
     #   {name, type, seconds, dice, sides, device_id, reply, enabled, owner_only,
-    #    mention, hide_in_list, description, start_events, range_gate}
+    #    mention, hide_in_list, description, start_events, range_gate,
+    #    react_only, react_emoji}
+    # react_only → acknowledge the command with a reaction (react_emoji, default 💨)
+    #   on the caller's message instead of posting a text reply (cuts chat spam for
+    #   rapid-fire commands). The fire/roll/credit still happen; only the reply text
+    #   is suppressed. Cross-server echo is skipped (a reaction is local to the
+    #   origin channel). Falls back to a normal reply if the emoji can't be added.
     # type "fire"   → fire device_id for `seconds` (+ optional extra `fires` rows)
     # type "roll"   → roll dice/sides (or the range's) and fire for the total
     # type "say"    → text-only reply, no device

@@ -1,6 +1,6 @@
 {
-  "version": "3.4.0",
-  "versionCode": 55,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=55",
-  "notes": "DiscoFlate v3.4.0 — [uptime] placeholder + Dashboard session timer; loop events can 'Clean up previous round' to delete old round messages as they progress (anti-spam), on by default for PumpRoulette"
+  "version": "3.5.0",
+  "versionCode": 56,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=56",
+  "notes": "DiscoFlate v3.5.0 — readability: optional [label · user] output headers (ANON cross-server) to untangle interleaved output; per-command 'react only' acks; new [toppump]/[toppump-all]/[on_message]/[off_message] placeholders; [uptime] valid in the OFF message; wider mobile end-sequence textboxes"
 }

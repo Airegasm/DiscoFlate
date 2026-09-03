@@ -38,8 +38,8 @@ PORT = int(os.getenv("DISCOFLATE_PORT", "8765"))
 HOST = "127.0.0.1"
 
 # App version — keep in sync with android versionCode + version.json in the repo.
-VERSION = "3.4.0"
-VERSION_CODE = 55
+VERSION = "3.5.0"
+VERSION_CODE = 56
 VERSION_URL = "https://raw.githubusercontent.com/Airegasm/DiscoFlate/main/version.json"
 
 # Scalar/message keys that "Restore Default Config" RESETS to the shipped default.
@@ -120,6 +120,7 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "listen_channel_id": cfg.get("listen_channel_id", ""),
         "listen_targets": cfg.get("listen_targets", []),
         "anon_user_label": cfg.get("anon_user_label", ""),
+        "output_headers": cfg.get("output_headers", False),
         "allow_dms": cfg.get("allow_dms", False),
         "server_channels": cfg.get("server_channels", {}),
         "invite_url": botmgr.invite_url(),
@@ -186,7 +187,7 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
                     "allow", "pumpdirect_path", "cooldown_seconds",
                     "cooldown_exempt_user_ids", "cooldown_exempt_names", "operator_name", "auto_report",
                     "announce_channel_id", "listen_guild_id", "listen_channel_id",
-                    "listen_targets", "anon_user_label",
+                    "listen_targets", "anon_user_label", "output_headers",
                     "allow_dms", "server_channels", "vendors", "silence_onoff_log",
                     "mock_calibration_seconds_to_100",
                     "always_on_enabled", "always_on_commands",

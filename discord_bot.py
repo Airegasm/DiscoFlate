@@ -23,6 +23,11 @@ import discord
 
 import minigames
 
+# Short token used for the actor name inside an output header when the destination
+# isn't allowed to see the real name. Kept terse on purpose (the long
+# anon_user_label sentence is for message bodies, not the compact [label · x] tag).
+_HDR_ANON = "ANON"
+
 
 class BotManager:
     def __init__(self, engine, get_config) -> None:
@@ -361,7 +366,16 @@ class BotManager:
         await self.broadcast(self.engine.leaderboard_text(), None)
         return {"ok": True}
 
-    async def _broadcast_named(self, real: str, anon: str, uid, exclude_channel_id=None) -> None:
+    def _hdr(self, cfg: dict, label: str | None, name: str | None) -> str:
+        """The **[label · name]** output-header prefix (empty unless output_headers
+        is on). `name` is the actor name the destination is allowed to see, so the
+        tag never leaks a real name where the body would show the anon label."""
+        if not cfg.get("output_headers") or not label:
+            return ""
+        return f"**[{label} · {name}]** " if name else f"**[{label}]** "
+
+    async def _broadcast_named(self, real: str, anon: str, uid, exclude_channel_id=None,
+                               label: str | None = None, who: str | None = None) -> None:
         """Broadcast a per-player result: each destination shows the real name if
         the player is a member of that server, else the anonymized version (same
         cross-server rule as command echoes)."""
@@ -380,14 +394,15 @@ class BotManager:
             show_real = bool(real) and author_id is not None and await self._is_member(getattr(ch, "guild", None), author_id)
             text = real if show_real else (anon or real)
             if text:
-                await self._send(ch, text, None)
+                await self._send(ch, self._hdr(cfg, label, who if show_real else _HDR_ANON) + text, None)
 
     async def game_payoff(self, cmd: dict, score, who: str, uid) -> None:
         """A minigame finished — fire the tier's devices (credited to the player)
         and broadcast the game-labeled result, respecting cross-server anonymity."""
         try:
             res = await self.engine.game_result(cmd, score, who, uid)
-            await self._broadcast_named(res.get("real"), res.get("anon"), uid)
+            label = self.engine.game_display_name(cmd)
+            await self._broadcast_named(res.get("real"), res.get("anon"), uid, label=label, who=who)
         except Exception as e:  # noqa: BLE001
             self.engine._log("error", f"game payoff failed: {e}")
 
@@ -495,17 +510,31 @@ class BotManager:
             if res.get("game"):
                 # Minigame: post the public Play button (locked to the author). The
                 # game itself runs ephemerally; the result is broadcast at the end.
+                glabel = self.engine.game_display_name(custom)
                 intro = (res.get("reply") or "").strip() or f"🎮 **{who}** started **{custom.get('name')}** — press Play!"
                 view = minigames.make_play_view(self, custom, who, str(message.author.id))
                 try:
-                    await message.channel.send(intro, view=view)
+                    await message.channel.send(self._hdr(cfg, glabel, who) + intro, view=view)
                 except Exception as e:  # noqa: BLE001
                     await _reply(message, f"⚠️ couldn't start the game: {e}")
                 return
             line = res["reply"]
             tail = "\n⏳ (a fire is already running — ignored)" if (res.get("device") and not res.get("started")) else ""
-            await _reply(message, line + tail, as_reply=bool(custom.get("mention")))
-            await self._echo(message, res.get("reply_anon"), tail, res.get("reply"))
+            label = custom.get("name") or ""
+            # react_only: acknowledge with a reaction instead of a text reply (spam
+            # cut for rapid-fire commands). Cross-server echo is skipped (a reaction
+            # is local); falls back to a normal reply if the emoji can't be added.
+            reacted = False
+            if custom.get("react_only"):
+                emoji = (str(custom.get("react_emoji") or "").strip()) or "💨"
+                try:
+                    await message.add_reaction(emoji)
+                    reacted = True
+                except Exception as e:  # noqa: BLE001
+                    self.engine._log("error", f"react failed ({emoji}): {e}")
+            if not reacted:
+                await _reply(message, self._hdr(cfg, label, who) + line + tail, as_reply=bool(custom.get("mention")))
+                await self._echo(message, res.get("reply_anon"), tail, res.get("reply"), label=label)
             # Event activation / in-process / cooldown lines come AFTER the reply.
             # A clean_previous loop's first round arrives as a dict carrying its
             # replace_key so subsequent rounds can delete it; others are plain text.
@@ -528,8 +557,9 @@ class BotManager:
         line = res["reply"]
         # No extend notice: the reply's [timer] already shows the new remaining
         # time, so a separate "added to the running fire" line would be redundant.
-        await _reply(message, line)
-        await self._echo(message, res.get("reply_anon"), "", res.get("reply"))
+        roll_label = self.engine.builtin_names().get("roll") or "roll"
+        await _reply(message, self._hdr(cfg, roll_label, who) + line)
+        await self._echo(message, res.get("reply_anon"), "", res.get("reply"), label=roll_label)
 
     async def _is_member(self, guild, uid: int) -> bool:
         """True if user `uid` is a member of `guild`. Checks the member cache, then
@@ -555,7 +585,7 @@ class BotManager:
         return ok
 
     async def _echo(self, message: discord.Message, anon_text: str | None, tail: str,
-                    real_text: str | None = None) -> None:
+                    real_text: str | None = None, label: str | None = None) -> None:
         """Echo a copy of a reply to the OTHER listen channels so a shared game
         reads across servers. Each destination shows the actor's real name if they
         are a member of that server (they'd be visible there anyway); otherwise the
@@ -576,7 +606,8 @@ class BotManager:
             show_real = bool(real_text) and await self._is_member(getattr(ch, "guild", None), author_id)
             text = real_text if show_real else anon_text
             if text:
-                await self._send(ch, (text + tail).strip(), None)
+                hdr = self._hdr(cfg, label, message.author.display_name if show_real else _HDR_ANON)
+                await self._send(ch, (hdr + text + tail).strip(), None)
 
 
 def _ints(xs) -> list[int]:
