@@ -903,6 +903,16 @@ class Engine:
                     val = float(a.get("capacity_value") or 0)
                     self.set_capacity(val if op == "set" else self.capacity + val)
                     continue
+                if typ == "broadcast":
+                    # posts one of the saved Broadcast presets (Commands tab)
+                    bname = str(a.get("broadcast") or "").strip().lower()
+                    row = next((b for b in self.cfg.get("broadcasts", [])
+                                if (b.get("name") or "").strip().lower() == bname), None)
+                    if row is None:
+                        self._log("error", f"{name}: no broadcast named '{a.get('broadcast')}'")
+                    elif (row.get("message") or "").strip():
+                        await self._announce(self._evt_hdr(name) + self.render(row["message"].strip()), None)
+                    continue
                 if typ == "poll":
                     pd = self.find_poll(a.get("poll"))
                     if pd is None:
