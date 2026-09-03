@@ -959,11 +959,13 @@ class Engine:
     def poll_active(self) -> bool:
         return self._poll is not None
 
-    async def _announce_poll(self, title: str, text: str) -> None:
-        """Post the poll as a rich embed (falls back to plain text)."""
+    async def _announce_poll(self, title: str, text: str, options: list | None = None) -> None:
+        """Post the poll as a rich embed (falls back to plain text). `options`
+        (the option labels) rides along on live poll posts so the transport can
+        attach vote buttons; results posts pass None."""
         if self.embed_cb:
             try:
-                await self.embed_cb(title, text)
+                await self.embed_cb(title, text, options=options)
                 return
             except Exception as e:  # noqa: BLE001
                 self._log("error", f"poll embed failed: {e}")
@@ -1014,8 +1016,9 @@ class Engine:
         self._poll = {"def": pd, "opts": opts, "votes": {}, "voters": {}}
         self._log("bot", f"POLL '{name}' started ({duration:g}s, {len(opts)} options) [{source}]")
         winner_idx = None
+        labels = [o.get("label", "") for o in opts]
         try:
-            await self._announce_poll(title, text)
+            await self._announce_poll(title, text, options=labels)
             end = time.monotonic() + duration
             while True:
                 remaining = end - time.monotonic()
@@ -1024,7 +1027,8 @@ class Engine:
                 await asyncio.sleep(min(remaining, repeat) if repeat else remaining)
                 if repeat and time.monotonic() < end - 1:
                     # reposts carry the live tally next to each option
-                    await self._announce_poll(title, self._poll_text(pd, opts, self._poll_counts(opts)))
+                    await self._announce_poll(title, self._poll_text(pd, opts, self._poll_counts(opts)),
+                                              options=labels)
             # tally
             counts = self._poll_counts(opts)
             total = sum(counts)
@@ -1070,7 +1074,25 @@ class Engine:
             return {"reply": f"🗳 That poll has options 1–{len(opts)}."}
         self._poll["votes"][str(uid)] = n - 1
         self._poll["voters"][str(uid)] = who
-        return {"broadcast": f"🗳 **[Poll]** {who} has voted in the poll!"}
+        # `label` is for the voter's PRIVATE confirmation (ephemeral button/
+        # slash replies) — the channel broadcast never reveals the choice.
+        return {"broadcast": f"🗳 **[Poll]** {who} has voted in the poll!",
+                "label": opts[n - 1].get("label", "")}
+
+    def start_poll_bg(self, name, source: str = "manual") -> dict:
+        """Start a named poll in the BACKGROUND — used by poll-type commands and
+        the dashboard Controls. Never blocks anything: other commands keep
+        working while it runs (only a poll inside an event's action block
+        blocks, and then only that block)."""
+        pd = self.find_poll(name)
+        if pd is None:
+            return {"ok": False, "error": f"no poll named '{name}' — create it in Events → Polls"}
+        if self._poll is not None:
+            return {"ok": False, "error": "🗳 A poll is already running — wait for it to finish."}
+        if self._paused:
+            return {"ok": False, "error": "session is paused"}
+        self._poll_task = asyncio.create_task(self._run_poll(pd, source=source))
+        return {"ok": True}
 
     def _cancel_poll_task(self) -> None:
         if self._poll_task is not None:
@@ -1567,17 +1589,14 @@ class Engine:
                 remaining = self.cooldown_remaining(key_uid, cmdkey)
                 if remaining > 0:
                     return {"ok": False, "cooldown": True, "error": self._cooldown_reply(who, remaining, uid, cmdkey)}
-            pd = self.find_poll(cmd.get("poll"))
-            if pd is None:
-                return {"ok": False, "error": f"no poll named '{cmd.get('poll')}' — pick one in Events → Polls"}
-            if self._poll is not None:
-                return {"ok": False, "error": "🗳 A poll is already running — wait for it to finish."}
+            res = self.start_poll_bg(cmd.get("poll"), source=f"command {name}")
+            if not res.get("ok"):
+                return {"ok": False, "error": res.get("error")}
             if uid is not None:
                 self._track_user(uid, who)
                 if scope == "command" or not owner_exempt:
                     self._touch_cooldown(key_uid, cmdkey, cd)
             _spend_use()
-            self._poll_task = asyncio.create_task(self._run_poll(pd, source=f"command {name}"))
             anon = self._anon_label()
             tmpl = cmd.get("reply") or ""
             return {"ok": True, "device": False, "started": False,

@@ -196,6 +196,8 @@
           <button class="ghost" onclick="controlCapacity()">📊 Broadcast Capacity</button>
           <select id="ctrlBroadcast" style="max-width:220px"></select>
           <button class="ghost" onclick="controlBroadcast()">📢 Broadcast Custom</button>
+          <select id="ctrlPoll" style="max-width:180px"></select>
+          <button class="ghost" onclick="controlPoll()">🗳 Start Poll</button>
           <div style="flex:1"></div>
           <span class="muted" id="ctrlMsg"></span>
         </div>
@@ -1139,6 +1141,19 @@ async function controlBroadcast(){
   const b = broadcastRows.find(x=>(x.name||'')===name);
   if(!b){ const m=$('#ctrlMsg'); if(m){ m.textContent='pick a broadcast first'; setTimeout(()=>{if(m)m.textContent='';},2500);} return; }
   ctl('/api/control/broadcast', {message: b.message||''});
+}
+async function controlPoll(){
+  const sel=$('#ctrlPoll'); const name = sel ? sel.value : '';
+  if(!name){ const m=$('#ctrlMsg'); if(m){ m.textContent='pick a poll first'; setTimeout(()=>{if(m)m.textContent='';},2500);} return; }
+  ctl('/api/control/poll', {name});
+}
+function renderPollDropdown(){
+  const sel=$('#ctrlPoll'); if(!sel) return;
+  const prev=sel.value;
+  const names=pollRows.map(p=>(p.name||'').trim()).filter(Boolean);
+  sel.innerHTML = names.length ? names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')
+                              : `<option value="">(no polls — add in Events)</option>`;
+  if(prev) sel.value = prev;
 }
 
 // ---- broadcasts (preset messages) ----
@@ -2813,6 +2828,7 @@ function applyState(st, full){
     renderEvents();
     renderCapEvents();
     renderPolls();
+    renderPollDropdown();
     renderTemplates();
     renderBroadcasts();
     renderBroadcastDropdown();
@@ -2958,7 +2974,7 @@ async function doSave(){
 // config save for them is pointless and used to race their endpoint's rev bump.
 const NO_AUTOSAVE_IDS = new Set(['mock','listener','silenceOnOff','token','announceChan',
   'raEnabled','raNewIp','capSlider','capInput','ctrlDice','ctrlSides','ctrlPump',
-  'ctrlBroadcast','camSelect','camMirror','camZoomSlider','snapCaption','importFile']);
+  'ctrlBroadcast','ctrlPoll','camSelect','camMirror','camZoomSlider','snapCaption','importFile']);
 function maybeSave(e){ if(e.target && NO_AUTOSAVE_IDS.has(e.target.id)) return; scheduleSave(); }
 document.addEventListener('input', maybeSave);
 document.addEventListener('change', maybeSave);

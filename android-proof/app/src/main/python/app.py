@@ -737,6 +737,11 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         b = await _json(request)
         return web.json_response(await botmgr.operator_resume((b.get("who") or "").strip()))
 
+    async def control_poll(request):
+        await guard(request)
+        b = await _json(request)
+        return web.json_response(await botmgr.operator_start_poll((b.get("name") or "").strip()))
+
     async def control_capacity(request):
         await guard(request)
         return web.json_response(await botmgr.operator_broadcast_capacity())
@@ -947,6 +952,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/control/pump", control_pump),
         web.post("/api/control/stop", control_stop),
         web.post("/api/control/resume", control_resume),
+        web.post("/api/control/poll", control_poll),
         web.post("/api/control/capacity", control_capacity),
         web.post("/api/control/leaderboard", control_leaderboard),
         web.post("/api/control/broadcast", control_broadcast),

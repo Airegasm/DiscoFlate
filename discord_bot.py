@@ -38,6 +38,28 @@ def _resolve_img(image: str | None) -> str | None:
 _HDR_ANON = "ANON"
 
 
+class PollVoteButton(discord.ui.Button):
+    def __init__(self, bot, idx: int, label: str):
+        super().__init__(label=f"{idx + 1} · {(label or '')[:70]}",
+                         style=discord.ButtonStyle.primary)
+        self._bot = bot
+        self._idx = idx
+
+    async def callback(self, interaction: discord.Interaction):
+        await self._bot.handle_vote_interaction(interaction, self._idx + 1)
+
+
+class PollVoteView(discord.ui.View):
+    """Tap-to-vote buttons attached to every live poll embed. timeout=None so
+    late taps route to cast_vote, which answers 'no poll is running' cleanly
+    after the poll ends (instead of Discord's 'interaction failed')."""
+
+    def __init__(self, bot, labels: list):
+        super().__init__(timeout=None)
+        for i, lab in enumerate((labels or [])[:4]):
+            self.add_item(PollVoteButton(bot, i, str(lab)))
+
+
 class BotManager:
     def __init__(self, engine, get_config) -> None:
         self.engine = engine
@@ -162,10 +184,31 @@ class BotManager:
         intents.message_content = True  # required to read "!roll" text
         client = discord.Client(intents=intents)
 
+        # /vote — the silent ballot: the invocation never appears in chat and
+        # the confirmation is ephemeral. Fixed name (slash names are registered
+        # with Discord; the renameable !agvote text command still works too).
+        tree = discord.app_commands.CommandTree(client)
+        self._tree = tree
+
+        @tree.command(name="vote", description="Vote in the running poll (only you see the confirmation)")
+        @discord.app_commands.describe(option="The option number to vote for")
+        async def slash_vote(interaction: discord.Interaction,
+                             option: discord.app_commands.Range[int, 1, 4]):
+            await self.handle_vote_interaction(interaction, int(option))
+
         @client.event
         async def on_ready():
             self.engine.bot_connected = True
             self.engine._log("bot", f"connected as {client.user}")
+            # Per-guild sync is instant (global registration can take up to an
+            # hour, so copy into each guild the bot is in).
+            try:
+                for g in client.guilds:
+                    tree.copy_global_to(guild=g)
+                    await tree.sync(guild=g)
+                self.engine._log("bot", f"/vote slash command synced to {len(client.guilds)} server(s)")
+            except Exception as e:  # noqa: BLE001 — slash sync failing must not kill the bot
+                self.engine._log("error", f"slash command sync failed: {e}")
 
         @client.event
         async def on_disconnect():
@@ -294,13 +337,15 @@ class BotManager:
                 return None
         return ch
 
-    async def _send(self, ch, text: str, image: str | None, embed=None):
+    async def _send(self, ch, text: str, image: str | None, embed=None, view=None):
         """Send one message; returns the sent discord.Message (or None on failure).
         When `embed` is given the text is carried as the embed (rich card) instead."""
         text = _clip(text)
         image = _resolve_img(image)
         try:
             if embed is not None:
+                if view is not None:
+                    return await ch.send(embed=embed, view=view)
                 return await ch.send(embed=embed)
             if image and image.lower().startswith(("http://", "https://")):
                 return await ch.send(_clip(f"{text}\n{image}" if text else image))
@@ -347,7 +392,7 @@ class BotManager:
                 pass
 
     async def broadcast(self, text: str, image: str | None = None, exclude_channel_id=None,
-                        replace_key: str | None = None, embed=None) -> None:
+                        replace_key: str | None = None, embed=None, view=None) -> None:
         """Post to every listen channel (across all servers). Used for events,
         milestones, snapshots, and cross-server echoes. When `replace_key` is set
         (a clean_previous loop round), the prior round's message in each channel is
@@ -367,7 +412,7 @@ class BotManager:
                 continue
             if replace_key:
                 await self._delete_tracked(replace_key, cid)
-            msg = await self._send(ch, text, image, embed=embed)
+            msg = await self._send(ch, text, image, embed=embed, view=view)
             if replace_key and msg is not None:
                 self._track_msg(replace_key, cid, msg)
 
@@ -435,6 +480,13 @@ class BotManager:
         who = (who or "").strip() or self._bot_name()
         return await self.engine.resume(who)
 
+    async def operator_start_poll(self, name: str) -> dict:
+        cfg = self.get_config()
+        err = self._operator_ready(cfg)
+        if err:
+            return {"ok": False, "error": err}
+        return self.engine.start_poll_bg(name, source="dashboard")
+
     async def operator_broadcast_capacity(self) -> dict:
         cfg = self.get_config()
         err = self._operator_ready(cfg)
@@ -456,16 +508,38 @@ class BotManager:
         await self.broadcast(txt, None, embed=self._status_embed("leaderboard", txt))
         return {"ok": True}
 
-    async def post_embed(self, title: str, text: str) -> None:
+    async def post_embed(self, title: str, text: str, options: list | None = None) -> None:
         """Broadcast a rich embed (polls). Always an embed — not gated on
-        rich_output — because the content is designed as a card."""
+        rich_output. When `options` (poll option labels) is given, the embed
+        carries tap-to-vote buttons; each tap answers the voter EPHEMERALLY
+        (only they see their choice) and fires the quiet vote broadcast."""
         try:
             e = discord.Embed(title=(title or "")[:256], description=(text or "")[:4096],
                               color=0x9B59B6)
         except Exception:  # noqa: BLE001 — no embed support → plain text
             await self.broadcast(f"**{title}**\n{text}", None)
             return
-        await self.broadcast("", None, embed=e)
+        view = PollVoteView(self, options) if options else None
+        await self.broadcast("", None, embed=e, view=view)
+
+    async def handle_vote_interaction(self, interaction, option_number: int) -> None:
+        """Shared by the vote buttons and the /vote slash command: cast the
+        ballot, confirm privately (ephemeral), broadcast the quiet notice."""
+        res = self.engine.cast_vote(str(interaction.user.id),
+                                    interaction.user.display_name, str(option_number))
+        try:
+            if res is None:
+                await interaction.response.send_message("🗳 No poll is running.", ephemeral=True)
+                return
+            if res.get("reply"):
+                await interaction.response.send_message(res["reply"], ephemeral=True)
+                return
+            await interaction.response.send_message(
+                f"🗳 You voted for **{res.get('label', '')}** — only you can see this.", ephemeral=True)
+        except Exception as e:  # noqa: BLE001 — interaction expired / double-ack
+            self.engine._log("error", f"vote interaction reply failed: {e}")
+        if res and res.get("broadcast"):
+            await self.broadcast(res["broadcast"], None)
 
     def _hdr(self, cfg: dict, label: str | None, name: str | None) -> str:
         """The **[label · name]** output-header prefix (empty unless output_headers

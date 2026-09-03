@@ -1,6 +1,6 @@
 {
-  "version": "3.11.1",
-  "versionCode": 69,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.11.1/discoflate.apk",
-  "notes": "DiscoFlate v3.11.1 \u2014 secret-ballot polls: votes broadcast only '[Poll] <name> has voted in the poll!' (never the choice), and repeated poll messages show the live tally next to each option."
+  "version": "3.12.0",
+  "versionCode": 70,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.12.0/discoflate.apk",
+  "notes": "DiscoFlate v3.12.0 \u2014 silent voting: tap-to-vote buttons on every poll embed and a /vote slash command, both with ephemeral private confirmations (the channel only sees '[Poll] <name> has voted!'). Plus: Start Poll dropdown+button in Dashboard Controls."
 }
