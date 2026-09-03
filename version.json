@@ -1,6 +1,6 @@
 {
-  "version": "1.5",
-  "versionCode": 19,
+  "version": "1.6",
+  "versionCode": 20,
   "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk",
-  "notes": "DiscoFlate v1.5 \u2014 settable Mock pump calibration"
+  "notes": "DiscoFlate v1.6 \u2014 clearer Kauf/ESPHome connection errors (refused = web_server off)"
 }

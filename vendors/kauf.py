@@ -10,6 +10,7 @@ Stdlib + aiohttp only (Chaquopy-safe). UNVERIFIED against real hardware.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 
 import aiohttp
@@ -34,12 +35,30 @@ def _auth(creds: dict):
 
 async def set_state(device: dict, on: bool, creds: dict) -> None:
     action = "turn_on" if on else "turn_off"
-    url = f"{_base(device)}/switch/{_entity(device)}/{action}"
-    async with aiohttp.ClientSession() as s:
-        async with s.post(url, auth=_auth(creds),
-                          timeout=aiohttp.ClientTimeout(total=8)) as r:
-            if r.status >= 300:
-                raise Exception(f"Kauf {r.status}: {(await r.text())[:200]}")
+    base = _base(device)
+    url = f"{base}/switch/{_entity(device)}/{action}"
+    try:
+        async with aiohttp.ClientSession() as s:
+            async with s.post(url, auth=_auth(creds),
+                              timeout=aiohttp.ClientTimeout(total=8)) as r:
+                if r.status == 401:
+                    raise Exception(f"Kauf 401 at {base}: web server needs auth — "
+                                    f"fill the Kauf web username/password in credentials.")
+                if r.status == 404:
+                    raise Exception(f"Kauf 404 at {base}: no switch named '{_entity(device)}' — "
+                                    f"open {base} in a browser to see the real switch id and set it as the device's entity.")
+                if r.status >= 300:
+                    raise Exception(f"Kauf {r.status}: {(await r.text())[:200]}")
+    except aiohttp.ClientConnectorError as e:
+        # TCP refused / host unreachable — nothing is serving HTTP at that host:port.
+        raise Exception(
+            f"can't reach an ESPHome web server at {base} — the plug refused the connection. "
+            f"Enable `web_server:` on the plug (it's off by default in ESPHome) and confirm the host/port. "
+            f"Test by opening {base} in a browser. [{e.__class__.__name__}]") from e
+    except (aiohttp.ServerTimeoutError, asyncio.TimeoutError) as e:
+        raise Exception(
+            f"the ESPHome web server at {base} didn't respond in time — check the IP and that the plug is online. "
+            f"[{e.__class__.__name__}]") from e
 
 
 async def get_state(device: dict, creds: dict):
