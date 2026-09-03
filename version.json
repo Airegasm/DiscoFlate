@@ -1,6 +1,6 @@
 {
-  "version": "3.2.3",
-  "versionCode": 47,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=47",
-  "notes": "DiscoFlate v3.2.3 \u2014 two new minigames (game-balloon/Do not Pop It, game-rps); default !agpopit & !agrps always-on; results now labelled by game + respect cross-server anonymity"
+  "version": "3.2.4",
+  "versionCode": 48,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=48",
+  "notes": "DiscoFlate v3.2.4 \u2014 Restore Defaults is now additive: keeps your edited/custom commands + system-command renames, only adds what is missing"
 }

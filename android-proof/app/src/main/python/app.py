@@ -38,41 +38,46 @@ PORT = int(os.getenv("DISCOFLATE_PORT", "8765"))
 HOST = "127.0.0.1"
 
 # App version — keep in sync with android versionCode + version.json in the repo.
-VERSION = "3.2.3"
-VERSION_CODE = 47
+VERSION = "3.2.4"
+VERSION_CODE = 48
 VERSION_URL = "https://raw.githubusercontent.com/Airegasm/DiscoFlate/main/version.json"
 
-# Config keys "Restore Default Config" touches (game content). Everything else —
-# token, devices, listen targets, operator, vendors, etc. — is left untouched.
-_DEFAULT_SCALAR_KEYS = ["roll", "command_names", "capacity_message", "pumptimer_message",
+# Scalar/message keys that "Restore Default Config" RESETS to the shipped default.
+# (Commands and system-command NAMES are handled additively below so your edits
+# and customs are never clobbered.) Connection/personal keys are never touched.
+_DEFAULT_SCALAR_KEYS = ["roll", "capacity_message", "pumptimer_message",
                         "pump_message", "cooldown_message", "cooldown_reset_message",
                         "system_buffer_seconds", "cooldown_seconds", "roll_enabled",
                         "max_roll_prize", "auto_report", "listener_message_on", "listener_message_off",
-                        "always_on_enabled", "always_on_commands"]
-# list key -> identity function (default items win on a key match; user extras kept)
+                        "always_on_enabled"]
+# list key -> identity function. Restore KEEPS everything you already have (edited
+# defaults + customs) and only ADDS shipped items whose key is missing.
 _DEFAULT_LIST_KEYS = {
     "commands": lambda c: (c.get("name") or "").strip().lower(),
     "prizes": lambda p: (p.get("command") or "").strip().lower(),
     "modes": lambda m: (m.get("name") or "").strip().lower(),
     "events": lambda e: (e.get("name") or "").strip().lower(),
     "capacity_ranges": lambda r: f"{r.get('min')}-{r.get('max')}",
+    "always_on_commands": lambda a: (a.get("name") if isinstance(a, dict) else str(a) or "").strip().lower(),
 }
 
 
 def _merge_defaults(cur: dict, dflt: dict) -> dict:
-    """Overlay the shipped default game content ON TOP of the current config:
-    scalar/message keys reset to default; list keys become default-items +
-    any user-added items the default doesn't have. Connection/personal keys
-    (not listed) are never touched."""
+    """Additively top up the config with shipped defaults: reset the scalar/message
+    keys, KEEP every command/range/event/etc. you already have (an edited default or
+    a custom with the same name is never overwritten), and ADD only the shipped
+    items you're missing. Connection/personal keys (not listed) are untouched."""
     out = dict(cur)
     for k in _DEFAULT_SCALAR_KEYS:
         if k in dflt:
             out[k] = dflt[k]
+    # system command names: keep your renames, add any NEW built-in names.
+    out["command_names"] = {**(dflt.get("command_names") or {}), **(cur.get("command_names") or {})}
     for k, keyfn in _DEFAULT_LIST_KEYS.items():
-        dlist = list(dflt.get(k) or [])
-        seen = {keyfn(x) for x in dlist}
-        extras = [x for x in (cur.get(k) or []) if keyfn(x) not in seen]
-        merged = dlist + extras
+        current = list(cur.get(k) or [])
+        have = {keyfn(x) for x in current}
+        missing = [x for x in (dflt.get(k) or []) if keyfn(x) not in have]
+        merged = current + missing
         if k == "capacity_ranges":
             merged.sort(key=lambda r: (r.get("min", 0), r.get("max", 0)))
         out[k] = merged
