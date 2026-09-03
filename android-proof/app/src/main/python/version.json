@@ -1,6 +1,6 @@
 {
-  "version": "3.14.1",
-  "versionCode": 78,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.14.1/discoflate.apk",
-  "notes": "DiscoFlate v3.14.1 \u2014 each capacity event's whole header is now click-to-collapse (chevron), so they collapse independently at a glance instead of via the small pencil."
+  "version": "3.14.2",
+  "versionCode": 79,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.14.2/discoflate.apk",
+  "notes": "DiscoFlate v3.14.2 \u2014 timed events gain the 'broadcast' action: pick a saved Broadcast preset from a dropdown and the loop/once event posts it (placeholders rendered)."
 }

@@ -1308,6 +1308,19 @@ class Engine:
                 await self._emit(self._evt_hdr(name) + self.render(tmpl, base), sink, replace_key=replace_key)
             return
 
+        if action == "broadcast":
+            bname = str(ev.get("broadcast") or "").strip().lower()
+            row = next((b for b in self.cfg.get("broadcasts", [])
+                        if (b.get("name") or "").strip().lower() == bname), None)
+            if row is None:
+                self._log("error", f"event '{name}': no broadcast named '{ev.get('broadcast')}'")
+            elif (row.get("message") or "").strip():
+                await self._emit(self._evt_hdr(name) + self.render(row["message"].strip(), extra),
+                                 sink, replace_key=replace_key)
+            if msg:
+                await self._emit(self._evt_hdr(name) + self.render(msg, extra), sink, replace_key=replace_key)
+            return
+
         if action == "poll":
             # NON-BLOCKING: a timed event is a single action with nothing after
             # it, so start the poll in the background — awaiting it here would

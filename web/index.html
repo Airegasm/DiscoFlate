@@ -2103,8 +2103,9 @@ function renderEvents(){
       // --- action ---
       `<div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end;border-top:1px solid var(--line);padding-top:10px">`+
         `<label class="field">Action <select onchange="eventRows[${i}].action=this.value;renderEvents()">`+
-          ['message','fire','roll','capacity','chance','poll'].map(a=>`<option value="${a}" ${act===a?'selected':''}>${a}</option>`).join('')+`</select></label>`+
-        (act==='poll'?`<label class="field">Poll <span class="muted">(the event stays running until it completes)</span> <select onchange="eventRows[${i}].poll=this.value;scheduleSave()">${pollNameOpts(e.poll)}</select></label>`:'')+
+          ['message','broadcast','fire','roll','capacity','chance','poll'].map(a=>`<option value="${a}" ${act===a?'selected':''}>${a}</option>`).join('')+`</select></label>`+
+        (act==='broadcast'?`<label class="field">Broadcast <select onchange="eventRows[${i}].broadcast=this.value;scheduleSave()">${broadcastNameOpts(e.broadcast)}</select></label>`:'')+
+        (act==='poll'?`<label class="field">Poll <span class="muted">(runs in the background)</span> <select onchange="eventRows[${i}].poll=this.value;scheduleSave()">${pollNameOpts(e.poll)}</select></label>`:'')+
         (act==='fire'?`<label class="field">Seconds <input type="number" min="0" step="0.5" value="${e.seconds??''}" style="width:80px" onchange="eventRows[${i}].seconds=+this.value"></label>`+deviceField:'')+
         (act==='roll'?`<label class="field">Dice <input type="number" min="1" value="${e.dice??''}" placeholder="rng" style="width:70px" onchange="eventRows[${i}].dice=+this.value"></label>`+
             `<label class="field">Sides <input type="number" min="1" value="${e.sides??''}" placeholder="rng" style="width:70px" onchange="eventRows[${i}].sides=+this.value"></label>`+deviceField:'')+
@@ -2142,7 +2143,7 @@ function cleanEvents(){
     max_repeats:(e.max_repeats==null||e.max_repeats===''||+e.max_repeats<0)?null:+e.max_repeats, fire_immediately:!!e.fire_immediately, clean_previous:!!e.clean_previous, action:e.action||'message',
     message:e.message||'', seconds:(e.seconds>0)?+e.seconds:null, dice:(e.dice>0)?+e.dice:null, sides:(e.sides>0)?+e.sides:null,
     capacity_op:e.capacity_op||'add', capacity_value:e.capacity_value??0, device_id:e.device_id||null,
-    poll:(e.poll||'').trim()||null,
+    poll:(e.poll||'').trim()||null, broadcast:(e.broadcast||'').trim()||null,
     cooldown:(e.cooldown==null||e.cooldown==='')?null:+e.cooldown,
     activation_message:e.activation_message||'', end_message:e.end_message||'',
     chance:(e.chance==null||e.chance==='')?null:+e.chance, luck:(e.luck==null||e.luck==='')?null:+e.luck,
