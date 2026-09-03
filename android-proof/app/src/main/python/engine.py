@@ -638,9 +638,11 @@ class Engine:
             ending = one_shot or (cap > 0 and count >= cap)
             if ending:
                 self._events_done.add(key)   # "once", or a loop that hit its repeat cap → stop
-            # Loop placeholders for the event's message(s).
+            # Loop placeholders for the event's message(s). [next_round] is a
+            # smart line: "Next Round in N seconds" on every round except the last.
+            next_round = "" if ending else f"Next Round in {every:g} seconds"
             loop_ctx = {"current_loop": count, "total_loops": ("∞" if cap <= 0 else str(cap)),
-                        "loop_timer": f"{every:g}", "event": name}
+                        "loop_timer": f"{every:g}", "event": name, "next_round": next_round}
             try:
                 await self._run_event(ev, loop_ctx)
             except Exception as e:  # noqa: BLE001

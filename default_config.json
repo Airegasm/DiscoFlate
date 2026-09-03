@@ -382,7 +382,7 @@
       "name": "PumpRoulette",
       "enabled": false,
       "mode": "loop",
-      "every": 5,
+      "every": 30,
       "max_repeats": 3,
       "action": "chance",
       "chance": 50,
@@ -399,8 +399,8 @@
           "seconds": 5
         }
       ],
-      "success_message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udd34 **BIG HIT!** +20s pump! (Capacity now [capacity]%)",
-      "failure_message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udfe2 lucky, only +5s. (Capacity now [capacity]%)",
+      "success_message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udd34 **BIG HIT!** +20s pump! (Capacity now [capacity]%)\n[next_round]",
+      "failure_message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udfe2 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]",
       "activation_message": "\ud83c\udfb0 **PumpRoulette** begins \u2014 [total_loops] spins, each a 50/50 gamble between **+5s** and **+20s**. Hold on!",
       "end_message": "\ud83c\udfb0 **PumpRoulette** complete!",
       "cooldown": 30,
@@ -483,12 +483,12 @@
   "always_on_commands": [
     {
       "name": "cointoss",
-      "cooldown": null,
+      "cooldown": 300,
       "max_uses": null
     },
     {
       "name": "pumproulette",
-      "cooldown": null,
+      "cooldown": 300,
       "max_uses": 1
     }
   ],
