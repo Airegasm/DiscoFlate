@@ -52,7 +52,8 @@ class Engine:
         self._cooldowns: dict[str, dict] = {}
         self._milestones_fired: set = set()
         self._event_last: dict[str, float] = {}   # event name -> last-run monotonic
-        self._events_done: set = set()            # "once" events already fired
+        self._events_done: set = set()            # "once" events (and repeat-capped loops) already finished
+        self._event_fires: dict[str, int] = {}    # event name -> times fired (for loop max-repeats)
         self._listener_was: bool = False          # for detecting off→on transitions
         # Events temporarily switched on by a command. Reverts on session reset
         # / app restart (it's in-memory only), never persisted to config.
@@ -85,6 +86,7 @@ class Engine:
             # re-trigger range entry for the current range.
             self._event_last.clear()
             self._events_done.clear()
+            self._event_fires.clear()
             self._current_range_key = None
             self._end_triggered = False
         elif self._listener_was and not now_on:
@@ -92,6 +94,7 @@ class Engine:
             self._cooldowns.clear()
             self._event_last.clear()
             self._events_done.clear()
+            self._event_fires.clear()
             self._log("bot", "deactivated — cooldowns cleared, events cancelled")
         self._listener_was = now_on
 
@@ -594,14 +597,23 @@ class Engine:
             if last is None:
                 continue  # first tick just arms the timer (delay before first fire)
             one_shot = (ev.get("mode") or "loop").lower() == "once"
-            if one_shot:
-                self._events_done.add(name)
+            count = self._event_fires.get(name, 0) + 1
+            self._event_fires[name] = count
             try:
-                await self._run_event(ev)
+                cap = int(ev.get("max_repeats") or 0)   # loop cap; 0/blank = unlimited
+            except (TypeError, ValueError):
+                cap = 0
+            if one_shot or (not one_shot and cap > 0 and count >= cap):
+                self._events_done.add(name)   # "once", or a loop that hit its repeat cap → stop
+            # Loop placeholders for the event message.
+            loop_ctx = {"current_loop": count, "total_loops": ("∞" if cap <= 0 else str(cap)),
+                        "loop_timer": f"{every:g}"}
+            try:
+                await self._run_event(ev, loop_ctx)
             except Exception as e:  # noqa: BLE001
                 self._log("error", f"event {name} failed: {e}")
 
-    async def _run_event(self, ev: dict) -> None:
+    async def _run_event(self, ev: dict, extra: dict | None = None) -> None:
         name = ev.get("name", "event")
         action = (ev.get("action") or "message").lower()
         msg = (ev.get("message") or "").strip()
@@ -633,7 +645,7 @@ class Engine:
             self._log("bot", f"event '{name}': message")
 
         if msg:
-            await self._announce(self.render(msg), None)
+            await self._announce(self.render(msg, extra), None)
 
     def _cooldown_reply(self, who: str, remaining: float, uid=None, cmdkey: str = "") -> str:
         tmpl = self.cfg.get("cooldown_message") or "⏳ [mention], [cmd] is on cooldown — [cooldown]s left"
@@ -875,7 +887,8 @@ class Engine:
             elif luck < 0 and random.random() * 100 < min(100.0, -luck):
                 win = False
             _spend_use()   # an attempt costs a use whether you win or lose
-            fired = await self._run_fires(cmd.get("fires"), who, uid) if win else []
+            # Win fires the `fires` rows; a miss fires the `fail_fires` rows (if any).
+            fired = await self._run_fires(cmd.get("fires") if win else cmd.get("fail_fires"), who, uid)
             if win:
                 self.start_events(cmd.get("start_events"))
             total_secs = round(sum(f["duration"] for f in fired), 1)
@@ -1137,6 +1150,7 @@ class Engine:
         self._runtime_events_on.clear()
         self._event_last.clear()
         self._events_done.clear()
+        self._event_fires.clear()
         self._perfect.clear()
         self._prize_uses.clear()
         self._pump_time.clear()

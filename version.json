@@ -1,6 +1,6 @@
 {
-  "version": "2.8",
-  "versionCode": 32,
+  "version": "2.9",
+  "versionCode": 33,
   "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk",
-  "notes": "DiscoFlate v2.8 \u2014 Always-On commands (work in every range); default !cointoss chance command, always on"
+  "notes": "DiscoFlate v2.9 \u2014 Pump Timer on Dashboard; loop event max-repeats + [current_loop]/[total_loops]/[loop_timer]; chance failure device-fires"
 }

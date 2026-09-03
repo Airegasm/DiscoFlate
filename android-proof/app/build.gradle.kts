@@ -11,8 +11,8 @@ android {
         applicationId = "com.discoflate.proof"
         minSdk = 26
         targetSdk = 34
-        versionCode = 32
-        versionName = "2.8"
+        versionCode = 33
+        versionName = "2.9"
         // Only the ABIs that (a) have Chaquopy wheels and (b) we actually run:
         // arm64-v8a = a real phone (Pixel 9); x86_64 = an emulator.
         ndk {

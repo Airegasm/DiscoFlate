@@ -157,7 +157,8 @@ DEFAULTS = {
     # Timed events — like commands, but fired automatically on a timer.
     # Each: {name, enabled, mode ("loop"|"once"), every (secs), action, message,
     #        seconds, device_id, dice, sides, capacity_op ("add"|"set"), capacity_value}
-    #   mode "loop"       → fires every `every` seconds, repeatedly
+    #   mode "loop"       → fires every `every` seconds, repeatedly (up to
+    #                       `max_repeats` times if set; 0/blank = unlimited)
     #   mode "once"       → fires a single time, `every` seconds after arming
     #   action "message"  → post `message` to all listen channels
     #   action "fire"     → fire device for `seconds` (+ optional message)
