@@ -1,6 +1,6 @@
 {
-  "version": "2.0",
-  "versionCode": 24,
+  "version": "2.1",
+  "versionCode": 25,
   "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk",
-  "notes": "DiscoFlate v2.0 \u2014 APK homes to Dashboard on launch, auto-checks for updates, and shows an update banner above Capacity"
+  "notes": "DiscoFlate v2.1 \u2014 Owner name moved to the top of the Dashboard (ID stays in Game)"
 }
