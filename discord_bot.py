@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import time
 import discord
 
 
@@ -385,7 +386,7 @@ class BotManager:
                 await _reply(message, f"⚠️ {res.get('error', 'could not run')}")
                 return
             await _reply(message, res["reply"])
-            await self._echo(message, res.get("reply_anon"), "")
+            await self._echo(message, res.get("reply_anon"), "", res.get("reply"))
             return
 
 
@@ -434,7 +435,7 @@ class BotManager:
             line = res["reply"]
             tail = "\n⏳ (a fire is already running — ignored)" if (res.get("device") and not res.get("started")) else ""
             await _reply(message, line + tail, as_reply=bool(custom.get("mention")))
-            await self._echo(message, res.get("reply_anon"), tail)
+            await self._echo(message, res.get("reply_anon"), tail, res.get("reply"))
             # Event activation / in-process / cooldown lines come AFTER the reply.
             for post in (res.get("events_posted") or []):
                 await self.broadcast(post, None)
@@ -452,16 +453,54 @@ class BotManager:
         # No extend notice: the reply's [timer] already shows the new remaining
         # time, so a separate "added to the running fire" line would be redundant.
         await _reply(message, line)
-        await self._echo(message, res.get("reply_anon"), "")
+        await self._echo(message, res.get("reply_anon"), "", res.get("reply"))
 
-    async def _echo(self, message: discord.Message, anon_text: str | None, tail: str) -> None:
-        """Echo an anonymized copy of a reply to the OTHER listen channels, so a
-        shared game reads across servers without leaking who/where."""
-        if not anon_text:
+    async def _is_member(self, guild, uid: int) -> bool:
+        """True if user `uid` is a member of `guild`. Checks the member cache, then
+        does a single fetch (works even without the Server Members intent), with a
+        short TTL cache so repeated commands don't hammer the API."""
+        if guild is None:
+            return False
+        if guild.get_member(uid) is not None:
+            return True
+        if not hasattr(self, "_member_cache"):
+            self._member_cache = {}
+        key = (guild.id, uid)
+        now = time.monotonic()
+        hit = self._member_cache.get(key)
+        if hit is not None and now - hit[1] < 300:
+            return hit[0]
+        try:
+            await guild.fetch_member(uid)
+            ok = True
+        except Exception:
+            ok = False
+        self._member_cache[key] = (ok, now)
+        return ok
+
+    async def _echo(self, message: discord.Message, anon_text: str | None, tail: str,
+                    real_text: str | None = None) -> None:
+        """Echo a copy of a reply to the OTHER listen channels so a shared game
+        reads across servers. Each destination shows the actor's real name if they
+        are a member of that server (they'd be visible there anyway); otherwise the
+        anonymized version is used, so we never leak who/where to a server they
+        aren't in."""
+        if not (anon_text or real_text):
             return
-        # DMs have no channel to exclude by; broadcast everywhere.
+        cfg = self.get_config()
         origin = str(message.channel.id) if message.guild is not None else None
-        await self.broadcast((anon_text + tail).strip(), None, exclude_channel_id=origin)
+        author_id = message.author.id
+        for t in self._targets(cfg):
+            cid = str(t.get("channel_id") or "")
+            if not cid or cid == origin:
+                continue
+            ch = await self._channel(cid)
+            if ch is None:
+                continue
+            show_real = bool(real_text) and await self._is_member(getattr(ch, "guild", None), author_id)
+            text = real_text if show_real else anon_text
+            if text:
+                await self._send(ch, (text + tail).strip(), None)
 
 
 def _ints(xs) -> list[int]:

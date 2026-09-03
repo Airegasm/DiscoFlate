@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.1.0</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.1.1</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -254,8 +254,9 @@
           <div class="hint" style="margin-top:0">The bot must be connected for the lists to fill — click ↻ after inviting it somewhere new.
             Events, milestones &amp; snapshots are announced in these same listen channels.</div>
 
-          <label class="field" style="margin-top:6px">Cross-server label <span class="muted">(hides who/where in echoed messages)</span>
+          <label class="field" style="margin-top:6px">Cross-server label <span class="muted">(used only where the actor isn't a member)</span>
             <input id="anonLabel" placeholder="Someone on another server"></label>
+          <div class="hint" style="margin-top:0">When a trigger is echoed to your other servers, DiscoFlate shows the person's <b>real name</b> in any server they're actually a member of (they'd be visible there anyway), and falls back to this label only in servers they're not in.</div>
 
           <div class="row" style="margin-top:4px">
             <button onclick="saveDiscord()">Save Discord settings</button>
@@ -512,7 +513,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v3.1.0.</span>
+        <span class="muted" id="updMsg">You're on v3.1.1.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -1626,8 +1627,15 @@ function renderEvents(){
         `<label class="field">Every (s) <input type="number" min="1" step="1" value="${e.every??''}" style="width:90px" onchange="eventRows[${i}].every=+this.value"></label>`+
         (mode!=='once'?`<label class="field">Max repeats <input type="number" min="0" step="1" value="${e.max_repeats??''}" placeholder="∞" style="width:90px" title="stop after N repeats (blank = unlimited)" onchange="eventRows[${i}].max_repeats=(this.value===''?null:+this.value)"></label>`:'')+
       `</div>`+
+      // --- lifecycle: first-loop / cooldown / activation / end (event-level) ---
+      `<div class="row" style="gap:16px;flex-wrap:wrap;align-items:flex-end">`+
+        `<label class="row" style="gap:6px" title="fire the first loop the moment it's activated, instead of waiting one interval"><input type="checkbox" ${e.fire_immediately?'checked':''} onchange="eventRows[${i}].fire_immediately=this.checked"> Trigger First Loop Immediately</label>`+
+        `<label class="field">Cooldown (s) <span class="muted">(after it finishes)</span> <input type="number" min="0" step="1" value="${e.cooldown??''}" placeholder="0" style="width:90px" onchange="eventRows[${i}].cooldown=(this.value===''?null:+this.value)"></label>`+
+      `</div>`+
+      `<label class="field">Activation message <span class="muted">(posted when a command turns it on)</span><input value="${esc(e.activation_message||'')}" onchange="eventRows[${i}].activation_message=this.value"></label>`+
+      `<label class="field">End message <span class="muted">(optional, when it finishes)</span><input value="${esc(e.end_message||'')}" onchange="eventRows[${i}].end_message=this.value"></label>`+
       // --- action ---
-      `<div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end">`+
+      `<div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end;border-top:1px solid var(--line);padding-top:10px">`+
         `<label class="field">Action <select onchange="eventRows[${i}].action=this.value;renderEvents()">`+
           ['message','fire','roll','capacity','chance'].map(a=>`<option value="${a}" ${act===a?'selected':''}>${a}</option>`).join('')+`</select></label>`+
         (act==='fire'?`<label class="field">Seconds <input type="number" min="0" step="0.5" value="${e.seconds??''}" style="width:80px" onchange="eventRows[${i}].seconds=+this.value"></label>`+deviceField:'')+
@@ -1644,14 +1652,7 @@ function renderEvents(){
           evtFiresEditor(i, e, 'fires', '🟢 Fires on WIN')+
           `<label class="field">🔴 Failure message<textarea rows="2" onchange="eventRows[${i}].failure_message=this.value">${esc(e.failure_message||'')}</textarea></label>`+
           evtFiresEditor(i, e, 'fail_fires', '🔴 Fires on FAILURE')
-        : `<label class="field">Message <span class="muted">(optional · [capacity] [announce] [current_loop] [total_loops] [loop_timer] [next_round] …)</span><textarea rows="3" onchange="eventRows[${i}].message=this.value">${esc(e.message||'')}</textarea></label>`)+
-      // --- behaviour ---
-      `<div class="row" style="gap:16px;flex-wrap:wrap;align-items:flex-end">`+
-        `<label class="row" style="gap:6px" title="fire the first loop the moment it's activated, instead of waiting one interval"><input type="checkbox" ${e.fire_immediately?'checked':''} onchange="eventRows[${i}].fire_immediately=this.checked"> Trigger First Loop Immediately</label>`+
-        `<label class="field">Cooldown (s) <span class="muted">(after it finishes)</span> <input type="number" min="0" step="1" value="${e.cooldown??''}" placeholder="0" style="width:90px" onchange="eventRows[${i}].cooldown=(this.value===''?null:+this.value)"></label>`+
-      `</div>`+
-      `<label class="field">Activation message <span class="muted">(posted when a command turns it on)</span><input value="${esc(e.activation_message||'')}" onchange="eventRows[${i}].activation_message=this.value"></label>`+
-      `<label class="field">End message <span class="muted">(optional, when it finishes)</span><input value="${esc(e.end_message||'')}" onchange="eventRows[${i}].end_message=this.value"></label>`;
+        : `<label class="field">Message <span class="muted">(optional · [capacity] [announce] [current_loop] [total_loops] [loop_timer] [next_round] …)</span><textarea rows="3" onchange="eventRows[${i}].message=this.value">${esc(e.message||'')}</textarea></label>`);
     }
     el.innerHTML=html; box.appendChild(el);
   });

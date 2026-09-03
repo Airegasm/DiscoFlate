@@ -1,6 +1,6 @@
 {
-  "version": "3.1.0",
-  "versionCode": 40,
+  "version": "3.1.1",
+  "versionCode": 41,
   "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk",
-  "notes": "DiscoFlate v3.1.0 \u2014 collapsible + cleaned-up event editor; Broadcasts (preset messages) with a Dashboard Controls dropdown + Broadcast Custom"
+  "notes": "DiscoFlate v3.1.1 \u2014 cross-server echoes show the real name where the actor is a member; event editor lifecycle fields (first-loop/activation/end) moved to the top"
 }
