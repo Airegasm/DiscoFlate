@@ -144,6 +144,11 @@ DEFAULTS = {
     #   fires: [{device_id, seconds}] — independent, concurrent device fires
     "commands": [],
 
+    # Custom commands that work in EVERY capacity range (bypass per-range
+    # membership) when always_on_enabled is on. List of command names.
+    "always_on_enabled": False,
+    "always_on_commands": [],
+
     # Modes group several commands under one switch. Toggling a mode enables/
     # disables its member commands and optionally posts a message.
     # Each: {name, commands: [names], enabled, message_on, message_off}

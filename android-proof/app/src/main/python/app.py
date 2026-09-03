@@ -38,8 +38,8 @@ PORT = int(os.getenv("DISCOFLATE_PORT", "8765"))
 HOST = "127.0.0.1"
 
 # App version — keep in sync with android versionCode + version.json in the repo.
-VERSION = "2.7"
-VERSION_CODE = 31
+VERSION = "2.8"
+VERSION_CODE = 32
 VERSION_URL = "https://raw.githubusercontent.com/Airegasm/DiscoFlate/main/version.json"
 
 # Config keys "Restore Default Config" touches (game content). Everything else —
@@ -47,7 +47,8 @@ VERSION_URL = "https://raw.githubusercontent.com/Airegasm/DiscoFlate/main/versio
 _DEFAULT_SCALAR_KEYS = ["roll", "command_names", "capacity_message", "pumptimer_message",
                         "pump_message", "cooldown_message", "cooldown_reset_message",
                         "system_buffer_seconds", "cooldown_seconds", "roll_enabled",
-                        "max_roll_prize", "auto_report", "listener_message_on", "listener_message_off"]
+                        "max_roll_prize", "auto_report", "listener_message_on", "listener_message_off",
+                        "always_on_enabled", "always_on_commands"]
 # list key -> identity function (default items win on a key match; user extras kept)
 _DEFAULT_LIST_KEYS = {
     "commands": lambda c: (c.get("name") or "").strip().lower(),
@@ -99,6 +100,8 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "prizes": cfg.get("prizes", []),
         "capacity_ranges": cfg.get("capacity_ranges", []),
         "commands": cfg.get("commands", []),
+        "always_on_enabled": cfg.get("always_on_enabled", False),
+        "always_on_commands": cfg.get("always_on_commands", []),
         "modes": cfg.get("modes", []),
         "events": cfg.get("events", []),
         "devices": cfg.get("devices", []),
@@ -178,6 +181,7 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
                     "listen_targets", "anon_user_label",
                     "allow_dms", "server_channels", "vendors", "silence_onoff_log",
                     "mock_calibration_seconds_to_100",
+                    "always_on_enabled", "always_on_commands",
                     "listener_message_on", "listener_message_off"):
             if key in body:
                 patch[key] = body[key]

@@ -324,6 +324,32 @@
       "description": "the tiniest top-up",
       "hide_in_list": false,
       "mention": false
+    },
+    {
+      "name": "cointoss",
+      "type": "chance",
+      "chance": 50,
+      "luck": null,
+      "fires": [
+        {
+          "device_id": null,
+          "seconds": 10
+        }
+      ],
+      "success_reply": "[mention] took a chance on [prefix]cointoss - [user] can use this command [cmd_remain] more times.\n\n**SUCCESS!**\n\n[secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]%\nCurrent Capacity: [capacity]% Remaining Pump Timer: [timer]s",
+      "failure_reply": "[mention] took a chance on [prefix]cointoss - [user] can use this command [cmd_remain] more times.\n\n**FAILURE!**\n\nBetter luck next time...",
+      "reply": "",
+      "seconds": null,
+      "dice": null,
+      "sides": null,
+      "device_id": null,
+      "enabled": true,
+      "owner_only": false,
+      "mention": false,
+      "hide_in_list": false,
+      "description": "flip a coin",
+      "start_events": [],
+      "range_gate": "all"
     }
   ],
   "modes": [],
@@ -393,5 +419,9 @@
     "channel_ids": [],
     "user_ids": []
   },
-  "pumpdirect_path": ""
+  "pumpdirect_path": "",
+  "always_on_enabled": true,
+  "always_on_commands": [
+    "cointoss"
+  ]
 }

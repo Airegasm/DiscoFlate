@@ -410,13 +410,22 @@ class Engine:
         sides = e.get("sides") if e.get("sides") not in (None, "", 0) else r.get("sides")
         return int(dice or 1), int(sides or 6)
 
+    def _is_always_on(self, cmdkey: str) -> bool:
+        """True if this custom command is in the global Always-On set — active in
+        every range, bypassing per-range membership (when always_on_enabled)."""
+        if not self.cfg.get("always_on_enabled"):
+            return False
+        return cmdkey in {str(n).strip().lower() for n in (self.cfg.get("always_on_commands") or [])}
+
     def cmd_enabled_in_range(self, cmdkey: str) -> bool:
-        """Roll: active in every range unless toggled off. Custom command:
-        active in a range ONLY if it's a member (has an entry in that range's
-        cooldowns) — presence = active, absence = inactive."""
+        """Roll: active in every range unless toggled off. Custom command: active
+        in a range if it's a member (has an entry in that range's cooldowns) OR
+        it's in the global Always-On set — presence = active, absence = inactive."""
         cds = (self.range_for(self.capacity).get("cooldowns") or {})
         if cmdkey == "roll":
             return (cds.get("roll") or {}).get("enabled", True) is not False
+        if self._is_always_on(cmdkey):
+            return True
         e = cds.get(cmdkey)
         return e is not None and e.get("enabled", True) is not False
 

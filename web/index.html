@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v2.7 by AireGasm</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v2.8 by AireGasm</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -365,6 +365,11 @@
     <!-- capacity ranges -->
     <div class="card span" data-tab="game">
       <h2>Capacity ranges</h2>
+      <details class="help" style="margin-bottom:14px"><summary><b style="font-size:1.02rem">⚡ Always-On commands</b></summary>
+        <label class="row" style="gap:8px;margin:4px 0 8px"><input type="checkbox" id="alwaysOnEnabled" style="width:auto" onchange="renderAlwaysOn();scheduleSave()"> Enable — commands added here work in <b>every</b> range (bypassing per-range membership)</label>
+        <div id="alwaysOnBox"></div>
+        <div class="hint" style="margin-top:8px">Use for utility commands (like <code>!cointoss</code>) that should always be available. They use the default cooldown; set a per-person <b>Max/person</b> in any range as usual.</div>
+      </details>
       <div id="ranges"></div>
       <div class="row" style="margin-top:10px" id="rangeButtons">
         <button class="ghost" onclick="addRange()">+ Add range</button>
@@ -480,7 +485,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v2.7.</span>
+        <span class="muted" id="updMsg">You're on v2.8.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -534,6 +539,7 @@
     <div class="card span" data-tab="help">
       <details class="help"><summary><h2>Capacity ranges — how to set them up</h2></summary>
       <div class="hint" style="max-width:820px;margin-top:8px">Ranges are capacity bands (<b>From %</b> → <b>To %</b>) that change the game as the meter climbs. They're evaluated top-down — the <b>first band that contains the current capacity wins</b>. Edit them in Game → <b>Capacity ranges</b>.</div>
+      <div class="hint" style="max-width:820px"><b>⚡ Always-On commands</b> (the collapsible at the top of the ranges section) is the exception to per-range membership: any custom command listed there works in <b>every</b> range while the toggle is on — handy for utility commands like <code>!cointoss</code>. They use the default cooldown.</div>
       <h3 style="margin:14px 0 6px">Each range holds</h3>
       <ul style="line-height:1.7;padding-left:22px;margin:0;max-width:820px">
         <li><b>Dice + Luck</b> — the built-in 🎲 roll for this band (e.g. 1 d 4 low, 2 d 6 high). Luck is a ± % nudge on the result.</li>
@@ -1274,6 +1280,24 @@ function rangeGateOptions(sel){
   return html;
 }
 
+// ---- always-on commands (work in every range, bypass membership) ----
+let alwaysOnList = [];
+function renderAlwaysOn(){
+  const box=$('#alwaysOnBox'); if(!box) return;
+  const on = $('#alwaysOnEnabled') && $('#alwaysOnEnabled').checked;
+  const chips = alwaysOnList.map(n=>
+    `<span class="pill" style="display:inline-flex;align-items:center;gap:6px;margin:0 6px 6px 0">!${esc(n)} <button class="ghost" style="padding:0 6px" onclick="removeAlwaysOn('${esc(n)}')">✕</button></span>`).join('');
+  const avail = commandRows.map(c=>(c.name||'').trim()).filter(Boolean)
+    .filter(n=>!alwaysOnList.includes(n.toLowerCase()));
+  const addSel = avail.length
+    ? `<select onchange="addAlwaysOn(this.value); this.selectedIndex=0"><option value="">+ Add command…</option>`+
+      avail.map(n=>`<option value="${esc(n)}">!${esc(n)}</option>`).join('')+`</select>`
+    : `<span class="muted">No custom commands to add — create some in <b>Custom commands</b>.</span>`;
+  box.innerHTML = `<div style="opacity:${on?1:0.5}"><div style="margin-bottom:4px">${chips||'<span class="muted">none yet</span>'}</div>${addSel}</div>`;
+}
+function addAlwaysOn(name){ name=(name||'').trim().toLowerCase(); if(!name) return; if(!alwaysOnList.includes(name)) alwaysOnList.push(name); renderAlwaysOn(); scheduleSave(); }
+function removeAlwaysOn(name){ name=(name||'').trim().toLowerCase(); alwaysOnList=alwaysOnList.filter(n=>String(n).toLowerCase()!==name); renderAlwaysOn(); scheduleSave(); }
+
 // ---- custom commands (client-side editable, two rows each) ----
 let commandRows = [];
 let savedCmdNames = new Set();
@@ -1778,6 +1802,8 @@ function applyState(st, full){
     commandRows = JSON.parse(JSON.stringify(st.commands||[]));
     savedCmdNames = new Set(commandRows.map(c=>(c.name||'').trim().toLowerCase()));
     if(pruneOrphanMemberships()) api('/api/config', {capacity_ranges: rangeRows});  // clean up stale renamed-command leftovers
+    alwaysOnList = (st.always_on_commands||[]).map(n=>String(n).trim().toLowerCase()).filter(Boolean);
+    if($('#alwaysOnEnabled')) $('#alwaysOnEnabled').checked = !!st.always_on_enabled;
     modeRows = JSON.parse(JSON.stringify(st.modes||[]));
     savedModeNames = new Set(modeRows.map(m=>(m.name||'').trim().toLowerCase()));
     eventRows = JSON.parse(JSON.stringify(st.events||[]));
@@ -1785,6 +1811,7 @@ function applyState(st, full){
     prizeRows = (st.prizes && st.prizes.length) ? JSON.parse(JSON.stringify(st.prizes))
       : ((st.max_roll_prize && st.max_roll_prize.enabled) ? [JSON.parse(JSON.stringify(st.max_roll_prize))] : []);
     renderCommands();
+    renderAlwaysOn();
     renderEvents();
     renderModes();
     renderRanges();   // after commands + events so its dropdowns populate
@@ -1859,6 +1886,8 @@ function gatherConfig(){
     listener_message_on:$('#listenerOn').value, listener_message_off:$('#listenerOff').value,
     prizes:cleanPrizes(),
     capacity_ranges:rangeRows, commands:cleanCommands(), modes:cleanModes(), events:cleanEvents(),
+    always_on_enabled: $('#alwaysOnEnabled') ? $('#alwaysOnEnabled').checked : false,
+    always_on_commands: alwaysOnList,
   };
 }
 let saveT=null;
