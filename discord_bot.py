@@ -125,22 +125,36 @@ class BotManager:
         self.engine.bot_connected = False
 
     async def _runner(self, token: str) -> None:
-        try:
-            await self._client.start(token)
-        except asyncio.CancelledError:
-            pass
-        except discord.LoginFailure:
-            self.last_error = "invalid bot token"
-            self.engine._log("error", "Discord login failed: invalid token")
-            self.engine.bot_connected = False
-        except discord.PrivilegedIntentsRequired:
-            self.last_error = "enable the Message Content Intent in the Developer Portal"
-            self.engine._log("error", "Discord: Message Content Intent not enabled")
-            self.engine.bot_connected = False
-        except Exception as e:  # noqa: BLE001
-            self.last_error = str(e)
-            self.engine._log("error", f"Discord client error: {e}")
-            self.engine.bot_connected = False
+        delay = 30
+        while True:
+            try:
+                await self._client.start(token)
+                return
+            except asyncio.CancelledError:
+                return
+            except discord.LoginFailure:
+                self.last_error = "invalid bot token"
+                self.engine._log("error", "Discord login failed: invalid token")
+                self.engine.bot_connected = False
+                return   # a bad token won't fix itself — wait for the user
+            except discord.PrivilegedIntentsRequired:
+                self.last_error = "enable the Message Content Intent in the Developer Portal"
+                self.engine._log("error", "Discord: Message Content Intent not enabled")
+                self.engine.bot_connected = False
+                return
+            except Exception as e:  # noqa: BLE001
+                # Network-shaped failure (offline at launch, DNS blip, Discord
+                # outage): keep retrying with backoff instead of staying dead.
+                self.last_error = f"{e} — retrying in {delay}s"
+                self.engine._log("error", f"Discord client error: {e} — retrying in {delay}s")
+                self.engine.bot_connected = False
+                try:
+                    await self._client.close()
+                except Exception:  # noqa: BLE001
+                    pass
+                await asyncio.sleep(delay)
+                delay = min(300, delay * 2)
+                self._client = self._build_client()
 
     # -- wiring -------------------------------------------------------------- #
     def _build_client(self) -> discord.Client:
@@ -156,6 +170,12 @@ class BotManager:
         @client.event
         async def on_disconnect():
             self.engine.bot_connected = False
+
+        @client.event
+        async def on_resumed():
+            # a transient gateway blip RESUMEs without a fresh on_ready — the
+            # dashboard pill used to show "disconnected" forever after one
+            self.engine.bot_connected = True
 
         @client.event
         async def on_message(message: discord.Message):
@@ -191,20 +211,29 @@ class BotManager:
         try:
             while True:
                 await asyncio.sleep(5)
-                cfg = self.get_config()
-                ar = cfg.get("auto_report", {})
-                # Stop reporting when the listener is off (e.g. after an End
-                # Sequence deactivates the session) — no game, no announcements.
-                if not ar.get("enabled") or not cfg.get("listener_enabled"):
-                    elapsed = 0
-                    continue
-                if not self._client or not self._client.is_ready():
-                    continue
-                elapsed += 5
-                if elapsed >= max(15, int(ar.get("seconds", 300))):
-                    elapsed = 0
-                    txt = self.engine.auto_report_text(cfg.get("command_prefix", "!"))
-                    await self.broadcast(txt, None, embed=self._status_embed("auto", txt))
+                try:
+                    cfg = self.get_config()
+                    ar = cfg.get("auto_report", {})
+                    # Stop reporting when the listener is off (e.g. after an End
+                    # Sequence deactivates the session) — no game, no announcements.
+                    if not ar.get("enabled") or not cfg.get("listener_enabled") or self.engine.paused:
+                        elapsed = 0
+                        continue
+                    if not self._client or not self._client.is_ready():
+                        continue
+                    try:
+                        period = max(15, int(float(ar.get("seconds") or 300)))
+                    except (TypeError, ValueError):
+                        period = 300
+                    elapsed += 5
+                    if elapsed >= period:
+                        elapsed = 0
+                        txt = self.engine.auto_report_text(cfg.get("command_prefix", "!"))
+                        await self.broadcast(txt, None, embed=self._status_embed("auto", txt))
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:  # noqa: BLE001 — one bad tick must not kill the loop
+                    self.engine._log("error", f"auto-report: {e}")
         except asyncio.CancelledError:
             pass
 
@@ -285,13 +314,13 @@ class BotManager:
     async def _send(self, ch, text: str, image: str | None, embed=None):
         """Send one message; returns the sent discord.Message (or None on failure).
         When `embed` is given the text is carried as the embed (rich card) instead."""
-        text = (text or "").strip()
+        text = _clip(text)
         image = _resolve_img(image)
         try:
             if embed is not None:
                 return await ch.send(embed=embed)
             if image and image.lower().startswith(("http://", "https://")):
-                return await ch.send((f"{text}\n{image}" if text else image))
+                return await ch.send(_clip(f"{text}\n{image}" if text else image))
             elif image and os.path.exists(image):
                 return await ch.send(content=text or None, file=discord.File(image))
             elif text:
@@ -400,8 +429,10 @@ class BotManager:
                        "increase [operator]'s volume by **+[secs2capacity]%**\n"
                        "Current Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s")
             tmpl = cfg.get("pump_message") or default
-            extra = {"secs": f"{seconds:.1f}", "seconds": f"{seconds:.1f}",
-                     "secs2capacity": self.engine._secs_to_capacity(seconds, target)}
+            # broadcast what was actually delivered (the hard cap may clamp it)
+            actual = res.get("added") if res.get("added") is not None else seconds
+            extra = {"secs": f"{actual:.1f}", "seconds": f"{actual:.1f}",
+                     "secs2capacity": self.engine._secs_to_capacity(actual, target)}
             await self.broadcast(self.engine.render(tmpl, extra), None)
         return res
 
@@ -542,11 +573,14 @@ class BotManager:
             text = self.engine.help_text(prefix)
             mention = message.author.mention   # <@id> — pings them in the channel
             try:
-                await message.author.send(text)      # DM the command list
+                await message.author.send(_clip(text))      # DM the command list
                 if message.guild is not None:
                     await _reply(message, f"📬 {mention}, I've sent you a DM with the command list.")
-            except Exception:
+            except discord.Forbidden:
                 await _reply(message, f"⚠️ {mention}, I couldn't DM you — enable DMs from server members and try again.")
+            except Exception as e:  # noqa: BLE001 — not a DM-privacy problem; say what happened
+                self.engine._log("error", f"help DM failed: {e}")
+                await _reply(message, f"⚠️ {mention}, couldn't send the command list: {e}")
             return
 
         if action == "leaderboard":
@@ -696,8 +730,14 @@ def _ints(xs) -> list[int]:
     return out
 
 
+def _clip(text: str) -> str:
+    """Discord hard-caps messages at 2000 chars — truncate instead of 400ing."""
+    text = (text or "").strip()
+    return text if len(text) <= 2000 else text[:1997] + "…"
+
+
 async def _reply(message: discord.Message, text: str, as_reply: bool = False, embed=None) -> None:
-    kwargs = {"embed": embed} if embed is not None else {"content": text}
+    kwargs = {"embed": embed} if embed is not None else {"content": _clip(text)}
     try:
         if as_reply:
             await message.reply(**kwargs)      # a Discord reply — pings the author

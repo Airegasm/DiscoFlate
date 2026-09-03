@@ -112,7 +112,7 @@
     td textarea,.dev textarea{min-width:0}
     td input[type=text],td input:not([type]),
     .dev input[type=text],.dev input:not([type]){min-width:0}
-    input[type=number]{width:100%}
+    input[type=number]{width:100%!important} /* !important: beats the inline width:80px on number fields */
     label.field,label.field .muted{white-space:normal}
     .dev{flex-wrap:wrap}
     .dev .grow{flex-basis:100%}
@@ -388,7 +388,7 @@
       <div class="row" style="margin-top:10px">
         <button class="ghost" onclick="controlLeaderboard()">🏆 Broadcast Users</button>
         <div style="flex:1"></div>
-        <button class="ghost" onclick="act('/api/reset-users')">Reset tracking</button>
+        <button class="ghost" onclick="if(confirm('Reset session user tracking? Clears the tracked-users list and their cooldowns.')) act('/api/reset-users')">Reset tracking</button>
         <button class="warn" onclick="if(confirm('Wipe the ALL-TIME leaderboard? This can\'t be undone.')) act('/api/reset-lifetime')">Reset lifetime</button>
       </div>
       <div class="hint">Broadcast Users posts the leaderboard to your channel (same as the <code>leaderboard</code> command). Needs Activation on + a channel selected. <b>Reset tracking</b> clears this session's users; <b>Reset lifetime</b> wipes the persistent all-time leaderboard (the <code>toppumpers-life</code> command).</div>
@@ -529,7 +529,7 @@
         <b>loop</b> fires every N seconds (set <b>max</b> to stop after that many repeats; blank = forever); <b>once</b> fires a single time N seconds after Activation turns on (re-arms off→on).
         In a loop message, <code>[current_loop]</code> / <code>[total_loops]</code> / <code>[loop_timer]</code> show the iteration, the cap (∞ if none), and the interval.
         Runs only while <b>Activation</b> is on; turning Activation off cancels all events and clears cooldowns.</div>
-        <b>message</b> = post to announce channel · <b>fire</b> = run a device for N secs ·
+      <div class="hint"><b>message</b> = post to announce channel · <b>fire</b> = run a device for N secs ·
         <b>roll</b> = auto-roll a device · <b>capacity</b> = add/set % (op + value).
         Every action can also post its message. Placeholders work everywhere.</div>
     </div>
@@ -1034,13 +1034,14 @@ function renderBroadcasts(){
       `<div class="row" style="gap:8px">`+
         `<input value="${esc(b.name||'')}" placeholder="name (shown in the dropdown)" style="width:240px" onchange="broadcastRows[${i}].name=this.value;renderBroadcastDropdown()">`+
         `<div style="flex:1"></div>`+
-        `<button class="ghost" onclick="broadcastRows.splice(${i},1);renderBroadcasts();renderBroadcastDropdown();scheduleSave()">✕</button>`+
+        `<button class="ghost" onclick="delBroadcast(${i})">✕</button>`+
       `</div>`+
       `<textarea rows="3" placeholder="message · [capacity] [operator] [commands] …" onchange="broadcastRows[${i}].message=this.value">${esc(b.message||'')}</textarea>`;
     box.appendChild(el);
   });
 }
 function addBroadcast(){ broadcastRows.push({name:'',message:''}); renderBroadcasts(); renderBroadcastDropdown(); scheduleSave(); }
+function delBroadcast(i){ const b=broadcastRows[i]||{}; if(!confirm(`Delete broadcast "${b.name||'(unnamed)'}"? This can't be undone.`)) return; broadcastRows.splice(i,1); renderBroadcasts(); renderBroadcastDropdown(); scheduleSave(); }
 function cleanBroadcasts(){ return broadcastRows.filter(b=>(b.name||'').trim()||(b.message||'').trim()).map(b=>({name:(b.name||'').trim(), message:b.message||''})); }
 async function saveBroadcasts(){ await saveCfg({broadcasts: cleanBroadcasts()}); }
 function renderBroadcastDropdown(){
@@ -1229,7 +1230,11 @@ function addListenTarget(){
   listenTargets.push({guild_id:gid, guild_name:g?g.name:'', channel_id:cid, channel_name:c?c.name:''});
   renderListenTargets(); saveDiscord();
 }
-function removeListenTarget(i){ listenTargets.splice(i,1); renderListenTargets(); saveDiscord(); }
+function removeListenTarget(i){
+  const t=listenTargets[i]||{}, n=targetName(t);
+  if(!confirm(`Stop listening in ${n.gname} #${n.cname}? (Saves immediately.)`)) return;
+  listenTargets.splice(i,1); renderListenTargets(); saveDiscord();
+}
 async function saveRoll(){
   const s = await api('/api/config', {
     roll_enabled: $('#rollEnabled').checked,
@@ -1249,7 +1254,7 @@ async function saveAutomation(){
     cooldown_seconds: parseFloat($('#cooldown').value)||0,
     cooldown_exempt_user_ids: idList($('#cooldownExempt').value),
     cooldown_exempt_names: idList($('#cooldownExemptNames').value),
-    auto_report: {enabled: $('#autoEnabled').checked, seconds: parseInt($('#autoSecs').value)||300,
+    auto_report: {enabled: $('#autoEnabled').checked, seconds: Math.max(15, parseInt($('#autoSecs').value)||300),
                   message: $('#autoMessage').value},
     listener_message_on: $('#listenerOn').value,
     listener_message_off: $('#listenerOff').value,
@@ -1460,7 +1465,9 @@ function addRangeCmd(i, name){
 }
 // Remove a custom command from this range = delete its entry (inactive here).
 function removeRangeCmd(i, key){
-  const r=rangeRows[i]; if(r.cooldowns) delete r.cooldowns[key];
+  const r=rangeRows[i];
+  if(!confirm(`Remove !${key} from the ${r.min}–${r.max}% range? Its per-range cooldown/max/luck settings here are lost.`)) return;
+  if(r.cooldowns) delete r.cooldowns[key];
   renderRanges(); scheduleSave();
 }
 function addRangeEvent(i){ rangeRows[i].event_actions = rangeRows[i].event_actions||[]; rangeRows[i].event_actions.push({event:'',action:'enable'}); renderRanges(); scheduleSave(); }
@@ -1567,7 +1574,10 @@ function renderAlwaysOn(){
 function addAlwaysOn(name){ name=(name||'').trim().toLowerCase(); if(!name) return;
   if(!alwaysOnList.some(a=>aoName(a).toLowerCase()===name)) alwaysOnList.push({name:name, cooldown:null, max_uses:null, luck:null});
   renderAlwaysOn(); scheduleSave(); }
-function removeAlwaysOnIdx(idx){ alwaysOnList.splice(idx,1); renderAlwaysOn(); scheduleSave(); }
+function removeAlwaysOnIdx(idx){
+  if(!confirm(`Remove !${aoName(alwaysOnList[idx]||'')} from Always-On (its cooldown/max/luck here are lost)?`)) return;
+  alwaysOnList.splice(idx,1); renderAlwaysOn(); scheduleSave();
+}
 function setAlwaysOn(idx, field, val){ let a=alwaysOnList[idx];
   if(typeof a==='string'){ a={name:a, cooldown:null, max_uses:null}; alwaysOnList[idx]=a; }
   a[field] = (val===''?null:+val); scheduleSave(); }
@@ -1595,8 +1605,15 @@ function cmdDeviceOpts(sel){
 // (membership + a range's start-command are keyed by the command name).
 function renameCommand(i, val){
   const old=(commandRows[i].name||'').trim().toLowerCase();
-  commandRows[i].name = val;
   const neu=(val||'').trim().toLowerCase();
+  // a rename onto an existing command would silently absorb that command's
+  // per-range settings (and toggle both) — refuse it
+  if(neu && neu!==old && commandRows.some((c,j)=>j!==i && (c.name||'').trim().toLowerCase()===neu)){
+    toastMsg(`⚠ A command named "${neu}" already exists — pick another name.`);
+    renderCommands();
+    return;
+  }
+  commandRows[i].name = val;
   if(old && neu && old!==neu){
     rangeRows.forEach(r=>{
       if(r.cooldowns && Object.prototype.hasOwnProperty.call(r.cooldowns, old)){
@@ -1758,9 +1775,9 @@ function cleanFires(arr){
 }
 function cleanCommands(){
   return commandRows.filter(c=>(c.name||'').trim()).map(c=>({
-    name:(c.name||'').trim().replace(/^\W+/,''),
+    name:(c.name||'').trim().replace(/^\W+/,'').replace(/\s+/g,''),  // no interior spaces — untypeable in chat
     type: c.type||'fire',
-    seconds: c.seconds||null, dice: c.dice||null, sides: c.sides||null,
+    seconds: (c.seconds>0)?+c.seconds:null, dice: (c.dice>0)?+c.dice:null, sides: (c.sides>0)?+c.sides:null,
     reply: c.reply||'', enabled: c.enabled!==false, owner_only: !!c.owner_only,
     device_id: c.device_id||null,
     start_events: (c.start_events||[]).map(x=>x.trim()).filter(Boolean),
@@ -1785,7 +1802,8 @@ async function saveCommands(){ await saveCfg({commands: cleanCommands()}); }
 function toggleCmd(i, on){
   commandRows[i].enabled = on;
   const nm=(commandRows[i].name||'').trim().toLowerCase();
-  if(savedCmdNames.has(nm)) api('/api/command-toggle', {name:nm, enabled:on});  // live for saved cmds
+  if(savedCmdNames.has(nm)) api('/api/command-toggle', {name:nm, enabled:on}).catch(e=>toastMsg('⚠ '+(e.message||e)));  // live for saved cmds
+  scheduleSave();   // renamed-but-unsaved commands persist via the full save
 }
 
 // ---- modes (grouped command switches) ----
@@ -1807,11 +1825,12 @@ function renderModes(){
           `<textarea style="flex:1" rows="4" placeholder="message when OFF" onchange="modeRows[${i}].message_off=this.value">${esc(m.message_off||'')}</textarea>`+
         `</div>`+
       `</div>`+
-      `<button class="ghost" onclick="modeRows.splice(${i},1);renderModes();scheduleSave()">✕</button>`;
+      `<button class="ghost" onclick="delMode(${i})">✕</button>`;
     box.appendChild(el);
   });
 }
 function addMode(){ modeRows.push({name:'',commands:[],events:[],enabled:false,message_on:'',message_off:''}); renderModes(); scheduleSave(); }
+function delMode(i){ const m=modeRows[i]||{}; if(!confirm(`Delete mode "${m.name||'(unnamed)'}"? This can't be undone.`)) return; modeRows.splice(i,1); renderModes(); scheduleSave(); }
 function cleanModes(){
   return modeRows.filter(m=>(m.name||'').trim()).map(m=>({
     name:(m.name||'').trim(), commands:(m.commands||[]).map(x=>x.trim()).filter(Boolean),
@@ -1876,7 +1895,7 @@ function renderEvents(){
       html +=
       // --- timing ---
       `<div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end">`+
-        `<label class="field">Name <input value="${esc(e.name||'')}" placeholder="event name" style="width:150px" onchange="eventRows[${i}].name=this.value;renderModes()"></label>`+
+        `<label class="field">Name <input value="${esc(e.name||'')}" placeholder="event name" style="width:150px" onchange="renameEvent(${i},this.value)"></label>`+
         `<label class="field">Mode <select onchange="eventRows[${i}].mode=this.value;renderEvents()">`+
           `<option value="loop" ${mode!=='once'?'selected':''}>loop</option><option value="once" ${mode==='once'?'selected':''}>once</option></select></label>`+
         `<label class="field">Every (s) <input type="number" min="1" step="1" value="${e.every??''}" style="width:90px" onchange="eventRows[${i}].every=+this.value"></label>`+
@@ -1913,12 +1932,22 @@ function renderEvents(){
     el.innerHTML=html; box.appendChild(el);
   });
 }
+function renameEvent(i, val){
+  const neu=(val||'').trim().toLowerCase();
+  const old=(eventRows[i].name||'').trim().toLowerCase();
+  if(neu && neu!==old && eventRows.some((e,j)=>j!==i && (e.name||'').trim().toLowerCase()===neu)){
+    toastMsg(`⚠ An event named "${neu}" already exists — pick another name.`);
+    renderEvents();
+    return;
+  }
+  eventRows[i].name=val; renderModes();
+}
 function addEvent(){ eventRows.push({name:'',enabled:false,mode:'loop',every:60,max_repeats:null,fire_immediately:false,clean_previous:false,action:'message',message:'',seconds:5,dice:'',sides:'',capacity_op:'add',capacity_value:0,device_id:null,cooldown:null,activation_message:'',end_message:'',chance:50,luck:null,fires:[],fail_fires:[],success_message:'',failure_message:''}); renderEvents(); scheduleSave(); }
 function cleanEvents(){
   return eventRows.filter(e=>(e.name||'').trim()).map(e=>({
-    name:(e.name||'').trim(), enabled:e.enabled!==false, mode:e.mode||'loop', every:e.every||null,
-    max_repeats:(e.max_repeats==null||e.max_repeats==='')?null:+e.max_repeats, fire_immediately:!!e.fire_immediately, clean_previous:!!e.clean_previous, action:e.action||'message',
-    message:e.message||'', seconds:e.seconds||null, dice:e.dice||null, sides:e.sides||null,
+    name:(e.name||'').trim(), enabled:e.enabled!==false, mode:e.mode||'loop', every:(e.every>0)?+e.every:null,
+    max_repeats:(e.max_repeats==null||e.max_repeats===''||+e.max_repeats<0)?null:+e.max_repeats, fire_immediately:!!e.fire_immediately, clean_previous:!!e.clean_previous, action:e.action||'message',
+    message:e.message||'', seconds:(e.seconds>0)?+e.seconds:null, dice:(e.dice>0)?+e.dice:null, sides:(e.sides>0)?+e.sides:null,
     capacity_op:e.capacity_op||'add', capacity_value:e.capacity_value??0, device_id:e.device_id||null,
     cooldown:(e.cooldown==null||e.cooldown==='')?null:+e.cooldown,
     activation_message:e.activation_message||'', end_message:e.end_message||'',
@@ -1963,9 +1992,12 @@ function copyEvent(i){
 }
 function copyRange(i){ rangeRows.splice(i+1,0,clone(rangeRows[i])); renderRanges(); scheduleSave(); }
 // deletes require a confirmation popup (easy to fat-finger the ✕)
-function delCommand(i){ const c=commandRows[i]||{}; if(!confirm(`Delete command "${c.name||'(unnamed)'}"? This can't be undone.`)) return; commandRows.splice(i,1); cmdOpen.delete(i); renderCommands(); renderRanges(); scheduleSave(); }
-function delEvent(i){ const e=eventRows[i]||{}; if(!confirm(`Delete event "${e.name||'(unnamed)'}"? This can't be undone.`)) return; eventRows.splice(i,1); evtOpen.delete(i); renderEvents(); scheduleSave(); }
-function delRange(i){ const r=rangeRows[i]||{}; const lbl = r.is_end ? (r.end_only?'the End point':'the End Sequence') : `the ${r.min}–${r.max}% range`; if(!confirm(`Delete ${lbl}? This can't be undone.`)) return; rangeRows.splice(i,1); renderRanges(); scheduleSave(); }
+// deleting row i shifts the rows above it down — shift the expand-state sets
+// with them so the wrong row doesn't appear open
+function shiftSet(s, i){ return new Set([...s].filter(x=>x!==i).map(x=>x>i?x-1:x)); }
+function delCommand(i){ const c=commandRows[i]||{}; if(!confirm(`Delete command "${c.name||'(unnamed)'}"? This can't be undone.`)) return; commandRows.splice(i,1); cmdOpen=shiftSet(cmdOpen,i); renderCommands(); renderRanges(); scheduleSave(); }
+function delEvent(i){ const e=eventRows[i]||{}; if(!confirm(`Delete event "${e.name||'(unnamed)'}"? This can't be undone.`)) return; eventRows.splice(i,1); evtOpen=shiftSet(evtOpen,i); renderEvents(); scheduleSave(); }
+function delRange(i){ const r=rangeRows[i]||{}; const lbl = r.is_end ? (r.end_only?'the End point':'the End Sequence') : `the ${r.min}–${r.max}% range`; if(!confirm(`Delete ${lbl}? This can't be undone.`)) return; rangeRows.splice(i,1); rangeExpanded=shiftSet(rangeExpanded,i); renderRanges(); scheduleSave(); }
 function saveTemplate(kind, i){
   const src = kind==='commands'?commandRows[i] : kind==='events'?eventRows[i] : rangeRows[i];
   if(!src) return;
@@ -1988,7 +2020,12 @@ function addTemplateToConfig(kind, idx){
     toastMsg('Range added — set its From/To % in Capacity ranges');
   }
 }
-function removeTemplate(kind, idx){ (templatesData[kind]||[]).splice(idx,1); saveTemplates(); }
+function removeTemplate(kind, idx){
+  const t=(templatesData[kind]||[])[idx]||{};
+  const label = kind==='ranges' ? `range ${t.min??'?'}–${t.max??'?'}%` : (t.name||'(unnamed)');
+  if(!confirm(`Delete template "${label}"? This can't be undone.`)) return;
+  (templatesData[kind]||[]).splice(idx,1); saveTemplates();
+}
 function renderTemplates(){
   [['commands','tplCommands','tplCmdCount'],['events','tplEvents','tplEvtCount'],['ranges','tplRanges','tplRangeCount']]
   .forEach(([kind,boxId,cntId])=>{
@@ -2185,7 +2222,7 @@ function renderPrizes(){
         `<label class="field">Range gate <select onchange="prizeRows[${i}].range_gate=this.value">${rangeGateOptions(p.range_gate)}</select></label>`+
         `<label class="field">Perfects to unlock <input type="number" value="${p.goal??3}" min="1" style="width:80px" onchange="prizeRows[${i}].goal=+this.value"></label>`+
         `<label class="field">Uses <input type="number" value="${p.uses??1}" min="1" style="width:70px" onchange="prizeRows[${i}].uses=+this.value"></label>`+
-        `<div style="flex:1"></div><button class="ghost" onclick="prizeRows.splice(${i},1);renderPrizes();scheduleSave()">✕</button>`+
+        `<div style="flex:1"></div><button class="ghost" onclick="delPrize(${i})">✕</button>`+
       `</div>`+
       `<div class="row" style="gap:10px">`+
         `<label class="field">Action <select onchange="prizeRows[${i}].action=this.value;renderPrizes()">`+
@@ -2204,6 +2241,7 @@ function renderPrizes(){
     box.appendChild(el);
   });
 }
+function delPrize(i){ const p=prizeRows[i]||{}; if(!confirm(`Delete prize "${p.command||'(unnamed)'}"? This can't be undone.`)) return; prizeRows.splice(i,1); renderPrizes(); scheduleSave(); }
 function addPrize(){ prizeRows.push({enabled:true,command:'',range_gate:'all',goal:3,uses:1,action:'fire',seconds:10,dice:'',sides:'',device_id:null,description:'',
   progress_message:'[mention] rolled a perfect score [[count]/[goal]] — [remaining] more will unlock a bonus command!',
   unlock_message:'[mention] has unlocked: [prize_cmd] — [prize_desc]\\nYou can use this command a total of [uses] times.',
@@ -2219,7 +2257,11 @@ function cleanPrizes(){
 async function savePrizes(){ await saveCfg({prizes: cleanPrizes()}); }
 async function testDev(id){ try{ await api('/api/devices/test',{id}); }catch(e){ toastMsg('⚠ test failed: '+(e.message||e)); } }
 async function setCal(id,v){ await devApi('/api/devices/calibration',{id, seconds_to_100: parseFloat(v)}); }
-async function removeDev(id){ await devApi('/api/devices/remove',{id}); }
+async function removeDev(id){
+  const d=(allDevices||[]).find(x=>x.id===id)||{};
+  if(!confirm(`Remove device "${d.label||id}"? Its calibration is lost with it.`)) return;
+  await devApi('/api/devices/remove',{id});
+}
 async function importPD(){
   try{
     const r = await api('/api/devices/import',{});
@@ -2428,7 +2470,7 @@ function gatherConfig(){
     cooldown_exempt_user_ids: idList($('#cooldownExempt').value),
     cooldown_exempt_names: idList($('#cooldownExemptNames').value),
     cooldown_message:$('#cooldownMsg').value, cooldown_reset_message:$('#cooldownResetMsg').value,
-    auto_report:{ enabled:$('#autoEnabled').checked, seconds:parseInt($('#autoSecs').value)||300, message:$('#autoMessage').value },
+    auto_report:{ enabled:$('#autoEnabled').checked, seconds:Math.max(15, parseInt($('#autoSecs').value)||300), message:$('#autoMessage').value },
     listener_message_on:$('#listenerOn').value, listener_message_off:$('#listenerOff').value,
     pause_message: $('#pauseMsg') ? $('#pauseMsg').value : '',
     resume_message: $('#resumeMsg') ? $('#resumeMsg').value : '',

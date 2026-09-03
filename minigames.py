@@ -47,6 +47,8 @@ class SlotsView(discord.ui.View):
 
     @discord.ui.button(label="🎰 Pull", style=discord.ButtonStyle.danger)
     async def pull(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.is_finished():
+            return   # a second in-flight click after the spin resolved
         if self.starter_id is not None and interaction.user.id != self.starter_id:
             await interaction.response.send_message(
                 "This isn't your pull — run the command yourself to play.", ephemeral=True)
@@ -82,6 +84,8 @@ class PlayView(discord.ui.View):
 
     @discord.ui.button(label="▶ Play", style=discord.ButtonStyle.primary)
     async def play(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.is_finished():
+            return
         if self.starter_id is not None and interaction.user.id != self.starter_id:
             await interaction.response.send_message(
                 "This isn't your game — run the command yourself to play.", ephemeral=True)
@@ -93,15 +97,18 @@ class PlayView(discord.ui.View):
         if game is None:
             await interaction.response.send_message("Unknown game.", ephemeral=True)
             return
+        # One use = one game: lock this button out BEFORE the game launches, so
+        # a double-click can't open two concurrent games off one charge.
+        button.disabled = True
+        self.stop()
         g = game(self.bot, self.cmd, self.who, self.uid)
         g._interaction = interaction   # a pause needs a handle to edit the ephemeral
         self.bot._register_view(g)
         await g.begin(interaction)
-        button.disabled = True
         try:
             await interaction.message.edit(view=self)   # grey out the public Play button
-        except Exception:
-            pass
+        except Exception as e:  # noqa: BLE001
+            self.bot.engine._log("error", f"couldn't grey the Play button: {e}")
 
     async def on_timeout(self):
         for c in self.children:
@@ -136,6 +143,8 @@ class PushLuckView(discord.ui.View):
 
     @discord.ui.button(label="💨 Pump", style=discord.ButtonStyle.danger)
     async def pump(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.is_finished():
+            return
         if random.random() * 100 < self._bust_pct():
             self.pumps += 1
             self.score = 0.0
@@ -150,6 +159,8 @@ class PushLuckView(discord.ui.View):
 
     @discord.ui.button(label="🏦 Bank", style=discord.ButtonStyle.success)
     async def bank(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.is_finished():
+            return
         await self._finish(interaction, busted=False)
 
     async def _finish(self, interaction, busted, note=""):
@@ -195,18 +206,20 @@ class SimonView(discord.ui.View):
         self._interaction = interaction
         self._add()
         await interaction.response.send_message(self._reveal_text(), ephemeral=True)
-        asyncio.create_task(self._reveal_then_input())
+        self._reveal_task = asyncio.create_task(self._reveal_then_input())
 
     async def _reveal_then_input(self):
         try:
             await asyncio.sleep(self.reveal)
+            if self.is_finished():
+                return   # cancelled (session pause) while the sequence was showing
             self.entered = []
             self._build_buttons()
             await self._interaction.edit_original_response(
                 content=f"🧠 **{self.bot.engine.game_display_name(self.cmd)}** — now repeat it! (round {len(self.sequence)})",
                 view=self)
-        except Exception:
-            pass
+        except Exception as e:  # noqa: BLE001 — a failed edit strands the game; say so
+            self.bot.engine._log("error", f"simon reveal failed: {e}")
 
     def _build_buttons(self):
         self.clear_items()
@@ -214,6 +227,8 @@ class SimonView(discord.ui.View):
             self.add_item(SimonButton(sym))
 
     async def press(self, interaction: discord.Interaction, sym: str):
+        if self.is_finished():
+            return
         idx = len(self.entered)
         if idx >= len(self.sequence) or self.sequence[idx] != sym:
             # wrong → game over; score = fully-completed rounds
@@ -246,7 +261,7 @@ class SimonView(discord.ui.View):
         self._interaction = interaction
         await interaction.response.edit_message(
             content=self._reveal_text(prefix=f"✅ Round {self.score} done!\n"), view=self)
-        asyncio.create_task(self._reveal_then_input())
+        self._reveal_task = asyncio.create_task(self._reveal_then_input())
 
 
 class SimonButton(discord.ui.Button):
@@ -297,6 +312,8 @@ class BalloonView(discord.ui.View):
         await interaction.response.send_message(self._state(), view=self, ephemeral=True)
 
     async def reveal(self, interaction, k, btn):
+        if self.is_finished():
+            return
         if k in self.mines:
             for c in self.children:
                 c.disabled = True
@@ -319,6 +336,8 @@ class BalloonView(discord.ui.View):
         await interaction.response.edit_message(content=self._state(), view=self)
 
     async def cash_out(self, interaction):
+        if self.is_finished():
+            return
         for c in self.children:
             c.disabled = True
         self.stop()
@@ -367,6 +386,8 @@ class RpsView(discord.ui.View):
         await interaction.response.send_message(self._state(), view=self, ephemeral=True)
 
     async def throw(self, interaction, choice):
+        if self.is_finished():
+            return
         bot_choice = random.choice(list(self.EMOJI))
         if choice == bot_choice:
             last = f"🤝 Both {self.EMOJI[choice]} — tie."
@@ -445,6 +466,8 @@ class BlackjackView(discord.ui.View):
 
     @discord.ui.button(label="🃏 Hit", style=discord.ButtonStyle.primary)
     async def hit(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.is_finished():
+            return
         self.player.append(self._draw())
         if self._total(self.player) > 21:
             await self._resolve(interaction, busted=True)
@@ -453,6 +476,8 @@ class BlackjackView(discord.ui.View):
 
     @discord.ui.button(label="✋ Stand", style=discord.ButtonStyle.success)
     async def stand(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.is_finished():
+            return
         await self._resolve(interaction)
 
     async def _resolve(self, interaction, busted=False, natural=False, first=False):
@@ -463,7 +488,10 @@ class BlackjackView(discord.ui.View):
         if busted:
             score, head = 0, f"💥 Bust with **{pt}**!"
         elif natural:
-            score, head = 3, f"🂡 **Blackjack!** ({self._hand(self.player)})"
+            if self._total(self.dealer) == 21:   # dealer also has blackjack → push
+                score, head = 1, f"🤝 Push — both blackjack ({self._hand(self.player)})."
+            else:
+                score, head = 3, f"🂡 **Blackjack!** ({self._hand(self.player)})"
         else:
             while self._total(self.dealer) < 17:
                 self.dealer.append(self._draw())

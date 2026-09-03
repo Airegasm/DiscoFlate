@@ -25,6 +25,7 @@ import asyncio
 import json
 import os
 import random
+import re
 import time
 from collections import deque
 
@@ -94,6 +95,9 @@ class Engine:
         self._last_commanded: dict[str, bool] = {}
         self._on_sanctioned: dict[str, float] = {}   # device_id -> monotonic ok-until
         self._watchdog_next: dict[str, float] = {}
+        # Per-device command serialization: a dying fire's OFF and the next
+        # fire's ON (or a test/calibration call) can't interleave on one plug.
+        self._dev_locks: dict[str, asyncio.Lock] = {}
         # Session uptime: monotonic marker set when the engine starts ticking and
         # re-stamped on every session_reset (matches the "this session" scope used
         # by the leaderboard / use budgets). In-memory only; resets on app restart.
@@ -211,20 +215,25 @@ class Engine:
     def paused(self) -> bool:
         return self._paused
 
+    def _dev_lock(self, device_id) -> asyncio.Lock:
+        return self._dev_locks.setdefault(str(device_id), asyncio.Lock())
+
     async def _force_off(self, dev: dict | None, attempts: int = 3, delay: float = 1.0) -> bool:
         """OFF with retries — the one command that must not silently fail. Returns
-        True once the device confirms off; False if every attempt errored."""
+        True once the device confirms off; False if every attempt errored.
+        Serialized per device so it can't interleave with a new fire's ON."""
         if dev is None:
             return False
         alias = dev.get("label") or dev.get("host") or dev.get("id") or "device"
-        for i in range(max(1, attempts)):
-            try:
-                await self._set_state(dev, False)
-                return True
-            except Exception as e:  # noqa: BLE001
-                self._log("error", f"turn-off failed on {alias} (try {i + 1}/{attempts}): {e}")
-                if i + 1 < attempts:
-                    await asyncio.sleep(delay)
+        async with self._dev_lock(dev.get("id") or alias):
+            for i in range(max(1, attempts)):
+                try:
+                    await self._set_state(dev, False)
+                    return True
+                except Exception as e:  # noqa: BLE001
+                    self._log("error", f"turn-off failed on {alias} (try {i + 1}/{attempts}): {e}")
+                    if i + 1 < attempts:
+                        await asyncio.sleep(delay)
         return False
 
     async def _watchdog_sweep(self) -> None:
@@ -301,10 +310,18 @@ class Engine:
 
     # -- message rendering --------------------------------------------------- #
     def _render(self, template: str, ctx: dict) -> str:
+        # Single-pass substitution: a placeholder inside a substituted VALUE is
+        # never expanded again (a user nicknamed "[toppump]" stays literal
+        # instead of splicing the leaderboard into their name).
         out = template or ""
-        for k, v in ctx.items():
-            s = "" if v is None else str(v)
-            out = out.replace(f"[{k}]", s).replace("{" + k + "}", s)
+        if out:
+            values = {str(k): ("" if v is None else str(v)) for k, v in ctx.items()}
+
+            def _sub(m):
+                key = m.group(1) if m.group(1) is not None else m.group(2)
+                return values.get(key, m.group(0))
+
+            out = re.sub(r"\[([^\[\]{}]+)\]|\{([^\[\]{}]+)\}", _sub, out)
         return out.replace("\\n", "\n")
 
     def render(self, template: str, extra: dict | None = None) -> str:
@@ -431,6 +448,8 @@ class Engine:
         return {"min": 0, "max": 100, "dice": 1, "sides": 6, "announce": "", "milestone": "", "image": ""}
 
     async def _check_milestones(self) -> None:
+        if not self.cfg.get("listener_enabled"):
+            return   # muted: a web test-fire shouldn't post milestones to Discord
         for r in sorted(self.cfg.get("capacity_ranges", []), key=lambda r: r.get("min", 0)):
             mn = r.get("min", 0)
             if mn <= 0:
@@ -728,8 +747,10 @@ class Engine:
         if not tmpl:
             return
         now = time.monotonic()
-        for key_uid, cmds in self._cooldowns.items():
-            for cmdkey, rec in cmds.items():
+        # iterate over copies — the awaits below yield, and a command landing
+        # mid-broadcast mutates these dicts (RuntimeError otherwise)
+        for key_uid, cmds in list(self._cooldowns.items()):
+            for cmdkey, rec in list(cmds.items()):
                 if rec.get("notified"):
                     continue
                 if rec["cd"] and now >= rec["last"] + rec["cd"]:
@@ -894,13 +915,15 @@ class Engine:
                 sides = int(ev.get("sides") or rs)
                 total, _ = self._roll_total(dice, sides)
                 dur = self._duration_from_total(total)
-                self._begin_or_extend(target, dur, f"event {name}")
-                self.credit_pump(act_uid, act_who, dur, target)
+                fr = self._begin_or_extend(target, dur, f"event {name}")
+                if fr.get("status") in ("started", "extended"):
+                    self.credit_pump(act_uid, act_who, fr.get("added", dur), target)
                 self._log("bot", f"event '{name}': rolled {dice}d{sides}={total}")
             else:
                 secs = round(max(0.1, min(self._hard_cap(), float(ev.get("seconds") or 3))), 1)
-                self._begin_or_extend(target, secs, f"event {name}")
-                self.credit_pump(act_uid, act_who, secs, target)
+                fr = self._begin_or_extend(target, secs, f"event {name}")
+                if fr.get("status") in ("started", "extended"):
+                    self.credit_pump(act_uid, act_who, fr.get("added", secs), target)
                 self._log("bot", f"event '{name}': fired {secs}s")
         else:
             self._log("bot", f"event '{name}': message")
@@ -938,6 +961,9 @@ class Engine:
         if last is not None and now < last + b:
             return False
         self._last_fired[cmdkey] = now
+        if len(self._last_fired) > 500:   # bound the per-user keys over long sessions
+            cutoff = now - 3600
+            self._last_fired = {k: t for k, t in self._last_fired.items() if t > cutoff}
         return True
 
     def credit_pump(self, uid, who: str, seconds: float, device_id) -> None:
@@ -990,7 +1016,19 @@ class Engine:
 
     @staticmethod
     def _format_board(rows, header: str, empty: str) -> str:
-        rows = sorted(rows, key=lambda r: r["seconds"], reverse=True)
+        # Skip malformed rows instead of raising: a hand-edited lifetime file
+        # must never make every command reply silently fail to render.
+        clean = []
+        for r in rows:
+            if not isinstance(r, dict):
+                continue
+            try:
+                clean.append({"name": str(r.get("name") or "?"),
+                              "seconds": float(r.get("seconds") or 0),
+                              "capacity": float(r.get("capacity") or 0)})
+            except (TypeError, ValueError):
+                continue
+        rows = sorted(clean, key=lambda r: r["seconds"], reverse=True)
         if not rows:
             return f"{header}\n{empty}"
         namew = max(4, min(20, max(len(r["name"]) for r in rows)))
@@ -1059,7 +1097,7 @@ class Engine:
             remaining = self.cooldown_remaining(key_uid, "roll")
             if remaining > 0:
                 return {"ok": False, "cooldown": True, "error": self._cooldown_reply(who, remaining, uid, "roll")}
-        if self.cfg.get("roll", {}).get("disable_at_100") and self.capacity >= 100:
+        if self.cfg.get("roll", {}).get("disable_at_100") and self.capacity >= self._capacity_cap():
             return {"ok": False, "error": "at 100% capacity — control disabled"}
         if uid is not None:
             self._track_user(uid, who)
@@ -1069,7 +1107,9 @@ class Engine:
         p = self.preview_roll(dice, sides)
         fr = self._begin_or_extend(target, p["duration"], f"roll by {who}")
         extended = fr["status"] == "extended"
-        self.credit_pump(uid, who, p["duration"], target)
+        # Credit the seconds actually delivered (a stacked roll near the hard
+        # cap may add less than rolled) — keeps the leaderboards honest.
+        self.credit_pump(uid, who, fr.get("added", p["duration"]), target)
         self._log("roll", f"{who} rolled {p['dice']}d{p['sides']} = {p['total']} "
                   f"({'+'.join(map(str, p['rolls']))}) → {p['duration']:.1f}s"
                   + (f"  [+{fr['added']:.1f}s → {fr['remaining']:.1f}s]" if extended else ""))
@@ -1131,12 +1171,26 @@ class Engine:
             return "unlimited" if r is None else r
 
         if typ == "say":
+            # Say commands respect cooldowns like every other type (the shipped
+            # !pumproulette's 300s cooldown used to be decorative).
+            cmdkey = name.lower()
+            cd, scope = self._range_cd_scope(self.range_for(self.capacity), cmdkey)
+            key_uid = str(uid) if scope == "user" else "*"
+            if uid is not None and not owner_exempt:
+                remaining = self.cooldown_remaining(key_uid, cmdkey)
+                if remaining > 0:
+                    return {"ok": False, "cooldown": True, "error": self._cooldown_reply(who, remaining, uid, cmdkey)}
             ev_posts, activated = await self.start_events(cmd.get("start_events"), uid, who)
-            # A pure event-trigger command (e.g. !pumproulette) only costs a use when
-            # it actually starts something. If every event it targets was blocked
-            # (already running / on cooldown), don't drain the user's budget.
+            # A pure event-trigger command (e.g. !pumproulette) only costs a use
+            # (or touches its cooldown) when it actually starts something. If
+            # every event it targets was blocked (already running / on
+            # cooldown), don't drain the user's budget.
             if not (cmd.get("start_events") and activated == 0):
                 _spend_use()
+                if uid is not None:
+                    self._track_user(uid, who)
+                    if scope == "command" or not owner_exempt:
+                        self._touch_cooldown(key_uid, cmdkey, cd)
             anon = self._anon_label()
             return {"ok": True, "device": False, "started": False, "events_posted": ev_posts,
                     "reply": self.render(cmd.get("reply") or "", {"user": who, "mention": self._mention(uid, who), "cmd_remain": _remain()}) or f"{name}!",
@@ -1226,7 +1280,7 @@ class Engine:
             remaining = self.cooldown_remaining(key_uid, cmdkey)
             if remaining > 0:
                 return {"ok": False, "cooldown": True, "error": self._cooldown_reply(who, remaining, uid, cmdkey)}
-        if self.cfg.get("roll", {}).get("disable_at_100") and self.capacity >= 100:
+        if self.cfg.get("roll", {}).get("disable_at_100") and self.capacity >= self._capacity_cap():
             return {"ok": False, "error": "at 100% capacity — control disabled"}
         if uid is not None:
             self._track_user(uid, who)
@@ -1249,7 +1303,7 @@ class Engine:
         ev_posts, _ = await self.start_events(cmd.get("start_events"), uid, who)
         fr = self._begin_or_extend(target, duration, f"{name} by {who}")
         extended = fr["status"] == "extended"
-        self.credit_pump(uid, who, duration, target)
+        self.credit_pump(uid, who, fr.get("added", duration), target)
         # Extra "Add Device Fire" rows (fire type): each device runs independently.
         extra = await self._run_fires(cmd.get("fires"), who, uid) if typ == "fire" else []
         _spend_use()
@@ -1390,13 +1444,13 @@ class Engine:
             if not dev_id or self._device(dev_id) is None:
                 continue
             try:
-                dur = round(max(0.1, min(hi, float(row.get("seconds") or 3))), 1)
-            except (TypeError, ValueError):
+                dur = round(max(0.1, min(hi, float((row or {}).get("seconds") or 3))), 1)
+            except (TypeError, ValueError, AttributeError):
                 dur = 3.0
             fr = self._begin_or_extend(dev_id, dur, f"{who}'s device fire")
             if fr.get("status") not in ("started", "extended"):
-                continue   # paused / no device → nothing fired, credit nothing
-            self.credit_pump(uid, who, dur, dev_id)
+                continue   # paused / at cap / no device → nothing fired, credit nothing
+            self.credit_pump(uid, who, fr.get("added", dur), dev_id)
             out.append({"device_id": dev_id, "duration": dur, "status": fr.get("status")})
         return out
 
@@ -1414,6 +1468,11 @@ class Engine:
         # can switch a pump on while the session is paused, even code added later.
         if self._paused:
             return {"status": "paused"}
+        # disable_at_100 gates EVERY fire path here (chance, events, minigame
+        # payoffs, prizes included). The threshold is the capacity cap so an
+        # enabled End Sequence (which deliberately runs past 100%) still works.
+        if self.cfg.get("roll", {}).get("disable_at_100") and self.capacity >= self._capacity_cap():
+            return {"status": "at_cap"}
         dev = self._device(device_id)
         if dev is None:
             return {"status": "no_device"}
@@ -1428,13 +1487,16 @@ class Engine:
             f["extend"].set()
             return {"status": "extended", "added": round(added, 1), "remaining": round(new_deadline - now, 1)}
 
-        f = {"deadline": now + min(cap, duration), "abort": asyncio.Event(),
+        actual = min(cap, duration)
+        f = {"deadline": now + actual, "abort": asyncio.Event(),
              "extend": asyncio.Event(), "alias": dev.get("label") or dev["host"]}
         self._fires[device_id] = f
         f["task"] = asyncio.create_task(self._run_fire(device_id, reason))
         if self._pump_id() == device_id:
             self._cap_since = now
-        return {"status": "started", "remaining": round(f["deadline"] - now, 1)}
+        # "added" = seconds actually delivered (post-clamp) — what leaderboard
+        # credit should use, for starts and extensions alike.
+        return {"status": "started", "added": round(actual, 1), "remaining": round(f["deadline"] - now, 1)}
 
     async def _wait_abort_or_extend(self, f: dict) -> None:
         ab = asyncio.create_task(f["abort"].wait())
@@ -1447,7 +1509,8 @@ class Engine:
         dev = self._device(device_id)
         f = self._fires.get(device_id)
         try:
-            await self._set_state(dev, True)
+            async with self._dev_lock(device_id):
+                await self._set_state(dev, True)
             self._log("device", f"{f['alias']} ON ({reason})")
             while f and device_id in self._fires:
                 remaining = f["deadline"] - time.monotonic()
@@ -1464,23 +1527,34 @@ class Engine:
         except Exception as e:  # noqa: BLE001
             self._log("error", f"fire failed on {f['alias'] if f else device_id}: {e}")
         finally:
-            # Give the retrying OFF below room to finish before the watchdog
-            # piles on with its own force-off for the same device.
-            self._on_sanctioned[device_id] = time.monotonic() + 15.0
-            if dev:
-                await self._force_off(dev)
+            # Pop the fire entry BEFORE the (possibly slow) OFF network call, so
+            # a roll landing in that window starts a fresh fire instead of
+            # "extending" this dying one into nothing. The per-device lock
+            # inside _force_off keeps that new fire's ON from interleaving.
             self._fires.pop(device_id, None)
             if self._pump_id() == device_id:
                 self._cap_since = None
+            # Give the retrying OFF room before the watchdog piles on.
+            self._on_sanctioned[device_id] = time.monotonic() + 15.0
+            if dev:
+                await self._force_off(dev)
             if f:
                 self._log("device", f"{f['alias']} OFF")
 
     async def fire(self, duration: float, reason: str = "manual test", device_id: str | None = None) -> dict:
+        try:
+            duration = round(float(duration), 1)
+        except (TypeError, ValueError):
+            duration = 0.0
+        if duration <= 0:
+            return {"ok": False, "status": "bad_duration", "error": "duration must be positive"}
         target = device_id or self._active_id()
-        res = self._begin_or_extend(target, round(float(duration), 1), reason) if target else {"status": "no_device"}
+        res = self._begin_or_extend(target, duration, reason) if target else {"status": "no_device"}
         ok = res["status"] in ("started", "extended")
-        err = None if ok else ("session is paused" if res["status"] == "paused" else "no active device")
-        return {"ok": ok, "status": res["status"], "error": err}
+        err = None if ok else {"paused": "session is paused",
+                               "at_cap": "at capacity — control disabled"}.get(res["status"], "no active device")
+        return {"ok": ok, "status": res["status"], "error": err,
+                "added": res.get("added"), "remaining": res.get("remaining")}
 
     async def abort(self, device_id: str | None = None, *, reason: str = "aborted") -> None:
         ids = [device_id] if device_id else list(self._fires.keys())
@@ -1583,7 +1657,8 @@ class Engine:
 
         async def _pulse():
             try:
-                await self._set_state(dev, True)
+                async with self._dev_lock(dev.get("id") or alias):
+                    await self._set_state(dev, True)
                 self._log("device", f"TEST {alias} ON {seconds:.0f}s (no capacity)")
                 await asyncio.sleep(seconds)
             except Exception as e:  # noqa: BLE001
@@ -1607,7 +1682,8 @@ class Engine:
         # watchdog until device_off ends the run.
         self._on_sanctioned[device_id] = float("inf")
         try:
-            await self._set_state(dev, True)
+            async with self._dev_lock(device_id):
+                await self._set_state(dev, True)
         except Exception as e:  # noqa: BLE001
             self._log("error", f"calibration on failed: {e}")
             self._on_sanctioned.pop(device_id, None)
@@ -1622,7 +1698,8 @@ class Engine:
             return {"ok": False, "error": "device not found"}
         self._on_sanctioned.pop(device_id, None)
         try:
-            await self._set_state(dev, False)
+            async with self._dev_lock(device_id):
+                await self._set_state(dev, False)
         except Exception as e:  # noqa: BLE001
             self._log("error", f"calibration off failed: {e}")
             return {"ok": False, "error": str(e)}
@@ -1656,10 +1733,9 @@ class Engine:
                 continue
             ev = self._event_by_name(key)
             if ev is None:
-                self._runtime_events_on.add(key)   # unknown name → legacy behaviour
-                self._event_last.pop(key, None)
-                self._events_done.discard(key)
-                activated += 1
+                # No such event: activating nothing shouldn't count as an
+                # activation (it used to consume the caller's use for a no-op).
+                self._log("error", f"start_events: no event named '{key}'")
                 continue
             hdr = self._evt_hdr(ev.get("name", ""))
             active = bool(ev.get("enabled")) or key in self._runtime_events_on
@@ -1730,6 +1806,7 @@ class Engine:
         self._prize_uses.clear()
         self._pump_time.clear()
         self._cmd_uses.clear()
+        self._last_fired.clear()
         self._current_range_key = None
         self._end_triggered = False
         self._session_start = time.monotonic()   # uptime clock restarts with the session
