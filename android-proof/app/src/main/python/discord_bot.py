@@ -4,7 +4,6 @@ discord_bot.py — the Discord listener (a real bot account, not a self-bot).
 Reacts to prefix commands (default "!"):
   !roll        roll the current capacity range's dice, fire the active device
   !capacity    report current capacity + which dice are active
-  !stop        abort the current fire immediately
 
 Optional extras (all opt-in from the web UI):
   * per-user cooldown on !roll
@@ -340,12 +339,10 @@ class BotManager:
         if not content.startswith(prefix):
             return
         cmd = content[len(prefix):].split(" ", 1)[0].lower()
-        bn = self.engine.builtin_names()               # {roll,capacity,stop} → names
+        bn = self.engine.builtin_names()               # {roll,capacity,help,…} → names
         action = next((k for k, v in bn.items() if v == cmd), None)
         if action == "roll" and not cfg.get("roll_enabled", True):
             action = None  # dice disabled → ignore quietly
-        if action == "stop":
-            action = None  # !stop removed as a chat command (use UI abort / power switch)
         custom = self.engine.find_command(cmd)
         if custom is not None and not custom.get("enabled", True):
             custom = None  # disabled command → ignore quietly

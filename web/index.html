@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v2.1 by AireGasm</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v2.2 by AireGasm</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -390,7 +390,6 @@
         <label class="field">Roll <div class="row" style="gap:6px"><input id="cmdRoll" value="agroll" style="width:120px">
           <label class="row" style="gap:5px"><input type="checkbox" id="rollEnabled" style="width:auto"> on</label></div></label>
         <label class="field">Capacity <input id="cmdCapacity" value="capacity" style="width:120px"></label>
-        <label class="field">Stop <input id="cmdStop" value="stop" style="width:100px"></label>
         <label class="field">Help <input id="cmdHelp" value="aghelp" style="width:120px"></label>
         <label class="field">Leaderboard <input id="cmdLeaderboard" value="leaderboard" style="width:130px"></label>
         <label class="field">Pump timer <input id="cmdPumptimer" value="pumptimer" style="width:130px"></label>
@@ -478,7 +477,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v2.1.</span>
+        <span class="muted" id="updMsg">You're on v2.2.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -600,7 +599,7 @@ esphome dashboard config/</code></pre>
             <tr><td><code>[announce]</code></td><td>the current range's Announce text</td></tr>
             <tr><td><code>[commands]</code></td><td>all commands usable right now — <b>Capacity Range Commands</b> (this range's customs) on top, <b>System Commands</b> below</td></tr>
             <tr><td><code>[custom_commands]</code></td><td>just the <b>Capacity Range Commands (start%–stop%)</b> header + this range's custom commands (no system commands)</td></tr>
-            <tr><td><code>[prefix]</code> <code>[roll_cmd]</code> <code>[capacity_cmd]</code> <code>[stop_cmd]</code></td><td>the command names (e.g. <code>!agroll</code>)</td></tr>
+            <tr><td><code>[prefix]</code> <code>[roll_cmd]</code> <code>[capacity_cmd]</code> <code>[leaderboard_cmd]</code> <code>[pumptimer_cmd]</code></td><td>the command names (e.g. <code>!agroll</code>)</td></tr>
             <tr><td><code>[max_roll_goal]</code> <code>[max_roll_command]</code> <code>[max_roll_desc]</code></td><td>the active prize's goal / command / description</td></tr>
           </tbody></table>
         </div>
@@ -817,7 +816,6 @@ async function saveDiscord(){
     command_names: {
       roll: ($('#cmdRoll').value||'agroll').trim().toLowerCase(),
       capacity: ($('#cmdCapacity').value||'capacity').trim().toLowerCase(),
-      stop: ($('#cmdStop').value||'stop').trim().toLowerCase(),
       help: ($('#cmdHelp').value||'aghelp').trim().toLowerCase(),
       leaderboard: ($('#cmdLeaderboard').value||'leaderboard').trim().toLowerCase(),
       pumptimer: ($('#cmdPumptimer').value||'pumptimer').trim().toLowerCase(),
@@ -1583,7 +1581,6 @@ function applyState(st, full){
     const cn = st.command_names||{};
     $('#cmdRoll').value = cn.roll||'agroll';
     $('#cmdCapacity').value = cn.capacity||'capacity';
-    $('#cmdStop').value = cn.stop||'stop';
     $('#cmdHelp').value = cn.help||'aghelp';
     $('#cmdLeaderboard').value = cn.leaderboard||'leaderboard';
     $('#cmdPumptimer').value = cn.pumptimer||'pumptimer';
@@ -1691,7 +1688,6 @@ function gatherConfig(){
     command_prefix: $('#prefix').value||'!',
     command_names:{ roll:($('#cmdRoll').value||'agroll').trim().toLowerCase(),
       capacity:($('#cmdCapacity').value||'capacity').trim().toLowerCase(),
-      stop:($('#cmdStop').value||'stop').trim().toLowerCase(),
       help:($('#cmdHelp').value||'aghelp').trim().toLowerCase(),
       leaderboard:($('#cmdLeaderboard').value||'leaderboard').trim().toLowerCase(),
       pumptimer:($('#cmdPumptimer').value||'pumptimer').trim().toLowerCase() },

@@ -8,7 +8,6 @@
   "command_names": {
     "roll": "agroll",
     "capacity": "capacity",
-    "stop": "stop",
     "help": "aghelp",
     "leaderboard": "toppumpers",
     "pumptimer": "pumptimer"

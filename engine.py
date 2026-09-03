@@ -197,7 +197,6 @@ class Engine:
             "prefix": prefix,
             "roll_cmd": f"{prefix}{bn['roll']}",
             "capacity_cmd": f"{prefix}{bn['capacity']}",
-            "stop_cmd": f"{prefix}{bn['stop']}",
             "help_cmd": f"{prefix}{bn['help']}",
             "leaderboard_cmd": f"{prefix}{bn['leaderboard']}",
             "pumptimer_cmd": f"{prefix}{bn['pumptimer']}",
@@ -631,7 +630,6 @@ class Engine:
         n = self.cfg.get("command_names", {})
         return {"roll": (n.get("roll") or "agroll").strip().lower(),
                 "capacity": (n.get("capacity") or "capacity").strip().lower(),
-                "stop": (n.get("stop") or "stop").strip().lower(),
                 "help": (n.get("help") or "aghelp").strip().lower(),
                 "leaderboard": (n.get("leaderboard") or "leaderboard").strip().lower(),
                 "pumptimer": (n.get("pumptimer") or "pumptimer").strip().lower()}
@@ -1175,8 +1173,8 @@ class Engine:
         if self.cfg.get("roll_enabled", True) and self.cmd_enabled_in_range("roll"):
             lines.append(f"**{prefix}{bn['roll']}** - roll the dice")
         lines.append(f"**{prefix}{bn['capacity']}** - check capacity")
-        # !stop is intentionally not listed — removed as a chat command
-        # (stop via the UI abort button or a physical power switch).
+        lines.append(f"**{prefix}{bn['leaderboard']}** - show the leaderboard")
+        lines.append(f"**{prefix}{bn['pumptimer']}** - time left on the pump")
         return lines
 
     def custom_commands_str(self, prefix: str) -> str:

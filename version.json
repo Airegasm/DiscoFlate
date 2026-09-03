@@ -1,6 +1,6 @@
 {
-  "version": "2.1",
-  "versionCode": 25,
+  "version": "2.2",
+  "versionCode": 26,
   "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk",
-  "notes": "DiscoFlate v2.1 \u2014 Owner name moved to the top of the Dashboard (ID stays in Game)"
+  "notes": "DiscoFlate v2.2 \u2014 removed the stop chat command; [commands] now lists leaderboard + pumptimer under System Commands"
 }
