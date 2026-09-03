@@ -2032,7 +2032,7 @@ const VENDORS = {
   kauf:          {name:'Kauf (ESPHome · local)', add:['host','entity'], discover:false, creds:[['web_username','web auth username (optional)'],['web_password','web auth password (optional)']]},
 };
 const FIELD_PH = {host:'192.168.1.50', child_id:'outlet id (strips)', device_id:'device id', sku:'SKU e.g. H7141', mac:'AA:BB:CC:…', model:'e.g. WLPP1', entity_id:'switch.my_plug', entity:'switch id (default: relay)', label:'name (optional)'};
-let vendorCreds = {};
+let vendorsSet = {};   // {vendor:{field:bool}} — which creds are saved (values never leave the server)
 let addDraft = {};
 let calTimers = {};       // device id -> {start, interval, btn} during a live calibration
 let credsRendered = false;
@@ -2050,12 +2050,12 @@ let credsOpen = new Set();
 function toggleCred(v){ if(credsOpen.has(v)) credsOpen.delete(v); else credsOpen.add(v); renderVendorCreds(); }
 function renderVendorCreds(){
   const wrap=$('#vendorCredsWrap'); if(!wrap) return;
-  let html='<div class="muted" style="margin-bottom:8px">Brand credentials — expand only the brands you use (Kasa is local, needs none). Saved locally.</div>';
+  let html='<div class="muted" style="margin-bottom:8px">Brand credentials — expand only the brands you use (Kasa is local, needs none). Saved locally; values are never sent back to the page.</div>';
   for(const [v,meta] of Object.entries(VENDORS)){
     if(!meta.creds.length) continue;
-    vendorCreds[v]=vendorCreds[v]||{};
+    vendorsSet[v]=vendorsSet[v]||{};
     const open=credsOpen.has(v);
-    const filled=meta.creds.some(([f])=>vendorCreds[v][f]);
+    const filled=meta.creds.some(([f])=>vendorsSet[v][f]);
     html+=`<div class="dev" style="flex-direction:column;align-items:stretch;gap:8px;margin-bottom:6px">`+
       `<div class="row" style="cursor:pointer;gap:8px" onclick="toggleCred('${v}')">`+
         `<b>${esc(meta.name)}</b>${filled?' <span class="pill" style="padding:1px 8px;font-size:10px">set ✓</span>':''}`+
@@ -2063,14 +2063,21 @@ function renderVendorCreds(){
     if(open){
       for(const [f,ph] of meta.creds){
         const secret=['password','accessSecret','token','apiKey','totpKey'].includes(f);
-        html+=`<label class="field">${f} <input type="${secret?'password':'text'}" value="${esc(vendorCreds[v][f]||'')}" placeholder="${esc(ph)}" onchange="setCred('${v}','${f}',this.value)"></label>`;
+        const has=!!vendorsSet[v][f];
+        html+=`<label class="field">${f} <input type="${secret?'password':'text'}" value="" placeholder="${has?'•••• saved — type to replace':esc(ph)}" onchange="setCred('${v}','${f}',this.value)"></label>`;
       }
     }
     html+='</div>';
   }
   wrap.innerHTML=html;
 }
-function setCred(v,f,val){ vendorCreds[v]=vendorCreds[v]||{}; vendorCreds[v][f]=val; api('/api/config',{vendors:vendorCreds}); }
+async function setCred(v,f,val){
+  try{
+    const s = await api('/api/vendors', {vendor:v, creds:{[f]:val}});
+    vendorsSet = JSON.parse(JSON.stringify(s.vendors_set||{}));
+    renderVendorCreds();
+  }catch(e){ toastMsg('⚠ credential save failed: '+(e.message||e)); }
+}
 
 function renderDevices(st){
   if(Object.keys(calTimers).length) return;   // don't clobber a live calibration
@@ -2348,7 +2355,7 @@ function applyState(st, full){
     renderRanges();   // after commands + events so its dropdowns populate
     renderPrizes();
     renderDevices(st);
-    vendorCreds = JSON.parse(JSON.stringify(st.vendors||{}));
+    vendorsSet = JSON.parse(JSON.stringify(st.vendors_set||{}));
     if(!credsRendered){                 // build vendor picker + creds once (avoids clobbering typing)
       const av=$('#addVendor'); if(av) av.innerHTML=vendorOptions();
       renderAddFields();
@@ -2374,7 +2381,7 @@ function applyState(st, full){
 }
 function renderLog(events){
   $('#log').innerHTML = events.map(e =>
-    `<div><span class="t">${e.t}</span> <span class="${e.kind}">${esc(e.msg)}</span></div>`).join('');
+    `<div><span class="t">${esc(e.t)}</span> <span class="${esc(e.kind)}">${esc(e.msg)}</span></div>`).join('');
 }
 function copyLog(btn){
   const el=$('#log'); const text=(el.innerText||el.textContent||'').trim();

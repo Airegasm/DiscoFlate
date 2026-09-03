@@ -87,6 +87,16 @@ def _merge_defaults(cur: dict, dflt: dict) -> dict:
 # --------------------------------------------------------------------------- #
 # helpers
 # --------------------------------------------------------------------------- #
+def _mask_vendors(vendors: dict) -> dict:
+    """Which credential fields are filled, per vendor — never the values.
+    (GET /api/state used to ship every cloud password to the page; a DNS-
+    rebinding page or any local process could read them.)"""
+    out = {}
+    for v, creds in (vendors or {}).items():
+        out[v] = {f: bool(str(val or "").strip()) for f, val in (creds or {}).items()}
+    return out
+
+
 def _public_state(engine: Engine, botmgr: BotManager) -> dict:
     cfg = config_store.load()
     snap = engine.snapshot()
@@ -114,7 +124,7 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "broadcasts": cfg.get("broadcasts", []),
         "devices": cfg.get("devices", []),
         "active_device_id": cfg.get("active_device_id"),
-        "vendors": cfg.get("vendors", {}),
+        "vendors_set": _mask_vendors(cfg.get("vendors", {})),
         "allow": cfg.get("allow", {}),
         "listen_guild_id": cfg.get("listen_guild_id", ""),
         "listen_channel_id": cfg.get("listen_channel_id", ""),
@@ -164,14 +174,56 @@ def _origin_ok(request: web.Request) -> bool:
     return origin in (f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}")
 
 
+# Endpoints that reveal or replace secrets: beyond the origin check they need
+# the per-install browser cookie, so another local OS user can't just curl them.
+SENSITIVE_PATHS = {"/api/config/export", "/api/token", "/api/config/import", "/api/pull-updates"}
+
+
+def _web_secret() -> str:
+    """Per-install secret handed to the browser as a cookie when the UI loads.
+    Stored 0600 next to the config, so only this OS user can read it."""
+    path = os.path.join(config_store.DATA_DIR, ".web-secret")
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            s = fh.read().strip()
+        if s:
+            return s
+    except OSError:
+        pass
+    s = uuid.uuid4().hex + uuid.uuid4().hex
+    os.makedirs(config_store.DATA_DIR, exist_ok=True)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(s)
+    return s
+
+
 # --------------------------------------------------------------------------- #
 # route factory
 # --------------------------------------------------------------------------- #
 def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
-    app = web.Application()
+    secret = _web_secret()
+
+    @web.middleware
+    async def security_mw(request, handler):
+        # Host-header pinning kills DNS rebinding: a page on attacker.com whose
+        # DNS flips to 127.0.0.1 still arrives with Host: attacker.com.
+        host = (request.headers.get("Host") or "").lower()
+        if host not in (f"127.0.0.1:{PORT}", f"localhost:{PORT}", "127.0.0.1", "localhost"):
+            raise web.HTTPForbidden(text="bad host")
+        if request.path in SENSITIVE_PATHS:
+            token = request.cookies.get("df_auth") or request.headers.get("X-DiscoFlate-Auth")
+            if token != secret:
+                raise web.HTTPForbidden(
+                    text="missing local auth — open the DiscoFlate UI in this browser first")
+        return await handler(request)
+
+    app = web.Application(middlewares=[security_mw])
 
     async def index(request):
-        return web.FileResponse(os.path.join(WEB_DIR, "index.html"))
+        resp = web.FileResponse(os.path.join(WEB_DIR, "index.html"))
+        resp.set_cookie("df_auth", secret, httponly=True, samesite="Strict", path="/")
+        return resp
 
     async def get_state(request):
         return web.json_response(_public_state(engine, botmgr))
@@ -214,7 +266,7 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
                     "cooldown_exempt_user_ids", "cooldown_exempt_names", "operator_name", "auto_report",
                     "announce_channel_id", "listen_guild_id", "listen_channel_id",
                     "listen_targets", "anon_user_label", "output_headers", "rich_output", "templates",
-                    "allow_dms", "server_channels", "vendors", "silence_onoff_log",
+                    "allow_dms", "server_channels", "silence_onoff_log",
                     "mock_calibration_seconds_to_100",
                     "always_on_enabled", "always_on_commands",
                     "event_in_process_message", "event_cooldown_message", "broadcasts",
@@ -226,6 +278,24 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
                     raise web.HTTPBadRequest(text=f"{key} must be a {want.__name__}")
                 patch[key] = body[key]
         cfg = config_store.update(patch)
+        engine.set_config(cfg)
+        return web.json_response(_public_state(engine, botmgr))
+
+    async def set_vendors(request):
+        """Vendor credential writes — separated from the generic config patch so
+        credentials never ride along in (or come back from) full-config saves.
+        Sends only changed fields; an empty string clears a field."""
+        await guard(request)
+        b = await _json(request)
+        vendor = (b.get("vendor") or "").strip().lower()
+        creds = b.get("creds")
+        if not vendor or not isinstance(creds, dict):
+            raise web.HTTPBadRequest(text="expected {vendor, creds:{field:value}}")
+        cfg = config_store.load()
+        cur = cfg.setdefault("vendors", {}).setdefault(vendor, {})
+        for f, val in creds.items():
+            cur[str(f)] = str(val or "")
+        cfg = config_store.save(cfg)
         engine.set_config(cfg)
         return web.json_response(_public_state(engine, botmgr))
 
@@ -535,9 +605,11 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
     async def import_config(request):
         await guard(request)
         body = await _json(request)
-        if not isinstance(body, dict) or not body.get("command_prefix") and "command_names" not in body:
+        known = len(set(config_store.DEFAULTS) & set(body)) if isinstance(body, dict) else 0
+        if known < 3:
             raise web.HTTPBadRequest(text="that doesn't look like a DiscoFlate config backup")
-        cfg = config_store.save(config_store._deep_merge(config_store.DEFAULTS, body))
+        cfg = config_store.save(config_store._coerce_numbers(
+            config_store._deep_merge(config_store.DEFAULTS, body)))
         engine.set_config(cfg)
         await botmgr.ensure(cfg.get("discord_token"), force=True)
         return web.json_response({"ok": True})
@@ -599,8 +671,10 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
                     os.remove(dest)
                     raise web.HTTPRequestEntityTooLarge(max_size=8 * 1024 * 1024, actual_size=size)
                 fh.write(chunk)
-        # `path` is what the bot uploads to Discord; `url` is for the UI preview.
-        return web.json_response({"path": dest, "url": f"/images/{name}"})
+        # `path` is what the bot uploads to Discord (relative — resolved against
+        # the data dir at send time, so configs stay portable and the page never
+        # learns the install path); `url` is for the UI preview.
+        return web.json_response({"path": f"images/{name}", "url": f"/images/{name}"})
 
     async def snapshot(request):
         await guard(request)
@@ -655,6 +729,7 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
         web.get("/api/guilds", get_guilds),
         web.get("/images/{name}", serve_image),
         web.post("/api/config", set_config),
+        web.post("/api/vendors", set_vendors),
         web.post("/api/listener", set_listener),
         web.post("/api/mock", set_mock),
         web.post("/api/reconnect", reconnect),

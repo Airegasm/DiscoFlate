@@ -21,7 +21,16 @@ import os
 import time
 import discord
 
+import config_store
 import minigames
+
+
+def _resolve_img(image: str | None) -> str | None:
+    """Uploaded images are stored as 'images/<name>' relative paths — resolve
+    them against the data dir (absolute paths from older configs pass through)."""
+    if image and not image.lower().startswith(("http://", "https://")) and not os.path.isabs(image):
+        return os.path.join(config_store.DATA_DIR, "images", os.path.basename(image))
+    return image
 
 # Short token used for the actor name inside an output header when the destination
 # isn't allowed to see the real name. Kept terse on purpose (the long
@@ -277,6 +286,7 @@ class BotManager:
         """Send one message; returns the sent discord.Message (or None on failure).
         When `embed` is given the text is carried as the embed (rich card) instead."""
         text = (text or "").strip()
+        image = _resolve_img(image)
         try:
             if embed is not None:
                 return await ch.send(embed=embed)

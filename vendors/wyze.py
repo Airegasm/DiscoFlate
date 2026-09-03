@@ -445,7 +445,7 @@ async def set_state(device: dict, on: bool, creds: dict) -> None:
         "action_params": {},
         "custom_string": "",
     }
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
         await _app_request(creds, session, _URL_RUN_ACTION, extra)
 
 
@@ -457,7 +457,7 @@ async def get_state(device: dict, creds: dict):
     mac = _require(device, "mac")
     model = _require(device, "model")
     extra = {"device_mac": mac, "device_model": model}
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
         parsed = await _app_request(creds, session, _URL_PROPERTY_LIST, extra)
 
     props = ((parsed.get("data") or {}).get("property_list")) or []
@@ -479,7 +479,7 @@ async def discover(creds: dict) -> list:
     Returns [{"label": <nickname>, "vendor": "wyze", "mac": <mac>,
               "model": <product_model>}, ...].
     """
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
         parsed = await _app_request(creds, session, _URL_OBJECT_LIST, {})
 
     device_list = ((parsed.get("data") or {}).get("device_list")) or []

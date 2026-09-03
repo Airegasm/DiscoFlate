@@ -47,7 +47,7 @@ async def _request(method: str, endpoint: str, creds: dict, body: dict | None = 
     url = f"{GOVEE_API_BASE}{endpoint}"
     data = json.dumps(body).encode("utf-8") if body is not None else None
 
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
         async with session.request(method, url, headers=headers, data=data) as response:
             text = await response.text()
             if response.status < 200 or response.status >= 300:

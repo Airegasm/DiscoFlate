@@ -194,7 +194,7 @@ async def set_state(device: dict, on: bool, creds: dict) -> None:
     }
     path = f"/v1.0/iot-03/devices/{device['device_id']}/commands"
 
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
         await _request(session, creds, "POST", path, body)
 
 
@@ -207,7 +207,7 @@ async def get_state(device: dict, creds: dict):
     """
     path = f"/v1.0/devices/{device['device_id']}/status"
 
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
         result = await _request(session, creds, "GET", path)
 
     for item in result or []:

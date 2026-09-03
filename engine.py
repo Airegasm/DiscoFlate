@@ -114,6 +114,14 @@ class Engine:
         # pause()/resume() write these keys — set_config just mirrors them.
         self._paused = bool(cfg.get("session_paused"))
         self._paused_by = str(cfg.get("session_paused_by") or "")
+        # Display names are spoofable (any member can set a matching nickname);
+        # warn once if owner/exemption power rests on names alone.
+        if ((cfg.get("cooldown_exempt_names") or cfg.get("operator_name"))
+                and not cfg.get("cooldown_exempt_user_ids")
+                and not getattr(self, "_warned_name_owner", False)):
+            self._warned_name_owner = True
+            self._log("bot", "⚠ owner/exemptions match by display NAME only — any member can "
+                             "rename themselves to match. Set the Owner user ID (Game tab) too.")
         now_on = bool(cfg.get("listener_enabled"))
         if now_on and not self._listener_was:
             # Activation: re-arm all event timers so loops/once start fresh, and

@@ -253,6 +253,18 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void openUrl(final String url) {
             if (url == null || url.isEmpty()) return;
+            // Only https links to trusted hosts leave the app (the update
+            // apk_url comes from a fetched JSON — don't hand ACTION_VIEW an
+            // arbitrary scheme/host).
+            Uri u = Uri.parse(url);
+            String host = u.getHost() == null ? "" : u.getHost().toLowerCase();
+            if (!"https".equals(u.getScheme())
+                    || !(host.equals("github.com") || host.endsWith(".github.com")
+                         || host.endsWith(".githubusercontent.com")
+                         || host.equals("discord.com") || host.equals("www.amazon.com")
+                         || host.equals("kaufha.com") || host.equals("web.esphome.io"))) {
+                return;
+            }
             runOnUiThread(() -> {
                 try {
                     startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url))

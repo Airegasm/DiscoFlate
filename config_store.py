@@ -298,6 +298,41 @@ DEFAULTS = {
 }
 
 
+# Field names that are numeric wherever they appear in the config (commands,
+# events, ranges, prizes, always-on entries, fire rows, game tiers, templates).
+_NUM_FIELDS = {
+    "seconds", "dice", "sides", "chance", "luck", "every", "max_repeats",
+    "capacity_value", "cooldown", "goal", "uses", "min", "max", "max_uses",
+    "pl_bust_start", "pl_bust_step", "pl_max_pumps", "pl_points",
+    "sm_symbols", "sm_max_rounds", "sm_reveal",
+    "bl_cells", "bl_pops", "bl_points", "rps_wins", "sl_symbols",
+    "calibration_seconds_to_100", "factor", "min_seconds", "max_seconds",
+    "cooldown_seconds", "system_buffer_seconds", "mock_calibration_seconds_to_100",
+}
+
+
+def _coerce_numbers(node):
+    """Recursively force known-numeric fields to real numbers (junk → None).
+    The UI interpolates these into HTML attributes assuming they're numbers,
+    so a hand-edited or tampered backup can't smuggle markup through them."""
+    if isinstance(node, dict):
+        for k, v in list(node.items()):
+            if isinstance(v, (dict, list)):
+                _coerce_numbers(v)
+            elif k in _NUM_FIELDS and v is not None and not isinstance(v, bool):
+                if isinstance(v, (int, float)):
+                    continue
+                try:
+                    f = float(v)
+                    node[k] = int(f) if f == int(f) else f
+                except (TypeError, ValueError):
+                    node[k] = None
+    elif isinstance(node, list):
+        for item in node:
+            _coerce_numbers(item)
+    return node
+
+
 def _deep_merge(base: dict, patch: dict) -> dict:
     out = dict(base)
     for k, v in (patch or {}).items():
@@ -330,7 +365,7 @@ def load() -> dict:
         RECOVERED_FROM = aside
         print(f"!! config.json is corrupt ({e}) — moved to {aside}; check data/backups/ to restore")
         stored = {}
-    return _deep_merge(DEFAULTS, stored)
+    return _coerce_numbers(_deep_merge(DEFAULTS, stored))
 
 
 def _prune(paths: list[str], keep: int) -> None:
