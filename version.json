@@ -1,6 +1,6 @@
 {
-  "version": "2.4",
-  "versionCode": 28,
+  "version": "2.5",
+  "versionCode": 29,
   "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk",
-  "notes": "DiscoFlate v2.4 \u2014 Help guides for Custom commands, Capacity ranges, and Timed events (with examples)"
+  "notes": "DiscoFlate v2.5 \u2014 Updates panel restored to the top of Help"
 }
