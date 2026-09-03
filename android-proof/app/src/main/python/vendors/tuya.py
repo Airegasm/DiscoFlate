@@ -12,9 +12,7 @@ Chaquopy on Android -- no cryptography / pycryptodome / requests.
 Tuya has no LAN discovery here; device IDs are entered manually, so
 ``discover()`` returns ``[]`` (matching PumpDirect).
 
-WARNING: UNVERIFIED against real Tuya hardware. The request/response shapes and
-signing are transcribed from the PumpDirect JS service, not confirmed
-on-device.
+Verified working on real Tuya/Geeni/Smart Life plugs (2026-09).
 """
 
 from __future__ import annotations
@@ -194,7 +192,7 @@ async def set_state(device: dict, on: bool, creds: dict) -> None:
     }
     path = f"/v1.0/iot-03/devices/{device['device_id']}/commands"
 
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
         await _request(session, creds, "POST", path, body)
 
 
@@ -207,7 +205,7 @@ async def get_state(device: dict, creds: dict):
     """
     path = f"/v1.0/devices/{device['device_id']}/status"
 
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
         result = await _request(session, creds, "GET", path)
 
     for item in result or []:

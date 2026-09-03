@@ -37,9 +37,15 @@ DEFAULT_CONFIG_PATH = os.environ.get("DISCOFLATE_DEFAULT_CONFIG") or os.path.joi
 PORT = int(os.getenv("DISCOFLATE_PORT", "8765"))
 HOST = "127.0.0.1"
 
-# App version — keep in sync with android versionCode + version.json in the repo.
-VERSION = "3.6.3"
-VERSION_CODE = 60
+# App version — single-sourced from version.json (android build.gradle.kts and
+# the GitHub release tag are the only other places that carry it).
+try:
+    with open(os.path.join(HERE, "version.json"), "r", encoding="utf-8") as _vf:
+        _v = json.load(_vf)
+    VERSION = str(_v.get("version") or "0.0.0")
+    VERSION_CODE = int(_v.get("versionCode") or 0)
+except (OSError, ValueError):
+    VERSION, VERSION_CODE = "0.0.0", 0
 VERSION_URL = "https://raw.githubusercontent.com/Airegasm/DiscoFlate/main/version.json"
 
 # Scalar/message keys that "Restore Default Config" RESETS to the shipped default.
@@ -49,6 +55,7 @@ _DEFAULT_SCALAR_KEYS = ["roll", "capacity_message", "pumptimer_message",
                         "pump_message", "cooldown_message", "cooldown_reset_message",
                         "system_buffer_seconds", "cooldown_seconds", "roll_enabled",
                         "max_roll_prize", "auto_report", "listener_message_on", "listener_message_off",
+                        "pause_message", "resume_message", "paused_notice_message",
                         "always_on_enabled"]
 # list key -> identity function. Restore KEEPS everything you already have (edited
 # defaults + customs) and only ADDS shipped items whose key is missing.
@@ -87,6 +94,16 @@ def _merge_defaults(cur: dict, dflt: dict) -> dict:
 # --------------------------------------------------------------------------- #
 # helpers
 # --------------------------------------------------------------------------- #
+def _mask_vendors(vendors: dict) -> dict:
+    """Which credential fields are filled, per vendor — never the values.
+    (GET /api/state used to ship every cloud password to the page; a DNS-
+    rebinding page or any local process could read them.)"""
+    out = {}
+    for v, creds in (vendors or {}).items():
+        out[v] = {f: bool(str(val or "").strip()) for f, val in (creds or {}).items()}
+    return out
+
+
 def _public_state(engine: Engine, botmgr: BotManager) -> dict:
     cfg = config_store.load()
     snap = engine.snapshot()
@@ -114,7 +131,7 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "broadcasts": cfg.get("broadcasts", []),
         "devices": cfg.get("devices", []),
         "active_device_id": cfg.get("active_device_id"),
-        "vendors": cfg.get("vendors", {}),
+        "vendors_set": _mask_vendors(cfg.get("vendors", {})),
         "allow": cfg.get("allow", {}),
         "listen_guild_id": cfg.get("listen_guild_id", ""),
         "listen_channel_id": cfg.get("listen_channel_id", ""),
@@ -132,11 +149,17 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "operator_name": cfg.get("operator_name", ""),
         "listener_message_on": cfg.get("listener_message_on", ""),
         "listener_message_off": cfg.get("listener_message_off", ""),
+        "pause_message": cfg.get("pause_message", ""),
+        "resume_message": cfg.get("resume_message", ""),
+        "paused_notice_message": cfg.get("paused_notice_message", ""),
         "auto_report": cfg.get("auto_report", {}),
         "announce_channel_id": cfg.get("announce_channel_id", ""),
         "pumpdirect_path": cfg.get("pumpdirect_path"),
         "has_token": bool(cfg.get("discord_token")),
         "bot_error": botmgr.last_error,
+        "config_rev": cfg.get("config_rev", 0),
+        "recovered_config": config_store.RECOVERED_FROM,
+        "version": VERSION,
         "silence_onoff_log": cfg.get("silence_onoff_log", False),
         "mock_mode": cfg.get("mock_mode", False),
         "mock_calibration_seconds_to_100": cfg.get("mock_calibration_seconds_to_100", 60),
@@ -159,14 +182,56 @@ def _origin_ok(request: web.Request) -> bool:
     return origin in (f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}")
 
 
+# Endpoints that reveal or replace secrets: beyond the origin check they need
+# the per-install browser cookie, so another local OS user can't just curl them.
+SENSITIVE_PATHS = {"/api/config/export", "/api/token", "/api/config/import", "/api/pull-updates"}
+
+
+def _web_secret() -> str:
+    """Per-install secret handed to the browser as a cookie when the UI loads.
+    Stored 0600 next to the config, so only this OS user can read it."""
+    path = os.path.join(config_store.DATA_DIR, ".web-secret")
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            s = fh.read().strip()
+        if s:
+            return s
+    except OSError:
+        pass
+    s = uuid.uuid4().hex + uuid.uuid4().hex
+    os.makedirs(config_store.DATA_DIR, exist_ok=True)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(s)
+    return s
+
+
 # --------------------------------------------------------------------------- #
 # route factory
 # --------------------------------------------------------------------------- #
 def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
-    app = web.Application()
+    secret = _web_secret()
+
+    @web.middleware
+    async def security_mw(request, handler):
+        # Host-header pinning kills DNS rebinding: a page on attacker.com whose
+        # DNS flips to 127.0.0.1 still arrives with Host: attacker.com.
+        host = (request.headers.get("Host") or "").lower()
+        if host not in (f"127.0.0.1:{PORT}", f"localhost:{PORT}", "127.0.0.1", "localhost"):
+            raise web.HTTPForbidden(text="bad host")
+        if request.path in SENSITIVE_PATHS:
+            token = request.cookies.get("df_auth") or request.headers.get("X-DiscoFlate-Auth")
+            if token != secret:
+                raise web.HTTPForbidden(
+                    text="missing local auth — open the DiscoFlate UI in this browser first")
+        return await handler(request)
+
+    app = web.Application(middlewares=[security_mw])
 
     async def index(request):
-        return web.FileResponse(os.path.join(WEB_DIR, "index.html"))
+        resp = web.FileResponse(os.path.join(WEB_DIR, "index.html"))
+        resp.set_cookie("df_auth", secret, httponly=True, samesite="Strict", path="/")
+        return resp
 
     async def get_state(request):
         return web.json_response(_public_state(engine, botmgr))
@@ -179,9 +244,28 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
             raise web.HTTPForbidden(text="bad origin")
 
     # ---- config -----------------------------------------------------------
+    # Minimum shape per key — a patch with the wrong container type is refused
+    # (a malformed import/tab can't put a string where the engine expects a list).
+    _TYPE_FLOOR = {"commands": list, "events": list, "modes": list, "prizes": list,
+                   "capacity_ranges": list, "listen_targets": list, "broadcasts": list,
+                   "always_on_commands": list, "cooldown_exempt_user_ids": list,
+                   "cooldown_exempt_names": list, "command_names": dict, "roll": dict,
+                   "max_roll_prize": dict, "auto_report": dict, "templates": dict,
+                   "vendors": dict, "allow": dict, "server_channels": dict}
+
     async def set_config(request):
         await guard(request)
         body = await _json(request)
+        # Optimistic concurrency: a client that sends the rev it last saw is
+        # rejected if someone else saved since — the fix for the stale-tab
+        # full-snapshot clobber. Clients that send no rev skip the check.
+        if "config_rev" in body:
+            try:
+                client_rev = int(body.get("config_rev") or 0)
+            except (TypeError, ValueError):
+                client_rev = -1
+            if client_rev != config_store.load().get("config_rev", 0):
+                raise web.HTTPConflict(text="config changed elsewhere — reload and retry")
         patch = {}
         for key in ("command_prefix", "command_names", "capacity_message",
                     "roll_enabled", "system_buffer_seconds", "cooldown_message", "cooldown_reset_message", "pumptimer_message", "pump_message",
@@ -190,14 +274,36 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
                     "cooldown_exempt_user_ids", "cooldown_exempt_names", "operator_name", "auto_report",
                     "announce_channel_id", "listen_guild_id", "listen_channel_id",
                     "listen_targets", "anon_user_label", "output_headers", "rich_output", "templates",
-                    "allow_dms", "server_channels", "vendors", "silence_onoff_log",
+                    "allow_dms", "server_channels", "silence_onoff_log",
                     "mock_calibration_seconds_to_100",
                     "always_on_enabled", "always_on_commands",
                     "event_in_process_message", "event_cooldown_message", "broadcasts",
-                    "listener_message_on", "listener_message_off"):
+                    "listener_message_on", "listener_message_off",
+                    "pause_message", "resume_message", "paused_notice_message"):
             if key in body:
+                want = _TYPE_FLOOR.get(key)
+                if want and not isinstance(body[key], want):
+                    raise web.HTTPBadRequest(text=f"{key} must be a {want.__name__}")
                 patch[key] = body[key]
         cfg = config_store.update(patch)
+        engine.set_config(cfg)
+        return web.json_response(_public_state(engine, botmgr))
+
+    async def set_vendors(request):
+        """Vendor credential writes — separated from the generic config patch so
+        credentials never ride along in (or come back from) full-config saves.
+        Sends only changed fields; an empty string clears a field."""
+        await guard(request)
+        b = await _json(request)
+        vendor = (b.get("vendor") or "").strip().lower()
+        creds = b.get("creds")
+        if not vendor or not isinstance(creds, dict):
+            raise web.HTTPBadRequest(text="expected {vendor, creds:{field:value}}")
+        cfg = config_store.load()
+        cur = cfg.setdefault("vendors", {}).setdefault(vendor, {})
+        for f, val in creds.items():
+            cur[str(f)] = str(val or "")
+        cfg = config_store.save(cfg)
         engine.set_config(cfg)
         return web.json_response(_public_state(engine, botmgr))
 
@@ -428,7 +534,7 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
 
     async def abort(request):
         await guard(request)
-        await engine.abort("web")
+        await engine.abort(reason="web")
         return web.json_response({"ok": True})
 
     async def reset(request):
@@ -470,6 +576,11 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
         b = await _json(request)
         return web.json_response(await botmgr.operator_stop((b.get("who") or "").strip()))
 
+    async def control_resume(request):
+        await guard(request)
+        b = await _json(request)
+        return web.json_response(await botmgr.operator_resume((b.get("who") or "").strip()))
+
     async def control_capacity(request):
         await guard(request)
         return web.json_response(await botmgr.operator_broadcast_capacity())
@@ -502,9 +613,11 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
     async def import_config(request):
         await guard(request)
         body = await _json(request)
-        if not isinstance(body, dict) or not body.get("command_prefix") and "command_names" not in body:
+        known = len(set(config_store.DEFAULTS) & set(body)) if isinstance(body, dict) else 0
+        if known < 3:
             raise web.HTTPBadRequest(text="that doesn't look like a DiscoFlate config backup")
-        cfg = config_store.save(config_store._deep_merge(config_store.DEFAULTS, body))
+        cfg = config_store.save(config_store._coerce_numbers(
+            config_store._deep_merge(config_store.DEFAULTS, body)))
         engine.set_config(cfg)
         await botmgr.ensure(cfg.get("discord_token"), force=True)
         return web.json_response({"ok": True})
@@ -566,8 +679,10 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
                     os.remove(dest)
                     raise web.HTTPRequestEntityTooLarge(max_size=8 * 1024 * 1024, actual_size=size)
                 fh.write(chunk)
-        # `path` is what the bot uploads to Discord; `url` is for the UI preview.
-        return web.json_response({"path": dest, "url": f"/images/{name}"})
+        # `path` is what the bot uploads to Discord (relative — resolved against
+        # the data dir at send time, so configs stay portable and the page never
+        # learns the install path); `url` is for the UI preview.
+        return web.json_response({"path": f"images/{name}", "url": f"/images/{name}"})
 
     async def snapshot(request):
         await guard(request)
@@ -622,6 +737,7 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
         web.get("/api/guilds", get_guilds),
         web.get("/images/{name}", serve_image),
         web.post("/api/config", set_config),
+        web.post("/api/vendors", set_vendors),
         web.post("/api/listener", set_listener),
         web.post("/api/mock", set_mock),
         web.post("/api/reconnect", reconnect),
@@ -651,6 +767,7 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
         web.post("/api/control/roll", control_roll),
         web.post("/api/control/pump", control_pump),
         web.post("/api/control/stop", control_stop),
+        web.post("/api/control/resume", control_resume),
         web.post("/api/control/capacity", control_capacity),
         web.post("/api/control/leaderboard", control_leaderboard),
         web.post("/api/control/broadcast", control_broadcast),
@@ -682,6 +799,7 @@ async def main() -> None:
 
     botmgr = BotManager(engine, config_store.load)
     engine.announce_cb = botmgr.announce  # milestone / image posting
+    engine.cancel_games_cb = botmgr.cancel_all_games  # session pause kills live games
 
     async def _end_session():
         # Deactivate WITHOUT posting the activation-off message (End Sequence).

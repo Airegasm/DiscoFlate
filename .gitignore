@@ -24,3 +24,10 @@ android-proof/captures/
 # ── OS
 .DS_Store
 Thumbs.db
+
+# ── Release signing (NEVER commit — back these up privately!)
+android-proof/keystore.properties
+android-proof/*.keystore
+
+# ── APK is distributed via GitHub Releases, not git
+dist/

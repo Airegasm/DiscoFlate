@@ -12,9 +12,7 @@ Chaquopy on Android -- no cryptography / pycryptodome / requests.
 Tuya has no LAN discovery here; device IDs are entered manually, so
 ``discover()`` returns ``[]`` (matching PumpDirect).
 
-WARNING: UNVERIFIED against real Tuya hardware. The request/response shapes and
-signing are transcribed from the PumpDirect JS service, not confirmed
-on-device.
+Verified working on real Tuya/Geeni/Smart Life plugs (2026-09).
 """
 
 from __future__ import annotations

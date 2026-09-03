@@ -10,21 +10,38 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import tempfile
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # DISCOFLATE_DATA_DIR lets tests use a throwaway directory so they can never
 # touch the real data/config.json (which holds your saved token).
 DATA_DIR = os.environ.get("DISCOFLATE_DATA_DIR") or os.path.join(HERE, "data")
 CONFIG_PATH = os.path.join(DATA_DIR, "config.json")
+BACKUP_DIR = os.path.join(DATA_DIR, "backups")
+KEEP_BACKUPS = 10   # rolling ring of pre-save snapshots (max one per minute)
+KEEP_DAILY = 7      # plus one snapshot per day
+
+# Set when load() found a corrupt config and moved it aside — the UI surfaces
+# this so a boot-into-defaults never masquerades as a factory reset.
+RECOVERED_FROM: str | None = None
 
 # Default location of PumpDirect's device registry (device list + calibration).
 DEFAULT_PUMPDIRECT_PATH = os.path.normpath(
     os.path.join(HERE, "..", "PumpDirect", "data", "devices.json")
 )
 
+# Schema version of the stored config. Bump it + add a _migrate step whenever a
+# key is renamed/moved, so old configs upgrade instead of silently stranding data.
+CONFIG_VERSION = 1
+
 DEFAULTS = {
     "discord_token": "",
+    "config_version": CONFIG_VERSION,
+    # Bumped on every save; the UI sends the rev it last saw with each config
+    # write so a stale tab's snapshot is rejected instead of clobbering.
+    "config_rev": 0,
     "command_prefix": "!",
     "listener_enabled": False,
     # Master toggle for the built-in roll (dice) command. Off = dice disabled.
@@ -47,7 +64,7 @@ DEFAULTS = {
     # Names of the three built-in commands (rename to avoid clashing with other
     # bots — e.g. another dice bot already using !roll).
     "command_names": {"roll": "agroll", "capacity": "capacity",
-                      "help": "aghelp", "leaderboard": "leaderboard",
+                      "help": "aghelp", "leaderboard": "toppumpers",
                       "leaderboard_life": "toppumpers-life", "pumptimer": "pumptimer"},
     # The !pumptimer built-in reply (always available). Placeholders: [timer]/[total_secs].
     "pumptimer_message": "⏱️ [timer] seconds left on the pump timer.",
@@ -66,6 +83,18 @@ DEFAULTS = {
     # Blank = say nothing. Supports [capacity] and the other placeholders.
     "listener_message_on": "",
     "listener_message_off": "",
+
+    # Session pause (the dashboard STOP/RESUME button). While paused every
+    # device-on path is latched off, running fires/events/minigames are
+    # cancelled, and commands get the paused notice. The latch persists so a
+    # crash or restart comes back paused. Placeholders: [user] (who acted).
+    "session_paused": False,
+    "session_paused_by": "",
+    "pause_message": ("⏸️ **Session paused** by [user] — pumps are off and "
+                      "commands are disabled until the operator resumes."),
+    "resume_message": "▶️ **Session resumed** by [user] — pump away!",
+    # Reply to someone who runs a command while paused (per-user, buffered).
+    "paused_notice_message": "⏸️ [mention], the session is paused — hang tight until the operator resumes.",
 
     # The single server + channel the bot listens on (legacy / primary).
     # listen_channel_id "" = any channel in the selected server.
@@ -274,6 +303,41 @@ DEFAULTS = {
 }
 
 
+# Field names that are numeric wherever they appear in the config (commands,
+# events, ranges, prizes, always-on entries, fire rows, game tiers, templates).
+_NUM_FIELDS = {
+    "seconds", "dice", "sides", "chance", "luck", "every", "max_repeats",
+    "capacity_value", "cooldown", "goal", "uses", "min", "max", "max_uses",
+    "pl_bust_start", "pl_bust_step", "pl_max_pumps", "pl_points",
+    "sm_symbols", "sm_max_rounds", "sm_reveal",
+    "bl_cells", "bl_pops", "bl_points", "rps_wins", "sl_symbols",
+    "calibration_seconds_to_100", "factor", "min_seconds", "max_seconds",
+    "cooldown_seconds", "system_buffer_seconds", "mock_calibration_seconds_to_100",
+}
+
+
+def _coerce_numbers(node):
+    """Recursively force known-numeric fields to real numbers (junk → None).
+    The UI interpolates these into HTML attributes assuming they're numbers,
+    so a hand-edited or tampered backup can't smuggle markup through them."""
+    if isinstance(node, dict):
+        for k, v in list(node.items()):
+            if isinstance(v, (dict, list)):
+                _coerce_numbers(v)
+            elif k in _NUM_FIELDS and v is not None and not isinstance(v, bool):
+                if isinstance(v, (int, float)):
+                    continue
+                try:
+                    f = float(v)
+                    node[k] = int(f) if f == int(f) else f
+                except (TypeError, ValueError):
+                    node[k] = None
+    elif isinstance(node, list):
+        for item in node:
+            _coerce_numbers(item)
+    return node
+
+
 def _deep_merge(base: dict, patch: dict) -> dict:
     out = dict(base)
     for k, v in (patch or {}).items():
@@ -285,26 +349,107 @@ def _deep_merge(base: dict, patch: dict) -> dict:
 
 
 def load() -> dict:
+    global RECOVERED_FROM
     os.makedirs(DATA_DIR, exist_ok=True)
     try:
         with open(CONFIG_PATH, "r", encoding="utf-8") as fh:
             stored = json.load(fh)
-    except (FileNotFoundError, ValueError):
+        if not isinstance(stored, dict):
+            raise ValueError(f"config root is a {type(stored).__name__}, expected an object")
+    except FileNotFoundError:
         stored = {}
-    return _deep_merge(DEFAULTS, stored)
+    except ValueError as e:
+        # Corrupt config: NEVER run silently on defaults — the next save would
+        # make the wipe permanent. Move the bad file aside for recovery and
+        # flag it so the UI can warn.
+        aside = CONFIG_PATH + f".corrupt-{int(time.time())}"
+        try:
+            os.replace(CONFIG_PATH, aside)
+        except OSError:
+            aside = "(couldn't move the corrupt file aside)"
+        RECOVERED_FROM = aside
+        print(f"!! config.json is corrupt ({e}) — moved to {aside}; check data/backups/ to restore")
+        stored = {}
+    # Migrate the RAW stored config (merging first would inherit DEFAULTS'
+    # current config_version and skip every step).
+    return _coerce_numbers(_deep_merge(DEFAULTS, _migrate(stored)))
+
+
+def _migrate(cfg: dict) -> dict:
+    """Ordered upgrades for configs written by older versions. Each step bumps
+    config_version; unknown future keys always pass through untouched."""
+    v = int(cfg.get("config_version") or 0)
+    if v < 1:
+        # v1: roll.cooldown_reset_message was a dead nested key (nothing ever
+        # read it) — hoist it to the live top-level key if that one is blank.
+        nested = (cfg.get("roll") or {}).pop("cooldown_reset_message", None)
+        if nested and not cfg.get("cooldown_reset_message"):
+            cfg["cooldown_reset_message"] = nested
+    cfg["config_version"] = CONFIG_VERSION
+    return cfg
+
+
+def _prune(paths: list[str], keep: int) -> None:
+    for p in sorted(paths)[:-keep] if len(paths) > keep else []:
+        try:
+            os.remove(p)
+        except OSError:
+            pass
+
+
+def _rotate_backups() -> None:
+    """Copy the current config aside before it's overwritten: a rolling ring of
+    the last KEEP_BACKUPS saves (throttled to one per minute so a burst of
+    autosaves doesn't flush the whole ring) plus one snapshot per day."""
+    if not os.path.exists(CONFIG_PATH):
+        return
+    try:
+        os.makedirs(BACKUP_DIR, exist_ok=True)
+        ring = [os.path.join(BACKUP_DIR, f) for f in os.listdir(BACKUP_DIR)
+                if f.startswith("config.ring-")]
+        newest = max((os.path.getmtime(p) for p in ring), default=0)
+        if time.time() - newest >= 60:
+            shutil.copy2(CONFIG_PATH, os.path.join(BACKUP_DIR, f"config.ring-{int(time.time())}.json"))
+            _prune([os.path.join(BACKUP_DIR, f) for f in os.listdir(BACKUP_DIR)
+                    if f.startswith("config.ring-")], KEEP_BACKUPS)
+        daily = os.path.join(BACKUP_DIR, f"config.daily-{time.strftime('%Y-%m-%d')}.json")
+        if not os.path.exists(daily):
+            shutil.copy2(CONFIG_PATH, daily)
+            _prune([os.path.join(BACKUP_DIR, f) for f in os.listdir(BACKUP_DIR)
+                    if f.startswith("config.daily-")], KEEP_DAILY)
+    except OSError as e:
+        print(f"!! config backup rotation failed: {e}")
+
+
+def _fsync_dir(path: str) -> None:
+    """fsync the directory so the rename itself survives power loss (no-op on
+    platforms that can't fsync a directory, e.g. Windows)."""
+    try:
+        fd = os.open(path, os.O_RDONLY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    except OSError:
+        pass
 
 
 def save(cfg: dict) -> dict:
     os.makedirs(DATA_DIR, exist_ok=True)
+    cfg["config_rev"] = int(cfg.get("config_rev") or 0) + 1
+    _rotate_backups()
     fd, tmp = tempfile.mkstemp(dir=DATA_DIR, prefix=".config-", suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             json.dump(cfg, fh, indent=2)
+            fh.flush()
+            os.fsync(fh.fileno())   # data on disk BEFORE the rename makes it live
         try:
             os.chmod(tmp, 0o600)   # protect the token on desktop; best-effort on
         except OSError:            # Android, where app-private storage is already isolated
             pass
         os.replace(tmp, CONFIG_PATH)
+        _fsync_dir(DATA_DIR)
     finally:
         if os.path.exists(tmp):
             os.remove(tmp)

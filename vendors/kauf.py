@@ -6,7 +6,7 @@ The switch's object id defaults to ``relay`` — set the device's ``entity`` fie
 if yours differs. Optional web-server auth via the Kauf credentials
 (web_username / web_password).
 
-Stdlib + aiohttp only (Chaquopy-safe). UNVERIFIED against real hardware.
+Stdlib + aiohttp only (Chaquopy-safe). Verified working on real Kauf plugs (2026-09).
 """
 from __future__ import annotations
 

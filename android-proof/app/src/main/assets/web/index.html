@@ -112,7 +112,7 @@
     td textarea,.dev textarea{min-width:0}
     td input[type=text],td input:not([type]),
     .dev input[type=text],.dev input:not([type]){min-width:0}
-    input[type=number]{width:100%}
+    input[type=number]{width:100%!important} /* !important: beats the inline width:80px on number fields */
     label.field,label.field .muted{white-space:normal}
     .dev{flex-wrap:wrap}
     .dev .grow{flex-basis:100%}
@@ -127,9 +127,10 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.6.3</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" id="verLabel" style="font-size:13px;font-weight:400"></span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
+    <span class="pill" id="pausedPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">⏸ SESSION PAUSED</span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
     <span class="muted" id="saveStatus" style="transition:opacity .3s;opacity:0;color:var(--accent2)">saved ✓</span>
     <div class="toggles">
@@ -183,7 +184,7 @@
         <div class="row" style="gap:8px;align-items:center">
           <select id="ctrlDice"></select><span class="muted">d</span><select id="ctrlSides"></select>
           <button onclick="controlRoll()">🎲 Roll</button>
-          <button class="bad" onclick="controlStop()">🛑 Stop</button>
+          <button class="bad" id="ctrlStopBtn" onclick="controlStop()" title="Pause the whole session: pumps off, events + games cancelled, commands latched until Resume">🛑 Stop</button>
           <div style="flex:1"></div>
           <span class="muted">Pump</span>
           <input type="number" id="ctrlPump" value="5" min="1" step="0.5" style="width:80px">
@@ -366,6 +367,15 @@
             <textarea id="listenerOff" rows="4" placeholder="blank = say nothing"></textarea></label>
           <div class="hint" style="margin-top:6px">Both auto-append a fixed footer — <code>DiscoFlate v[version] by AireGasm</code> — as small subtext (not editable, only shown when the message isn't blank).</div>
         </div>
+        <div class="colsec" style="flex:1;min-width:240px">
+          <h3>Session pause (STOP button)</h3>
+          <label class="field">Paused broadcast <span class="muted">([user] = who paused)</span>
+            <textarea id="pauseMsg" rows="3" placeholder="⏸️ Session paused by [user]…"></textarea></label>
+          <label class="field">Resumed broadcast
+            <textarea id="resumeMsg" rows="3" placeholder="▶️ Session resumed by [user]…"></textarea></label>
+          <label class="field">Paused notice <span class="muted">(reply to a command while paused)</span>
+            <input id="pausedNoticeMsg" placeholder="⏸️ [mention], the session is paused…"></label>
+        </div>
       </div>
       <div class="row" style="margin-top:12px"><button onclick="saveAutomation()">Save</button>
         <span class="muted">Placeholders: <code>[capacity] [capacity_bar] [commands]</code> … see <b>Help</b>. Enter = newline.</span></div>
@@ -378,7 +388,7 @@
       <div class="row" style="margin-top:10px">
         <button class="ghost" onclick="controlLeaderboard()">🏆 Broadcast Users</button>
         <div style="flex:1"></div>
-        <button class="ghost" onclick="act('/api/reset-users')">Reset tracking</button>
+        <button class="ghost" onclick="if(confirm('Reset session user tracking? Clears the tracked-users list and their cooldowns.')) act('/api/reset-users')">Reset tracking</button>
         <button class="warn" onclick="if(confirm('Wipe the ALL-TIME leaderboard? This can\'t be undone.')) act('/api/reset-lifetime')">Reset lifetime</button>
       </div>
       <div class="hint">Broadcast Users posts the leaderboard to your channel (same as the <code>leaderboard</code> command). Needs Activation on + a channel selected. <b>Reset tracking</b> clears this session's users; <b>Reset lifetime</b> wipes the persistent all-time leaderboard (the <code>toppumpers-life</code> command).</div>
@@ -519,7 +529,7 @@
         <b>loop</b> fires every N seconds (set <b>max</b> to stop after that many repeats; blank = forever); <b>once</b> fires a single time N seconds after Activation turns on (re-arms off→on).
         In a loop message, <code>[current_loop]</code> / <code>[total_loops]</code> / <code>[loop_timer]</code> show the iteration, the cap (∞ if none), and the interval.
         Runs only while <b>Activation</b> is on; turning Activation off cancels all events and clears cooldowns.</div>
-        <b>message</b> = post to announce channel · <b>fire</b> = run a device for N secs ·
+      <div class="hint"><b>message</b> = post to announce channel · <b>fire</b> = run a device for N secs ·
         <b>roll</b> = auto-roll a device · <b>capacity</b> = add/set % (op + value).
         Every action can also post its message. Placeholders work everywhere.</div>
     </div>
@@ -542,7 +552,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v3.6.3.</span>
+        <span class="muted" id="updMsg"></span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -833,6 +843,7 @@ esphome dashboard config/</code></pre>
 <script>
 const $ = s => document.querySelector(s);
 let editingForms = false;   // becomes true once user-editable forms are populated
+let configRev = null;       // last config revision this tab saw (concurrency check)
 
 // ---- fluid tabs (no page navigation) ----
 function showTab(name){
@@ -862,9 +873,34 @@ let allCommandKeys = ['roll'];  // 'roll' + custom command names (for range cool
 async function api(path, body){
   const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'},
                               body: JSON.stringify(body||{})});
+  if(!r.ok){
+    // aiohttp error responses are plain text — surface them instead of blowing
+    // up in r.json() and leaving the user thinking the call worked.
+    const txt = await r.text().catch(()=> '');
+    throw new Error(txt || (r.status+' '+r.statusText));
+  }
   return r.json();
 }
-async function act(path){ await api(path); refresh(); }
+async function act(path){
+  try{ await api(path); }catch(e){ toastMsg('⚠ failed: '+(e.message||e)); }
+  refresh();
+}
+// Config saves from the explicit Save buttons: carries the concurrency rev and
+// surfaces failures (a 409 means another tab/process saved first — reload).
+async function saveCfg(patch){
+  try{
+    const s = await api('/api/config', {...patch, config_rev: configRev});
+    applyState(s, true);
+    return s;
+  }catch(e){
+    if(String(e.message||'').includes('config changed')){
+      toastMsg('⚠ Config changed elsewhere — reloaded it. Re-apply your last edit.');
+      try{ applyState(await (await fetch('/api/state')).json(), true); }catch(_){ }
+    } else {
+      toastMsg('⚠ save failed: '+(e.message||e));
+    }
+  }
+}
 
 // ---- snapshot / camera (uses this machine's cameras via the browser) ----
 let camStream = null, camZoom = 1, snapBlob = null, snapBlobUrl = null;
@@ -975,7 +1011,8 @@ async function ctl(path, body){
   }catch(e){ if(msg){ msg.textContent='✗ '+(e.message||e); } }
 }
 async function controlRoll(){ ctl('/api/control/roll', {dice:+$('#ctrlDice').value, sides:+$('#ctrlSides').value}); }
-async function controlStop(){ ctl('/api/control/stop', {}); }
+let sessionPaused = false;
+async function controlStop(){ ctl(sessionPaused ? '/api/control/resume' : '/api/control/stop', {}); }
 async function controlPump(){ ctl('/api/control/pump', {seconds: parseFloat($('#ctrlPump').value)||5}); }
 async function controlCapacity(){ ctl('/api/control/capacity', {}); }
 async function controlLeaderboard(){ ctl('/api/control/leaderboard', {}); }
@@ -997,15 +1034,16 @@ function renderBroadcasts(){
       `<div class="row" style="gap:8px">`+
         `<input value="${esc(b.name||'')}" placeholder="name (shown in the dropdown)" style="width:240px" onchange="broadcastRows[${i}].name=this.value;renderBroadcastDropdown()">`+
         `<div style="flex:1"></div>`+
-        `<button class="ghost" onclick="broadcastRows.splice(${i},1);renderBroadcasts();renderBroadcastDropdown();scheduleSave()">✕</button>`+
+        `<button class="ghost" onclick="delBroadcast(${i})">✕</button>`+
       `</div>`+
       `<textarea rows="3" placeholder="message · [capacity] [operator] [commands] …" onchange="broadcastRows[${i}].message=this.value">${esc(b.message||'')}</textarea>`;
     box.appendChild(el);
   });
 }
 function addBroadcast(){ broadcastRows.push({name:'',message:''}); renderBroadcasts(); renderBroadcastDropdown(); scheduleSave(); }
+function delBroadcast(i){ const b=broadcastRows[i]||{}; if(!confirm(`Delete broadcast "${b.name||'(unnamed)'}"? This can't be undone.`)) return; broadcastRows.splice(i,1); renderBroadcasts(); renderBroadcastDropdown(); scheduleSave(); }
 function cleanBroadcasts(){ return broadcastRows.filter(b=>(b.name||'').trim()||(b.message||'').trim()).map(b=>({name:(b.name||'').trim(), message:b.message||''})); }
-async function saveBroadcasts(){ applyState(await api('/api/config', {broadcasts: cleanBroadcasts()}), true); }
+async function saveBroadcasts(){ await saveCfg({broadcasts: cleanBroadcasts()}); }
 function renderBroadcastDropdown(){
   const sel=$('#ctrlBroadcast'); if(!sel) return;
   const prev=sel.value;
@@ -1099,12 +1137,14 @@ $('#mock').addEventListener('change', async e => {
 });
 
 async function saveToken(){
-  const s = await api('/api/token', {token: $('#token').value});
-  $('#token').value=''; applyState(s, true);
+  try{
+    const s = await api('/api/token', {token: $('#token').value});
+    $('#token').value=''; applyState(s, true);
+  }catch(e){ toastMsg('⚠ token save failed: '+(e.message||e)); }
 }
 let listenTargets = [];    // [{guild_id, guild_name, channel_id, channel_name}]
 async function saveDiscord(){
-  const s = await api('/api/config', {
+  const s = await saveCfg({
     command_prefix: $('#prefix').value || '!',
     command_names: {
       roll: ($('#cmdRoll').value||'agroll').trim().toLowerCase(),
@@ -1119,7 +1159,7 @@ async function saveDiscord(){
     allow_dms: $('#allowDms').checked,
     allow: { user_ids: idList($('#allowUsers').value) },
   });
-  applyState(s, true);
+  return s;
 }
 function copyInvite(){
   const el=$('#inviteUrl'); el.select();
@@ -1190,7 +1230,11 @@ function addListenTarget(){
   listenTargets.push({guild_id:gid, guild_name:g?g.name:'', channel_id:cid, channel_name:c?c.name:''});
   renderListenTargets(); saveDiscord();
 }
-function removeListenTarget(i){ listenTargets.splice(i,1); renderListenTargets(); saveDiscord(); }
+function removeListenTarget(i){
+  const t=listenTargets[i]||{}, n=targetName(t);
+  if(!confirm(`Stop listening in ${n.gname} #${n.cname}? (Saves immediately.)`)) return;
+  listenTargets.splice(i,1); renderListenTargets(); saveDiscord();
+}
 async function saveRoll(){
   const s = await api('/api/config', {
     roll_enabled: $('#rollEnabled').checked,
@@ -1206,18 +1250,20 @@ async function saveRoll(){
 function idList(v){ return (v||'').split(',').map(x=>x.trim()).filter(Boolean); }
 
 async function saveAutomation(){
-  const s = await api('/api/config', {
+  await saveCfg({
     cooldown_seconds: parseFloat($('#cooldown').value)||0,
-    cooldown_exempt_user_ids: $('#cooldownExempt').value.trim() ? [$('#cooldownExempt').value.trim()] : [],
-    cooldown_exempt_names: $('#cooldownExemptNames').value.trim() ? [$('#cooldownExemptNames').value.trim()] : [],
-    auto_report: {enabled: $('#autoEnabled').checked, seconds: parseInt($('#autoSecs').value)||300,
+    cooldown_exempt_user_ids: idList($('#cooldownExempt').value),
+    cooldown_exempt_names: idList($('#cooldownExemptNames').value),
+    auto_report: {enabled: $('#autoEnabled').checked, seconds: Math.max(15, parseInt($('#autoSecs').value)||300),
                   message: $('#autoMessage').value},
     listener_message_on: $('#listenerOn').value,
     listener_message_off: $('#listenerOff').value,
+    pause_message: $('#pauseMsg').value,
+    resume_message: $('#resumeMsg').value,
+    paused_notice_message: $('#pausedNoticeMsg').value,
     output_headers: $('#outputHeaders').checked,
     rich_output: $('#richOutput').checked,
   });
-  applyState(s, true);
 }
 
 // ---- tracked users ----
@@ -1419,7 +1465,9 @@ function addRangeCmd(i, name){
 }
 // Remove a custom command from this range = delete its entry (inactive here).
 function removeRangeCmd(i, key){
-  const r=rangeRows[i]; if(r.cooldowns) delete r.cooldowns[key];
+  const r=rangeRows[i];
+  if(!confirm(`Remove !${key} from the ${r.min}–${r.max}% range? Its per-range cooldown/max/luck settings here are lost.`)) return;
+  if(r.cooldowns) delete r.cooldowns[key];
   renderRanges(); scheduleSave();
 }
 function addRangeEvent(i){ rangeRows[i].event_actions = rangeRows[i].event_actions||[]; rangeRows[i].event_actions.push({event:'',action:'enable'}); renderRanges(); scheduleSave(); }
@@ -1471,13 +1519,14 @@ async function uploadImg(i, input, field, inputId){
   field = field||'image';
   const f = input.files[0]; if(!f) return;
   const fd = new FormData(); fd.append('file', f);
-  const r = await (await fetch('/api/upload', {method:'POST', body:fd})).json();
-  if(r.path){ rangeRows[i][field] = r.path; const el = document.getElementById(inputId||('img_'+field+'_'+i)); if(el) el.value = r.path; scheduleSave(); }
+  try{
+    const resp = await fetch('/api/upload', {method:'POST', body:fd});
+    if(!resp.ok){ toastMsg('⚠ upload failed: '+(await resp.text().catch(()=>resp.statusText))); return; }
+    const r = await resp.json();
+    if(r.path){ rangeRows[i][field] = r.path; const el = document.getElementById(inputId||('img_'+field+'_'+i)); if(el) el.value = r.path; scheduleSave(); }
+  }catch(e){ toastMsg('⚠ upload failed: '+(e.message||e)); }
 }
-async function saveRanges(){
-  const s = await api('/api/config', {capacity_ranges: rangeRows});
-  applyState(s, true);
-}
+async function saveRanges(){ await saveCfg({capacity_ranges: rangeRows}); }
 
 // ---- range gate dropdown (shared by commands + prize) ----
 function rangeGateOptions(sel){
@@ -1525,7 +1574,10 @@ function renderAlwaysOn(){
 function addAlwaysOn(name){ name=(name||'').trim().toLowerCase(); if(!name) return;
   if(!alwaysOnList.some(a=>aoName(a).toLowerCase()===name)) alwaysOnList.push({name:name, cooldown:null, max_uses:null, luck:null});
   renderAlwaysOn(); scheduleSave(); }
-function removeAlwaysOnIdx(idx){ alwaysOnList.splice(idx,1); renderAlwaysOn(); scheduleSave(); }
+function removeAlwaysOnIdx(idx){
+  if(!confirm(`Remove !${aoName(alwaysOnList[idx]||'')} from Always-On (its cooldown/max/luck here are lost)?`)) return;
+  alwaysOnList.splice(idx,1); renderAlwaysOn(); scheduleSave();
+}
 function setAlwaysOn(idx, field, val){ let a=alwaysOnList[idx];
   if(typeof a==='string'){ a={name:a, cooldown:null, max_uses:null}; alwaysOnList[idx]=a; }
   a[field] = (val===''?null:+val); scheduleSave(); }
@@ -1553,8 +1605,15 @@ function cmdDeviceOpts(sel){
 // (membership + a range's start-command are keyed by the command name).
 function renameCommand(i, val){
   const old=(commandRows[i].name||'').trim().toLowerCase();
-  commandRows[i].name = val;
   const neu=(val||'').trim().toLowerCase();
+  // a rename onto an existing command would silently absorb that command's
+  // per-range settings (and toggle both) — refuse it
+  if(neu && neu!==old && commandRows.some((c,j)=>j!==i && (c.name||'').trim().toLowerCase()===neu)){
+    toastMsg(`⚠ A command named "${neu}" already exists — pick another name.`);
+    renderCommands();
+    return;
+  }
+  commandRows[i].name = val;
   if(old && neu && old!==neu){
     rangeRows.forEach(r=>{
       if(r.cooldowns && Object.prototype.hasOwnProperty.call(r.cooldowns, old)){
@@ -1716,9 +1775,9 @@ function cleanFires(arr){
 }
 function cleanCommands(){
   return commandRows.filter(c=>(c.name||'').trim()).map(c=>({
-    name:(c.name||'').trim().replace(/^\W+/,''),
+    name:(c.name||'').trim().replace(/^\W+/,'').replace(/\s+/g,''),  // no interior spaces — untypeable in chat
     type: c.type||'fire',
-    seconds: c.seconds||null, dice: c.dice||null, sides: c.sides||null,
+    seconds: (c.seconds>0)?+c.seconds:null, dice: (c.dice>0)?+c.dice:null, sides: (c.sides>0)?+c.sides:null,
     reply: c.reply||'', enabled: c.enabled!==false, owner_only: !!c.owner_only,
     device_id: c.device_id||null,
     start_events: (c.start_events||[]).map(x=>x.trim()).filter(Boolean),
@@ -1739,11 +1798,12 @@ function cleanCommands(){
     game_tiers:(c.game_tiers||[]).map(t=>({op:t.op||'>=', min:+t.min||0, message:t.message||'', fires:cleanFires(t.fires)})),
   }));
 }
-async function saveCommands(){ applyState(await api('/api/config', {commands: cleanCommands()}), true); }
+async function saveCommands(){ await saveCfg({commands: cleanCommands()}); }
 function toggleCmd(i, on){
   commandRows[i].enabled = on;
   const nm=(commandRows[i].name||'').trim().toLowerCase();
-  if(savedCmdNames.has(nm)) api('/api/command-toggle', {name:nm, enabled:on});  // live for saved cmds
+  if(savedCmdNames.has(nm)) api('/api/command-toggle', {name:nm, enabled:on}).catch(e=>toastMsg('⚠ '+(e.message||e)));  // live for saved cmds
+  scheduleSave();   // renamed-but-unsaved commands persist via the full save
 }
 
 // ---- modes (grouped command switches) ----
@@ -1765,11 +1825,12 @@ function renderModes(){
           `<textarea style="flex:1" rows="4" placeholder="message when OFF" onchange="modeRows[${i}].message_off=this.value">${esc(m.message_off||'')}</textarea>`+
         `</div>`+
       `</div>`+
-      `<button class="ghost" onclick="modeRows.splice(${i},1);renderModes();scheduleSave()">✕</button>`;
+      `<button class="ghost" onclick="delMode(${i})">✕</button>`;
     box.appendChild(el);
   });
 }
 function addMode(){ modeRows.push({name:'',commands:[],events:[],enabled:false,message_on:'',message_off:''}); renderModes(); scheduleSave(); }
+function delMode(i){ const m=modeRows[i]||{}; if(!confirm(`Delete mode "${m.name||'(unnamed)'}"? This can't be undone.`)) return; modeRows.splice(i,1); renderModes(); scheduleSave(); }
 function cleanModes(){
   return modeRows.filter(m=>(m.name||'').trim()).map(m=>({
     name:(m.name||'').trim(), commands:(m.commands||[]).map(x=>x.trim()).filter(Boolean),
@@ -1777,11 +1838,14 @@ function cleanModes(){
     enabled:!!m.enabled, message_on:m.message_on||'', message_off:m.message_off||'',
   }));
 }
-async function saveModes(){ applyState(await api('/api/config', {modes: cleanModes()}), true); }
+async function saveModes(){ await saveCfg({modes: cleanModes()}); }
 async function toggleMode(i, on){
   modeRows[i].enabled = on;
   const nm=(modeRows[i].name||'').trim().toLowerCase();
-  if(savedModeNames.has(nm)) applyState(await api('/api/mode-toggle', {name:nm, enabled:on}), true);
+  if(savedModeNames.has(nm)){
+    try{ applyState(await api('/api/mode-toggle', {name:nm, enabled:on}), true); }
+    catch(e){ toastMsg('⚠ mode toggle failed: '+(e.message||e)); }
+  }
 }
 
 // ---- timed events ----
@@ -1831,7 +1895,7 @@ function renderEvents(){
       html +=
       // --- timing ---
       `<div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end">`+
-        `<label class="field">Name <input value="${esc(e.name||'')}" placeholder="event name" style="width:150px" onchange="eventRows[${i}].name=this.value;renderModes()"></label>`+
+        `<label class="field">Name <input value="${esc(e.name||'')}" placeholder="event name" style="width:150px" onchange="renameEvent(${i},this.value)"></label>`+
         `<label class="field">Mode <select onchange="eventRows[${i}].mode=this.value;renderEvents()">`+
           `<option value="loop" ${mode!=='once'?'selected':''}>loop</option><option value="once" ${mode==='once'?'selected':''}>once</option></select></label>`+
         `<label class="field">Every (s) <input type="number" min="1" step="1" value="${e.every??''}" style="width:90px" onchange="eventRows[${i}].every=+this.value"></label>`+
@@ -1868,12 +1932,22 @@ function renderEvents(){
     el.innerHTML=html; box.appendChild(el);
   });
 }
+function renameEvent(i, val){
+  const neu=(val||'').trim().toLowerCase();
+  const old=(eventRows[i].name||'').trim().toLowerCase();
+  if(neu && neu!==old && eventRows.some((e,j)=>j!==i && (e.name||'').trim().toLowerCase()===neu)){
+    toastMsg(`⚠ An event named "${neu}" already exists — pick another name.`);
+    renderEvents();
+    return;
+  }
+  eventRows[i].name=val; renderModes();
+}
 function addEvent(){ eventRows.push({name:'',enabled:false,mode:'loop',every:60,max_repeats:null,fire_immediately:false,clean_previous:false,action:'message',message:'',seconds:5,dice:'',sides:'',capacity_op:'add',capacity_value:0,device_id:null,cooldown:null,activation_message:'',end_message:'',chance:50,luck:null,fires:[],fail_fires:[],success_message:'',failure_message:''}); renderEvents(); scheduleSave(); }
 function cleanEvents(){
   return eventRows.filter(e=>(e.name||'').trim()).map(e=>({
-    name:(e.name||'').trim(), enabled:e.enabled!==false, mode:e.mode||'loop', every:e.every||null,
-    max_repeats:(e.max_repeats==null||e.max_repeats==='')?null:+e.max_repeats, fire_immediately:!!e.fire_immediately, clean_previous:!!e.clean_previous, action:e.action||'message',
-    message:e.message||'', seconds:e.seconds||null, dice:e.dice||null, sides:e.sides||null,
+    name:(e.name||'').trim(), enabled:e.enabled!==false, mode:e.mode||'loop', every:(e.every>0)?+e.every:null,
+    max_repeats:(e.max_repeats==null||e.max_repeats===''||+e.max_repeats<0)?null:+e.max_repeats, fire_immediately:!!e.fire_immediately, clean_previous:!!e.clean_previous, action:e.action||'message',
+    message:e.message||'', seconds:(e.seconds>0)?+e.seconds:null, dice:(e.dice>0)?+e.dice:null, sides:(e.sides>0)?+e.sides:null,
     capacity_op:e.capacity_op||'add', capacity_value:e.capacity_value??0, device_id:e.device_id||null,
     cooldown:(e.cooldown==null||e.cooldown==='')?null:+e.cooldown,
     activation_message:e.activation_message||'', end_message:e.end_message||'',
@@ -1882,14 +1956,20 @@ function cleanEvents(){
     success_message:e.success_message||'', failure_message:e.failure_message||'',
   }));
 }
-async function saveEvents(){ applyState(await api('/api/config', {events: cleanEvents()}), true); }
+async function saveEvents(){ await saveCfg({events: cleanEvents()}); }
 
 // ---- templates (reusable command / event / range snapshots) ----
 let templatesData = {commands:[], events:[], ranges:[]};
 function _tplList(kind){ templatesData[kind]=templatesData[kind]||[]; return templatesData[kind]; }
 // persist just the templates map — DON'T full-applyState (that would reload the
 // editor rows from the server and could revert unsaved command/event edits).
-async function saveTemplates(){ await api('/api/config', {templates: templatesData}); renderTemplates(); }
+async function saveTemplates(){
+  try{
+    const s = await api('/api/config', {templates: templatesData, config_rev: configRev});
+    configRev = s.config_rev ?? configRev;
+  }catch(e){ toastMsg('⚠ template save failed: '+(e.message||e)); }
+  renderTemplates();
+}
 // pick a name not already taken (case-insensitive): foo → foo-copy → foo-copy-2 …
 function uniqueName(base, taken){
   base=String(base||'').trim()||'item';
@@ -1912,9 +1992,12 @@ function copyEvent(i){
 }
 function copyRange(i){ rangeRows.splice(i+1,0,clone(rangeRows[i])); renderRanges(); scheduleSave(); }
 // deletes require a confirmation popup (easy to fat-finger the ✕)
-function delCommand(i){ const c=commandRows[i]||{}; if(!confirm(`Delete command "${c.name||'(unnamed)'}"? This can't be undone.`)) return; commandRows.splice(i,1); cmdOpen.delete(i); renderCommands(); renderRanges(); scheduleSave(); }
-function delEvent(i){ const e=eventRows[i]||{}; if(!confirm(`Delete event "${e.name||'(unnamed)'}"? This can't be undone.`)) return; eventRows.splice(i,1); evtOpen.delete(i); renderEvents(); scheduleSave(); }
-function delRange(i){ const r=rangeRows[i]||{}; const lbl = r.is_end ? (r.end_only?'the End point':'the End Sequence') : `the ${r.min}–${r.max}% range`; if(!confirm(`Delete ${lbl}? This can't be undone.`)) return; rangeRows.splice(i,1); renderRanges(); scheduleSave(); }
+// deleting row i shifts the rows above it down — shift the expand-state sets
+// with them so the wrong row doesn't appear open
+function shiftSet(s, i){ return new Set([...s].filter(x=>x!==i).map(x=>x>i?x-1:x)); }
+function delCommand(i){ const c=commandRows[i]||{}; if(!confirm(`Delete command "${c.name||'(unnamed)'}"? This can't be undone.`)) return; commandRows.splice(i,1); cmdOpen=shiftSet(cmdOpen,i); renderCommands(); renderRanges(); scheduleSave(); }
+function delEvent(i){ const e=eventRows[i]||{}; if(!confirm(`Delete event "${e.name||'(unnamed)'}"? This can't be undone.`)) return; eventRows.splice(i,1); evtOpen=shiftSet(evtOpen,i); renderEvents(); scheduleSave(); }
+function delRange(i){ const r=rangeRows[i]||{}; const lbl = r.is_end ? (r.end_only?'the End point':'the End Sequence') : `the ${r.min}–${r.max}% range`; if(!confirm(`Delete ${lbl}? This can't be undone.`)) return; rangeRows.splice(i,1); rangeExpanded=shiftSet(rangeExpanded,i); renderRanges(); scheduleSave(); }
 function saveTemplate(kind, i){
   const src = kind==='commands'?commandRows[i] : kind==='events'?eventRows[i] : rangeRows[i];
   if(!src) return;
@@ -1937,7 +2020,12 @@ function addTemplateToConfig(kind, idx){
     toastMsg('Range added — set its From/To % in Capacity ranges');
   }
 }
-function removeTemplate(kind, idx){ (templatesData[kind]||[]).splice(idx,1); saveTemplates(); }
+function removeTemplate(kind, idx){
+  const t=(templatesData[kind]||[])[idx]||{};
+  const label = kind==='ranges' ? `range ${t.min??'?'}–${t.max??'?'}%` : (t.name||'(unnamed)');
+  if(!confirm(`Delete template "${label}"? This can't be undone.`)) return;
+  (templatesData[kind]||[]).splice(idx,1); saveTemplates();
+}
 function renderTemplates(){
   [['commands','tplCommands','tplCmdCount'],['events','tplEvents','tplEvtCount'],['ranges','tplRanges','tplRangeCount']]
   .forEach(([kind,boxId,cntId])=>{
@@ -1972,16 +2060,16 @@ function toastMsg(msg){
 // ---- devices ----
 // ---- multi-vendor device support ----
 const VENDORS = {
-  kasa:          {name:'Kasa (TP-Link · local)',        add:['host','child_id'], discover:true,  creds:[]},
-  homeassistant: {name:'Home Assistant',                add:['entity_id'],       discover:true,  creds:[['baseUrl','http://homeassistant.local:8123'],['token','long-lived token']]},
-  tuya:          {name:'Tuya / Geeni (cloud)',          add:['device_id'],       discover:false, creds:[['accessId','Tuya access ID'],['accessSecret','access secret'],['region','us']]},
-  govee:         {name:'Govee (cloud)',                 add:['device_id','sku'], discover:true,  creds:[['apiKey','Govee API key']]},
-  wyze:          {name:'Wyze (cloud · high-risk)',      add:['mac','model'],     discover:true,  creds:[['email','email'],['password','password'],['keyId','key id'],['apiKey','api key'],['totpKey','TOTP secret if 2FA']]},
-  tapo:          {name:'Tapo (KLAP · fragile — prefer Home Assistant)', add:['host'], discover:false, creds:[['email','TP-Link email'],['password','TP-Link password']]},
-  kauf:          {name:'Kauf (ESPHome · local)', add:['host','entity'], discover:false, creds:[['web_username','web auth username (optional)'],['web_password','web auth password (optional)']]},
+  kasa:          {name:'Kasa (TP-Link · local · verified)', add:['host','child_id'], discover:true,  creds:[]},
+  homeassistant: {name:'Home Assistant (beta — unverified)', add:['entity_id'],      discover:true,  creds:[['baseUrl','http://homeassistant.local:8123'],['token','long-lived token']]},
+  tuya:          {name:'Tuya / Geeni (cloud · verified)',   add:['device_id'],       discover:false, creds:[['accessId','Tuya access ID'],['accessSecret','access secret'],['region','us']]},
+  govee:         {name:'Govee (cloud · beta — unverified)', add:['device_id','sku'], discover:true,  creds:[['apiKey','Govee API key']]},
+  wyze:          {name:'Wyze (cloud · beta — unverified · high-risk)', add:['mac','model'], discover:true, creds:[['email','email'],['password','password'],['keyId','key id'],['apiKey','api key'],['totpKey','TOTP secret if 2FA']]},
+  tapo:          {name:'Tapo (KLAP · beta — prefer Home Assistant)', add:['host'], discover:false, creds:[['email','TP-Link email'],['password','TP-Link password']]},
+  kauf:          {name:'Kauf (ESPHome · local · verified)', add:['host','entity'], discover:false, creds:[['web_username','web auth username (optional)'],['web_password','web auth password (optional)']]},
 };
 const FIELD_PH = {host:'192.168.1.50', child_id:'outlet id (strips)', device_id:'device id', sku:'SKU e.g. H7141', mac:'AA:BB:CC:…', model:'e.g. WLPP1', entity_id:'switch.my_plug', entity:'switch id (default: relay)', label:'name (optional)'};
-let vendorCreds = {};
+let vendorsSet = {};   // {vendor:{field:bool}} — which creds are saved (values never leave the server)
 let addDraft = {};
 let calTimers = {};       // device id -> {start, interval, btn} during a live calibration
 let credsRendered = false;
@@ -1999,12 +2087,12 @@ let credsOpen = new Set();
 function toggleCred(v){ if(credsOpen.has(v)) credsOpen.delete(v); else credsOpen.add(v); renderVendorCreds(); }
 function renderVendorCreds(){
   const wrap=$('#vendorCredsWrap'); if(!wrap) return;
-  let html='<div class="muted" style="margin-bottom:8px">Brand credentials — expand only the brands you use (Kasa is local, needs none). Saved locally.</div>';
+  let html='<div class="muted" style="margin-bottom:8px">Brand credentials — expand only the brands you use (Kasa is local, needs none). Saved locally; values are never sent back to the page.</div>';
   for(const [v,meta] of Object.entries(VENDORS)){
     if(!meta.creds.length) continue;
-    vendorCreds[v]=vendorCreds[v]||{};
+    vendorsSet[v]=vendorsSet[v]||{};
     const open=credsOpen.has(v);
-    const filled=meta.creds.some(([f])=>vendorCreds[v][f]);
+    const filled=meta.creds.some(([f])=>vendorsSet[v][f]);
     html+=`<div class="dev" style="flex-direction:column;align-items:stretch;gap:8px;margin-bottom:6px">`+
       `<div class="row" style="cursor:pointer;gap:8px" onclick="toggleCred('${v}')">`+
         `<b>${esc(meta.name)}</b>${filled?' <span class="pill" style="padding:1px 8px;font-size:10px">set ✓</span>':''}`+
@@ -2012,14 +2100,21 @@ function renderVendorCreds(){
     if(open){
       for(const [f,ph] of meta.creds){
         const secret=['password','accessSecret','token','apiKey','totpKey'].includes(f);
-        html+=`<label class="field">${f} <input type="${secret?'password':'text'}" value="${esc(vendorCreds[v][f]||'')}" placeholder="${esc(ph)}" onchange="setCred('${v}','${f}',this.value)"></label>`;
+        const has=!!vendorsSet[v][f];
+        html+=`<label class="field">${f} <input type="${secret?'password':'text'}" value="" placeholder="${has?'•••• saved — type to replace':esc(ph)}" onchange="setCred('${v}','${f}',this.value)"></label>`;
       }
     }
     html+='</div>';
   }
   wrap.innerHTML=html;
 }
-function setCred(v,f,val){ vendorCreds[v]=vendorCreds[v]||{}; vendorCreds[v][f]=val; api('/api/config',{vendors:vendorCreds}); }
+async function setCred(v,f,val){
+  try{
+    const s = await api('/api/vendors', {vendor:v, creds:{[f]:val}});
+    vendorsSet = JSON.parse(JSON.stringify(s.vendors_set||{}));
+    renderVendorCreds();
+  }catch(e){ toastMsg('⚠ credential save failed: '+(e.message||e)); }
+}
 
 function renderDevices(st){
   if(Object.keys(calTimers).length) return;   // don't clobber a live calibration
@@ -2061,8 +2156,13 @@ function renderDevices(st){
     box.appendChild(el);
   });
 }
-async function setActive(id){ applyState(await api('/api/devices/active',{id}), true); }
-async function setDevType(id,type){ applyState(await api('/api/devices/type',{id,type}), true); }
+// device endpoints share one wrapper so failures surface instead of vanishing
+async function devApi(path, body){
+  try{ applyState(await api(path, body), true); }
+  catch(e){ toastMsg('⚠ '+(e.message||e)); }
+}
+async function setActive(id){ await devApi('/api/devices/active',{id}); }
+async function setDevType(id,type){ await devApi('/api/devices/type',{id,type}); }
 
 // live calibration: tap Calibrate → pump ON + count up; tap Full → pump OFF + save elapsed as secs→100%
 async function toggleCal(id){
@@ -2122,7 +2222,7 @@ function renderPrizes(){
         `<label class="field">Range gate <select onchange="prizeRows[${i}].range_gate=this.value">${rangeGateOptions(p.range_gate)}</select></label>`+
         `<label class="field">Perfects to unlock <input type="number" value="${p.goal??3}" min="1" style="width:80px" onchange="prizeRows[${i}].goal=+this.value"></label>`+
         `<label class="field">Uses <input type="number" value="${p.uses??1}" min="1" style="width:70px" onchange="prizeRows[${i}].uses=+this.value"></label>`+
-        `<div style="flex:1"></div><button class="ghost" onclick="prizeRows.splice(${i},1);renderPrizes();scheduleSave()">✕</button>`+
+        `<div style="flex:1"></div><button class="ghost" onclick="delPrize(${i})">✕</button>`+
       `</div>`+
       `<div class="row" style="gap:10px">`+
         `<label class="field">Action <select onchange="prizeRows[${i}].action=this.value;renderPrizes()">`+
@@ -2141,6 +2241,7 @@ function renderPrizes(){
     box.appendChild(el);
   });
 }
+function delPrize(i){ const p=prizeRows[i]||{}; if(!confirm(`Delete prize "${p.command||'(unnamed)'}"? This can't be undone.`)) return; prizeRows.splice(i,1); renderPrizes(); scheduleSave(); }
 function addPrize(){ prizeRows.push({enabled:true,command:'',range_gate:'all',goal:3,uses:1,action:'fire',seconds:10,dice:'',sides:'',device_id:null,description:'',
   progress_message:'[mention] rolled a perfect score [[count]/[goal]] — [remaining] more will unlock a bonus command!',
   unlock_message:'[mention] has unlocked: [prize_cmd] — [prize_desc]\\nYou can use this command a total of [uses] times.',
@@ -2153,18 +2254,24 @@ function cleanPrizes(){
     progress_message:p.progress_message||'', unlock_message:p.unlock_message||'',
   }));
 }
-async function savePrizes(){ applyState(await api('/api/config', {prizes: cleanPrizes()}), true); }
-async function testDev(id){ await api('/api/devices/test',{id}); }
-async function setCal(id,v){ applyState(await api('/api/devices/calibration',{id, seconds_to_100: parseFloat(v)}), true); }
-async function removeDev(id){ applyState(await api('/api/devices/remove',{id}), true); }
+async function savePrizes(){ await saveCfg({prizes: cleanPrizes()}); }
+async function testDev(id){ try{ await api('/api/devices/test',{id}); }catch(e){ toastMsg('⚠ test failed: '+(e.message||e)); } }
+async function setCal(id,v){ await devApi('/api/devices/calibration',{id, seconds_to_100: parseFloat(v)}); }
+async function removeDev(id){
+  const d=(allDevices||[]).find(x=>x.id===id)||{};
+  if(!confirm(`Remove device "${d.label||id}"? Its calibration is lost with it.`)) return;
+  await devApi('/api/devices/remove',{id});
+}
 async function importPD(){
-  const r = await api('/api/devices/import',{});
-  $('#devMsg').textContent = `imported ${r.added} new (${r.found} found)`;
-  applyState(r.state, true);
+  try{
+    const r = await api('/api/devices/import',{});
+    $('#devMsg').textContent = `imported ${r.added} new (${r.found} found)`;
+    applyState(r.state, true);
+  }catch(e){ $('#devMsg').textContent = 'import failed: '+(e.message||e); }
 }
 async function addDisc(btn){
   let d={}; try{ d=JSON.parse(btn.getAttribute('data-dev')); }catch(e){}
-  applyState(await api('/api/devices/add', {...d, source:'discovered'}), true);
+  await devApi('/api/devices/add', {...d, source:'discovered'});
   $('#discovered').innerHTML='';
 }
 
@@ -2187,9 +2294,19 @@ function applyState(st, full){
   const fd=$('#fireDot'), ft=$('#fireText');
   if(st.firing){ fd.className='dot on'; ft.textContent=`firing · ${st.remaining}s left`; }
   else { fd.className='dot'; ft.textContent='idle'; }
+  // session pause: flip the STOP button to RESUME + show the paused pill
+  sessionPaused = !!st.paused;
+  const sb=$('#ctrlStopBtn');
+  if(sb){ sb.textContent = sessionPaused ? '▶ Resume' : '🛑 Stop';
+          sb.style.background = sessionPaused ? 'var(--on)' : 'var(--bad)'; }
+  const pp=$('#pausedPill');
+  if(pp){ pp.style.display = sessionPaused ? 'inline-flex' : 'none';
+          if(sessionPaused) pp.textContent = '⏸ SESSION PAUSED' + (st.paused_by ? (' by ' + st.paused_by) : ''); }
   // per-device live timers next to each device
   (st.devices||[]).forEach(d=>{ const el=document.getElementById('ft-'+d.id);
     if(el){ const r=(st.fires||{})[d.id]; el.textContent = r?`🔥 ${r}s`:''; } });
+  if(st.version){ const vl=$('#verLabel'); if(vl && !vl.textContent) vl.textContent='v'+st.version;
+    const um=$('#updMsg'); if(um && !um.textContent) um.textContent=`You're on v${st.version}.`; }
   $('#listener').checked = !!st.listener_enabled;
   if(document.activeElement!==$('#mock')) $('#mock').checked = !!st.mock_mode;
   $('#mockPill').style.display = st.mock_mode ? 'inline-flex' : 'none';
@@ -2234,8 +2351,8 @@ function applyState(st, full){
     if(st.invite_url){ $('#inviteUrl').value = st.invite_url; ir.style.display='flex'; }
     else { ir.style.display='none'; }
     $('#cooldown').value = st.cooldown_seconds??30;
-    $('#cooldownExempt').value = (st.cooldown_exempt_user_ids||[])[0]||'';
-    $('#cooldownExemptNames').value = (st.cooldown_exempt_names||[])[0]||'';
+    $('#cooldownExempt').value = (st.cooldown_exempt_user_ids||[]).join(', ');
+    $('#cooldownExemptNames').value = (st.cooldown_exempt_names||[]).join(', ');
     $('#cooldownMsg').value = st.cooldown_message||'';
     $('#cooldownResetMsg').value = st.cooldown_reset_message||'';
     const ar = st.auto_report||{};
@@ -2244,6 +2361,9 @@ function applyState(st, full){
     $('#autoMessage').value = ar.message||'';
     $('#listenerOn').value = st.listener_message_on||'';
     $('#listenerOff').value = st.listener_message_off||'';
+    if($('#pauseMsg')) $('#pauseMsg').value = st.pause_message||'';
+    if($('#resumeMsg')) $('#resumeMsg').value = st.resume_message||'';
+    if($('#pausedNoticeMsg')) $('#pausedNoticeMsg').value = st.paused_notice_message||'';
     if($('#outputHeaders')) $('#outputHeaders').checked = !!st.output_headers;
     if($('#richOutput')) $('#richOutput').checked = !!st.rich_output;
     $('#tokenState').textContent = st.has_token ? '✓ token saved' : 'no token yet';
@@ -2279,7 +2399,7 @@ function applyState(st, full){
     renderRanges();   // after commands + events so its dropdowns populate
     renderPrizes();
     renderDevices(st);
-    vendorCreds = JSON.parse(JSON.stringify(st.vendors||{}));
+    vendorsSet = JSON.parse(JSON.stringify(st.vendors_set||{}));
     if(!credsRendered){                 // build vendor picker + creds once (avoids clobbering typing)
       const av=$('#addVendor'); if(av) av.innerHTML=vendorOptions();
       renderAddFields();
@@ -2292,12 +2412,20 @@ function applyState(st, full){
       if($('#ctrlSides')) $('#ctrlSides').innerHTML = d20Options(6);
       ctrlInit=true;
     }
+    configRev = st.config_rev ?? configRev;
     editingForms = true;
+  }
+  // one-time loud warning if the server booted from a corrupt config
+  if(st.recovered_config && !window._recoveredWarned){
+    window._recoveredWarned = true;
+    alert('⚠ Your config file was corrupt and has been moved aside:\n\n'+st.recovered_config+
+          '\n\nDiscoFlate started from DEFAULTS. Restore a snapshot from data/backups/ '+
+          'or Help → Restore from file before changing anything.');
   }
 }
 function renderLog(events){
   $('#log').innerHTML = events.map(e =>
-    `<div><span class="t">${e.t}</span> <span class="${e.kind}">${esc(e.msg)}</span></div>`).join('');
+    `<div><span class="t">${esc(e.t)}</span> <span class="${esc(e.kind)}">${esc(e.msg)}</span></div>`).join('');
 }
 function copyLog(btn){
   const el=$('#log'); const text=(el.innerText||el.textContent||'').trim();
@@ -2341,11 +2469,16 @@ function gatherConfig(){
     roll:{ reply:$('#rollReply').value },
     capacity_message:$('#capacityMsg').value, pumptimer_message:$('#pumptimerMsg').value,
     cooldown_seconds:parseFloat($('#cooldown').value)||0,
-    cooldown_exempt_user_ids: $('#cooldownExempt').value.trim() ? [$('#cooldownExempt').value.trim()] : [],
-    cooldown_exempt_names: $('#cooldownExemptNames').value.trim() ? [$('#cooldownExemptNames').value.trim()] : [],
+    cooldown_exempt_user_ids: idList($('#cooldownExempt').value),
+    cooldown_exempt_names: idList($('#cooldownExemptNames').value),
     cooldown_message:$('#cooldownMsg').value, cooldown_reset_message:$('#cooldownResetMsg').value,
-    auto_report:{ enabled:$('#autoEnabled').checked, seconds:parseInt($('#autoSecs').value)||300, message:$('#autoMessage').value },
+    auto_report:{ enabled:$('#autoEnabled').checked, seconds:Math.max(15, parseInt($('#autoSecs').value)||300), message:$('#autoMessage').value },
     listener_message_on:$('#listenerOn').value, listener_message_off:$('#listenerOff').value,
+    pause_message: $('#pauseMsg') ? $('#pauseMsg').value : '',
+    resume_message: $('#resumeMsg') ? $('#resumeMsg').value : '',
+    paused_notice_message: $('#pausedNoticeMsg') ? $('#pausedNoticeMsg').value : '',
+    output_headers: $('#outputHeaders') ? $('#outputHeaders').checked : false,
+    rich_output: $('#richOutput') ? $('#richOutput').checked : false,
     prizes:cleanPrizes(),
     capacity_ranges:rangeRows, commands:cleanCommands(), modes:cleanModes(), events:cleanEvents(),
     event_in_process_message: $('#eventInProcessMsg') ? $('#eventInProcessMsg').value : '',
@@ -2357,18 +2490,72 @@ function gatherConfig(){
 }
 let saveT=null;
 function scheduleSave(){ if(!editingForms) return; clearTimeout(saveT); saveT=setTimeout(doSave, 600); }
+function saveBadge(ok){
+  const el=$('#saveStatus'); if(!el) return;
+  el.textContent = ok ? 'saved ✓' : '⚠ NOT saved — retrying';
+  el.style.color = ok ? 'var(--accent2)' : 'var(--bad)';
+  el.style.opacity = 1; clearTimeout(el._t);
+  if(ok) el._t = setTimeout(()=>el.style.opacity=0, 1400);
+}
 async function doSave(){
+  saveT = null;
+  const payload = gatherConfig();
+  if(configRev != null) payload.config_rev = configRev;
   try{
-    await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(gatherConfig())});
-    const el=$('#saveStatus'); if(el){ el.style.opacity=1; clearTimeout(el._t); el._t=setTimeout(()=>el.style.opacity=0,1400); }
-  }catch(e){}
+    const r = await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if(r.status === 409){
+      // someone else (another tab, a restore, the bot) saved first — adopt
+      // their config rather than clobbering it with this tab's stale snapshot
+      toastMsg('⚠ Config changed in another tab — reloaded it. Re-apply your last edit.');
+      try{ applyState(await (await fetch('/api/state')).json(), true); }catch(e){}
+      saveBadge(true);
+      return;
+    }
+    if(!r.ok) throw new Error(await r.text().catch(()=>r.status+' '+r.statusText));
+    const st = await r.json();
+    configRev = st.config_rev ?? configRev;
+    saveBadge(true);
+  }catch(e){
+    saveBadge(false);
+    clearTimeout(saveT); saveT = setTimeout(doSave, 3000);   // keep retrying
+  }
 }
 // any edit to a config field schedules a debounced save (token/device fields save via their own endpoints)
 document.addEventListener('input', scheduleSave);
 document.addEventListener('change', scheduleSave);
+// tab closing with a save still debounced → flush it now (best-effort beacon)
+window.addEventListener('beforeunload', ()=>{
+  if(!saveT) return;
+  clearTimeout(saveT); saveT=null;
+  try{
+    const payload = gatherConfig(); if(configRev!=null) payload.config_rev = configRev;
+    navigator.sendBeacon('/api/config', new Blob([JSON.stringify(payload)], {type:'application/json'}));
+  }catch(e){}
+});
 
+let refreshFails = 0;
 async function refresh(){
-  try{ const st = await (await fetch('/api/state')).json(); applyState(st, false); }catch(e){}
+  try{
+    const st = await (await fetch('/api/state')).json();
+    refreshFails = 0; offlineBanner(false);
+    if(configRev != null && st.config_rev !== configRev && !saveT){
+      applyState(st, true);   // config changed elsewhere → adopt it fully
+    } else {
+      applyState(st, false);
+    }
+  }catch(e){
+    if(++refreshFails >= 3) offlineBanner(true);   // server gone — say so
+  }
+}
+function offlineBanner(on){
+  let el=$('#offlineBanner');
+  if(on && !el){
+    el=document.createElement('div'); el.id='offlineBanner';
+    el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9998;background:var(--bad);color:#fff;font-weight:700;text-align:center;padding:8px';
+    el.textContent='⚠ DiscoFlate server unreachable — data below is stale';
+    document.body.appendChild(el);
+  }
+  if(el) el.style.display = on ? '' : 'none';
 }
 refresh(); setInterval(refresh, 1000);
 autoCheckUpdates();

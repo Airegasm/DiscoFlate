@@ -329,9 +329,15 @@ class _KlapSession:
         resp_ciphertext = resp_body[32:]
         decrypted = _aes_cbc_decrypt(self.key, iv, resp_ciphertext)
         try:
-            return json.loads(decrypted.decode("utf-8"))
+            decoded = json.loads(decrypted.decode("utf-8"))
         except (ValueError, UnicodeDecodeError) as exc:
             raise TapoError(f"could not decode decrypted response JSON: {exc}") from exc
+        # KLAP delivers device-level failures as error_code over HTTP 200 —
+        # treat them as failures or a rejected command counts as a success.
+        code = decoded.get("error_code")
+        if code not in (None, 0):
+            raise TapoError(f"device returned error_code {code}")
+        return decoded
 
     # -- public entry point -------------------------------------------------
 

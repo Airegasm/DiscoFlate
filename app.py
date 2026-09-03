@@ -37,9 +37,15 @@ DEFAULT_CONFIG_PATH = os.environ.get("DISCOFLATE_DEFAULT_CONFIG") or os.path.joi
 PORT = int(os.getenv("DISCOFLATE_PORT", "8765"))
 HOST = "127.0.0.1"
 
-# App version — keep in sync with android versionCode + version.json in the repo.
-VERSION = "3.6.3"
-VERSION_CODE = 60
+# App version — single-sourced from version.json (android build.gradle.kts and
+# the GitHub release tag are the only other places that carry it).
+try:
+    with open(os.path.join(HERE, "version.json"), "r", encoding="utf-8") as _vf:
+        _v = json.load(_vf)
+    VERSION = str(_v.get("version") or "0.0.0")
+    VERSION_CODE = int(_v.get("versionCode") or 0)
+except (OSError, ValueError):
+    VERSION, VERSION_CODE = "0.0.0", 0
 VERSION_URL = "https://raw.githubusercontent.com/Airegasm/DiscoFlate/main/version.json"
 
 # Scalar/message keys that "Restore Default Config" RESETS to the shipped default.
@@ -153,6 +159,7 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "bot_error": botmgr.last_error,
         "config_rev": cfg.get("config_rev", 0),
         "recovered_config": config_store.RECOVERED_FROM,
+        "version": VERSION,
         "silence_onoff_log": cfg.get("silence_onoff_log", False),
         "mock_mode": cfg.get("mock_mode", False),
         "mock_calibration_seconds_to_100": cfg.get("mock_calibration_seconds_to_100", 60),

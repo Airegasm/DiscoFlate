@@ -64,9 +64,12 @@ def _tcp_query(host: str, payload: dict, port: int = DEFAULT_PORT, timeout: floa
     with socket.create_connection((host, port), timeout=timeout) as sock:
         sock.sendall(_framed(raw))
 
-        # Reply is also length-prefixed.
+        # Reply is also length-prefixed. Cap it: a real sysinfo is a few KB, so
+        # a spoofed device declaring a huge length can't balloon our memory.
         header = _recv_exact(sock, 4)
         (length,) = struct.unpack(">I", header)
+        if length > 1024 * 1024:
+            raise ConnectionError(f"kasa reply claims {length} bytes — refusing")
         body = _recv_exact(sock, length)
 
     return json.loads(decrypt(body))

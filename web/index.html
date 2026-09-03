@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.6.3</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" id="verLabel" style="font-size:13px;font-weight:400"></span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="pausedPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">⏸ SESSION PAUSED</span>
@@ -552,7 +552,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v3.6.3.</span>
+        <span class="muted" id="updMsg"></span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -2060,13 +2060,13 @@ function toastMsg(msg){
 // ---- devices ----
 // ---- multi-vendor device support ----
 const VENDORS = {
-  kasa:          {name:'Kasa (TP-Link · local)',        add:['host','child_id'], discover:true,  creds:[]},
-  homeassistant: {name:'Home Assistant',                add:['entity_id'],       discover:true,  creds:[['baseUrl','http://homeassistant.local:8123'],['token','long-lived token']]},
-  tuya:          {name:'Tuya / Geeni (cloud)',          add:['device_id'],       discover:false, creds:[['accessId','Tuya access ID'],['accessSecret','access secret'],['region','us']]},
-  govee:         {name:'Govee (cloud)',                 add:['device_id','sku'], discover:true,  creds:[['apiKey','Govee API key']]},
-  wyze:          {name:'Wyze (cloud · high-risk)',      add:['mac','model'],     discover:true,  creds:[['email','email'],['password','password'],['keyId','key id'],['apiKey','api key'],['totpKey','TOTP secret if 2FA']]},
-  tapo:          {name:'Tapo (KLAP · fragile — prefer Home Assistant)', add:['host'], discover:false, creds:[['email','TP-Link email'],['password','TP-Link password']]},
-  kauf:          {name:'Kauf (ESPHome · local)', add:['host','entity'], discover:false, creds:[['web_username','web auth username (optional)'],['web_password','web auth password (optional)']]},
+  kasa:          {name:'Kasa (TP-Link · local · verified)', add:['host','child_id'], discover:true,  creds:[]},
+  homeassistant: {name:'Home Assistant (beta — unverified)', add:['entity_id'],      discover:true,  creds:[['baseUrl','http://homeassistant.local:8123'],['token','long-lived token']]},
+  tuya:          {name:'Tuya / Geeni (cloud · verified)',   add:['device_id'],       discover:false, creds:[['accessId','Tuya access ID'],['accessSecret','access secret'],['region','us']]},
+  govee:         {name:'Govee (cloud · beta — unverified)', add:['device_id','sku'], discover:true,  creds:[['apiKey','Govee API key']]},
+  wyze:          {name:'Wyze (cloud · beta — unverified · high-risk)', add:['mac','model'], discover:true, creds:[['email','email'],['password','password'],['keyId','key id'],['apiKey','api key'],['totpKey','TOTP secret if 2FA']]},
+  tapo:          {name:'Tapo (KLAP · beta — prefer Home Assistant)', add:['host'], discover:false, creds:[['email','TP-Link email'],['password','TP-Link password']]},
+  kauf:          {name:'Kauf (ESPHome · local · verified)', add:['host','entity'], discover:false, creds:[['web_username','web auth username (optional)'],['web_password','web auth password (optional)']]},
 };
 const FIELD_PH = {host:'192.168.1.50', child_id:'outlet id (strips)', device_id:'device id', sku:'SKU e.g. H7141', mac:'AA:BB:CC:…', model:'e.g. WLPP1', entity_id:'switch.my_plug', entity:'switch id (default: relay)', label:'name (optional)'};
 let vendorsSet = {};   // {vendor:{field:bool}} — which creds are saved (values never leave the server)
@@ -2305,6 +2305,8 @@ function applyState(st, full){
   // per-device live timers next to each device
   (st.devices||[]).forEach(d=>{ const el=document.getElementById('ft-'+d.id);
     if(el){ const r=(st.fires||{})[d.id]; el.textContent = r?`🔥 ${r}s`:''; } });
+  if(st.version){ const vl=$('#verLabel'); if(vl && !vl.textContent) vl.textContent='v'+st.version;
+    const um=$('#updMsg'); if(um && !um.textContent) um.textContent=`You're on v${st.version}.`; }
   $('#listener').checked = !!st.listener_enabled;
   if(document.activeElement!==$('#mock')) $('#mock').checked = !!st.mock_mode;
   $('#mockPill').style.display = st.mock_mode ? 'inline-flex' : 'none';

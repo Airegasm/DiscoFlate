@@ -50,7 +50,7 @@ def _domain_of(entity_id: str) -> str:
 async def _request(method: str, url: str, headers: dict, body=None):
     """Perform one HTTP request; raise a clear Exception on non-2xx."""
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
             async with session.request(method, url, headers=headers, json=body) as res:
                 if not (200 <= res.status < 300):
                     txt = ""
