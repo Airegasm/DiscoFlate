@@ -1,6 +1,6 @@
 {
-  "version": "3.1.2",
-  "versionCode": 42,
+  "version": "3.1.3",
+  "versionCode": 43,
   "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk",
-  "notes": "DiscoFlate v3.1.2 \u2014 camera: pinch/slider zoom, portrait (9:16) snapshots, on-preview Snap button, review + discard before Send"
+  "notes": "DiscoFlate v3.1.3 \u2014 fix: APK bundled the wrong app.py version (kept prompting to update)"
 }
