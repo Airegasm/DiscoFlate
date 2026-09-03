@@ -97,13 +97,21 @@ def _merge_defaults(cur: dict, dflt: dict) -> dict:
 # --------------------------------------------------------------------------- #
 # helpers
 # --------------------------------------------------------------------------- #
+# Vendor credential fields that are NOT secrets — their saved value is shown
+# in the UI (a region picker / base URL is useless as a filled/not-filled bool).
+_VENDOR_PUBLIC_FIELDS = {"tuya": {"region"}, "homeassistant": {"baseUrl"}}
+
+
 def _mask_vendors(vendors: dict) -> dict:
-    """Which credential fields are filled, per vendor — never the values.
-    (GET /api/state used to ship every cloud password to the page; a DNS-
-    rebinding page or any local process could read them.)"""
+    """Which credential fields are filled, per vendor — never the secret
+    values (GET /api/state used to ship every cloud password to the page; a
+    DNS-rebinding page or any local process could read them). Non-secret
+    fields (_VENDOR_PUBLIC_FIELDS) pass their value through for the UI."""
     out = {}
     for v, creds in (vendors or {}).items():
-        out[v] = {f: bool(str(val or "").strip()) for f, val in (creds or {}).items()}
+        pub = _VENDOR_PUBLIC_FIELDS.get(v, set())
+        out[v] = {f: (str(val or "") if f in pub else bool(str(val or "").strip()))
+                  for f, val in (creds or {}).items()}
     return out
 
 

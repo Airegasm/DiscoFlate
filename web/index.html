@@ -719,6 +719,21 @@
     </div>
 
     <div class="card span" data-tab="help">
+      <details class="help"><summary><h2>Set up Tuya / Geeni / Smart Life plugs</h2></summary>
+      <div class="hint" style="margin-top:0;margin-bottom:12px">Tuya-based plugs (incl. <b>Geeni</b> and anything in the <b>Smart Life</b> app) are controlled through Tuya's cloud API. The credentials come from Tuya's <b>developer platform</b> — <b>not</b> your Geeni/Smart Life app login. Tuya labels them with slashed double names, which is why they look unfamiliar: <b>Access ID / Client ID</b> and <b>Access Secret / Client Secret</b>.</div>
+      <ol style="line-height:1.9;padding-left:22px;margin:0;max-width:820px">
+        <li>Go to <a href="https://platform.tuya.com/" target="_blank" rel="noopener" onclick="return openExternal('https://platform.tuya.com/', event)">platform.tuya.com ↗</a> and create a free <b>developer</b> account (separate from your plug app's login).</li>
+        <li><b>Cloud → Development → Create Cloud Project.</b> Pick the <b>data center</b> matching where your app account lives — <b>US (Americas)</b> for Geeni and most US plugs. It must match the <b>Data center</b> dropdown in Devices → Brand credentials, or every call fails with an auth error.</li>
+        <li>The project's <b>Overview</b> tab shows <b>Access ID/Client ID</b> and <b>Access Secret/Client Secret</b> — paste those two into DiscoFlate → <b>Devices → Tuya / Geeni</b> credentials.</li>
+        <li>Enable the <b>IoT Core</b> service on the project (Service API → free trial subscription). Without it, device calls fail even though the credentials are right.</li>
+        <li>In the project: <b>Devices → Link App Account</b> → scan the QR with your app. ⚠️ <b>Geeni gotcha:</b> the QR link works with the <b>Smart Life</b> or <b>Tuya</b> apps, but usually <b>not</b> Geeni's own app. If your Geeni account won't link, re-pair the plugs into the <b>Smart Life</b> app (same hardware, same protocol) and link that.</li>
+        <li>Your plugs now appear in the project's device list — each shows a <b>Device ID</b>. That's what goes in the <b>device_id</b> field when you add the plug in DiscoFlate → Devices. Select it as the active pump and <b>Calibrate</b>.</li>
+      </ol>
+      <div class="hint" style="max-width:820px">If a call fails after setup: check the data center matches the project, the IoT Core trial hasn't expired, and the device is linked into <i>this</i> project (not just visible in the phone app).</div>
+      </details>
+    </div>
+
+    <div class="card span" data-tab="help">
       <details class="help"><summary><h2>Set up ESPHome (for Kauf plugs)</h2></summary>
       <div class="hint" style="margin-top:0;margin-bottom:12px">Kauf plugs run <b>ESPHome</b> firmware with a built-in local web interface — that's what DiscoFlate talks to (no cloud, no account). Most stock Kauf plugs have it enabled out of the box.</div>
       <ol style="line-height:1.9;padding-left:22px;margin:0;max-width:820px">
@@ -2126,14 +2141,19 @@ function toastMsg(msg){
 
 // ---- devices ----
 // ---- multi-vendor device support ----
+// creds rows: [field, placeholder, displayLabel?, dropdownOptions?]
+// (label defaults to the raw field name; options turns the input into a select)
 const VENDORS = {
   kasa:          {name:'Kasa (TP-Link · local · verified)', add:['host','child_id'], discover:true,  creds:[]},
-  homeassistant: {name:'Home Assistant (beta — unverified)', add:['entity_id'],      discover:true,  creds:[['baseUrl','http://homeassistant.local:8123'],['token','long-lived token']]},
-  tuya:          {name:'Tuya / Geeni (cloud · verified)',   add:['device_id'],       discover:false, creds:[['accessId','Tuya access ID'],['accessSecret','access secret'],['region','us']]},
-  govee:         {name:'Govee (cloud · beta — unverified)', add:['device_id','sku'], discover:true,  creds:[['apiKey','Govee API key']]},
-  wyze:          {name:'Wyze (cloud · beta — unverified · high-risk)', add:['mac','model'], discover:true, creds:[['email','email'],['password','password'],['keyId','key id'],['apiKey','api key'],['totpKey','TOTP secret if 2FA']]},
+  homeassistant: {name:'Home Assistant (beta — unverified)', add:['entity_id'],      discover:true,  creds:[['baseUrl','http://homeassistant.local:8123','Base URL'],['token','long-lived token','Access token']]},
+  tuya:          {name:'Tuya / Geeni (cloud · verified)',   add:['device_id'],       discover:false, creds:[
+                    ['accessId','from your Cloud Project\'s Overview page','Access ID / Client ID'],
+                    ['accessSecret','shown next to the Access ID','Access Secret / Client Secret'],
+                    ['region','','Data center',[['us','US (Americas — Geeni & most US plugs)'],['eu','Central Europe'],['cn','China'],['in','India']]]]},
+  govee:         {name:'Govee (cloud · beta — unverified)', add:['device_id','sku'], discover:true,  creds:[['apiKey','Govee API key','API key']]},
+  wyze:          {name:'Wyze (cloud · beta — unverified · high-risk)', add:['mac','model'], discover:true, creds:[['email','email'],['password','password'],['keyId','key id','Key ID'],['apiKey','api key','API key'],['totpKey','TOTP secret if 2FA','TOTP key']]},
   tapo:          {name:'Tapo (KLAP · beta — prefer Home Assistant)', add:['host'], discover:false, creds:[['email','TP-Link email'],['password','TP-Link password']]},
-  kauf:          {name:'Kauf (ESPHome · local · verified)', add:['host','entity'], discover:false, creds:[['web_username','web auth username (optional)'],['web_password','web auth password (optional)']]},
+  kauf:          {name:'Kauf (ESPHome · local · verified)', add:['host','entity'], discover:false, creds:[['web_username','web auth username (optional)','Web username'],['web_password','web auth password (optional)','Web password']]},
 };
 const FIELD_PH = {host:'192.168.1.50', child_id:'outlet id (strips)', device_id:'device id', sku:'SKU e.g. H7141', mac:'AA:BB:CC:…', model:'e.g. WLPP1', entity_id:'switch.my_plug', entity:'switch id (default: relay)', label:'name (optional)'};
 let vendorsSet = {};   // {vendor:{field:bool}} — which creds are saved (values never leave the server)
@@ -2159,16 +2179,27 @@ function renderVendorCreds(){
     if(!meta.creds.length) continue;
     vendorsSet[v]=vendorsSet[v]||{};
     const open=credsOpen.has(v);
-    const filled=meta.creds.some(([f])=>vendorsSet[v][f]);
+    // "set ✓" = a real credential is saved (dropdowns like the data center
+    // always have a value, so they don't count)
+    const filled=meta.creds.some(([f,_ph,_lbl,opts])=>!opts && vendorsSet[v][f]);
     html+=`<div class="dev" style="flex-direction:column;align-items:stretch;gap:8px;margin-bottom:6px">`+
       `<div class="row" style="cursor:pointer;gap:8px" onclick="toggleCred('${v}')">`+
         `<b>${esc(meta.name)}</b>${filled?' <span class="pill" style="padding:1px 8px;font-size:10px">set ✓</span>':''}`+
         `<div style="flex:1"></div><span class="muted">${open?'▾':'▸'}</span></div>`;
     if(open){
-      for(const [f,ph] of meta.creds){
+      for(const [f,ph,label,options] of meta.creds){
         const secret=['password','accessSecret','token','apiKey','totpKey'].includes(f);
-        const has=!!vendorsSet[v][f];
-        html+=`<label class="field">${f} <input type="${secret?'password':'text'}" value="" placeholder="${has?'•••• saved — type to replace':esc(ph)}" onchange="setCred('${v}','${f}',this.value)"></label>`;
+        const raw=vendorsSet[v][f];
+        const has=!!raw;
+        const cur=(typeof raw==='string')?raw:'';   // non-secret fields carry their value
+        const lbl=esc(label||f);
+        if(options){
+          html+=`<label class="field">${lbl} <select onchange="setCred('${v}','${f}',this.value)">`+
+            options.map(([val,txt],oi)=>`<option value="${esc(val)}" ${cur===val||(!cur&&oi===0)?'selected':''}>${esc(txt)}</option>`).join('')+
+            `</select></label>`;
+        } else {
+          html+=`<label class="field">${lbl} <input type="${secret?'password':'text'}" value="${esc(cur)}" placeholder="${has&&!cur?'•••• saved — type to replace':esc(ph)}" onchange="setCred('${v}','${f}',this.value)"></label>`;
+        }
       }
     }
     html+='</div>';
