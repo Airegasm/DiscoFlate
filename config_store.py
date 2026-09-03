@@ -370,7 +370,9 @@ def load() -> dict:
         RECOVERED_FROM = aside
         print(f"!! config.json is corrupt ({e}) — moved to {aside}; check data/backups/ to restore")
         stored = {}
-    return _migrate(_coerce_numbers(_deep_merge(DEFAULTS, stored)))
+    # Migrate the RAW stored config (merging first would inherit DEFAULTS'
+    # current config_version and skip every step).
+    return _coerce_numbers(_deep_merge(DEFAULTS, _migrate(stored)))
 
 
 def _migrate(cfg: dict) -> dict:
