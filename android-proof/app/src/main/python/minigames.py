@@ -46,7 +46,8 @@ class PlayView(discord.ui.View):
             return
         typ = (self.cmd.get("type") or "").lower()
         game = {"game-pushluck": PushLuckView, "game-simon": SimonView,
-                "game-balloon": BalloonView, "game-rps": RpsView}.get(typ)
+                "game-balloon": BalloonView, "game-rps": RpsView,
+                "game-blackjack": BlackjackView}.get(typ)
         if game is None:
             await interaction.response.send_message("Unknown game.", ephemeral=True)
             return
@@ -353,3 +354,86 @@ class RpsView(discord.ui.View):
     @discord.ui.button(label="✌️", style=discord.ButtonStyle.secondary)
     async def scissors(self, interaction, button):
         await self.throw(interaction, "scissors")
+
+
+class BlackjackView(discord.ui.View):
+    """Blackjack (21) — Hit or Stand vs the dealer. Infinite-deck draws.
+    Score → tier: 0 = bust/lose, 1 = push, 2 = win, 3 = natural blackjack."""
+
+    def __init__(self, bot, cmd, who, uid):
+        super().__init__(timeout=180)
+        self.bot = bot
+        self.cmd = cmd
+        self.who = who
+        self.uid = uid
+        self.player = [self._draw(), self._draw()]
+        self.dealer = [self._draw(), self._draw()]
+
+    @staticmethod
+    def _draw():
+        # 11 = Ace; four 10-valued cards represent 10/J/Q/K.
+        return random.choice([2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10, 11])
+
+    @staticmethod
+    def _total(cards):
+        t = sum(cards)
+        aces = cards.count(11)
+        while t > 21 and aces:
+            t -= 10
+            aces -= 1
+        return t
+
+    def _hand(self, cards):
+        show = ", ".join("A" if c == 11 else str(c) for c in cards)
+        return f"{show}  =  **{self._total(cards)}**"
+
+    def _state(self):
+        up = "A" if self.dealer[0] == 11 else str(self.dealer[0])
+        return (f"🃏 **{self.bot.engine.game_display_name(self.cmd)}** — get close to 21 without going over.\n"
+                f"Your hand: {self._hand(self.player)}\nDealer shows: **{up}**, 🂠")
+
+    async def begin(self, interaction: discord.Interaction):
+        if self._total(self.player) == 21:            # natural blackjack on the deal
+            await self._resolve(interaction, natural=True, first=True)
+            return
+        await interaction.response.send_message(self._state(), view=self, ephemeral=True)
+
+    @discord.ui.button(label="🃏 Hit", style=discord.ButtonStyle.primary)
+    async def hit(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.player.append(self._draw())
+        if self._total(self.player) > 21:
+            await self._resolve(interaction, busted=True)
+        else:
+            await interaction.response.edit_message(content=self._state(), view=self)
+
+    @discord.ui.button(label="✋ Stand", style=discord.ButtonStyle.success)
+    async def stand(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self._resolve(interaction)
+
+    async def _resolve(self, interaction, busted=False, natural=False, first=False):
+        for c in self.children:
+            c.disabled = True
+        self.stop()
+        pt = self._total(self.player)
+        if busted:
+            score, head = 0, f"💥 Bust with **{pt}**!"
+        elif natural:
+            score, head = 3, f"🂡 **Blackjack!** ({self._hand(self.player)})"
+        else:
+            while self._total(self.dealer) < 17:
+                self.dealer.append(self._draw())
+            dt = self._total(self.dealer)
+            if dt > 21 or pt > dt:
+                score, head = 2, f"✅ You win — **{pt}** vs dealer **{dt}**."
+            elif pt == dt:
+                score, head = 1, f"🤝 Push — both **{pt}**."
+            else:
+                score, head = 0, f"❌ Dealer wins **{dt}** vs your **{pt}**."
+        try:
+            if first:
+                await interaction.response.send_message(head, view=self, ephemeral=True)
+            else:
+                await interaction.response.edit_message(content=head, view=self)
+        except Exception:
+            pass
+        await self.bot.game_payoff(self.cmd, score, self.who, self.uid)

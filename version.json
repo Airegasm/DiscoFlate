@@ -1,6 +1,6 @@
 {
-  "version": "3.2.6",
-  "versionCode": 50,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=50",
-  "notes": "DiscoFlate v3.2.6 \u2014 config Backup exports a FILE (Downloads on phone) and Restore takes a file upload"
+  "version": "3.2.7",
+  "versionCode": 51,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=51",
+  "notes": "DiscoFlate v3.2.7 \u2014 two more minigames: Slots (public !agpull) and Blackjack (ephemeral !agblackjack), always-on defaults"
 }

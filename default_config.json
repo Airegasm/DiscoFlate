@@ -605,6 +605,135 @@
           ]
         }
       ]
+    },
+    {
+      "name": "agpull",
+      "type": "game-slots",
+      "description": "public slot machine \u2014 one pull, tiered payout",
+      "enabled": true,
+      "owner_only": false,
+      "mention": false,
+      "hide_in_list": false,
+      "range_gate": "all",
+      "start_events": [],
+      "reply": "",
+      "seconds": null,
+      "dice": null,
+      "sides": null,
+      "device_id": null,
+      "fires": [],
+      "fail_fires": [],
+      "chance": null,
+      "luck": null,
+      "success_reply": "",
+      "failure_reply": "",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "sl_symbols": 6,
+      "game_intro": "\ud83c\udfb0 **[user]** pulls the lever\u2026",
+      "game_tiers": [
+        {
+          "min": 0,
+          "message": "\ud83c\udfb0 no match \u2014 better luck next pull, **[user]**.",
+          "fires": []
+        },
+        {
+          "min": 1,
+          "message": "\ud83c\udfb0 **[user]** hit a pair \u2014 small win! **+[secs]s**",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 6
+            }
+          ]
+        },
+        {
+          "min": 3,
+          "message": "\ud83c\udfb0\ud83c\udf89 **JACKPOT!** **[user]** hit three of a kind! **+[secs]s** pump!",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 20
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "agblackjack",
+      "type": "game-blackjack",
+      "description": "blackjack (21) vs the bot \u2014 hit or stand",
+      "enabled": true,
+      "owner_only": false,
+      "mention": false,
+      "hide_in_list": false,
+      "range_gate": "all",
+      "start_events": [],
+      "reply": "",
+      "seconds": null,
+      "dice": null,
+      "sides": null,
+      "device_id": null,
+      "fires": [],
+      "fail_fires": [],
+      "chance": null,
+      "luck": null,
+      "success_reply": "",
+      "failure_reply": "",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "sl_symbols": 6,
+      "game_intro": "\ud83c\udccf **[user]** sits down at the blackjack table\u2026",
+      "game_tiers": [
+        {
+          "min": 0,
+          "message": "\ud83c\udccf **[user]** lost the hand.",
+          "fires": []
+        },
+        {
+          "min": 1,
+          "message": "\ud83c\udccf **[user]** pushed \u2014 a wash.",
+          "fires": []
+        },
+        {
+          "min": 2,
+          "message": "\ud83c\udccf **[user]** beat the dealer! **+[secs]s**",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 8
+            }
+          ]
+        },
+        {
+          "min": 3,
+          "message": "\ud83c\udccf\ud83c\udca1 **BLACKJACK!** **[user]** \u2014 **+[secs]s** pump!",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 18
+            }
+          ]
+        }
+      ]
     }
   ],
   "modes": [],
@@ -740,6 +869,16 @@
     },
     {
       "name": "agrps",
+      "cooldown": 300,
+      "max_uses": null
+    },
+    {
+      "name": "agpull",
+      "cooldown": 300,
+      "max_uses": null
+    },
+    {
+      "name": "agblackjack",
       "cooldown": 300,
       "max_uses": null
     }

@@ -980,6 +980,27 @@ class Engine:
                     "reply": self.render(cmd.get("reply") or "", {"user": who, "mention": self._mention(uid, who), "cmd_remain": _remain()}) or f"{name}!",
                     "reply_anon": self.render(cmd.get("reply") or "", {"user": anon, "mention": anon, "cmd_remain": _remain()}) or f"{name}!"}
 
+        if typ == "game-slots":
+            # Public one-shot: spin, fire the winning tier, reply in-channel (echoed
+            # cross-server with anonymity via the normal command reply path).
+            cmdkey = name.lower()
+            cd, scope = self._range_cd_scope(self.range_for(self.capacity), cmdkey)
+            key_uid = str(uid) if scope == "user" else "*"
+            if uid is not None and not owner_exempt:
+                remaining = self.cooldown_remaining(key_uid, cmdkey)
+                if remaining > 0:
+                    return {"ok": False, "cooldown": True, "error": self._cooldown_reply(who, remaining, uid, cmdkey)}
+            if uid is not None:
+                self._track_user(uid, who)
+                if scope == "command" or not owner_exempt:
+                    self._touch_cooldown(key_uid, cmdkey, cd)
+            _spend_use()
+            reels, score = self.slots_spin(cmd)
+            res = await self.game_result(cmd, score, who, uid)   # fires the tier + real/anon text
+            reel = "🎰  " + "  ".join(reels) + "\n"
+            return {"ok": True, "device": True, "started": True,
+                    "reply": reel + res["real"], "reply_anon": reel + res["anon"]}
+
         if typ.startswith("game-"):
             # Minigames run interactively via Discord buttons — here we only gate
             # them (membership already checked; now cooldown + per-person budget)
@@ -1128,6 +1149,19 @@ class Engine:
         """The full game name from the command type (e.g. 'Rock Paper Scissors'),
         falling back to the command's own name for non-game commands."""
         return GAME_DISPLAY_NAMES.get((cmd.get("type") or "").lower(), cmd.get("name", "game"))
+
+    def slots_spin(self, cmd: dict):
+        """Spin 3 reels. Returns (reels, score): 3-of-a-kind → 3, a pair → 1, else 0."""
+        n = max(2, min(len(SLOT_SYMBOLS), int(cmd.get("sl_symbols") or 6)))
+        syms = SLOT_SYMBOLS[:n]
+        reels = [random.choice(syms) for _ in range(3)]
+        if reels[0] == reels[1] == reels[2]:
+            score = 3
+        elif reels[0] == reels[1] or reels[1] == reels[2] or reels[0] == reels[2]:
+            score = 1
+        else:
+            score = 0
+        return reels, score
 
     def game_tier_for(self, cmd: dict, score) -> dict:
         """The highest score→outcome tier whose `min` the score reaches."""
