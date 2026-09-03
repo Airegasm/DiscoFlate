@@ -54,6 +54,7 @@ class Engine:
         self._event_last: dict[str, float] = {}   # event name -> last-run monotonic
         self._events_done: set = set()            # "once" events (and repeat-capped loops) already finished
         self._event_fires: dict[str, int] = {}    # event name -> times fired (for loop max-repeats)
+        self._event_cooldown_until: dict[str, float] = {}  # event name -> monotonic when its cooldown ends
         self._listener_was: bool = False          # for detecting off→on transitions
         # Events temporarily switched on by a command. Reverts on session reset
         # / app restart (it's in-memory only), never persisted to config.
@@ -87,6 +88,7 @@ class Engine:
             self._event_last.clear()
             self._events_done.clear()
             self._event_fires.clear()
+            self._event_cooldown_until.clear()
             self._current_range_key = None
             self._end_triggered = False
         elif self._listener_was and not now_on:
@@ -95,6 +97,8 @@ class Engine:
             self._event_last.clear()
             self._events_done.clear()
             self._event_fires.clear()
+            self._event_cooldown_until.clear()
+            self._runtime_events_on.clear()
             self._log("bot", "deactivated — cooldowns cleared, events cancelled")
         self._listener_was = now_on
 
@@ -579,8 +583,9 @@ class Engine:
         now = time.monotonic()
         for ev in self.cfg.get("events", []):
             name = (ev.get("name") or "").strip()
+            key = name.lower()
             # Effective on = saved tick OR temporarily started by a command.
-            if not (ev.get("enabled") or name.lower() in self._runtime_events_on):
+            if not (ev.get("enabled") or key in self._runtime_events_on):
                 continue
             try:
                 every = float(ev.get("every") or 0)
@@ -588,35 +593,80 @@ class Engine:
                 every = 0
             if not name or every <= 0:
                 continue
-            if name in self._events_done:
-                continue  # a "once" event that already fired
-            last = self._event_last.get(name)
+            if key in self._events_done:
+                continue  # a "once" event / repeat-capped loop that already finished
+            last = self._event_last.get(key)
             if last is not None and now < last + every:
                 continue
-            self._event_last[name] = now
+            self._event_last[key] = now
             if last is None:
                 continue  # first tick just arms the timer (delay before first fire)
             one_shot = (ev.get("mode") or "loop").lower() == "once"
-            count = self._event_fires.get(name, 0) + 1
-            self._event_fires[name] = count
+            count = self._event_fires.get(key, 0) + 1
+            self._event_fires[key] = count
             try:
                 cap = int(ev.get("max_repeats") or 0)   # loop cap; 0/blank = unlimited
             except (TypeError, ValueError):
                 cap = 0
-            if one_shot or (not one_shot and cap > 0 and count >= cap):
-                self._events_done.add(name)   # "once", or a loop that hit its repeat cap → stop
-            # Loop placeholders for the event message.
+            ending = one_shot or (cap > 0 and count >= cap)
+            if ending:
+                self._events_done.add(key)   # "once", or a loop that hit its repeat cap → stop
+            # Loop placeholders for the event's message(s).
             loop_ctx = {"current_loop": count, "total_loops": ("∞" if cap <= 0 else str(cap)),
-                        "loop_timer": f"{every:g}"}
+                        "loop_timer": f"{every:g}", "event": name}
             try:
                 await self._run_event(ev, loop_ctx)
             except Exception as e:  # noqa: BLE001
                 self._log("error", f"event {name} failed: {e}")
+            if ending:
+                # Loop finished: leave runtime-on, start its cooldown, post end message.
+                self._runtime_events_on.discard(key)
+                try:
+                    cdn = float(ev.get("cooldown") or 0)
+                except (TypeError, ValueError):
+                    cdn = 0.0
+                if cdn > 0:
+                    self._event_cooldown_until[key] = time.monotonic() + cdn
+                em = (ev.get("end_message") or "").strip()
+                if em:
+                    try:
+                        await self._announce(self.render(em, loop_ctx), None)
+                    except Exception as e:  # noqa: BLE001
+                        self._log("error", f"event {name} end msg failed: {e}")
 
     async def _run_event(self, ev: dict, extra: dict | None = None) -> None:
         name = ev.get("name", "event")
         action = (ev.get("action") or "message").lower()
         msg = (ev.get("message") or "").strip()
+
+        if action == "chance":
+            # Per-loop gamble: win fires `fires` + posts success_message; miss fires
+            # `fail_fires` + posts failure_message (each falls back to `message`).
+            try:
+                chance = max(0.0, min(100.0, float(ev.get("chance") if ev.get("chance") is not None else 50)))
+            except (TypeError, ValueError):
+                chance = 50.0
+            try:
+                luck = float(ev.get("luck") or 0)
+            except (TypeError, ValueError):
+                luck = 0.0
+            roll = random.randint(1, 100)
+            win = roll <= chance
+            if luck > 0 and random.random() * 100 < min(100.0, luck):
+                win = True
+            elif luck < 0 and random.random() * 100 < min(100.0, -luck):
+                win = False
+            fired = await self._run_fires(ev.get("fires") if win else ev.get("fail_fires"), f"event {name}", None)
+            total_secs = round(sum(f["duration"] for f in fired), 1)
+            self._log("bot", f"event '{name}': chance rolled {roll} vs {chance:.0f}% → {'WIN' if win else 'miss'}")
+            base = {"roll": roll, "chance": f"{chance:.0f}", "luck": f"{luck:.0f}", "won": win,
+                    "secs": f"{total_secs:.1f}", "seconds": f"{total_secs:.1f}",
+                    "secs2capacity": (self._secs_to_capacity(total_secs, self._active_id()) if fired else "0"),
+                    **(extra or {})}
+            tmpl = (ev.get("success_message") if win else ev.get("failure_message")) or msg
+            if tmpl:
+                await self._announce(self.render(tmpl, base), None)
+            return
 
         if action == "capacity":
             op = (ev.get("capacity_op") or "add").lower()
@@ -848,7 +898,7 @@ class Engine:
             return "unlimited" if r is None else r
 
         if typ == "say":
-            self.start_events(cmd.get("start_events"))
+            await self.start_events(cmd.get("start_events"))
             _spend_use()
             anon = self._anon_label()
             return {"ok": True, "device": False, "started": False,
@@ -890,7 +940,7 @@ class Engine:
             # Win fires the `fires` rows; a miss fires the `fail_fires` rows (if any).
             fired = await self._run_fires(cmd.get("fires") if win else cmd.get("fail_fires"), who, uid)
             if win:
-                self.start_events(cmd.get("start_events"))
+                await self.start_events(cmd.get("start_events"))
             total_secs = round(sum(f["duration"] for f in fired), 1)
             self._log("roll", f"{who} gambled {name}: rolled {roll} vs {chance:.0f}%"
                       + (f" (luck {luck:+.0f})" if luck else "")
@@ -940,7 +990,7 @@ class Engine:
             duration = round(max(0.1, min(hi, float(cmd.get("seconds") or 3))), 1)
             detail = f"{duration:.1f}s"
 
-        self.start_events(cmd.get("start_events"))
+        await self.start_events(cmd.get("start_events"))
         fr = self._begin_or_extend(target, duration, f"{name} by {who}")
         extended = fr["status"] == "extended"
         self.credit_pump(uid, who, duration, target)
@@ -1132,14 +1182,63 @@ class Engine:
         self._milestones_fired.clear()
         self._log("capacity", "reset to 0%")
 
-    def start_events(self, names) -> None:
-        """Temporarily switch on events by name (until session reset / restart)."""
+    async def start_events(self, names) -> None:
+        """A command activates events by name — intelligently: an already-running
+        event posts the global 'in process' message; one still on cooldown posts
+        the global 'cooldown' message; otherwise it switches on (re-armed) and its
+        own activation message is posted."""
+        now = time.monotonic()
         for n in (names or []):
             key = str(n).strip().lower()
-            if key:
-                self._runtime_events_on.add(key)
-                self._event_last.pop(key, None)   # re-arm from now
+            if not key:
+                continue
+            ev = self._event_by_name(key)
+            if ev is None:
+                self._runtime_events_on.add(key)   # unknown name → legacy behaviour
+                self._event_last.pop(key, None)
                 self._events_done.discard(key)
+                continue
+            active = bool(ev.get("enabled")) or key in self._runtime_events_on
+            if active and key not in self._events_done:
+                msg = (self.cfg.get("event_in_process_message") or "").strip()
+                if msg:
+                    await self._announce(self.render(msg, self._event_ctx(ev)), None)
+                continue
+            cd_until = self._event_cooldown_until.get(key, 0.0)
+            if now < cd_until:
+                msg = (self.cfg.get("event_cooldown_message") or "").strip()
+                if msg:
+                    await self._announce(self.render(msg, {**self._event_ctx(ev), "cooldown": f"{cd_until - now:.0f}"}), None)
+                continue
+            self._runtime_events_on.add(key)
+            self._event_last.pop(key, None)    # re-arm the timer from now
+            self._events_done.discard(key)
+            self._event_fires.pop(key, None)   # fresh loop count for this activation
+            am = (ev.get("activation_message") or "").strip()
+            if am:
+                await self._announce(self.render(am, self._event_ctx(ev)), None)
+
+    def _event_by_name(self, key: str) -> dict | None:
+        key = (key or "").strip().lower()
+        for ev in self.cfg.get("events", []):
+            if (ev.get("name") or "").strip().lower() == key:
+                return ev
+        return None
+
+    def _event_ctx(self, ev: dict) -> dict:
+        """Placeholders for an event's messages: [event] [loop_timer] [current_loop] [total_loops]."""
+        try:
+            every = float(ev.get("every") or 0)
+        except (TypeError, ValueError):
+            every = 0
+        try:
+            cap = int(ev.get("max_repeats") or 0)
+        except (TypeError, ValueError):
+            cap = 0
+        name = (ev.get("name") or "").strip()
+        return {"event": name, "loop_timer": f"{every:g}",
+                "total_loops": ("∞" if cap <= 0 else str(cap)),
+                "current_loop": self._event_fires.get(name.lower(), 0)}
 
     def session_reset(self) -> None:
         """Full session reset: capacity→0, clear all cooldowns, revert any
@@ -1151,6 +1250,7 @@ class Engine:
         self._event_last.clear()
         self._events_done.clear()
         self._event_fires.clear()
+        self._event_cooldown_until.clear()
         self._perfect.clear()
         self._prize_uses.clear()
         self._pump_time.clear()

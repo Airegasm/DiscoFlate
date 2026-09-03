@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v2.9 by AireGasm</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.0.0</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -157,13 +157,13 @@
           <input id="cooldownExemptNames" placeholder="AireGasm"></label>
       </div>
       <div id="updBanner" onclick="showTab('help')" title="Go to Help → Updates" style="display:none;cursor:pointer;background:var(--warn);color:#3a2a00;font-weight:700;border-radius:8px;padding:10px 14px;margin-bottom:14px;text-align:center">⬆️ Update available! (Click on the Help tab to update)</div>
-      <h2>Capacity</h2>
-      <div class="row" style="justify-content:space-between;align-items:flex-end">
+      <div class="row" style="justify-content:space-between;align-items:baseline;margin-bottom:6px">
+        <h2 style="margin:0">Capacity</h2>
+        <h2 style="margin:0">Pump Timer</h2>
+      </div>
+      <div class="row" style="justify-content:space-between;align-items:baseline">
         <span class="big"><span id="capVal">0</span>%</span>
-        <div style="text-align:right;line-height:1.15">
-          <div class="muted" style="font-size:13px">Pump Timer</div>
-          <span class="big"><span id="pumpTimerVal">0</span>s</span>
-        </div>
+        <span class="big"><span id="pumpTimerVal">0</span>s</span>
       </div>
       <div class="gauge" style="margin:12px 0"><div id="capBar"></div></div>
       <div class="row" style="gap:8px;align-items:center;margin-bottom:10px">
@@ -476,6 +476,13 @@
         <div style="flex:1"></div>
         <button onclick="saveEvents()">Save events</button>
       </div>
+      <div class="row" style="gap:16px;align-items:flex-start;margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
+        <label class="field" style="flex:1">“In process” message <span class="muted">(a command tried to start a running event)</span>
+          <input id="eventInProcessMsg" placeholder="⏳ [event] is already running."></label>
+        <label class="field" style="flex:1">“Cooldown” message <span class="muted">([event] on cooldown · [cooldown]s left)</span>
+          <input id="eventCooldownMsg" placeholder="⏳ [event] is on cooldown — [cooldown]s left."></label>
+      </div>
+      <div class="hint" style="margin-top:2px">These two are <b>global</b>: posted when a <code>!command</code> tries to <b>activate</b> an event that's already running or still on cooldown. Each event sets its own <b>cooldown</b>, <b>activation message</b>, and optional <b>end message</b>.</div>
       <div class="hint"><b>Events are OFF by default</b> — tick one to run, or have a custom command start it temporarily.
         <b>loop</b> fires every N seconds (set <b>max</b> to stop after that many repeats; blank = forever); <b>once</b> fires a single time N seconds after Activation turns on (re-arms off→on).
         In a loop message, <code>[current_loop]</code> / <code>[total_loops]</code> / <code>[loop_timer]</code> show the iteration, the cap (∞ if none), and the interval.
@@ -490,7 +497,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v2.9.</span>
+        <span class="muted" id="updMsg">You're on v3.0.0.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -567,14 +574,21 @@
         <li><b>loop</b> — fires <b>every N seconds</b>, repeatedly. Set <b>max</b> to stop after that many repeats (blank = forever). In the message, <code>[current_loop]</code>, <code>[total_loops]</code> (∞ if uncapped), and <code>[loop_timer]</code> (the interval) are available.</li>
         <li><b>once</b> — fires a <b>single</b> time, N seconds after Activation turns on (re-arms on the next off→on).</li>
       </ul>
-      <h3 style="margin:14px 0 6px">Four actions</h3>
+      <h3 style="margin:14px 0 6px">Five actions</h3>
       <ul style="line-height:1.7;padding-left:22px;margin:0;max-width:820px">
         <li><b>message</b> — post its text to the announce channel.</li>
         <li><b>fire</b> — run a device for N seconds.</li>
         <li><b>roll</b> — auto-roll a device (its own dice/sides, or the current range's).</li>
         <li><b>capacity</b> — <b>add</b> or <b>set</b> the meter by a value.</li>
+        <li><b>chance</b> — each fire is a gamble (like the chance command): rolls vs <b>chance %</b> (± <b>luck</b>); a win fires the <b>🟢 win</b> rows + posts the success message, a miss fires the <b>🔴 failure</b> rows + posts the failure message.</li>
       </ul>
       <div class="hint" style="max-width:820px">Every action can <i>also</i> post a message, and placeholders work everywhere. <b>Events are OFF by default</b> — turn one on three ways: tick it here, list its name in a command's <b>Starts events</b>, or have a range <b>Enable</b> it on entry.</div>
+      <h3 style="margin:14px 0 6px">Activation, cooldown &amp; messages</h3>
+      <ul style="line-height:1.7;padding-left:22px;margin:0;max-width:820px">
+        <li>When a <code>!command</code>'s <b>Starts events</b> tries to turn an event on, it's smart: if it's <b>already running</b> it posts the global <b>“in process”</b> message; if it's still on <b>cooldown</b> it posts the global <b>“cooldown”</b> message; otherwise it activates and posts that event's own <b>activation message</b>.</li>
+        <li>Each event has its own <b>cooldown</b> (seconds) that starts when it <b>finishes</b> (a “once” fires, or a loop hits its <b>max</b>), and an optional <b>end message</b> posted at that point.</li>
+        <li>The two “in process” / “cooldown” messages are <b>global</b> (set at the bottom of the Events tab) and support <code>[event]</code> and (cooldown) <code>[cooldown]</code>.</li>
+      </ul>
       <div class="hint" style="max-width:820px"><b>Example — a slow drip only in the top band:</b> Events tab → <b>+ Add event</b> → Name <code>drip</code>, mode <b>loop</b>, every <code>45</code> s, action <b>fire</b>, <code>2</code> seconds on the active pump, message <code>💧 a slow drip…</code>. Leave it <b>OFF</b>. Then Game → Capacity ranges → the <b>66–100%</b> band → <b>+ Add event</b> (on entry) → <code>drip</code> / <b>Enable</b>. Now the drip only runs once the meter is two-thirds full, and stops when it drops back out.</div>
       </details>
     </div>
@@ -704,6 +718,7 @@ esphome dashboard config/</code></pre>
             <tr><td><code>[result]</code></td><td>the roll total</td></tr>
             <tr><td><code>[roll]</code> <code>[chance]</code> <code>[luck]</code></td><td>chance command: the 1–100 roll, the target %, the luck %</td></tr>
             <tr><td><code>[current_loop]</code> <code>[total_loops]</code> <code>[loop_timer]</code></td><td>loop event: iteration #, the repeat cap (∞ if none), the interval (s)</td></tr>
+            <tr><td><code>[event]</code> <code>[cooldown]</code></td><td>event messages: the event name; the cooldown seconds left (in the cooldown message)</td></tr>
             <tr><td><code>[secs]</code></td><td>seconds this fire runs</td></tr>
             <tr><td><code>[secs2capacity]</code></td><td>% capacity this fire will add</td></tr>
             <tr><td><code>[sides]</code></td><td>number of sides</td></tr>
@@ -1494,14 +1509,33 @@ async function toggleMode(i, on){
 
 // ---- timed events ----
 let eventRows = [];
+// event device-fire rows (chance action) — parallel to the command fires editor
+function evtFiresEditor(i, e, arr, label){
+  arr = arr||'fires';
+  const fires = e[arr]||[];
+  const rows = fires.map((f,j)=>
+    `<div class="row" style="gap:8px;align-items:center">`+
+      `<span class="muted">Device</span><select onchange="evtSetFire(${i},'${arr}',${j},'device_id',this.value)">${cmdDeviceOpts(f.device_id)}</select>`+
+      `<span class="muted">for</span><input type="number" value="${f.seconds??''}" min="0" step="0.5" style="width:80px" onchange="evtSetFire(${i},'${arr}',${j},'seconds',this.value)"><span class="muted">s</span>`+
+      `<button class="ghost" onclick="evtRemoveFire(${i},'${arr}',${j})">✕</button>`+
+    `</div>`).join('');
+  return `<div style="border-top:1px solid var(--line);padding-top:6px;margin-top:4px">`+
+    `<div class="muted" style="margin-bottom:4px">${label||'Device fires'}</div>`+
+    (rows||'<div class="muted" style="margin-bottom:4px">none</div>')+
+    `<button class="ghost" style="margin-top:4px" onclick="evtAddFire(${i},'${arr}')">+ Add Device Fire</button></div>`;
+}
+function evtAddFire(i, arr){ arr=arr||'fires'; eventRows[i][arr]=eventRows[i][arr]||[]; eventRows[i][arr].push({device_id:null,seconds:3}); renderEvents(); scheduleSave(); }
+function evtRemoveFire(i, arr, j){ arr=arr||'fires'; (eventRows[i][arr]||[]).splice(j,1); renderEvents(); scheduleSave(); }
+function evtSetFire(i, arr, j, key, val){ const f=(eventRows[i][arr]||[])[j]; if(!f) return; f[key]=(key==='seconds')?(val===''?null:+val):(val||null); scheduleSave(); }
 function renderEvents(){
   const box=$('#events'); box.innerHTML='';
   if(!eventRows.length){ box.innerHTML='<div class="muted">No events yet.</div>'; return; }
   eventRows.forEach((e,i)=>{
     const act=e.action||'message';
     const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap='6px';
+    const deviceSel = `<span class="muted">device</span><select onchange="eventRows[${i}].device_id=this.value||null">${cmdDeviceOpts(e.device_id)}</select>`;
     el.innerHTML =
-      `<div class="row" style="gap:8px">`+
+      `<div class="row" style="gap:8px;flex-wrap:wrap">`+
         `<label class="row" style="gap:6px"><input type="checkbox" ${e.enabled!==false?'checked':''} onchange="eventRows[${i}].enabled=this.checked"> on</label>`+
         `<input value="${esc(e.name||'')}" placeholder="event name" style="width:130px" onchange="eventRows[${i}].name=this.value;renderModes()">`+
         `<select onchange="eventRows[${i}].mode=this.value;renderEvents()">`+
@@ -1510,28 +1544,43 @@ function renderEvents(){
         `<span class="muted">every</span><input type="number" min="1" step="1" value="${e.every??''}" style="width:80px" onchange="eventRows[${i}].every=+this.value"><span class="muted">s</span>`+
         ((e.mode||'loop')!=='once'?`<span class="muted">max</span><input type="number" min="0" step="1" value="${e.max_repeats??''}" style="width:64px" placeholder="∞" title="stop this loop after N repeats (blank = unlimited)" onchange="eventRows[${i}].max_repeats=(this.value===''?null:+this.value)"><span class="muted">×</span>`:'')+
         `<span class="muted">action</span><select onchange="eventRows[${i}].action=this.value;renderEvents()">`+
-          ['message','fire','roll','capacity'].map(a=>`<option value="${a}" ${act===a?'selected':''}>${a}</option>`).join('')+
+          ['message','fire','roll','capacity','chance'].map(a=>`<option value="${a}" ${act===a?'selected':''}>${a}</option>`).join('')+
         `</select>`+
-        (act==='fire'?`<span class="muted">secs</span><input type="number" min="0" step="0.5" value="${e.seconds??''}" style="width:70px" onchange="eventRows[${i}].seconds=+this.value">`:'')+
-        (act==='roll'?`<span class="muted">dice</span><input type="number" min="1" value="${e.dice??''}" style="width:56px" placeholder="rng" onchange="eventRows[${i}].dice=+this.value"><input type="number" min="1" value="${e.sides??''}" style="width:56px" placeholder="rng" onchange="eventRows[${i}].sides=+this.value">`:'')+
+        (act==='fire'?`<span class="muted">secs</span><input type="number" min="0" step="0.5" value="${e.seconds??''}" style="width:70px" onchange="eventRows[${i}].seconds=+this.value">`+deviceSel:'')+
+        (act==='roll'?`<span class="muted">dice</span><input type="number" min="1" value="${e.dice??''}" style="width:56px" placeholder="rng" onchange="eventRows[${i}].dice=+this.value"><input type="number" min="1" value="${e.sides??''}" style="width:56px" placeholder="rng" onchange="eventRows[${i}].sides=+this.value">`+deviceSel:'')+
         (act==='capacity'?`<select onchange="eventRows[${i}].capacity_op=this.value">`+
             `<option value="add" ${e.capacity_op!=='set'?'selected':''}>add</option><option value="set" ${e.capacity_op==='set'?'selected':''}>set</option></select>`+
             `<input type="number" step="1" value="${e.capacity_value??''}" style="width:70px" placeholder="%" onchange="eventRows[${i}].capacity_value=+this.value">`:'')+
-        ((act==='fire'||act==='roll')?`<span class="muted">device</span><select onchange="eventRows[${i}].device_id=this.value||null">`+
-            `<option value="">(active pump)</option>`+allDevices.map(d=>`<option value="${esc(d.id)}" ${e.device_id===d.id?'selected':''}>${esc(d.label)}</option>`).join('')+`</select>`:'')+
+        (act==='chance'?`<span class="muted">chance</span><input type="number" min="0" max="100" step="1" value="${e.chance??50}" style="width:64px" onchange="eventRows[${i}].chance=Math.max(0,Math.min(100,+this.value||0))"><span class="muted">%</span>`+
+            `<span class="muted">luck</span><input type="number" min="-100" max="100" step="1" value="${e.luck??''}" style="width:64px" placeholder="0" onchange="eventRows[${i}].luck=(this.value===''?null:+this.value)"><span class="muted">%</span>`:'')+
         `<div style="flex:1"></div><button class="ghost" onclick="eventRows.splice(${i},1);renderEvents();scheduleSave()">✕</button>`+
       `</div>`+
-      `<textarea rows="4" placeholder="optional message · [capacity] [capacity_bar] [announce] …" onchange="eventRows[${i}].message=this.value">${esc(e.message||'')}</textarea>`;
+      (act==='chance'
+        ? `<textarea rows="2" placeholder="success message · [roll] [chance] [luck] [secs] [current_loop] …" onchange="eventRows[${i}].success_message=this.value">${esc(e.success_message||'')}</textarea>`+
+          evtFiresEditor(i, e, 'fires', '🟢 Fires on WIN')+
+          `<textarea rows="2" placeholder="failure message" onchange="eventRows[${i}].failure_message=this.value">${esc(e.failure_message||'')}</textarea>`+
+          evtFiresEditor(i, e, 'fail_fires', '🔴 Fires on FAILURE')
+        : `<textarea rows="3" placeholder="optional message · [capacity] [announce] [current_loop] [total_loops] [loop_timer] …" onchange="eventRows[${i}].message=this.value">${esc(e.message||'')}</textarea>`)+
+      `<div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">`+
+        `<span class="muted">cooldown</span><input type="number" min="0" step="1" value="${e.cooldown??''}" style="width:70px" placeholder="0" title="after it finishes, block re-activation for N seconds" onchange="eventRows[${i}].cooldown=(this.value===''?null:+this.value)"><span class="muted">s</span>`+
+        `<input style="flex:1;min-width:180px" placeholder="activation message (posted when a command turns it on)" value="${esc(e.activation_message||'')}" onchange="eventRows[${i}].activation_message=this.value">`+
+        `<input style="flex:1;min-width:180px" placeholder="end message (optional, when it finishes)" value="${esc(e.end_message||'')}" onchange="eventRows[${i}].end_message=this.value">`+
+      `</div>`;
     box.appendChild(el);
   });
 }
-function addEvent(){ eventRows.push({name:'',enabled:false,mode:'loop',every:60,max_repeats:null,action:'message',message:'',seconds:5,dice:'',sides:'',capacity_op:'add',capacity_value:0,device_id:null}); renderEvents(); scheduleSave(); }
+function addEvent(){ eventRows.push({name:'',enabled:false,mode:'loop',every:60,max_repeats:null,action:'message',message:'',seconds:5,dice:'',sides:'',capacity_op:'add',capacity_value:0,device_id:null,cooldown:null,activation_message:'',end_message:'',chance:50,luck:null,fires:[],fail_fires:[],success_message:'',failure_message:''}); renderEvents(); scheduleSave(); }
 function cleanEvents(){
   return eventRows.filter(e=>(e.name||'').trim()).map(e=>({
     name:(e.name||'').trim(), enabled:e.enabled!==false, mode:e.mode||'loop', every:e.every||null,
     max_repeats:(e.max_repeats==null||e.max_repeats==='')?null:+e.max_repeats, action:e.action||'message',
     message:e.message||'', seconds:e.seconds||null, dice:e.dice||null, sides:e.sides||null,
     capacity_op:e.capacity_op||'add', capacity_value:e.capacity_value??0, device_id:e.device_id||null,
+    cooldown:(e.cooldown==null||e.cooldown==='')?null:+e.cooldown,
+    activation_message:e.activation_message||'', end_message:e.end_message||'',
+    chance:(e.chance==null||e.chance==='')?null:+e.chance, luck:(e.luck==null||e.luck==='')?null:+e.luck,
+    fires:cleanFires(e.fires), fail_fires:cleanFires(e.fail_fires),
+    success_message:e.success_message||'', failure_message:e.failure_message||'',
   }));
 }
 async function saveEvents(){ applyState(await api('/api/config', {events: cleanEvents()}), true); }
@@ -1823,6 +1872,8 @@ function applyState(st, full){
     modeRows = JSON.parse(JSON.stringify(st.modes||[]));
     savedModeNames = new Set(modeRows.map(m=>(m.name||'').trim().toLowerCase()));
     eventRows = JSON.parse(JSON.stringify(st.events||[]));
+    if($('#eventInProcessMsg')) $('#eventInProcessMsg').value = st.event_in_process_message||'';
+    if($('#eventCooldownMsg')) $('#eventCooldownMsg').value = st.event_cooldown_message||'';
     // Max Roll Prizes (list) — migrate legacy single prize if the list is empty
     prizeRows = (st.prizes && st.prizes.length) ? JSON.parse(JSON.stringify(st.prizes))
       : ((st.max_roll_prize && st.max_roll_prize.enabled) ? [JSON.parse(JSON.stringify(st.max_roll_prize))] : []);
@@ -1902,6 +1953,8 @@ function gatherConfig(){
     listener_message_on:$('#listenerOn').value, listener_message_off:$('#listenerOff').value,
     prizes:cleanPrizes(),
     capacity_ranges:rangeRows, commands:cleanCommands(), modes:cleanModes(), events:cleanEvents(),
+    event_in_process_message: $('#eventInProcessMsg') ? $('#eventInProcessMsg').value : '',
+    event_cooldown_message: $('#eventCooldownMsg') ? $('#eventCooldownMsg').value : '',
     always_on_enabled: $('#alwaysOnEnabled') ? $('#alwaysOnEnabled').checked : false,
     always_on_commands: alwaysOnList,
   };

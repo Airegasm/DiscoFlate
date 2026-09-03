@@ -1,6 +1,6 @@
 {
-  "version": "2.9",
-  "versionCode": 33,
+  "version": "3.0.0",
+  "versionCode": 34,
   "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk",
-  "notes": "DiscoFlate v2.9 \u2014 Pump Timer on Dashboard; loop event max-repeats + [current_loop]/[total_loops]/[loop_timer]; chance failure device-fires"
+  "notes": "DiscoFlate v3.0.0 \u2014 event overhaul: intelligent activation, per-event cooldown + activation/end messages, global in-process/cooldown messages, event chance action with win/fail fires; aligned Pump Timer"
 }

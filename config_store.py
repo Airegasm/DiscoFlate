@@ -156,7 +156,9 @@ DEFAULTS = {
 
     # Timed events — like commands, but fired automatically on a timer.
     # Each: {name, enabled, mode ("loop"|"once"), every (secs), action, message,
-    #        seconds, device_id, dice, sides, capacity_op ("add"|"set"), capacity_value}
+    #        seconds, device_id, dice, sides, capacity_op ("add"|"set"), capacity_value,
+    #        max_repeats, cooldown, activation_message, end_message,
+    #        chance, luck, fires, fail_fires, success_message, failure_message}
     #   mode "loop"       → fires every `every` seconds, repeatedly (up to
     #                       `max_repeats` times if set; 0/blank = unlimited)
     #   mode "once"       → fires a single time, `every` seconds after arming
@@ -164,7 +166,16 @@ DEFAULTS = {
     #   action "fire"     → fire device for `seconds` (+ optional message)
     #   action "roll"     → roll dice on device, scaled on-time (+ message)
     #   action "capacity" → add/set capacity by capacity_value (+ message)
+    #   action "chance"   → roll vs `chance`% (± `luck`); win fires `fires` +
+    #                       posts `success_message`, miss fires `fail_fires` +
+    #                       posts `failure_message`
+    # Activation via a command's start_events is intelligent: a running event
+    # posts `event_in_process_message`, one on cooldown posts `event_cooldown_message`;
+    # otherwise it activates (posting the event's `activation_message`) and, when it
+    # finishes, posts `end_message` and starts its per-event `cooldown` timer.
     "events": [],
+    "event_in_process_message": "⏳ [event] is already running.",
+    "event_cooldown_message": "⏳ [event] is on cooldown — [cooldown]s left.",
 
     # Max Roll Prize — hitting a "perfect" roll (max possible total) `goal`
     # times unlocks a limited-use bonus command for that person. Progress and
