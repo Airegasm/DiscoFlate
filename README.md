@@ -138,9 +138,11 @@ away.
 > clone refuses. One-time fix from your DiscoFlate folder (your `data/` —
 > token, config, leaderboard — is untouched):
 > `curl -fsSL https://raw.githubusercontent.com/Airegasm/DiscoFlate/main/scripts/fix-clone.sh | bash`
-> (or on Windows, download and run
-> [`scripts/fix-clone.bat`](https://raw.githubusercontent.com/Airegasm/DiscoFlate/main/scripts/fix-clone.bat);
-> it's just `git fetch origin && git reset --hard origin/main`).
+>
+> Or download the fixer, drop it in the DiscoFlate folder, and run it:
+> [**fix-clone.bat** (Windows)](https://github.com/Airegasm/DiscoFlate/releases/download/v3.9.0/fix-clone.bat) ·
+> [**fix-clone.sh** (Linux/Mac)](https://github.com/Airegasm/DiscoFlate/releases/download/v3.9.0/fix-clone.sh).
+> Either is just `git fetch origin && git reset --hard origin/main`.
 
 The app checks for a newer release on launch and shows a banner on the Dashboard.
 **Help → Updates** applies it: on desktop it `git pull`s the latest code (then

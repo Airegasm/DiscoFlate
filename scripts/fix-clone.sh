@@ -7,12 +7,14 @@
 # NOT touched by this. Local edits to the app's own source files are discarded.
 set -euo pipefail
 
-# find the repo root: current dir, or the dir this script lives in
+# Find the repo root — works from the folder itself, with the script
+# downloaded INTO the DiscoFlate folder, or from its shipped scripts/ home.
+here="$(dirname "${BASH_SOURCE[0]:-.}")"
+for d in . "$here" "$here/.."; do
+  if [ -f "$d/app.py" ] && [ -d "$d/.git" ]; then cd "$d"; break; fi
+done
 if [ ! -f app.py ] || [ ! -d .git ]; then
-  cd "$(dirname "${BASH_SOURCE[0]:-.}")/.." 2>/dev/null || true
-fi
-if [ ! -f app.py ] || [ ! -d .git ]; then
-  echo "!! Run this from your DiscoFlate folder (where app.py lives)."
+  echo "!! Put this script in your DiscoFlate folder (next to app.py) and run it again."
   exit 1
 fi
 
