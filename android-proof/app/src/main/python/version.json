@@ -1,6 +1,6 @@
 {
-  "version": "3.9.1",
-  "versionCode": 65,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.9.1/discoflate.apk",
-  "notes": "DiscoFlate v3.9.1 \u2014 properly kills the false 'config changed in another tab' popup: autosave now waits for in-flight saves (e.g. Activation-ON broadcasts) instead of racing them, and runtime toggles no longer trigger config autosaves at all."
+  "version": "3.9.2",
+  "versionCode": 66,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.9.2/discoflate.apk",
+  "notes": "DiscoFlate v3.9.2 \u2014 session uptime now means what it says: 0 until Activation turns on, ticks during the session, freezes at the final value when Activation goes off (so the OFF message's [uptime] still reports the full run). It no longer counts time the app merely sat open."
 }

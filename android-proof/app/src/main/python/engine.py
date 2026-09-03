@@ -98,10 +98,12 @@ class Engine:
         # Per-device command serialization: a dying fire's OFF and the next
         # fire's ON (or a test/calibration call) can't interleave on one plug.
         self._dev_locks: dict[str, asyncio.Lock] = {}
-        # Session uptime: monotonic marker set when the engine starts ticking and
-        # re-stamped on every session_reset (matches the "this session" scope used
-        # by the leaderboard / use budgets). In-memory only; resets on app restart.
-        self._session_start: float = time.monotonic()
+        # Session uptime: None until Activation turns on (uptime reads 0 — the
+        # app being open is not a session). Stamped on activation / session
+        # reset; frozen at its final value on deactivation so the OFF message's
+        # [uptime] reports the full run. In-memory only; resets on app restart.
+        self._session_start: float | None = None
+        self._session_frozen: float = 0.0
 
         self.announce_cb = None                # async (text, image) -> None
         self.end_session_cb = None             # async () -> None : deactivate without the off-message
@@ -133,6 +135,7 @@ class Engine:
             # the session uptime clock; muting leaves it intact so the OFF message
             # can still report the full run.
             self._session_start = time.monotonic()
+            self._session_frozen = 0.0
             self._event_last.clear()
             self._events_done.clear()
             self._event_fires.clear()
@@ -141,7 +144,12 @@ class Engine:
             self._current_range_key = None
             self._end_triggered = False
         elif self._listener_was and not now_on:
-            # Deactivation: quietly clear cooldowns and cancel timed events.
+            # Deactivation: freeze the session clock at its final value (the OFF
+            # message renders [uptime] right after this), then clear cooldowns
+            # and cancel timed events.
+            if self._session_start is not None:
+                self._session_frozen = max(0.0, time.monotonic() - self._session_start)
+                self._session_start = None
             self._cooldowns.clear()
             self._event_last.clear()
             self._events_done.clear()
@@ -258,7 +266,6 @@ class Engine:
     # -- lifecycle ----------------------------------------------------------- #
     def start(self) -> None:
         if not self._tick_task:
-            self._session_start = time.monotonic()   # session clock starts now
             self._tick_task = asyncio.create_task(self._capacity_loop())
 
     async def stop(self) -> None:
@@ -372,7 +379,10 @@ class Engine:
         return self._render(template, ctx)
 
     def session_uptime(self) -> float:
-        """Seconds the current session has been running (since start / last reset)."""
+        """Seconds the current session has been running. 0 before the first
+        activation; frozen at the final value while deactivated."""
+        if self._session_start is None:
+            return self._session_frozen
         return max(0.0, time.monotonic() - self._session_start)
 
     def _evt_hdr(self, name: str) -> str:
@@ -1844,7 +1854,10 @@ class Engine:
         self._last_fired.clear()
         self._current_range_key = None
         self._end_triggered = False
-        self._session_start = time.monotonic()   # uptime clock restarts with the session
+        # Uptime restarts with the session — but only ticks if a session is
+        # actually running (Activation on); otherwise it goes back to 0.
+        self._session_start = time.monotonic() if self.cfg.get("listener_enabled") else None
+        self._session_frozen = 0.0
         self._log("bot", "SESSION RESET — capacity 0%, cooldowns cleared, events re-armed, prizes reset")
 
     # -- max roll prizes (multiple) ----------------------------------------- #
