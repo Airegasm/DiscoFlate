@@ -1,6 +1,6 @@
 {
-  "version": "3.0.3",
-  "versionCode": 37,
+  "version": "3.0.4",
+  "versionCode": 38,
   "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk",
-  "notes": "DiscoFlate v3.0.3 \u2014 command-triggered events credit the triggerers leaderboard; Trigger First Loop Immediately tickbox (on for PumpRoulette)"
+  "notes": "DiscoFlate v3.0.4 \u2014 event activation/in-process/cooldown lines post AFTER the command reply; owner bypasses cooldowns + max-uses (still limited by in-progress events)"
 }

@@ -920,28 +920,33 @@ class Engine:
 
         if not self.cmd_enabled_in_range(name.lower()):
             return {"ok": False, "silent": True}  # not a member of the current range → ignore quietly
+        # The owner is never limited by cooldowns or per-person max-uses (they're
+        # still subject to the in-progress event guard).
+        owner_exempt = uid is not None and self._is_exempt(uid, who)
         # Per-person session use budget (carries across ranges, never replenishes).
         cmdkey_uses = name.lower()
-        left = self.cmd_uses_left(uid, cmdkey_uses) if uid is not None else None
+        left = self.cmd_uses_left(uid, cmdkey_uses) if (uid is not None and not owner_exempt) else None
         if left is not None and left <= 0:
             msg = f"🚫 {self._mention(uid, who)}, you're all out of uses for {self._cmd_display(cmdkey_uses)} this session."
             return {"ok": False, "used_up": True, "error": msg}
 
         def _spend_use():
-            if uid is not None and self.cmd_max_uses(cmdkey_uses) is not None:
+            if uid is not None and not owner_exempt and self.cmd_max_uses(cmdkey_uses) is not None:
                 d = self._cmd_uses.setdefault(str(uid), {})
                 d[cmdkey_uses] = d.get(cmdkey_uses, 0) + 1
 
         def _remain():
             # None = the command has no per-person limit → show the word "unlimited".
+            if owner_exempt:
+                return "unlimited"
             r = self.cmd_uses_left(uid, cmdkey_uses)
             return "unlimited" if r is None else r
 
         if typ == "say":
-            await self.start_events(cmd.get("start_events"), uid, who)
+            ev_posts = await self.start_events(cmd.get("start_events"), uid, who)
             _spend_use()
             anon = self._anon_label()
-            return {"ok": True, "device": False, "started": False,
+            return {"ok": True, "device": False, "started": False, "events_posted": ev_posts,
                     "reply": self.render(cmd.get("reply") or "", {"user": who, "mention": self._mention(uid, who), "cmd_remain": _remain()}) or f"{name}!",
                     "reply_anon": self.render(cmd.get("reply") or "", {"user": anon, "mention": anon, "cmd_remain": _remain()}) or f"{name}!"}
 
@@ -979,8 +984,7 @@ class Engine:
             _spend_use()   # an attempt costs a use whether you win or lose
             # Win fires the `fires` rows; a miss fires the `fail_fires` rows (if any).
             fired = await self._run_fires(cmd.get("fires") if win else cmd.get("fail_fires"), who, uid)
-            if win:
-                await self.start_events(cmd.get("start_events"), uid, who)
+            ev_posts = await self.start_events(cmd.get("start_events"), uid, who) if win else []
             total_secs = round(sum(f["duration"] for f in fired), 1)
             self._log("roll", f"{who} gambled {name}: rolled {roll} vs {chance:.0f}%"
                       + (f" (luck {luck:+.0f})" if luck else "")
@@ -996,7 +1000,7 @@ class Engine:
             reply = self.render(tmpl, {"user": who, "mention": self._mention(uid, who), **base}) or dflt.replace("{u}", who)
             reply_anon = self.render(tmpl, {"user": anon, "mention": anon, **base}) or dflt.replace("{u}", anon)
             return {"ok": True, "device": bool(fired), "started": bool(fired), "won": win,
-                    "reply": reply, "reply_anon": reply_anon}
+                    "events_posted": ev_posts, "reply": reply, "reply_anon": reply_anon}
 
         target = cmd.get("device_id") or self._active_id()
         tdev = self._device(target)
@@ -1030,7 +1034,7 @@ class Engine:
             duration = round(max(0.1, min(hi, float(cmd.get("seconds") or 3))), 1)
             detail = f"{duration:.1f}s"
 
-        await self.start_events(cmd.get("start_events"), uid, who)
+        ev_posts = await self.start_events(cmd.get("start_events"), uid, who)
         fr = self._begin_or_extend(target, duration, f"{name} by {who}")
         extended = fr["status"] == "extended"
         self.credit_pump(uid, who, duration, target)
@@ -1055,7 +1059,7 @@ class Engine:
             tail = f"  ⏱️ +{fr['added']:.1f}s ({fr['remaining']:.1f}s running)"
             reply += tail; reply_anon += tail
         return {"ok": True, "device": True, "started": True, "extended": extended,
-                "reply": reply, "reply_anon": reply_anon}
+                "events_posted": ev_posts, "reply": reply, "reply_anon": reply_anon}
 
     async def _run_fires(self, fires, who: str, uid: str | None) -> list:
         """Fire each {device_id, seconds} row independently and concurrently.
@@ -1222,13 +1226,17 @@ class Engine:
         self._milestones_fired.clear()
         self._log("capacity", "reset to 0%")
 
-    async def start_events(self, names, uid=None, who: str = "") -> None:
+    async def start_events(self, names, uid=None, who: str = "") -> list:
         """A command activates events by name — intelligently: an already-running
-        event posts the global 'in process' message; one still on cooldown posts
+        event yields the global 'in process' message; one still on cooldown yields
         the global 'cooldown' message; otherwise it switches on (re-armed) and its
-        own activation message is posted. The activator (uid, who) is remembered so
-        the event's pump fires credit that person's leaderboard."""
+        own activation message is yielded. The activator (uid, who) is remembered so
+        the event's pump fires credit that person's leaderboard.
+
+        Returns the list of channel messages to post AFTER the command's own reply
+        (so 'already running' / 'on cooldown' / activation lines follow it)."""
         now = time.monotonic()
+        posts = []
         for n in (names or []):
             key = str(n).strip().lower()
             if not key:
@@ -1243,13 +1251,13 @@ class Engine:
             if active and key not in self._events_done:
                 msg = (self.cfg.get("event_in_process_message") or "").strip()
                 if msg:
-                    await self._announce(self.render(msg, self._event_ctx(ev)), None)
+                    posts.append(self.render(msg, self._event_ctx(ev)))
                 continue
             cd_until = self._event_cooldown_until.get(key, 0.0)
             if now < cd_until:
                 msg = (self.cfg.get("event_cooldown_message") or "").strip()
                 if msg:
-                    await self._announce(self.render(msg, {**self._event_ctx(ev), "cooldown": f"{cd_until - now:.0f}"}), None)
+                    posts.append(self.render(msg, {**self._event_ctx(ev), "cooldown": f"{cd_until - now:.0f}"}))
                 continue
             self._runtime_events_on.add(key)
             self._event_last.pop(key, None)    # re-arm the timer from now
@@ -1259,7 +1267,8 @@ class Engine:
                 self._event_activator[key] = (uid, who)   # credit this person for the event's pumps
             am = (ev.get("activation_message") or "").strip()
             if am:
-                await self._announce(self.render(am, self._event_ctx(ev)), None)
+                posts.append(self.render(am, self._event_ctx(ev)))
+        return posts
 
     def _event_by_name(self, key: str) -> dict | None:
         key = (key or "").strip().lower()

@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.0.3</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.0.4</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -331,7 +331,7 @@
             <input id="cooldownExempt" placeholder="123456789012345678"></label>
           <label class="field">Default per-user cooldown <span class="muted">(seconds)</span>
             <input type="number" id="cooldown" value="30" min="0" step="1" style="width:110px"></label>
-          <div class="hint" style="margin-top:0">The Owner <b>name</b> is now set at the top of the <b>Dashboard</b>. Owner bypasses cooldowns + runs owner-only commands. Cooldown messages are on the <b>Commands</b> tab.</div>
+          <div class="hint" style="margin-top:0">The Owner <b>name</b> is now set at the top of the <b>Dashboard</b>. Owner bypasses <b>cooldowns and per-person max-uses</b> (still limited only by in-progress events) and runs owner-only commands. Cooldown messages are on the <b>Commands</b> tab.</div>
         </div>
         <div class="colsec" style="flex:1;min-width:240px">
           <h3>Auto-report</h3>
@@ -498,7 +498,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v3.0.3.</span>
+        <span class="muted" id="updMsg">You're on v3.0.4.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>

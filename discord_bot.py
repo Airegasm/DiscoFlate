@@ -424,6 +424,9 @@ class BotManager:
             tail = "\n⏳ (a fire is already running — ignored)" if (res.get("device") and not res.get("started")) else ""
             await _reply(message, line + tail, as_reply=bool(custom.get("mention")))
             await self._echo(message, res.get("reply_anon"), tail)
+            # Event activation / in-process / cooldown lines come AFTER the reply.
+            for post in (res.get("events_posted") or []):
+                await self.broadcast(post, None)
             return
 
         # action == "roll"
