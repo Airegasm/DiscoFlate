@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v2.5 by AireGasm</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v2.6 by AireGasm</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -435,8 +435,9 @@
         <div style="flex:1"></div>
         <button onclick="saveCommands()">Save commands</button>
       </div>
-      <div class="hint"><b>fire</b> = active device on for fixed seconds. <b>roll</b> = roll dice (blank dice/sides
+      <div class="hint"><b>fire</b> = active device on for fixed seconds (+ optional <b>Add Device Fire</b> rows for extra devices). <b>roll</b> = roll dice (blank dice/sides
         uses the current capacity range) and fire for the total. <b>say</b> = text-only reply, no device.
+        <b>chance</b> = a gamble: roll vs a <b>Chance %</b> (nudged by <b>Luck</b>); a win posts the success message and fires its device rows, a miss posts the failure message.
         See the <b>Help</b> tab for reply placeholders. <b>Starts events</b> = names of (off-by-default) events this command
         switches on temporarily (they revert on Session reset or app restart).</div>
     </div>
@@ -477,7 +478,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v2.5.</span>
+        <span class="muted" id="updMsg">You're on v2.6.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -509,11 +510,12 @@
     <div class="card span" data-tab="help">
       <details class="help"><summary><h2>Custom commands — how to set them up</h2></summary>
       <div class="hint" style="max-width:820px;margin-top:8px">A custom command is a chat trigger you invent (e.g. <code>!spin</code>). You build it once on the <b>Commands</b> tab, then switch it on for the capacity ranges where it should work.</div>
-      <h3 style="margin:14px 0 6px">The three types</h3>
+      <h3 style="margin:14px 0 6px">The four types</h3>
       <ul style="line-height:1.7;padding-left:22px;margin:0;max-width:820px">
-        <li><b>fire</b> — turns the device on for a fixed number of <b>Seconds</b>. (Drives capacity if the device is a pump.)</li>
+        <li><b>fire</b> — turns the device on for a fixed number of <b>Seconds</b>. (Drives capacity if the device is a pump.) Add <b>+ Add Device Fire</b> rows to also fire other devices, each for its own seconds, independently.</li>
         <li><b>roll</b> — rolls dice and fires for the total. Leave <b>Dice/Sides</b> on <code>rng</code> to use the <i>current range's</i> dice, or pin specific dice (e.g. 2 d 6).</li>
         <li><b>say</b> — text-only reply, no device. Good for lore, hints, or status.</li>
+        <li><b>chance</b> — a gamble. Rolls 1–100 against your <b>Chance %</b>; <b>Luck %</b> is a ± chance to force the outcome (positive = force a win, negative = force a miss). A <b>win</b> posts the <b>Success message</b> and fires the device rows; a <b>miss</b> posts the <b>Failure message</b> and fires nothing. Placeholders <code>[roll]</code>, <code>[chance]</code>, <code>[luck]</code>, <code>[secs]</code> work in both. Like every command it's range-gated, cooldownable, and <b>exhaustable</b> (Max/person, set per range).</li>
       </ul>
       <h3 style="margin:14px 0 6px">Per-command options</h3>
       <ul style="line-height:1.7;padding-left:22px;margin:0;max-width:820px">
@@ -687,6 +689,7 @@ esphome dashboard config/</code></pre>
           <table><tbody>
             <tr><td><code>[dice]</code></td><td>dice notation, e.g. 2d6</td></tr>
             <tr><td><code>[result]</code></td><td>the roll total</td></tr>
+            <tr><td><code>[roll]</code> <code>[chance]</code> <code>[luck]</code></td><td>chance command: the 1–100 roll, the target %, the luck %</td></tr>
             <tr><td><code>[secs]</code></td><td>seconds this fire runs</td></tr>
             <tr><td><code>[secs2capacity]</code></td><td>% capacity this fire will add</td></tr>
             <tr><td><code>[sides]</code></td><td>number of sides</td></tr>
@@ -1282,6 +1285,44 @@ function cmdRangeSummary(name){
     ? `Active in: <b>${inR.join(', ')}</b>. Add/remove ranges in <b>Game → Capacity ranges</b>.`
     : `Not in any range yet — add it under a range in <b>Game → Capacity ranges</b> to make it usable.`;
 }
+// Device dropdown options for command device pickers (module-level so the fires editor can reuse it).
+function cmdDeviceOpts(sel){
+  return `<option value="">(active pump)</option>`+
+    allDevices.map(d=>`<option value="${esc(d.id)}" ${sel===d.id?'selected':''}>${esc(d.label)}</option>`).join('');
+}
+// Renaming a command must follow it into every range it's a member of
+// (membership + a range's start-command are keyed by the command name).
+function renameCommand(i, val){
+  const old=(commandRows[i].name||'').trim().toLowerCase();
+  commandRows[i].name = val;
+  const neu=(val||'').trim().toLowerCase();
+  if(old && neu && old!==neu){
+    rangeRows.forEach(r=>{
+      if(r.cooldowns && Object.prototype.hasOwnProperty.call(r.cooldowns, old)){
+        r.cooldowns[neu]=r.cooldowns[old]; delete r.cooldowns[old];
+      }
+      if(r.start_command && r.start_command.toLowerCase()===old) r.start_command = val.trim();
+    });
+  }
+  renderCommands(); renderRanges(); scheduleSave();
+}
+// "Add Device Fire" rows — multiple devices, each on for its own seconds, independently.
+function firesEditor(i, c){
+  const fires = c.fires||[];
+  const rows = fires.map((f,j)=>
+    `<div class="row" style="gap:8px;align-items:center">`+
+      `<span class="muted">Device</span><select onchange="setFire(${i},${j},'device_id',this.value)">${cmdDeviceOpts(f.device_id)}</select>`+
+      `<span class="muted">for</span><input type="number" value="${f.seconds??''}" min="0" step="0.5" style="width:80px" onchange="setFire(${i},${j},'seconds',this.value)"><span class="muted">s</span>`+
+      `<button class="ghost" onclick="removeFire(${i},${j})">✕</button>`+
+    `</div>`).join('');
+  return `<div style="border-top:1px solid var(--line);padding-top:8px">`+
+    `<div class="muted" style="margin-bottom:6px">Device fires — each device turns on <b>independently</b> for its own seconds${(c.type==='chance')?' (only on a win)':''}.</div>`+
+    (rows||'<div class="muted" style="margin-bottom:6px">none yet</div>')+
+    `<button class="ghost" style="margin-top:6px" onclick="addFire(${i})">+ Add Device Fire</button></div>`;
+}
+function addFire(i){ commandRows[i].fires = commandRows[i].fires||[]; commandRows[i].fires.push({device_id:null, seconds:3}); renderCommands(); scheduleSave(); }
+function removeFire(i,j){ (commandRows[i].fires||[]).splice(j,1); renderCommands(); scheduleSave(); }
+function setFire(i,j,field,val){ const f=(commandRows[i].fires||[])[j]; if(!f) return; f[field] = (field==='seconds') ? (val===''?null:+val) : (val||null); scheduleSave(); }
 function renderCommands(){
   const box = $('#commands'); box.innerHTML='';
   if(!commandRows.length){ box.innerHTML='<div class="muted">No custom commands yet.</div>'; return; }
@@ -1302,15 +1343,18 @@ function renderCommands(){
         `<button class="ghost" onclick="commandRows.splice(${i},1);cmdOpen.delete(${i});renderCommands();renderRanges();scheduleSave()">✕</button>`+
       `</div>`;
     if(open){
+      const typ=(c.type||'fire');
       html +=
       `<div class="row" style="gap:10px">`+
-        `<label class="field">Name <input value="${esc(c.name||'')}" placeholder="spin" style="width:140px" onchange="commandRows[${i}].name=this.value;renderRanges()"></label>`+
+        `<label class="field">Name <input value="${esc(c.name||'')}" placeholder="spin" style="width:140px" onchange="renameCommand(${i}, this.value)"></label>`+
         `<label class="field">Type <select onchange="commandRows[${i}].type=this.value;renderCommands()">`+
-          ['fire','roll','say'].map(t=>`<option value="${t}" ${(c.type||'fire')===t?'selected':''}>${t}</option>`).join('')+`</select></label>`+
-        ((c.type||'fire')==='fire'?`<label class="field">Seconds <input type="number" value="${c.seconds??''}" min="0" step="0.5" style="width:80px" onchange="commandRows[${i}].seconds=+this.value"></label>`:'')+
-        ((c.type||'fire')==='roll'?`<label class="field">Dice <select onchange="commandRows[${i}].dice=+this.value"><option value="">rng</option>${d20Options(c.dice)}</select></label>`+
+          ['fire','roll','say','chance'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`+
+        (typ==='fire'?`<label class="field">Seconds <input type="number" value="${c.seconds??''}" min="0" step="0.5" style="width:80px" onchange="commandRows[${i}].seconds=+this.value"></label>`:'')+
+        (typ==='roll'?`<label class="field">Dice <select onchange="commandRows[${i}].dice=+this.value"><option value="">rng</option>${d20Options(c.dice)}</select></label>`+
           `<label class="field">Sides <select onchange="commandRows[${i}].sides=+this.value"><option value="">rng</option>${d20Options(c.sides)}</select></label>`:'')+
-        ((c.type||'fire')!=='say'?`<label class="field">Device <select style="width:140px" onchange="commandRows[${i}].device_id=this.value||null">${deviceOpts(c.device_id)}</select></label>`:'')+
+        (typ==='chance'?`<label class="field">Chance % <input type="number" value="${c.chance??50}" min="0" max="100" step="1" style="width:80px" onchange="commandRows[${i}].chance=Math.max(0,Math.min(100,+this.value||0))"></label>`+
+          `<label class="field">Luck % <span class="muted">(±force)</span> <input type="number" value="${c.luck??''}" min="-100" max="100" step="1" style="width:80px" placeholder="0" onchange="commandRows[${i}].luck=(this.value===''?null:+this.value)"></label>`:'')+
+        ((typ==='fire'||typ==='roll')?`<label class="field">Device <select style="width:140px" onchange="commandRows[${i}].device_id=this.value||null">${cmdDeviceOpts(c.device_id)}</select></label>`:'')+
       `</div>`+
       `<div class="muted" style="font-size:12px">${cmdRangeSummary(c.name)}</div>`+
       `<div class="row" style="gap:16px">`+
@@ -1319,14 +1363,18 @@ function renderCommands(){
         `<label class="row" style="gap:6px"><input type="checkbox" ${c.hide_in_list?'checked':''} onchange="commandRows[${i}].hide_in_list=this.checked"> hide from command list</label>`+
       `</div>`+
       `<label class="field">Description <input value="${esc(c.description||'')}" placeholder="what it does (shown in the command list)" onchange="commandRows[${i}].description=this.value"></label>`+
-      `<label class="field">Reply <textarea rows="4" onchange="commandRows[${i}].reply=this.value">${esc(c.reply||'')}</textarea></label>`+
+      (typ==='chance'
+        ? `<label class="field">Success message <span class="muted">([roll] [chance] [luck] [secs] work here)</span><textarea rows="3" onchange="commandRows[${i}].success_reply=this.value">${esc(c.success_reply||'')}</textarea></label>`+
+          `<label class="field">Failure message <span class="muted">(on a miss)</span><textarea rows="3" onchange="commandRows[${i}].failure_reply=this.value">${esc(c.failure_reply||'')}</textarea></label>`
+        : `<label class="field">Reply <textarea rows="4" onchange="commandRows[${i}].reply=this.value">${esc(c.reply||'')}</textarea></label>`)+
+      ((typ==='fire'||typ==='chance') ? firesEditor(i, c) : '')+
       `<label class="field">Starts events <input value="${esc((c.start_events||[]).join(', '))}" placeholder="event names, comma-separated" onchange="commandRows[${i}].start_events=idList(this.value)"></label>`;
     }
     el.innerHTML = html;
     box.appendChild(el);
   });
 }
-function addCommand(){ commandRows.push({name:'',type:'fire',seconds:5,dice:'',sides:'',reply:'',enabled:true,owner_only:false,device_id:null,start_events:[],range_gate:'all',description:'',hide_in_list:false,mention:false}); renderCommands(); renderRanges(); }
+function addCommand(){ commandRows.push({name:'',type:'fire',seconds:5,dice:'',sides:'',reply:'',enabled:true,owner_only:false,device_id:null,start_events:[],range_gate:'all',description:'',hide_in_list:false,mention:false,fires:[],chance:50,luck:null,success_reply:'',failure_reply:''}); renderCommands(); renderRanges(); }
 function cleanCommands(){
   return commandRows.filter(c=>(c.name||'').trim()).map(c=>({
     name:(c.name||'').trim().replace(/^\W+/,''),
@@ -1337,6 +1385,12 @@ function cleanCommands(){
     start_events: (c.start_events||[]).map(x=>x.trim()).filter(Boolean),
     range_gate: c.range_gate||'all',
     description: c.description||'', hide_in_list: !!c.hide_in_list, mention: !!c.mention,
+    // chance + multi-device fire
+    fires: (c.fires||[]).filter(f=>f && (f.seconds!=null && f.seconds!=='' || f.device_id!=null))
+             .map(f=>({device_id: f.device_id||null, seconds: (f.seconds===''||f.seconds==null)?null:+f.seconds})),
+    chance: (c.chance==null||c.chance==='')?null:+c.chance,
+    luck: (c.luck==null||c.luck==='')?null:+c.luck,
+    success_reply: c.success_reply||'', failure_reply: c.failure_reply||'',
   }));
 }
 async function saveCommands(){ applyState(await api('/api/config', {commands: cleanCommands()}), true); }

@@ -132,8 +132,15 @@ DEFAULTS = {
         {"min": 66,  "max": 100, "dice": 2, "sides": 6},
     ],
 
-    # User-defined commands, created in the web UI on the fly.
-    # Each: {name, type: "fire"|"roll"|"say", seconds, dice, sides, reply, enabled}
+    # User-defined commands, created in the web UI on the fly. Each:
+    #   {name, type, seconds, dice, sides, device_id, reply, enabled, owner_only,
+    #    mention, hide_in_list, description, start_events, range_gate}
+    # type "fire"   → fire device_id for `seconds` (+ optional extra `fires` rows)
+    # type "roll"   → roll dice/sides (or the range's) and fire for the total
+    # type "say"    → text-only reply, no device
+    # type "chance" → gamble: roll 1–100 vs `chance`% (± `luck`); win posts
+    #                 `success_reply` + fires the `fires` rows, miss posts `failure_reply`
+    #   fires: [{device_id, seconds}] — independent, concurrent device fires
     "commands": [],
 
     # Modes group several commands under one switch. Toggling a mode enables/

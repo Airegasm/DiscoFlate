@@ -790,6 +790,58 @@ class Engine:
                     "reply": self.render(cmd.get("reply") or "", {"user": who, "mention": self._mention(uid, who), "cmd_remain": _remain()}) or f"{name}!",
                     "reply_anon": self.render(cmd.get("reply") or "", {"user": anon, "mention": anon, "cmd_remain": _remain()}) or f"{name}!"}
 
+        if typ == "chance":
+            # A gamble: roll 1–100 vs the chance%. Win → post success + fire the
+            # optional device rows; miss → post failure, no fire. Same cooldown /
+            # scope / per-person budget / membership as any custom command.
+            cmdkey = name.lower()
+            cd, scope = self._range_cd_scope(self.range_for(self.capacity), cmdkey)
+            key_uid = str(uid) if scope == "user" else "*"
+            exempt = uid is not None and self._is_exempt(uid, who)
+            if uid is not None and not exempt:
+                remaining = self.cooldown_remaining(key_uid, cmdkey)
+                if remaining > 0:
+                    return {"ok": False, "cooldown": True, "error": self._cooldown_reply(who, remaining, uid, cmdkey)}
+            if uid is not None:
+                self._track_user(uid, who)
+                if scope == "command" or not exempt:
+                    self._touch_cooldown(key_uid, cmdkey, cd)
+            try:
+                chance = max(0.0, min(100.0, float(cmd.get("chance") if cmd.get("chance") is not None else 50)))
+            except (TypeError, ValueError):
+                chance = 50.0
+            try:
+                luck = float(cmd.get("luck") or 0)
+            except (TypeError, ValueError):
+                luck = 0.0
+            roll = random.randint(1, 100)
+            win = roll <= chance
+            # Luck: positive % = chance to force a win; negative % = chance to force a loss.
+            if luck > 0 and random.random() * 100 < min(100.0, luck):
+                win = True
+            elif luck < 0 and random.random() * 100 < min(100.0, -luck):
+                win = False
+            _spend_use()   # an attempt costs a use whether you win or lose
+            fired = await self._run_fires(cmd.get("fires"), who, uid) if win else []
+            if win:
+                self.start_events(cmd.get("start_events"))
+            total_secs = round(sum(f["duration"] for f in fired), 1)
+            self._log("roll", f"{who} gambled {name}: rolled {roll} vs {chance:.0f}%"
+                      + (f" (luck {luck:+.0f})" if luck else "")
+                      + f" → {'WIN' if win else 'miss'}"
+                      + (f", fired {len(fired)} device(s) {total_secs}s" if fired else ""))
+            base = {"roll": roll, "chance": f"{chance:.0f}", "luck": f"{luck:.0f}", "won": win,
+                    "secs": f"{total_secs:.1f}", "seconds": f"{total_secs:.1f}",
+                    "secs2capacity": (self._secs_to_capacity(total_secs, self._active_id()) if fired else "0"),
+                    "cmd_remain": _remain()}
+            dflt = f"🎲 **{{u}}** rolled {roll} vs {chance:.0f}% — " + ("**win!**" if win else "no luck.")
+            tmpl = (cmd.get("success_reply") if win else cmd.get("failure_reply")) or ""
+            anon = self._anon_label()
+            reply = self.render(tmpl, {"user": who, "mention": self._mention(uid, who), **base}) or dflt.replace("{u}", who)
+            reply_anon = self.render(tmpl, {"user": anon, "mention": anon, **base}) or dflt.replace("{u}", anon)
+            return {"ok": True, "device": bool(fired), "started": bool(fired), "won": win,
+                    "reply": reply, "reply_anon": reply_anon}
+
         target = cmd.get("device_id") or self._active_id()
         tdev = self._device(target)
         if tdev is None:
@@ -826,9 +878,12 @@ class Engine:
         fr = self._begin_or_extend(target, duration, f"{name} by {who}")
         extended = fr["status"] == "extended"
         self.credit_pump(uid, who, duration, target)
+        # Extra "Add Device Fire" rows (fire type): each device runs independently.
+        extra = await self._run_fires(cmd.get("fires"), who, uid) if typ == "fire" else []
         _spend_use()
         self._log("roll", f"{who} ran {name} on {tdev.get('label')} ({detail})"
-                  + (f"  [+{fr['added']:.1f}s → {fr['remaining']:.1f}s]" if extended else ""))
+                  + (f"  [+{fr['added']:.1f}s → {fr['remaining']:.1f}s]" if extended else "")
+                  + (f"  +{len(extra)} extra device fire(s)" if extra else ""))
         dice_notation = f"{dice}d{sides}" if dice and sides else ""
         base = {"dice": dice_notation, "result": total, "total": total,
                 "secs": f"{duration:.1f}", "seconds": f"{duration:.1f}", "sides": sides,
@@ -845,6 +900,25 @@ class Engine:
             reply += tail; reply_anon += tail
         return {"ok": True, "device": True, "started": True, "extended": extended,
                 "reply": reply, "reply_anon": reply_anon}
+
+    async def _run_fires(self, fires, who: str, uid: str | None) -> list:
+        """Fire each {device_id, seconds} row independently and concurrently.
+        Shared by the fire type's extra rows and the chance type's win-fires.
+        Returns [{device_id, duration, status}] for the rows that actually fired."""
+        out = []
+        hi = self._hard_cap()
+        for row in (fires or []):
+            dev_id = (row or {}).get("device_id") or self._active_id()
+            if not dev_id or self._device(dev_id) is None:
+                continue
+            try:
+                dur = round(max(0.1, min(hi, float(row.get("seconds") or 3))), 1)
+            except (TypeError, ValueError):
+                dur = 3.0
+            fr = self._begin_or_extend(dev_id, dur, f"{who}'s device fire")
+            self.credit_pump(uid, who, dur, dev_id)
+            out.append({"device_id": dev_id, "duration": dur, "status": fr.get("status")})
+        return out
 
     # -- firing (per-device) ------------------------------------------------- #
     def _hard_cap(self) -> float:
