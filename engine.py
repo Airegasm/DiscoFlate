@@ -1274,14 +1274,16 @@ class Engine:
             return
 
         if action == "poll":
-            # BLOCKING by design: the event counts as still running for the
-            # poll's whole duration, and its remaining rounds/messages resume
-            # only after the poll (and its winner's actions) complete.
-            pd = self.find_poll(ev.get("poll"))
-            if pd is None:
-                self._log("error", f"event '{name}': no poll named '{ev.get('poll')}'")
-            else:
-                await self._run_poll(pd, source=f"event {name}")
+            # NON-BLOCKING: a timed event is a single action with nothing after
+            # it, so start the poll in the background — awaiting it here would
+            # freeze the capacity loop (accrual/milestones/other events) for the
+            # poll's whole duration. (A poll inside a capacity-event ACTION
+            # BLOCK still runs inline there, keeping that block's later actions
+            # ordered after it — that block is itself a detached task, so the
+            # loop keeps ticking.)
+            res = self.start_poll_bg(ev.get("poll"), source=f"event {name}")
+            if not res.get("ok"):
+                self._log("error", f"event '{name}': {res.get('error')}")
             if msg:
                 await self._emit(self._evt_hdr(name) + self.render(msg, extra), sink, replace_key=replace_key)
             return
