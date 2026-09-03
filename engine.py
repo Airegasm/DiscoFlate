@@ -1028,8 +1028,12 @@ class Engine:
             return "unlimited" if r is None else r
 
         if typ == "say":
-            ev_posts = await self.start_events(cmd.get("start_events"), uid, who)
-            _spend_use()
+            ev_posts, activated = await self.start_events(cmd.get("start_events"), uid, who)
+            # A pure event-trigger command (e.g. !pumproulette) only costs a use when
+            # it actually starts something. If every event it targets was blocked
+            # (already running / on cooldown), don't drain the user's budget.
+            if not (cmd.get("start_events") and activated == 0):
+                _spend_use()
             anon = self._anon_label()
             return {"ok": True, "device": False, "started": False, "events_posted": ev_posts,
                     "reply": self.render(cmd.get("reply") or "", {"user": who, "mention": self._mention(uid, who), "cmd_remain": _remain()}) or f"{name}!",
@@ -1089,7 +1093,7 @@ class Engine:
             _spend_use()   # an attempt costs a use whether you win or lose
             # Win fires the `fires` rows; a miss fires the `fail_fires` rows (if any).
             fired = await self._run_fires(cmd.get("fires") if win else cmd.get("fail_fires"), who, uid)
-            ev_posts = await self.start_events(cmd.get("start_events"), uid, who) if win else []
+            ev_posts = (await self.start_events(cmd.get("start_events"), uid, who))[0] if win else []
             total_secs = round(sum(f["duration"] for f in fired), 1)
             self._log("roll", f"{who} gambled {name}: rolled {roll} vs {chance:.0f}%"
                       + (f" (luck {luck:+.0f})" if luck else "")
@@ -1139,7 +1143,7 @@ class Engine:
             duration = round(max(0.1, min(hi, float(cmd.get("seconds") or 3))), 1)
             detail = f"{duration:.1f}s"
 
-        ev_posts = await self.start_events(cmd.get("start_events"), uid, who)
+        ev_posts, _ = await self.start_events(cmd.get("start_events"), uid, who)
         fr = self._begin_or_extend(target, duration, f"{name} by {who}")
         extended = fr["status"] == "extended"
         self.credit_pump(uid, who, duration, target)
@@ -1437,17 +1441,20 @@ class Engine:
         self._milestones_fired.clear()
         self._log("capacity", "reset to 0%")
 
-    async def start_events(self, names, uid=None, who: str = "") -> list:
+    async def start_events(self, names, uid=None, who: str = "") -> tuple:
         """A command activates events by name — intelligently: an already-running
         event yields the global 'in process' message; one still on cooldown yields
         the global 'cooldown' message; otherwise it switches on (re-armed) and its
         own activation message is yielded. The activator (uid, who) is remembered so
         the event's pump fires credit that person's leaderboard.
 
-        Returns the list of channel messages to post AFTER the command's own reply
-        (so 'already running' / 'on cooldown' / activation lines follow it)."""
+        Returns (posts, activated): the channel messages to post AFTER the command's
+        own reply (so 'already running' / 'on cooldown' / activation lines follow
+        it), and a count of events that actually switched on. `activated` lets a
+        pure event-trigger command skip charging a use when the event was blocked."""
         now = time.monotonic()
         posts = []
+        activated = 0
         for n in (names or []):
             key = str(n).strip().lower()
             if not key:
@@ -1457,6 +1464,7 @@ class Engine:
                 self._runtime_events_on.add(key)   # unknown name → legacy behaviour
                 self._event_last.pop(key, None)
                 self._events_done.discard(key)
+                activated += 1
                 continue
             hdr = self._evt_hdr(ev.get("name", ""))
             active = bool(ev.get("enabled")) or key in self._runtime_events_on
@@ -1464,17 +1472,18 @@ class Engine:
                 msg = (self.cfg.get("event_in_process_message") or "").strip()
                 if msg:
                     posts.append(hdr + self.render(msg, self._event_ctx(ev)))
-                continue
+                continue   # already running → blocked (no activation)
             cd_until = self._event_cooldown_until.get(key, 0.0)
             if now < cd_until:
                 msg = (self.cfg.get("event_cooldown_message") or "").strip()
                 if msg:
                     posts.append(hdr + self.render(msg, {**self._event_ctx(ev), "cooldown": f"{cd_until - now:.0f}"}))
-                continue
+                continue   # on cooldown → blocked (no activation)
             self._runtime_events_on.add(key)
             self._event_last.pop(key, None)    # re-arm the timer from now
             self._events_done.discard(key)
             self._event_fires.pop(key, None)   # fresh loop count for this activation
+            activated += 1
             if uid is not None:
                 self._event_activator[key] = (uid, who)   # credit this person for the event's pumps
             am = (ev.get("activation_message") or "").strip()
@@ -1485,7 +1494,7 @@ class Engine:
                 # instead of racing the async tick loop. The tick then waits `every`.
                 self._event_last[key] = now
                 await self._fire_event_once(ev, key, sink=posts)
-        return posts
+        return posts, activated
 
     def _event_by_name(self, key: str) -> dict | None:
         key = (key or "").strip().lower()
