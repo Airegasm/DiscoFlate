@@ -495,7 +495,15 @@ class Engine:
                 self._log("bot", f"range {key[0]}–{key[1]}%: start command '{cname}'")
                 try:
                     res = await self.run_custom(cmd, self._anon_label(), uid=None)
-                    if res.get("ok") and res.get("reply"):
+                    if res.get("ok") and res.get("game"):
+                        # A game launched here has no Play button (buttons only
+                        # exist on the Discord path) — invite people to type it.
+                        prefix = self.cfg.get("command_prefix", "!")
+                        intro = (res.get("reply") or "").strip()
+                        await self._announce(
+                            (intro + "\n" if intro else "") +
+                            f"🎮 Type **{prefix}{cname}** to play!", None)
+                    elif res.get("ok") and res.get("reply"):
                         await self._announce(res["reply"], None)
                 except Exception as e:  # noqa: BLE001
                     self._log("error", f"range start command failed: {e}")
@@ -1014,6 +1022,28 @@ class Engine:
         self._save_lifetime()
         self._log("bot", "LIFETIME leaderboard reset")
 
+    def lifetime_board(self) -> dict:
+        """The all-time leaderboard data (for config export)."""
+        return dict(self._pump_life)
+
+    def set_lifetime(self, data) -> None:
+        """Replace the all-time leaderboard (config import/restore)."""
+        if not isinstance(data, dict):
+            return
+        clean = {}
+        for uid, rec in data.items():
+            if not isinstance(rec, dict):
+                continue
+            try:
+                clean[str(uid)] = {"name": str(rec.get("name") or "?"),
+                                   "seconds": float(rec.get("seconds") or 0),
+                                   "capacity": float(rec.get("capacity") or 0)}
+            except (TypeError, ValueError):
+                continue
+        self._pump_life = clean
+        self._save_lifetime()
+        self._log("bot", f"LIFETIME leaderboard restored ({len(clean)} pumpers)")
+
     @staticmethod
     def _format_board(rows, header: str, empty: str) -> str:
         # Skip malformed rows instead of raising: a hand-edited lifetime file
@@ -1148,6 +1178,8 @@ class Engine:
 
         if not self.cmd_enabled_in_range(name.lower()):
             return {"ok": False, "silent": True}  # not a member of the current range → ignore quietly
+        if not self._range_gate_ok(cmd.get("range_gate")):
+            return {"ok": False, "silent": True}  # gated to a different capacity band
         # The owner is never limited by cooldowns or per-person max-uses (they're
         # still subject to the in-progress event guard).
         owner_exempt = uid is not None and self._is_exempt(uid, who)
@@ -1417,6 +1449,9 @@ class Engine:
                 pass
         tier = self.game_tier_for(cmd, score)
         fired = await self._run_fires(tier.get("fires"), who, uid)
+        # Finishing a game activates its start_events, same as a say command
+        # (the UI has always offered "Starts events" on game types).
+        ev_posts, _ = await self.start_events(cmd.get("start_events"), uid, who)
         total = round(sum(f["duration"] for f in fired), 1)
         name = self.game_display_name(cmd)   # full game name (Rock Paper Scissors, …)
         base = {"score": score, "luck": f"{luck:+.0f}" if luck else "0",
@@ -1431,7 +1466,7 @@ class Engine:
         anon_msg = header + (self.render(tmpl, {"user": anon, "mention": anon, **base})
                              or f"**{anon}** scored **{score}**.")
         self._log("roll", f"{who} finished {name} — score {score}" + (f", fired {total}s" if fired else ""))
-        return {"real": real, "anon": anon_msg}
+        return {"real": real, "anon": anon_msg, "events_posted": ev_posts}
 
     async def _run_fires(self, fires, who: str, uid: str | None) -> list:
         """Fire each {device_id, seconds} row independently and concurrently.

@@ -34,7 +34,7 @@ DEFAULT_PUMPDIRECT_PATH = os.path.normpath(
 
 # Schema version of the stored config. Bump it + add a _migrate step whenever a
 # key is renamed/moved, so old configs upgrade instead of silently stranding data.
-CONFIG_VERSION = 1
+CONFIG_VERSION = 2
 
 DEFAULTS = {
     "discord_token": "",
@@ -296,8 +296,9 @@ DEFAULTS = {
         "kauf": {"web_username": "", "web_password": ""},
     },
 
-    # Optional scoping so the bot only reacts where you want it to.
-    "allow": {"guild_ids": [], "channel_ids": [], "user_ids": []},
+    # Optional user allowlist so the bot only reacts to specific people.
+    # (guild/channel scoping is listen_targets' job — see migration v2.)
+    "allow": {"user_ids": []},
 
     # Remote access (System tab): OFF = the server binds loopback only (the
     # default, nothing else on the network can even connect). ON = binds
@@ -392,6 +393,12 @@ def _migrate(cfg: dict) -> dict:
         nested = (cfg.get("roll") or {}).pop("cooldown_reset_message", None)
         if nested and not cfg.get("cooldown_reset_message"):
             cfg["cooldown_reset_message"] = nested
+    if v < 2:
+        # v2: allow.guild_ids / allow.channel_ids were never read (listen_targets
+        # is the real scoping) — drop them so nobody edits a dead knob.
+        if isinstance(cfg.get("allow"), dict):
+            cfg["allow"].pop("guild_ids", None)
+            cfg["allow"].pop("channel_ids", None)
     cfg["config_version"] = CONFIG_VERSION
     return cfg
 
@@ -424,6 +431,13 @@ def _rotate_backups() -> None:
             shutil.copy2(CONFIG_PATH, daily)
             _prune([os.path.join(BACKUP_DIR, f) for f in os.listdir(BACKUP_DIR)
                     if f.startswith("config.daily-")], KEEP_DAILY)
+        # The all-time leaderboard is precious too — one snapshot per day.
+        life = os.path.join(DATA_DIR, "pumpers_lifetime.json")
+        life_daily = os.path.join(BACKUP_DIR, f"pumpers.daily-{time.strftime('%Y-%m-%d')}.json")
+        if os.path.exists(life) and not os.path.exists(life_daily):
+            shutil.copy2(life, life_daily)
+            _prune([os.path.join(BACKUP_DIR, f) for f in os.listdir(BACKUP_DIR)
+                    if f.startswith("pumpers.daily-")], KEEP_DAILY)
     except OSError as e:
         print(f"!! config backup rotation failed: {e}")
 

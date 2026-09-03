@@ -183,23 +183,6 @@ class BotManager:
 
         return client
 
-    async def _announce_channel(self) -> discord.abc.Messageable | None:
-        cfg = self.get_config()
-        cid = str(cfg.get("announce_channel_id") or "").strip()
-        if not cid or not self._client or not self._client.is_ready():
-            return None
-        try:
-            cid_int = int(cid)
-        except ValueError:
-            return None
-        ch = self._client.get_channel(cid_int)
-        if ch is None:
-            try:
-                ch = await self._client.fetch_channel(cid_int)
-            except Exception:
-                return None
-        return ch
-
     async def announce(self, text: str, image: str | None = None, replace_key: str | None = None) -> None:
         """Called by the engine to post events/milestones — broadcast to every
         listen channel across all servers (plus the announce channel)."""
@@ -371,6 +354,11 @@ class BotManager:
         deleted before the new one is posted. `embed` posts a rich card instead."""
         cfg = self.get_config()
         chan_ids = {str(t["channel_id"]) for t in self._targets(cfg)}
+        # The optional announce channel gets every broadcast too (auto-reports,
+        # milestones, events, pause/resume) — deduped if it's also a listen target.
+        ann = str(cfg.get("announce_channel_id") or "").strip()
+        if ann:
+            chan_ids.add(ann)
         if exclude_channel_id is not None:
             chan_ids.discard(str(exclude_channel_id))
         for cid in chan_ids:
@@ -505,6 +493,14 @@ class BotManager:
             res = await self.engine.game_result(cmd, score, who, uid)
             label = self.engine.game_display_name(cmd)
             await self._broadcast_named(res.get("real"), res.get("anon"), uid, label=label, who=who)
+            # events the game's start_events activated (activation lines + any
+            # fire_immediately first rounds) follow the result
+            for post in (res.get("events_posted") or []):
+                if isinstance(post, dict):
+                    await self.broadcast(post.get("text", ""), post.get("image"),
+                                         replace_key=post.get("replace_key"))
+                else:
+                    await self.broadcast(post, None)
         except Exception as e:  # noqa: BLE001
             self.engine._log("error", f"game payoff failed: {e}")
 

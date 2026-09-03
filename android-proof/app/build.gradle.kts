@@ -5,6 +5,10 @@ plugins {
     id("com.chaquo.python")
 }
 
+// Version is single-sourced from the repo-root version.json (7.3): bump it
+// there and every surface — app, UI, update check, this APK — agrees.
+val appVersion = groovy.json.JsonSlurper().parse(rootProject.file("../version.json")) as Map<*, *>
+
 android {
     namespace = "com.discoflate.proof"
     compileSdk = 34
@@ -13,8 +17,8 @@ android {
         applicationId = "com.discoflate.proof"
         minSdk = 26
         targetSdk = 34
-        versionCode = 63
-        versionName = "3.8.1"
+        versionCode = (appVersion["versionCode"] as Number).toInt()
+        versionName = appVersion["version"].toString()
         // Only the ABIs that (a) have Chaquopy wheels and (b) we actually run:
         // arm64-v8a = a real phone (Pixel 9); x86_64 = an emulator.
         ndk {

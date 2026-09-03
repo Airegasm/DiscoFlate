@@ -114,12 +114,15 @@ in-process. One install, one tap, no Termux.
 android-proof/        # Android Studio (Gradle) project
 ```
 
-Build a debug APK (needs Android SDK + a full JDK 17 with `jlink`):
+Build the release APK (needs Android SDK + a full JDK 17 with `jlink`, plus the
+release keystore — `discoflate-release.keystore` + `keystore.properties`, which
+are **never committed**; back yours up):
 
 ```bash
+scripts/sync-android.sh          # mirror the desktop sources into the app
 cd android-proof
-./gradlew :app:assembleDebug
-# → app/build/outputs/apk/debug/app-debug.apk
+./gradlew :app:assembleRelease "-Dorg.gradle.java.home=$JDK17_HOME"
+# → app/build/outputs/apk/release/app-release.apk
 ```
 
 A Wi-Fi `MulticastLock` handles Kasa discovery on Android; a foreground service
@@ -132,9 +135,12 @@ away.
 
 The app checks for a newer release on launch and shows a banner on the Dashboard.
 **Help → Updates** applies it: on desktop it `git pull`s the latest code (then
-restart DiscoFlate); on the phone it downloads and installs the new APK. Every APK
-is signed with the same key, so the phone updates **in place** and keeps your
-config and token.
+restart DiscoFlate); on the phone it opens the new APK's download link in your
+browser — install it from there. Since v3.7.0 every APK is release-signed with
+the same key, so the phone updates **in place** and keeps your config and token.
+(Coming from v3.6.3 or older debug-signed builds: one-time uninstall/reinstall —
+export your config first via **Help → Export config**.) APKs are published on
+[GitHub Releases](https://github.com/Airegasm/DiscoFlate/releases).
 
 ---
 
@@ -148,7 +154,7 @@ config and token.
 | `device_control.py` | vendor-agnostic on/off/discovery router |
 | `vendors/` | per-brand drivers (kasa is `kasa_legacy.py`) |
 | `kasa_legacy.py` | legacy Kasa driver (UDP/TCP 9999, XOR autokey cipher) |
-| `config_store.py` | `data/config.json` (atomic, 0600 — holds your token; git-ignored) |
+| `config_store.py` | `data/config.json` (atomic + fsync, 0600 — holds your token; git-ignored; auto-backups in `data/backups/`) |
 | `web/index.html` | the control-surface GUI |
 | `android-proof/` | the Chaquopy Android app |
 

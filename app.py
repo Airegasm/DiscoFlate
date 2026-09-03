@@ -124,6 +124,7 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "command_names": cfg.get("command_names", {}),
         "capacity_message": cfg.get("capacity_message", ""),
         "pumptimer_message": cfg.get("pumptimer_message", ""),
+        "pump_message": cfg.get("pump_message", ""),
         "roll_enabled": cfg.get("roll_enabled", True),
         "system_buffer_seconds": cfg.get("system_buffer_seconds", 8),
         "cooldown_message": cfg.get("cooldown_message", ""),
@@ -683,26 +684,12 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         return web.json_response(_public_state(engine, botmgr))
 
     # ---- actions ----------------------------------------------------------
-    async def fire(request):
-        await guard(request)
-        b = await _json(request)
-        secs = _num(b.get("seconds")) or 3.0
-        res = await engine.fire(secs, "web test-fire")
-        return web.json_response(res)
-
-    async def roll(request):
-        await guard(request)
-        res = await engine.roll_and_fire("web")
-        return web.json_response(res)
-
     async def abort(request):
+        # Kept for the Android wrapper: android_boot.force_off() POSTs here as
+        # the swipe-away / service-stop safety shutoff. (The UI uses
+        # /api/control/stop, which pauses the whole session instead.)
         await guard(request)
         await engine.abort(reason="web")
-        return web.json_response({"ok": True})
-
-    async def reset(request):
-        await guard(request)
-        engine.reset_capacity()
         return web.json_response({"ok": True})
 
     async def set_capacity(request):
@@ -769,9 +756,11 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         return web.json_response(_public_state(engine, botmgr))
 
     async def export_config(request):
-        # Full config (incl. token) for backup — loopback-only, so it never leaves the device.
+        # Full config (incl. token) for backup, plus the all-time leaderboard —
+        # so a reinstall/restore brings the stats back too.
         await guard(request)
-        return web.json_response(config_store.load())
+        return web.json_response({**config_store.load(),
+                                  "_lifetime_leaderboard": engine.lifetime_board()})
 
     async def import_config(request):
         await guard(request)
@@ -779,6 +768,11 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         known = len(set(config_store.DEFAULTS) & set(body)) if isinstance(body, dict) else 0
         if known < 3:
             raise web.HTTPBadRequest(text="that doesn't look like a DiscoFlate config backup")
+        # Lifetime leaderboard travels inside the backup (newer exports) — pull
+        # it out before the merge so it never lands in config.json itself.
+        board = body.pop("_lifetime_leaderboard", None)
+        if isinstance(board, dict):
+            engine.set_lifetime(board)
         cfg = config_store.save(config_store._coerce_numbers(
             config_store._deep_merge(config_store.DEFAULTS, body)))
         engine.set_config(cfg)
@@ -920,10 +914,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/devices/calibration", set_calibration),
         web.post("/api/upload", upload),
         web.post("/api/snapshot", snapshot),
-        web.post("/api/fire", fire),
-        web.post("/api/roll", roll),
         web.post("/api/abort", abort),
-        web.post("/api/reset", reset),
         web.post("/api/capacity", set_capacity),
         web.post("/api/reset-users", reset_users),
         web.post("/api/reset-lifetime", reset_lifetime),

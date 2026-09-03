@@ -23,18 +23,34 @@ def load_kasa_devices(path: str) -> list[dict]:
     try:
         with open(path, "r", encoding="utf-8") as fh:
             raw = json.load(fh)
-    except (FileNotFoundError, ValueError):
+    except (OSError, ValueError):
+        # OSError covers missing file, a directory path, permissions — a bad
+        # path must mean "nothing to import", never a 500 on the endpoint.
+        return []
+    if not isinstance(raw, dict):
         return []
 
     out: list[dict] = []
     for d in raw.get("devices", []):
+        if not isinstance(d, dict):
+            continue
         if (d.get("vendor") or "").lower() != "kasa":
             continue
         if not d.get("ip"):
             continue
+        if not d.get("id"):
+            continue   # no id → would collide with every other id-less device as "pd:None"
+        # secondsTo100 must be a positive number — a string here used to freeze
+        # the capacity loop with a TypeError every 200ms.
         cal = (d.get("calibration") or {}).get("secondsTo100")
+        try:
+            cal = float(cal)
+            if cal <= 0:
+                cal = None
+        except (TypeError, ValueError):
+            cal = None
         out.append({
-            "id": f"pd:{d.get('id')}",
+            "id": f"pd:{d['id']}",
             "label": d.get("label") or d.get("ip"),
             "host": d["ip"],
             "child_id": d.get("childId") or None,

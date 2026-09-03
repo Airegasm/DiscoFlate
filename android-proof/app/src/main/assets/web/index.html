@@ -257,6 +257,8 @@
           <div class="hint" style="margin-top:0">The bot must be connected for the lists to fill — click ↻ after inviting it somewhere new.
             Events, milestones &amp; snapshots are announced in these same listen channels.</div>
 
+          <label class="field" style="margin-top:6px">Announce channel <span class="muted">(optional — ALSO receives every broadcast: auto-reports, milestones, events, pause/resume)</span>
+            <select id="announceChan"><option value="">— none —</option></select></label>
           <label class="field" style="margin-top:6px">Cross-server label <span class="muted">(used only where the actor isn't a member)</span>
             <input id="anonLabel" placeholder="Someone on another server"></label>
           <div class="hint" style="margin-top:0">When a trigger is echoed to your other servers, DiscoFlate shows the person's <b>real name</b> in any server they're actually a member of (they'd be visible there anyway), and falls back to this label only in servers they're not in.</div>
@@ -449,6 +451,10 @@
         <label class="field" style="flex:1">Cooldown-ready message <span class="muted">(blank = silent)</span>
           <input id="cooldownResetMsg" placeholder="✅ [mention], [cmd] is ready again!"></label>
       </div>
+      <div class="row" style="gap:16px;align-items:flex-start;margin-top:10px">
+        <label class="field" style="flex:1">Operator Pump message <span class="muted">(posted by Dashboard → Controls → 💨 Pump · [secs] [secs2capacity] [capacity] [timer] [operator])</span>
+          <textarea id="pumpMsg" rows="3"></textarea></label>
+      </div>
 
       <div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px">
         <button class="ghost" onclick="togglePrizes()">🏆 Max Roll Prizes <span id="prizeChevron">▸</span></button>
@@ -580,7 +586,7 @@
         <b>Phone update stuck?</b> Delete old <code>discoflate*.apk</code> files from Downloads first, then update — the phone can re-install a cached old copy otherwise.</div>
       <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">
         <h3 style="margin:0 0 6px">Backup / Restore config</h3>
-        <div class="hint" style="margin-top:0"><b>Uninstalling the app erases everything</b> (token, devices, games). <b>Export config</b> saves a <code>discoflate-backup.json</code> file (to your <b>Downloads</b> on the phone), and <b>Restore from file</b> loads one back — so you can recover in seconds after a reinstall or on a new device. ⚠️ The file <b>includes your bot token</b>, so keep it private.</div>
+        <div class="hint" style="margin-top:0"><b>Uninstalling the app erases everything</b> (token, devices, games). <b>Export config</b> saves a <code>discoflate-backup.json</code> file (to your <b>Downloads</b> on the phone) — including the <b>all-time leaderboard</b> — and <b>Restore from file</b> loads it all back, so you can recover in seconds after a reinstall or on a new device. ⚠️ The file <b>includes your bot token</b>, so keep it private.</div>
         <div class="row" style="margin-top:8px">
           <button class="ghost" onclick="exportConfig()">⬇ Export config (file)</button>
           <button onclick="$('#importFile').click()">⬆ Restore from file</button>
@@ -858,6 +864,32 @@ esphome dashboard config/</code></pre>
       </details>
     </div>
 
+    <div class="card span" data-tab="help">
+      <details class="help"><summary><h2>Minigames — how each one plays</h2></summary>
+      <div class="hint" style="margin-top:8px;max-width:820px">Minigames are custom command types (Commands tab → Type → <code>game-*</code>). Running one posts a public <b>▶ Play</b> button locked to whoever typed it; the game itself is <b>ephemeral</b> (only the player sees it), and when it ends the tiered result broadcasts to the channel — with any pump fires credited to the player's leaderboard. <b>Slots is the exception:</b> it plays fully in-channel with no Play button. Every game maps its final <b>score</b> through your <b>Outcome tiers</b> (score → message + optional device fires), so YOU decide what a win pays. A per-range or Always-On <b>Luck</b> value is a flat ± added to the score before the tier is picked.</div>
+
+      <h3 style="margin:14px 0 6px">💨 Push Your Luck (<code>game-pushluck</code>)</h3>
+      <div class="hint" style="margin-top:0;max-width:820px">Press-your-luck banking. Each <b>💨 Pump</b> adds <b>Points/pump</b> to a pot — but the bust chance starts at <b>Bust start %</b> and climbs <b>+% / pump</b> with every press. <b>🏦 Bank</b> locks the pot in as the score; busting scores <b>0</b>. Hitting <b>Max pumps</b> auto-banks. Score = points banked. Tune it greedy (low start, steep step) or generous (high ceiling, shallow step).</div>
+
+      <h3 style="margin:14px 0 6px">🧠 Simon (<code>game-simon</code>)</h3>
+      <div class="hint" style="margin-top:0;max-width:820px">Memory. The bot shows a growing emoji sequence for <b>Reveal (s)</b> seconds, hides it, and the player repeats it with buttons. Each cleared round adds one symbol. One wrong press ends the game. Score = <b>rounds fully cleared</b>; clearing <b>Max rounds</b> is a perfect run. Fewer <b>Symbols</b> (2–6) and a longer reveal = easier.</div>
+
+      <h3 style="margin:14px 0 6px">🎈 Don't Pop It (<code>game-balloon</code>)</h3>
+      <div class="hint" style="margin-top:0;max-width:820px">Minesweeper-style nerve test. A grid of <b>Cells</b> hides <b>Balloons</b>; revealing a safe cell adds <b>Points/cell</b>, and <b>🏦 Cash Out</b> keeps the total. Revealing a balloon pops — score <b>0</b>. Clearing every safe cell scores the whole board. Score = points held at the end. More balloons per cell = spicier.</div>
+
+      <h3 style="margin:14px 0 6px">✊✋✌️ Rock Paper Scissors (<code>game-rps</code>)</h3>
+      <div class="hint" style="margin-top:0;max-width:820px">Best-of series vs the bot — first to <b>Rounds to win</b> takes the match, ties replay. Score = <b>rounds the player won</b> (win or lose the match), so tiers can pay partial credit for a close loss or reserve the top tier for a sweep.</div>
+
+      <h3 style="margin:14px 0 6px">🎰 Slots (<code>game-slots</code>)</h3>
+      <div class="hint" style="margin-top:0;max-width:820px">One public pull — the reels spin right in the channel. Score is fixed: <b>3</b> = three of a kind, <b>1</b> = any pair, <b>0</b> = no match. <b>Symbols</b> (2–8) sets the odds: more symbols = rarer wins (with 6 symbols a triple is 1-in-36, a pair about 42%). Tiers at ≥3 / ≥1 / ≥0 map jackpot / small win / nothing.</div>
+
+      <h3 style="margin:14px 0 6px">🃏 Blackjack (<code>game-blackjack</code>)</h3>
+      <div class="hint" style="margin-top:0;max-width:820px">Classic 21 vs the dealer, infinite deck, <b>Hit</b> / <b>Stand</b>, dealer stands on 17. Score is fixed: <b>0</b> = bust or dealer wins · <b>1</b> = push (including blackjack-vs-blackjack) · <b>2</b> = win · <b>3</b> = natural blackjack on the deal. No knobs beyond the tiers — the game IS the odds.</div>
+
+      <div class="hint" style="max-width:820px;margin-top:12px"><b>Shared rules:</b> a game charges its cooldown + per-person use when the command runs (not when Play is pressed); one use = one game. Abandoned games pay nothing. A session <b>pause</b> cancels live games and refunds the use. Results are labelled with the game's name and respect cross-server anonymity. Placeholders <code>[score]</code>, <code>[luck]</code>, <code>[secs]</code>, <code>[secs2capacity]</code>, <code>[game]</code> work in tier messages, and games can trigger <b>Starts events</b> on completion.</div>
+      </details>
+    </div>
+
     <!-- log -->
     <div class="card span" data-tab="dashboard">
       <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:14px">
@@ -915,6 +947,12 @@ async function api(path, body){
   }
   return r.json();
 }
+// Adopt the config revision from any state-shaped response WITHOUT reloading
+// the form rows. EVERY caller of an endpoint that saves config must do this
+// (or full applyState) — a discarded response leaves configRev stale and the
+// next autosave 409s with a bogus "changed in another tab".
+function adoptRev(s){ if(s && s.config_rev!=null) configRev = s.config_rev; return s; }
+async function syncRev(){ try{ adoptRev(await (await fetch('/api/state')).json()); }catch(e){} }
 async function act(path){
   try{ await api(path); }catch(e){ toastMsg('⚠ failed: '+(e.message||e)); }
   refresh();
@@ -975,7 +1013,6 @@ function applyPreviewTransform(){
   const mir=($('#camMirror')&&$('#camMirror').checked)?' scaleX(-1)':'';
   v.style.transform = `scale(${camZoom})${mir}`;
 }
-function applyMirror(){ applyPreviewTransform(); }   // legacy alias
 // Pinch-to-zoom on the preview (touch). Slider handles desktop.
 (function(){
   const wrap=$('#camWrap'); if(!wrap) return;
@@ -1040,6 +1077,7 @@ async function ctl(path, body){
   try{
     const r = await api(path, {who: operatorName(), ...(body||{})});
     if(msg){ msg.textContent = r && r.ok ? 'sent ✓' : ('✗ '+((r&&r.error)||'failed')); setTimeout(()=>{ if(msg) msg.textContent=''; }, 3500); }
+    await syncRev();   // stop/resume persist the pause latch → rev bumped server-side
     refresh();
     return r;
   }catch(e){ if(msg){ msg.textContent='✗ '+(e.message||e); } }
@@ -1212,10 +1250,10 @@ async function pullUpdates(){
 }
 
 $('#listener').addEventListener('change', async e => {
-  await api('/api/listener', {enabled: e.target.checked}); refresh();
+  adoptRev(await api('/api/listener', {enabled: e.target.checked})); refresh();
 });
 $('#mock').addEventListener('change', async e => {
-  await api('/api/mock', {enabled: e.target.checked}); refresh();
+  adoptRev(await api('/api/mock', {enabled: e.target.checked})); refresh();
 });
 
 async function saveToken(){
@@ -1237,6 +1275,7 @@ async function saveDiscord(){
       pumptimer: ($('#cmdPumptimer').value||'pumptimer').trim().toLowerCase(),
     },
     listen_targets: listenTargets,
+    announce_channel_id: announceChanId,
     anon_user_label: $('#anonLabel').value,
     allow_dms: $('#allowDms').checked,
     allow: { user_ids: idList($('#allowUsers').value) },
@@ -1258,6 +1297,7 @@ async function loadGuilds(){
   guildsLoaded = true;
   try{ guildsCache = await (await fetch('/api/guilds')).json(); }catch(e){ guildsCache=[]; }
   populateGuilds();
+  populateAnnounceChan();
   // restore last-picked server/channel across launches
   const g=lsGet('df_pick_guild'); if(g && guildsCache.find(x=>x.id===g)) $('#guildSel').value=g;
   populateChannels($('#guildSel').value);
@@ -1293,6 +1333,21 @@ function populateChannels(gid){
   const cs=$('#chanSel');
   cs.innerHTML = `<option value="">— select a channel —</option>`+chans.map(c=>`<option value="${esc(c.id)}">#${esc(c.name)}</option>`).join('');
 }
+let announceChanId = '';
+function populateAnnounceChan(){
+  const sel=$('#announceChan'); if(!sel) return;
+  let html = `<option value="">— none —</option>`;
+  guildsCache.forEach(g=>{
+    html += `<optgroup label="${esc(g.name)}">`+
+      g.channels.map(c=>`<option value="${esc(c.id)}" ${announceChanId===c.id?'selected':''}>#${esc(c.name)}</option>`).join('')+
+      `</optgroup>`;
+  });
+  // keep a saved id visible even before the bot connects / resolves names
+  if(announceChanId && ![...guildsCache.flatMap(g=>g.channels)].some(c=>c.id===announceChanId))
+    html += `<option value="${esc(announceChanId)}" selected>channel ${esc(announceChanId)}</option>`;
+  sel.innerHTML = html;
+  sel.onchange = ()=>{ announceChanId = sel.value; saveDiscord(); };
+}
 function onGuildChange(){ lsSet('df_pick_guild', $('#guildSel').value); populateChannels($('#guildSel').value); }
 function renderListenTargets(){
   const box=$('#listenTargets'); if(!box) return;
@@ -1316,18 +1371,6 @@ function removeListenTarget(i){
   const t=listenTargets[i]||{}, n=targetName(t);
   if(!confirm(`Stop listening in ${n.gname} #${n.cname}? (Saves immediately.)`)) return;
   listenTargets.splice(i,1); renderListenTargets(); saveDiscord();
-}
-async function saveRoll(){
-  const s = await api('/api/config', {
-    roll_enabled: $('#rollEnabled').checked,
-    system_buffer_seconds: parseFloat($('#systemBuffer').value)||0,
-    roll: { reply: $('#rollReply').value },
-    capacity_message: $('#capacityMsg').value,
-    pumptimer_message: $('#pumptimerMsg').value,
-    cooldown_message: $('#cooldownMsg').value,
-    cooldown_reset_message: $('#cooldownResetMsg').value,
-  });
-  applyState(s, true);
 }
 function idList(v){ return (v||'').split(',').map(x=>x.trim()).filter(Boolean); }
 
@@ -1826,6 +1869,7 @@ function renderCommands(){
       `</div>`+
       `<div class="muted" style="font-size:12px">${cmdRangeSummary(c.name)}</div>`+
       `<div class="row" style="gap:16px">`+
+        `<label class="field" title="EXTRA restriction on top of range membership: even where the command is a member, it only responds while capacity is inside this band. 'All ranges' (default) = no extra gate.">Range gate <select onchange="commandRows[${i}].range_gate=this.value;scheduleSave()">${rangeGateOptions(c.range_gate)}</select></label>`+
         `<label class="row" style="gap:6px"><input type="checkbox" ${c.owner_only?'checked':''} onchange="commandRows[${i}].owner_only=this.checked"> owner-only</label>`+
         `<label class="row" style="gap:6px"><input type="checkbox" ${c.mention?'checked':''} onchange="commandRows[${i}].mention=this.checked"> reply pings user</label>`+
         `<label class="row" style="gap:6px"><input type="checkbox" ${c.hide_in_list?'checked':''} onchange="commandRows[${i}].hide_in_list=this.checked"> hide from command list</label>`+
@@ -1884,7 +1928,7 @@ async function saveCommands(){ await saveCfg({commands: cleanCommands()}); }
 function toggleCmd(i, on){
   commandRows[i].enabled = on;
   const nm=(commandRows[i].name||'').trim().toLowerCase();
-  if(savedCmdNames.has(nm)) api('/api/command-toggle', {name:nm, enabled:on}).catch(e=>toastMsg('⚠ '+(e.message||e)));  // live for saved cmds
+  if(savedCmdNames.has(nm)) api('/api/command-toggle', {name:nm, enabled:on}).then(adoptRev).catch(e=>toastMsg('⚠ '+(e.message||e)));  // live for saved cmds
   scheduleSave();   // renamed-but-unsaved commands persist via the full save
 }
 
@@ -2208,7 +2252,7 @@ function renderVendorCreds(){
 }
 async function setCred(v,f,val){
   try{
-    const s = await api('/api/vendors', {vendor:v, creds:{[f]:val}});
+    const s = adoptRev(await api('/api/vendors', {vendor:v, creds:{[f]:val}}));
     vendorsSet = JSON.parse(JSON.stringify(s.vendors_set||{}));
     renderVendorCreds();
   }catch(e){ toastMsg('⚠ credential save failed: '+(e.message||e)); }
@@ -2248,6 +2292,7 @@ function renderDevices(st){
       `<label class="field" style="flex-direction:row;align-items:center;gap:6px">secs→100%`+
         `<input id="cal-${esc(d.id)}" type="number" value="${d.calibration_seconds_to_100??''}" min="1" step="0.5" style="width:78px"`+
         ` onchange="setCal('${d.id}', this.value)"></label>`+
+      `<span id="ft-${esc(d.id)}" style="min-width:52px;color:var(--warn);font-weight:600"></span>`+
       `<button class="ghost warn" id="calbtn-${esc(d.id)}" onclick="toggleCal('${d.id}')" title="Run the pump and time it to 100%">Calibrate</button>`+
       `<button class="ghost" onclick="testDev('${d.id}')" title="2s on/off, no capacity">Test</button>`+
       `<button class="ghost" onclick="removeDev('${d.id}')">Remove</button>`;
@@ -2430,6 +2475,9 @@ function applyState(st, full){
     $('#rollReply').value = rl.reply||'';
     $('#capacityMsg').value = st.capacity_message||'';
     $('#pumptimerMsg').value = st.pumptimer_message||'';
+    if($('#pumpMsg')) $('#pumpMsg').value = st.pump_message||'';
+    announceChanId = st.announce_channel_id||'';
+    populateAnnounceChan();
     const al = st.allow||{};
     $('#allowUsers').value = (al.user_ids||[]).join(', ');
     $('#allowDms').checked = !!st.allow_dms;
@@ -2542,8 +2590,8 @@ function openExternal(url, ev){
   if(window.Android && window.Android.openUrl){ if(ev) ev.preventDefault(); window.Android.openUrl(url); return false; }
   return true;
 }
-function setSilence(v){ api('/api/config', {silence_onoff_log: !!v}); }
-function setMockCal(v){ api('/api/config', {mock_calibration_seconds_to_100: parseFloat(v)||60}); }
+function setSilence(v){ api('/api/config', {silence_onoff_log: !!v}).then(adoptRev).catch(()=>{}); }
+function setMockCal(v){ api('/api/config', {mock_calibration_seconds_to_100: parseFloat(v)||60}).then(adoptRev).catch(()=>{}); }
 function fallbackCopy(text,done){
   try{
     const ta=document.createElement('textarea'); ta.value=text;
@@ -2564,7 +2612,9 @@ function gatherConfig(){
       leaderboard_life:($('#cmdLeaderboardLife').value||'toppumpers-life').trim().toLowerCase(),
       pumptimer:($('#cmdPumptimer').value||'pumptimer').trim().toLowerCase() },
     capacity_message:$('#capacityMsg').value, pumptimer_message:$('#pumptimerMsg').value,
-    listen_targets:listenTargets, anon_user_label:$('#anonLabel').value,
+    pump_message: $('#pumpMsg') ? $('#pumpMsg').value : '',
+    listen_targets:listenTargets, announce_channel_id: announceChanId,
+    anon_user_label:$('#anonLabel').value,
     allow_dms:$('#allowDms').checked,
     allow:{user_ids:idList($('#allowUsers').value)},
     roll_enabled:$('#rollEnabled').checked, system_buffer_seconds:parseFloat($('#systemBuffer').value)||0,

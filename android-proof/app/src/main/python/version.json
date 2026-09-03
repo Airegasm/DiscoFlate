@@ -1,6 +1,6 @@
 {
-  "version": "3.8.1",
-  "versionCode": 63,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.8.1/discoflate.apk",
-  "notes": "DiscoFlate v3.8.1 \u2014 Tuya/Geeni made understandable: credential fields relabeled to match Tuya's portal (Access ID / Client ID, Access Secret / Client Secret), the data center is a dropdown, and Help gains a full platform.tuya.com walkthrough (incl. the Geeni\u2192Smart Life linking gotcha)."
+  "version": "3.9.0",
+  "versionCode": 64,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.9.0/discoflate.apk",
+  "notes": "DiscoFlate v3.9.0 \u2014 remediation complete: announce channel works (gets every broadcast), games can start events, per-command Range gate, operator Pump message editable, live per-device fire timers, Minigames guide in Help, fixed the false 'config changed in another tab' popup, dead endpoints removed, importer hardening."
 }
