@@ -33,6 +33,9 @@ class BotManager:
         self._auto_task: asyncio.Task | None = None
         self._token: str | None = None
         self.last_error: str | None = None
+        # replace_key -> {channel_id: Message} for loop events with clean_previous,
+        # so the next round can delete the message it replaces. Bounded (see _track_msg).
+        self._loop_msgs: "dict[str, dict[str, discord.Message]]" = {}
 
     # -- lifecycle ----------------------------------------------------------- #
     def _alive(self) -> bool:
@@ -127,10 +130,10 @@ class BotManager:
                 return None
         return ch
 
-    async def announce(self, text: str, image: str | None = None) -> None:
+    async def announce(self, text: str, image: str | None = None, replace_key: str | None = None) -> None:
         """Called by the engine to post events/milestones — broadcast to every
         listen channel across all servers (plus the announce channel)."""
-        await self.broadcast(text, image)
+        await self.broadcast(text, image, replace_key=replace_key)
 
     async def _auto_loop(self) -> None:
         """Post the capacity/commands report every auto_report.seconds."""
@@ -228,29 +231,54 @@ class BotManager:
                 return None
         return ch
 
-    async def _send(self, ch, text: str, image: str | None) -> None:
+    async def _send(self, ch, text: str, image: str | None):
+        """Send one message; returns the sent discord.Message (or None on failure)."""
         text = (text or "").strip()
         try:
             if image and image.lower().startswith(("http://", "https://")):
-                await ch.send((f"{text}\n{image}" if text else image))
+                return await ch.send((f"{text}\n{image}" if text else image))
             elif image and os.path.exists(image):
-                await ch.send(content=text or None, file=discord.File(image))
+                return await ch.send(content=text or None, file=discord.File(image))
             elif text:
-                await ch.send(text)
+                return await ch.send(text)
         except Exception as e:  # noqa: BLE001
             self.engine._log("error", f"send failed: {e}")
+        return None
 
-    async def broadcast(self, text: str, image: str | None = None, exclude_channel_id=None) -> None:
+    def _track_msg(self, replace_key: str, cid: str, msg) -> None:
+        """Remember the message posted for (replace_key, channel) so the next round
+        can delete it. Bound the map so long-running sessions don't leak entries."""
+        self._loop_msgs.setdefault(replace_key, {})[cid] = msg
+        if len(self._loop_msgs) > 40:  # drop the oldest run's tracking (not the messages)
+            self._loop_msgs.pop(next(iter(self._loop_msgs)), None)
+
+    async def _delete_tracked(self, replace_key: str, cid: str) -> None:
+        prev = self._loop_msgs.get(replace_key, {}).pop(cid, None)
+        if prev is not None:
+            try:
+                await prev.delete()
+            except Exception:  # noqa: BLE001 — message already gone / no perms
+                pass
+
+    async def broadcast(self, text: str, image: str | None = None, exclude_channel_id=None,
+                        replace_key: str | None = None) -> None:
         """Post to every listen channel (across all servers). Used for events,
-        milestones, snapshots, and cross-server echoes."""
+        milestones, snapshots, and cross-server echoes. When `replace_key` is set
+        (a clean_previous loop round), the prior round's message in each channel is
+        deleted before the new one is posted."""
         cfg = self.get_config()
         chan_ids = {str(t["channel_id"]) for t in self._targets(cfg)}
         if exclude_channel_id is not None:
             chan_ids.discard(str(exclude_channel_id))
         for cid in chan_ids:
             ch = await self._channel(cid)
-            if ch is not None:
-                await self._send(ch, text, image)
+            if ch is None:
+                continue
+            if replace_key:
+                await self._delete_tracked(replace_key, cid)
+            msg = await self._send(ch, text, image)
+            if replace_key and msg is not None:
+                self._track_msg(replace_key, cid, msg)
 
     # -- operator controls (dashboard buttons that act as the owner in-channel) --
     def _operator_ready(self, cfg) -> str | None:
@@ -479,8 +507,14 @@ class BotManager:
             await _reply(message, line + tail, as_reply=bool(custom.get("mention")))
             await self._echo(message, res.get("reply_anon"), tail, res.get("reply"))
             # Event activation / in-process / cooldown lines come AFTER the reply.
+            # A clean_previous loop's first round arrives as a dict carrying its
+            # replace_key so subsequent rounds can delete it; others are plain text.
             for post in (res.get("events_posted") or []):
-                await self.broadcast(post, None)
+                if isinstance(post, dict):
+                    await self.broadcast(post.get("text", ""), post.get("image"),
+                                         replace_key=post.get("replace_key"))
+                else:
+                    await self.broadcast(post, None)
             return
 
         # action == "roll"

@@ -68,6 +68,7 @@ class Engine:
         self._event_fires: dict[str, int] = {}    # event name -> times fired (for loop max-repeats)
         self._event_cooldown_until: dict[str, float] = {}  # event name -> monotonic when its cooldown ends
         self._event_activator: dict[str, tuple] = {}   # event name -> (uid, who) that started it (for leaderboard credit)
+        self._event_run_id: dict[str, int] = {}    # event key -> run counter, so each loop run replaces only its own round messages
         self._listener_was: bool = False          # for detecting off→on transitions
         # Events temporarily switched on by a command. Reverts on session reset
         # / app restart (it's in-memory only), never persisted to config.
@@ -83,6 +84,10 @@ class Engine:
         self._last_fired: dict[str, float] = {}  # cmdkey -> last-fired monotonic (anti-spam buffer)
         self._current_range_key = None           # (min,max) of the range we're in, for entry detection
         self._end_triggered = False               # End Sequence final threshold already fired
+        # Session uptime: monotonic marker set when the engine starts ticking and
+        # re-stamped on every session_reset (matches the "this session" scope used
+        # by the leaderboard / use budgets). In-memory only; resets on app restart.
+        self._session_start: float = time.monotonic()
 
         self.announce_cb = None                # async (text, image) -> None
         self.end_session_cb = None             # async () -> None : deactivate without the off-message
@@ -172,6 +177,7 @@ class Engine:
     # -- lifecycle ----------------------------------------------------------- #
     def start(self) -> None:
         if not self._tick_task:
+            self._session_start = time.monotonic()   # session clock starts now
             self._tick_task = asyncio.create_task(self._capacity_loop())
 
     async def stop(self) -> None:
@@ -221,6 +227,8 @@ class Engine:
         ctx = {
             "capacity": round(self.capacity, 1),
             "total_seconds": rem, "total_secs": rem, "timer": rem,
+            "uptime": self._fmt_duration(self.session_uptime()),
+            "uptime_seconds": int(self.session_uptime()),
             "capacity_bar": self._capacity_bar(),
             "prefix": prefix,
             "roll_cmd": f"{prefix}{bn['roll']}",
@@ -248,6 +256,25 @@ class Engine:
         ann = (self.range_for(self.capacity).get("announce") or "").strip()
         ctx["announce"] = self._render(ann, ctx)
         return self._render(template, ctx)
+
+    def session_uptime(self) -> float:
+        """Seconds the current session has been running (since start / last reset)."""
+        return max(0.0, time.monotonic() - self._session_start)
+
+    @staticmethod
+    def _fmt_duration(secs) -> str:
+        """Compact human duration: '45s', '5m 30s', '2h 5m 30s', '3d 4h 12m'."""
+        s = int(max(0, secs))
+        d, s = divmod(s, 86400)
+        h, s = divmod(s, 3600)
+        m, s = divmod(s, 60)
+        if d:
+            return f"{d}d {h}h {m}m"
+        if h:
+            return f"{h}h {m}m {s}s"
+        if m:
+            return f"{m}m {s}s"
+        return f"{s}s"
 
     def _anon_label(self) -> str:
         return self.cfg.get("anon_user_label") or "Someone on another server"
@@ -400,10 +427,10 @@ class Engine:
             except Exception as e:  # noqa: BLE001
                 self._log("error", f"end session failed: {e}")
 
-    async def _announce(self, text: str, image: str | None) -> None:
+    async def _announce(self, text: str, image: str | None, replace_key: str | None = None) -> None:
         if self.announce_cb:
             try:
-                await self.announce_cb(text, image)
+                await self.announce_cb(text, image, replace_key)
             except Exception as e:  # noqa: BLE001
                 self._log("error", f"announce failed: {e}")
 
@@ -645,12 +672,14 @@ class Engine:
                 continue  # first tick just arms the timer (delay before first fire)
             await self._fire_event_once(ev, key)
 
-    async def _emit(self, text: str, sink: list | None = None) -> None:
-        """Append to `sink` (in-order, for the immediate first round) or broadcast."""
+    async def _emit(self, text: str, sink: list | None = None, replace_key: str | None = None) -> None:
+        """Append to `sink` (in-order, for the immediate first round) or broadcast.
+        `replace_key` (loops with clean_previous) tags the post so the transport can
+        delete the prior round's message before showing the new one."""
         if sink is not None:
-            sink.append(text)
+            sink.append({"text": text, "replace_key": replace_key} if replace_key else text)
         else:
-            await self._announce(text, None)
+            await self._announce(text, None, replace_key=replace_key)
 
     async def _fire_event_once(self, ev: dict, key: str, sink: list | None = None) -> None:
         """Run one iteration of an event: bump the loop count, fire it, and on the
@@ -672,12 +701,19 @@ class Engine:
         ending = one_shot or (cap > 0 and count >= cap)
         if ending:
             self._events_done.add(key)   # "once", or a loop that hit its repeat cap → stop
+        # clean_previous (loops only): each round replaces the last round's message.
+        # A per-run id keeps a fresh run from deleting the previous run's end message.
+        replace_key = None
+        if not one_shot and ev.get("clean_previous"):
+            if count == 1:
+                self._event_run_id[key] = self._event_run_id.get(key, 0) + 1
+            replace_key = f"evloop:{key}:{self._event_run_id.get(key, 1)}"
         # [next_round] is a smart line: "Next Round in N seconds" except the last round.
         next_round = "" if ending else f"Next Round in {every:g} seconds"
         loop_ctx = {"current_loop": count, "total_loops": ("∞" if cap <= 0 else str(cap)),
                     "loop_timer": f"{every:g}", "event": name, "next_round": next_round}
         try:
-            await self._run_event(ev, loop_ctx, sink=sink)
+            await self._run_event(ev, loop_ctx, sink=sink, replace_key=replace_key)
         except Exception as e:  # noqa: BLE001
             self._log("error", f"event {name} failed: {e}")
         if ending:
@@ -694,11 +730,14 @@ class Engine:
             em = (ev.get("end_message") or "").strip()
             if em:
                 try:
-                    await self._emit(self.render(em, loop_ctx), sink)
+                    # Same replace_key: the end message deletes the final round and
+                    # stays put (the next run uses a new run id, so it's never wiped).
+                    await self._emit(self.render(em, loop_ctx), sink, replace_key=replace_key)
                 except Exception as e:  # noqa: BLE001
                     self._log("error", f"event {name} end msg failed: {e}")
 
-    async def _run_event(self, ev: dict, extra: dict | None = None, sink: list | None = None) -> None:
+    async def _run_event(self, ev: dict, extra: dict | None = None, sink: list | None = None,
+                         replace_key: str | None = None) -> None:
         name = ev.get("name", "event")
         action = (ev.get("action") or "message").lower()
         msg = (ev.get("message") or "").strip()
@@ -732,7 +771,7 @@ class Engine:
                     **(extra or {})}
             tmpl = (ev.get("success_message") if win else ev.get("failure_message")) or msg
             if tmpl:
-                await self._emit(self.render(tmpl, base), sink)
+                await self._emit(self.render(tmpl, base), sink, replace_key=replace_key)
             return
 
         if action == "capacity":
@@ -765,7 +804,7 @@ class Engine:
             self._log("bot", f"event '{name}': message")
 
         if msg:
-            await self._emit(self.render(msg, extra), sink)
+            await self._emit(self.render(msg, extra), sink, replace_key=replace_key)
 
     def _cooldown_reply(self, who: str, remaining: float, uid=None, cmdkey: str = "") -> str:
         tmpl = self.cfg.get("cooldown_message") or "⏳ [mention], [cmd] is on cooldown — [cooldown]s left"
@@ -1465,12 +1504,14 @@ class Engine:
         self._event_fires.clear()
         self._event_cooldown_until.clear()
         self._event_activator.clear()
+        self._event_run_id.clear()
         self._perfect.clear()
         self._prize_uses.clear()
         self._pump_time.clear()
         self._cmd_uses.clear()
         self._current_range_key = None
         self._end_triggered = False
+        self._session_start = time.monotonic()   # uptime clock restarts with the session
         self._log("bot", "SESSION RESET — capacity 0%, cooldowns cleared, events re-armed, prizes reset")
 
     # -- max roll prizes (multiple) ----------------------------------------- #
@@ -1694,6 +1735,8 @@ class Engine:
         fires = {did: round(self._remaining(did), 1) for did in self._fires}
         return {
             "capacity": round(self.capacity, 1),
+            "uptime": self._fmt_duration(self.session_uptime()),
+            "uptime_seconds": int(self.session_uptime()),
             "pump_on": self._pump_id() in self._fires,
             "firing": bool(self._fires),
             "remaining": round(self._remaining(self._active_id()), 1),

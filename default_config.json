@@ -790,7 +790,8 @@
       "device_id": null,
       "capacity_op": "add",
       "capacity_value": 0,
-      "fire_immediately": true
+      "fire_immediately": true,
+      "clean_previous": true
     }
   ],
   "max_roll_prize": {

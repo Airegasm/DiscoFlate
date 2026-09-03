@@ -1,6 +1,6 @@
 {
-  "version": "3.3.0",
-  "versionCode": 54,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=54",
-  "notes": "DiscoFlate v3.3.0 — minigames now take a luck modifier (a flat ± on the score) per range or on their Always-On entry; a range the game is in overrides Always-On"
+  "version": "3.4.0",
+  "versionCode": 55,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=55",
+  "notes": "DiscoFlate v3.4.0 — [uptime] placeholder + Dashboard session timer; loop events can 'Clean up previous round' to delete old round messages as they progress (anti-spam), on by default for PumpRoulette"
 }

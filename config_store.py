@@ -170,10 +170,13 @@ DEFAULTS = {
     # Timed events — like commands, but fired automatically on a timer.
     # Each: {name, enabled, mode ("loop"|"once"), every (secs), action, message,
     #        seconds, device_id, dice, sides, capacity_op ("add"|"set"), capacity_value,
-    #        max_repeats, cooldown, activation_message, end_message,
+    #        max_repeats, cooldown, fire_immediately, clean_previous,
+    #        activation_message, end_message,
     #        chance, luck, fires, fail_fires, success_message, failure_message}
     #   mode "loop"       → fires every `every` seconds, repeatedly (up to
-    #                       `max_repeats` times if set; 0/blank = unlimited)
+    #                       `max_repeats` times if set; 0/blank = unlimited).
+    #                       clean_previous → each round deletes the previous round's
+    #                       message (anti-spam); the end_message replaces the last.
     #   mode "once"       → fires a single time, `every` seconds after arming
     #   action "message"  → post `message` to all listen channels
     #   action "fire"     → fire device for `seconds` (+ optional message)
