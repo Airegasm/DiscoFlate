@@ -88,6 +88,18 @@ DEFAULTS = {
     # would). Events tag with just the event name (no user).
     "output_headers": False,
 
+    # Post the status/report outputs (capacity check, the two leaderboards, and the
+    # auto-report) as rich embed cards — a bordered, colored container — instead of
+    # plain text, so those blocks stand apart from the rapid command chatter. Only
+    # affects those status posts; per-command replies stay plain text.
+    "rich_output": False,
+
+    # Reusable templates saved from the Commands / Events / Ranges editors, kept per
+    # install (and included in config backup/restore). "Add to Config" ports one
+    # back into the live config with clash-safe naming. Each list holds whole item
+    # objects (a command / event / range).
+    "templates": {"commands": [], "events": [], "ranges": []},
+
     # Also accept commands via DM to the bot (opt-in). Anyone who shares a
     # server with the bot can DM it, so pair this with the user allowlist.
     "allow_dms": False,

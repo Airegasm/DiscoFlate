@@ -158,7 +158,8 @@ class BotManager:
                 elapsed += 5
                 if elapsed >= max(15, int(ar.get("seconds", 300))):
                     elapsed = 0
-                    await self.broadcast(self.engine.auto_report_text(cfg.get("command_prefix", "!")), None)
+                    txt = self.engine.auto_report_text(cfg.get("command_prefix", "!"))
+                    await self.broadcast(txt, None, embed=self._status_embed("auto", txt))
         except asyncio.CancelledError:
             pass
 
@@ -236,10 +237,13 @@ class BotManager:
                 return None
         return ch
 
-    async def _send(self, ch, text: str, image: str | None):
-        """Send one message; returns the sent discord.Message (or None on failure)."""
+    async def _send(self, ch, text: str, image: str | None, embed=None):
+        """Send one message; returns the sent discord.Message (or None on failure).
+        When `embed` is given the text is carried as the embed (rich card) instead."""
         text = (text or "").strip()
         try:
+            if embed is not None:
+                return await ch.send(embed=embed)
             if image and image.lower().startswith(("http://", "https://")):
                 return await ch.send((f"{text}\n{image}" if text else image))
             elif image and os.path.exists(image):
@@ -249,6 +253,24 @@ class BotManager:
         except Exception as e:  # noqa: BLE001
             self.engine._log("error", f"send failed: {e}")
         return None
+
+    # Embed accent colors per status kind (a colored stripe helps them read apart).
+    _EMBED_COLORS = {"capacity": 0x5865F2, "leaderboard": 0xF1C40F,
+                     "leaderboard_life": 0xE67E22, "auto": 0x2ECC71}
+
+    def _status_embed(self, kind: str, text: str, title: str | None = None):
+        """Wrap a status/report block in a bordered, colored embed card. Returns None
+        if rich_output is off or discord.Embed isn't available (falls back to text)."""
+        if not self.get_config().get("rich_output"):
+            return None
+        try:
+            e = discord.Embed(description=(text or "")[:4096],
+                              color=self._EMBED_COLORS.get(kind, 0x5865F2))
+            if title:
+                e.title = title[:256]
+            return e
+        except Exception:  # noqa: BLE001
+            return None
 
     def _track_msg(self, replace_key: str, cid: str, msg) -> None:
         """Remember the message posted for (replace_key, channel) so the next round
@@ -266,11 +288,11 @@ class BotManager:
                 pass
 
     async def broadcast(self, text: str, image: str | None = None, exclude_channel_id=None,
-                        replace_key: str | None = None) -> None:
+                        replace_key: str | None = None, embed=None) -> None:
         """Post to every listen channel (across all servers). Used for events,
         milestones, snapshots, and cross-server echoes. When `replace_key` is set
         (a clean_previous loop round), the prior round's message in each channel is
-        deleted before the new one is posted."""
+        deleted before the new one is posted. `embed` posts a rich card instead."""
         cfg = self.get_config()
         chan_ids = {str(t["channel_id"]) for t in self._targets(cfg)}
         if exclude_channel_id is not None:
@@ -281,7 +303,7 @@ class BotManager:
                 continue
             if replace_key:
                 await self._delete_tracked(replace_key, cid)
-            msg = await self._send(ch, text, image)
+            msg = await self._send(ch, text, image, embed=embed)
             if replace_key and msg is not None:
                 self._track_msg(replace_key, cid, msg)
 
@@ -355,7 +377,7 @@ class BotManager:
         default = "📊 Capacity **[capacity]%**\n[capacity_bar]\nRolling **[dice]** · [announce]"
         tmpl = cfg.get("capacity_message") or default
         msg = self.engine.render(tmpl, {"dice": f"{rd}d{rs}", "sides": rs}) or "📊"
-        await self.broadcast(msg, None)
+        await self.broadcast(msg, None, embed=self._status_embed("capacity", msg))
         return {"ok": True}
 
     async def operator_broadcast_leaderboard(self) -> dict:
@@ -363,7 +385,8 @@ class BotManager:
         err = self._operator_ready(cfg)
         if err:
             return {"ok": False, "error": err}
-        await self.broadcast(self.engine.leaderboard_text(), None)
+        txt = self.engine.leaderboard_text()
+        await self.broadcast(txt, None, embed=self._status_embed("leaderboard", txt))
         return {"ok": True}
 
     def _hdr(self, cfg: dict, label: str | None, name: str | None) -> str:
@@ -477,11 +500,13 @@ class BotManager:
             return
 
         if action == "leaderboard":
-            await _reply(message, self.engine.leaderboard_text())
+            txt = self.engine.leaderboard_text()
+            await _reply(message, txt, embed=self._status_embed("leaderboard", txt))
             return
 
         if action == "leaderboard_life":
-            await _reply(message, self.engine.leaderboard_life_text())
+            txt = self.engine.leaderboard_life_text()
+            await _reply(message, txt, embed=self._status_embed("leaderboard_life", txt))
             return
 
         if action == "pumptimer":
@@ -493,7 +518,8 @@ class BotManager:
             rd, rs = self.engine.range_dice(self.engine.range_for(self.engine.capacity))
             default = "📊 Capacity **[capacity]%**\n[capacity_bar]\nRolling **[dice]** · [announce]"
             tmpl = cfg.get("capacity_message") or default
-            await _reply(message, self.engine.render(tmpl, {"dice": f"{rd}d{rs}", "sides": rs}) or "📊")
+            txt = self.engine.render(tmpl, {"dice": f"{rd}d{rs}", "sides": rs}) or "📊"
+            await _reply(message, txt, embed=self._status_embed("capacity", txt))
             return
 
         if custom is not None:
@@ -620,15 +646,16 @@ def _ints(xs) -> list[int]:
     return out
 
 
-async def _reply(message: discord.Message, text: str, as_reply: bool = False) -> None:
+async def _reply(message: discord.Message, text: str, as_reply: bool = False, embed=None) -> None:
+    kwargs = {"embed": embed} if embed is not None else {"content": text}
     try:
         if as_reply:
-            await message.reply(text)      # a Discord reply — pings the author
+            await message.reply(**kwargs)      # a Discord reply — pings the author
         else:
-            await message.channel.send(text)
+            await message.channel.send(**kwargs)
     except Exception:
         # a reply can fail if the original message was deleted — fall back to send
         try:
-            await message.channel.send(text)
+            await message.channel.send(**kwargs)
         except Exception:
             pass

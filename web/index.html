@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.5.0</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.6.0</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -147,6 +147,7 @@
     <button class="tab-btn" data-go="commands">Commands</button>
     <button class="tab-btn" data-go="help">Help</button>
     <button class="tab-btn" data-go="events">Events</button>
+    <button class="tab-btn" data-go="templates">Templates</button>
   </nav>
 
   <div class="grid">
@@ -337,8 +338,10 @@
     <!-- automation: cooldown + auto-report + activation messages -->
     <div class="card span" data-tab="game">
       <h2>Limits &amp; announcements</h2>
-      <label class="row" style="gap:8px;margin-bottom:12px"><input type="checkbox" id="outputHeaders" style="width:auto"> <b>Display output headers</b>
+      <label class="row" style="gap:8px;margin-bottom:8px"><input type="checkbox" id="outputHeaders" style="width:auto"> <b>Display output headers</b>
         <span class="muted">— prefix each command / minigame / event message with a <code>[label · user]</code> tag so interleaved output stays readable (cross-server shows <code>ANON</code>).</span></label>
+      <label class="row" style="gap:8px;margin-bottom:12px"><input type="checkbox" id="richOutput" style="width:auto"> <b>Rich status embeds</b>
+        <span class="muted">— post the capacity check, both leaderboards, and the auto-report as bordered embed cards so those status blocks stand apart from command chatter.</span></label>
       <div class="row" style="gap:24px;align-items:flex-start">
         <div class="colsec" style="min-width:240px;max-width:320px;flex:1">
           <h3>Owner ID &amp; cooldown</h3>
@@ -521,12 +524,25 @@
         Every action can also post its message. Placeholders work everywhere.</div>
     </div>
 
+    <!-- templates -->
+    <div class="card span" data-tab="templates">
+      <h2>Templates</h2>
+      <div class="hint">Reusable snapshots saved from the <b>Commands</b>, <b>Events</b>, and <b>Ranges</b> editors — hit the <b>💾</b> on any row to save it here. <b>＋ Add to Config</b> ports one back into your live setup, renaming to dodge clashes. Templates are stored with your config and included in backup/restore.</div>
+      <details class="help" open style="margin-top:12px"><summary><b>Commands</b> (<span id="tplCmdCount">0</span>)</summary>
+        <div id="tplCommands" style="margin-top:8px"></div></details>
+      <details class="help"><summary><b>Events</b> (<span id="tplEvtCount">0</span>)</summary>
+        <div id="tplEvents" style="margin-top:8px"></div></details>
+      <details class="help"><summary><b>Ranges</b> (<span id="tplRangeCount">0</span>)</summary>
+        <div id="tplRanges" style="margin-top:8px"></div>
+        <div class="hint" style="margin-top:6px">A range template is a full snapshot — dice, announce, milestone, its <b>From/To band</b>, in-range commands and event actions. After adding, check its <b>From %</b> / <b>To %</b> in <b>Game → Capacity ranges</b> and adjust if it overlaps an existing band (bands are matched top-down). Custom commands it references must also exist in this config to work.</div></details>
+    </div>
+
     <!-- help -->
     <div class="card span" data-tab="help">
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v3.5.0.</span>
+        <span class="muted" id="updMsg">You're on v3.6.0.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -591,6 +607,7 @@
         <li><b>react only</b> (non-game) — instead of posting a text reply, the bot adds a reaction (the emoji box, default 💨) to the caller's message. The fire/roll/credit still happen — only the reply text is suppressed — so rapid-fire commands stop flooding the channel. Cross-server echo is skipped (a reaction is local to the origin channel); falls back to a normal reply if the emoji can't be added.</li>
         <li><b>Description</b> — shown next to the command in <code>[commands]</code>. <b>Reply</b> — the templated message it posts (see <b>Placeholders</b> below).</li>
         <li><b>Starts events</b> — comma-separated names of (off-by-default) timed events this command switches on temporarily. They revert on Session reset / app restart.</li>
+        <li><b>Row icons</b> — every command / event / range row has <b>📋 Duplicate</b> (a clash-safe copy, e.g. <code>fill</code> → <code>fill-copy</code>), <b>💾 Save as template</b> (stashes it in the <b>Templates</b> tab for reuse), <b>✏️ Edit</b> (expand/collapse), and <b>✕ Delete</b>. In the <b>Templates</b> tab, <b>＋ Add to Config</b> ports a saved template back in (auto-renaming on a clash).</li>
       </ul>
       <div class="hint" style="max-width:820px"><b>⚠️ Two-step setup — this trips people up:</b> creating a command does <b>nothing</b> on its own. A command only works in a range after you <b>add it to that range</b> (Game → <b>Capacity ranges</b> → open a range → “<b>+ Add command to this range</b>”). Its <b>cooldown</b>, <b>max uses/person</b>, and <b>scope</b> are set there, per range — not on the command itself.</div>
       <div class="hint" style="max-width:820px"><b>Example — a <code>!spin</code> roll command:</b> Commands tab → <b>+ Add command</b> → Name <code>spin</code>, Type <b>roll</b>, Dice/Sides left on <code>rng</code>, Reply <code>🌀 [user] spun [dice] = [result] → +[secs2capacity]%</code>. Save. Then Game → Capacity ranges → open the <b>66–100%</b> range → <b>+ Add command to this range</b> → <code>!spin</code>, and set Max/person <code>3</code>, Cooldown <code>30</code>, Scope <b>per-user</b>. Now <code>!spin</code> is live only in the top band.</div>
@@ -791,6 +808,7 @@ esphome dashboard config/</code></pre>
             <code>*italic*</code>, <code>`code`</code>. A literal <code>\n</code> also becomes a newline.</div>
           <h3 style="margin-top:14px">Readability — Display output headers</h3>
           <div class="hint" style="margin-top:0">When several people fire commands and multi-stage minigames at once, the lines braid together. Turn on <b>Display output headers</b> (Game → <b>Limits &amp; announcements</b>, at the top) and every command / minigame / event message is prefixed with a <code>**[label · user]**</code> tag, so each line is traceable to who and what it belongs to. The user portion respects cross-server anonymity — servers where the actor isn't a member see <code>ANON</code> instead of the name.</div>
+          <div class="hint">Turn on <b>Rich status embeds</b> (same spot) to post the <b>capacity check</b>, both <b>leaderboards</b>, and the <b>auto-report</b> as bordered embed cards instead of plain text — the border and color stripe make those status blocks stand apart from rapid command chatter. Per-command replies stay plain (use <b>react only</b> or <b>Display output headers</b> for those).</div>
         </div>
       </div>
       </details>
@@ -1197,6 +1215,7 @@ async function saveAutomation(){
     listener_message_on: $('#listenerOn').value,
     listener_message_off: $('#listenerOff').value,
     output_headers: $('#outputHeaders').checked,
+    rich_output: $('#richOutput').checked,
   });
   applyState(s, true);
 }
@@ -1293,8 +1312,10 @@ function renderRanges(){
         `<label class="field">From % <select onchange="setRangeMin(${i}, this.value)">${pctOptions(r.min)}</select></label>`+
         `<label class="field">To % <select onchange="setRangeMax(${i}, this.value)">${pctOptions(r.max)}</select></label>`+
         `<span class="muted" style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(preview)||'<i>no announce</i>'}</span>`+
-        `<button class="ghost" onclick="toggleRangeExpand(${i})">${open?'Done ▾':'Edit ▸'}</button>`+
-        `<button class="ghost" onclick="rangeRows.splice(${i},1);renderRanges();scheduleSave()">✕</button>`+
+        `<button class="ghost" title="Duplicate" onclick="copyRange(${i})">📋</button>`+
+        `<button class="ghost" title="Save as template" onclick="saveTemplate('ranges',${i})">💾</button>`+
+        `<button class="ghost" title="${open?'Collapse':'Edit'}" onclick="toggleRangeExpand(${i})">${open?'▾':'✏️'}</button>`+
+        `<button class="ghost" title="Delete" onclick="rangeRows.splice(${i},1);renderRanges();scheduleSave()">✕</button>`+
       `</div>`;
       if(open){
         html +=
@@ -1631,8 +1652,10 @@ function renderCommands(){
         `<b style="min-width:120px">${pf}${esc(c.name||'(unnamed)')}</b>`+
         `<span class="muted">${esc(c.type||'fire')}${c.owner_only?' · owner-only':''}</span>`+
         `<div style="flex:1"></div>`+
-        `<button class="ghost" onclick="toggleCmdOpen(${i})">${open?'Done ▾':'Edit ▸'}</button>`+
-        `<button class="ghost" onclick="commandRows.splice(${i},1);cmdOpen.delete(${i});renderCommands();renderRanges();scheduleSave()">✕</button>`+
+        `<button class="ghost" title="Duplicate" onclick="copyCommand(${i})">📋</button>`+
+        `<button class="ghost" title="Save as template" onclick="saveTemplate('commands',${i})">💾</button>`+
+        `<button class="ghost" title="${open?'Collapse':'Edit'}" onclick="toggleCmdOpen(${i})">${open?'▾':'✏️'}</button>`+
+        `<button class="ghost" title="Delete" onclick="commandRows.splice(${i},1);cmdOpen.delete(${i});renderCommands();renderRanges();scheduleSave()">✕</button>`+
       `</div>`;
     if(open){
       const typ=(c.type||'fire'), isGame=typ.indexOf('game-')===0;
@@ -1798,8 +1821,10 @@ function renderEvents(){
         `<b style="min-width:120px">${esc(e.name||'(unnamed)')}</b>`+
         `<span class="muted">${esc(summary)}</span>`+
         `<div style="flex:1"></div>`+
-        `<button class="ghost" onclick="toggleEvtOpen(${i})">${open?'Done ▾':'Edit ▸'}</button>`+
-        `<button class="ghost" onclick="eventRows.splice(${i},1);evtOpen.delete(${i});renderEvents();scheduleSave()">✕</button>`+
+        `<button class="ghost" title="Duplicate" onclick="copyEvent(${i})">📋</button>`+
+        `<button class="ghost" title="Save as template" onclick="saveTemplate('events',${i})">💾</button>`+
+        `<button class="ghost" title="${open?'Collapse':'Edit'}" onclick="toggleEvtOpen(${i})">${open?'▾':'✏️'}</button>`+
+        `<button class="ghost" title="Delete" onclick="eventRows.splice(${i},1);evtOpen.delete(${i});renderEvents();scheduleSave()">✕</button>`+
       `</div>`;
     if(open){
       const deviceField = `<label class="field">Device <select onchange="eventRows[${i}].device_id=this.value||null">${cmdDeviceOpts(e.device_id)}</select></label>`;
@@ -1858,6 +1883,87 @@ function cleanEvents(){
   }));
 }
 async function saveEvents(){ applyState(await api('/api/config', {events: cleanEvents()}), true); }
+
+// ---- templates (reusable command / event / range snapshots) ----
+let templatesData = {commands:[], events:[], ranges:[]};
+function _tplList(kind){ templatesData[kind]=templatesData[kind]||[]; return templatesData[kind]; }
+// persist just the templates map — DON'T full-applyState (that would reload the
+// editor rows from the server and could revert unsaved command/event edits).
+async function saveTemplates(){ await api('/api/config', {templates: templatesData}); renderTemplates(); }
+// pick a name not already taken (case-insensitive): foo → foo-copy → foo-copy-2 …
+function uniqueName(base, taken){
+  base=String(base||'').trim()||'item';
+  if(!taken.has(base.toLowerCase())) return base;
+  let cand=base+'-copy';
+  if(!taken.has(cand.toLowerCase())) return cand;
+  let k=2; while(taken.has((base+'-copy-'+k).toLowerCase())) k++;
+  return base+'-copy-'+k;
+}
+function clone(o){ return JSON.parse(JSON.stringify(o)); }
+function copyCommand(i){
+  const src=clone(commandRows[i]);
+  src.name=uniqueName(src.name, new Set(commandRows.map(c=>(c.name||'').toLowerCase())));
+  commandRows.splice(i+1,0,src); renderCommands(); renderRanges(); scheduleSave();
+}
+function copyEvent(i){
+  const src=clone(eventRows[i]);
+  src.name=uniqueName(src.name, new Set(eventRows.map(e=>(e.name||'').toLowerCase())));
+  eventRows.splice(i+1,0,src); renderEvents(); scheduleSave();
+}
+function copyRange(i){ rangeRows.splice(i+1,0,clone(rangeRows[i])); renderRanges(); scheduleSave(); }
+function saveTemplate(kind, i){
+  const src = kind==='commands'?commandRows[i] : kind==='events'?eventRows[i] : rangeRows[i];
+  if(!src) return;
+  _tplList(kind).push(clone(src));
+  saveTemplates();
+  const label = kind==='ranges' ? `range ${src.min}–${src.max}%` : (src.name||'item');
+  toastMsg(`💾 Saved ${label} to Templates`);
+}
+function addTemplateToConfig(kind, idx){
+  const tpl=(templatesData[kind]||[])[idx]; if(!tpl) return;
+  const copy=clone(tpl);
+  if(kind==='commands'){
+    copy.name=uniqueName(copy.name, new Set(commandRows.map(c=>(c.name||'').toLowerCase())));
+    commandRows.push(copy); renderCommands(); renderRanges(); scheduleSave(); showTab('commands');
+  } else if(kind==='events'){
+    copy.name=uniqueName(copy.name, new Set(eventRows.map(e=>(e.name||'').toLowerCase())));
+    eventRows.push(copy); renderEvents(); scheduleSave(); showTab('events');
+  } else {
+    rangeRows.push(copy); renderRanges(); scheduleSave(); showTab('game');
+    toastMsg('Range added — set its From/To % in Capacity ranges');
+  }
+}
+function removeTemplate(kind, idx){ (templatesData[kind]||[]).splice(idx,1); saveTemplates(); }
+function renderTemplates(){
+  [['commands','tplCommands','tplCmdCount'],['events','tplEvents','tplEvtCount'],['ranges','tplRanges','tplRangeCount']]
+  .forEach(([kind,boxId,cntId])=>{
+    const box=$('#'+boxId); if(!box) return;
+    const list=templatesData[kind]||[];
+    const cnt=$('#'+cntId); if(cnt) cnt.textContent=list.length;
+    if(!list.length){ box.innerHTML='<div class="muted">None saved. Use 💾 on a '+kind.slice(0,-1)+' row to save one here.</div>'; return; }
+    box.innerHTML=list.map((t,idx)=>{
+      const label = kind==='ranges' ? `Range ${t.min??'?'}–${t.max??'?'}%` : (t.name||'(unnamed)');
+      const sub = kind==='commands' ? (t.type||'') : kind==='events' ? [t.mode,t.action].filter(Boolean).join(' · ') : ((t.announce||'').replace(/\n/g,' ').slice(0,50));
+      return `<div class="row" style="gap:10px;align-items:center;margin-bottom:5px">`+
+        `<b style="min-width:150px">${esc(label)}</b>`+
+        `<span class="muted" style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(sub)}</span>`+
+        `<button onclick="addTemplateToConfig('${kind}',${idx})">＋ Add to Config</button>`+
+        `<button class="ghost" title="Delete template" onclick="removeTemplate('${kind}',${idx})">✕</button>`+
+      `</div>`;
+    }).join('');
+  });
+}
+// tiny non-blocking toast
+let _toastT=null;
+function toastMsg(msg){
+  let el=$('#toast');
+  if(!el){ el=document.createElement('div'); el.id='toast';
+    el.style.cssText='position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);color:var(--text);padding:10px 16px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.4);z-index:9999;font-size:14px;max-width:90vw;transition:opacity .4s';
+    document.body.appendChild(el); }
+  el.textContent=msg; el.style.opacity='1'; el.style.display='block';
+  if(_toastT) clearTimeout(_toastT);
+  _toastT=setTimeout(()=>{ el.style.opacity='0'; }, 2200);
+}
 
 // ---- devices ----
 // ---- multi-vendor device support ----
@@ -2135,6 +2241,7 @@ function applyState(st, full){
     $('#listenerOn').value = st.listener_message_on||'';
     $('#listenerOff').value = st.listener_message_off||'';
     if($('#outputHeaders')) $('#outputHeaders').checked = !!st.output_headers;
+    if($('#richOutput')) $('#richOutput').checked = !!st.rich_output;
     $('#tokenState').textContent = st.has_token ? '✓ token saved' : 'no token yet';
     allDevices = st.devices||[];
     allCommandKeys = ['roll', ...(st.commands||[]).map(c=>(c.name||'').trim().toLowerCase()).filter(Boolean)];
@@ -2153,6 +2260,7 @@ function applyState(st, full){
     eventRows = JSON.parse(JSON.stringify(st.events||[]));
     if($('#eventInProcessMsg')) $('#eventInProcessMsg').value = st.event_in_process_message||'';
     if($('#eventCooldownMsg')) $('#eventCooldownMsg').value = st.event_cooldown_message||'';
+    { const t = st.templates || {}; templatesData = {commands:t.commands||[], events:t.events||[], ranges:t.ranges||[]}; }
     broadcastRows = JSON.parse(JSON.stringify(st.broadcasts||[]));
     // Max Roll Prizes (list) — migrate legacy single prize if the list is empty
     prizeRows = (st.prizes && st.prizes.length) ? JSON.parse(JSON.stringify(st.prizes))
@@ -2160,6 +2268,7 @@ function applyState(st, full){
     renderCommands();
     renderAlwaysOn();
     renderEvents();
+    renderTemplates();
     renderBroadcasts();
     renderBroadcastDropdown();
     renderModes();
