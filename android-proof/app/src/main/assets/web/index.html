@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.0.2</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.0.3</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -498,7 +498,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v3.0.2.</span>
+        <span class="muted" id="updMsg">You're on v3.0.3.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -589,6 +589,8 @@
         <li>When a <code>!command</code>'s <b>Starts events</b> tries to turn an event on, it's smart: if it's <b>already running</b> it posts the global <b>“in process”</b> message; if it's still on <b>cooldown</b> it posts the global <b>“cooldown”</b> message; otherwise it activates and posts that event's own <b>activation message</b>.</li>
         <li>Each event has its own <b>cooldown</b> (seconds) that starts when it <b>finishes</b> (a “once” fires, or a loop hits its <b>max</b>), and an optional <b>end message</b> posted at that point.</li>
         <li>The two “in process” / “cooldown” messages are <b>global</b> (set at the bottom of the Events tab) and support <code>[event]</code> and (cooldown) <code>[cooldown]</code>.</li>
+        <li><b>Trigger First Loop Immediately</b> fires the first round the instant it's activated instead of waiting one interval.</li>
+        <li>When an event is started by a <code>!command</code>, its pump fires <b>credit that person's leaderboard</b> (session + lifetime). Events turned on by the checkbox or a range aren't attributed to anyone, so they credit no one (they still drive capacity + the pump timer).</li>
       </ul>
       <div class="hint" style="max-width:820px"><b>Example — a slow drip only in the top band:</b> Events tab → <b>+ Add event</b> → Name <code>drip</code>, mode <b>loop</b>, every <code>45</code> s, action <b>fire</b>, <code>2</code> seconds on the active pump, message <code>💧 a slow drip…</code>. Leave it <b>OFF</b>. Then Game → Capacity ranges → the <b>66–100%</b> band → <b>+ Add event</b> (on entry) → <code>drip</code> / <b>Enable</b>. Now the drip only runs once the meter is two-thirds full, and stops when it drops back out.</div>
       </details>
@@ -1579,6 +1581,7 @@ function renderEvents(){
           evtFiresEditor(i, e, 'fail_fires', '🔴 Fires on FAILURE')
         : `<textarea rows="3" placeholder="optional message · [capacity] [announce] [current_loop] [total_loops] [loop_timer] …" onchange="eventRows[${i}].message=this.value">${esc(e.message||'')}</textarea>`)+
       `<div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">`+
+        `<label class="row" style="gap:6px" title="fire the first loop the moment it's activated, instead of waiting one interval"><input type="checkbox" ${e.fire_immediately?'checked':''} onchange="eventRows[${i}].fire_immediately=this.checked"> Trigger First Loop Immediately</label>`+
         `<span class="muted">cooldown</span><input type="number" min="0" step="1" value="${e.cooldown??''}" style="width:70px" placeholder="0" title="after it finishes, block re-activation for N seconds" onchange="eventRows[${i}].cooldown=(this.value===''?null:+this.value)"><span class="muted">s</span>`+
         `<input style="flex:1;min-width:180px" placeholder="activation message (posted when a command turns it on)" value="${esc(e.activation_message||'')}" onchange="eventRows[${i}].activation_message=this.value">`+
         `<input style="flex:1;min-width:180px" placeholder="end message (optional, when it finishes)" value="${esc(e.end_message||'')}" onchange="eventRows[${i}].end_message=this.value">`+
@@ -1586,11 +1589,11 @@ function renderEvents(){
     box.appendChild(el);
   });
 }
-function addEvent(){ eventRows.push({name:'',enabled:false,mode:'loop',every:60,max_repeats:null,action:'message',message:'',seconds:5,dice:'',sides:'',capacity_op:'add',capacity_value:0,device_id:null,cooldown:null,activation_message:'',end_message:'',chance:50,luck:null,fires:[],fail_fires:[],success_message:'',failure_message:''}); renderEvents(); scheduleSave(); }
+function addEvent(){ eventRows.push({name:'',enabled:false,mode:'loop',every:60,max_repeats:null,fire_immediately:false,action:'message',message:'',seconds:5,dice:'',sides:'',capacity_op:'add',capacity_value:0,device_id:null,cooldown:null,activation_message:'',end_message:'',chance:50,luck:null,fires:[],fail_fires:[],success_message:'',failure_message:''}); renderEvents(); scheduleSave(); }
 function cleanEvents(){
   return eventRows.filter(e=>(e.name||'').trim()).map(e=>({
     name:(e.name||'').trim(), enabled:e.enabled!==false, mode:e.mode||'loop', every:e.every||null,
-    max_repeats:(e.max_repeats==null||e.max_repeats==='')?null:+e.max_repeats, action:e.action||'message',
+    max_repeats:(e.max_repeats==null||e.max_repeats==='')?null:+e.max_repeats, fire_immediately:!!e.fire_immediately, action:e.action||'message',
     message:e.message||'', seconds:e.seconds||null, dice:e.dice||null, sides:e.sides||null,
     capacity_op:e.capacity_op||'add', capacity_value:e.capacity_value??0, device_id:e.device_id||null,
     cooldown:(e.cooldown==null||e.cooldown==='')?null:+e.cooldown,

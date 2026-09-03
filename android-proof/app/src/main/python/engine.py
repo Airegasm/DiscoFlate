@@ -55,6 +55,7 @@ class Engine:
         self._events_done: set = set()            # "once" events (and repeat-capped loops) already finished
         self._event_fires: dict[str, int] = {}    # event name -> times fired (for loop max-repeats)
         self._event_cooldown_until: dict[str, float] = {}  # event name -> monotonic when its cooldown ends
+        self._event_activator: dict[str, tuple] = {}   # event name -> (uid, who) that started it (for leaderboard credit)
         self._listener_was: bool = False          # for detecting off→on transitions
         # Events temporarily switched on by a command. Reverts on session reset
         # / app restart (it's in-memory only), never persisted to config.
@@ -89,6 +90,7 @@ class Engine:
             self._events_done.clear()
             self._event_fires.clear()
             self._event_cooldown_until.clear()
+            self._event_activator.clear()
             self._current_range_key = None
             self._end_triggered = False
         elif self._listener_was and not now_on:
@@ -98,6 +100,7 @@ class Engine:
             self._events_done.clear()
             self._event_fires.clear()
             self._event_cooldown_until.clear()
+            self._event_activator.clear()
             self._runtime_events_on.clear()
             self._log("bot", "deactivated — cooldowns cleared, events cancelled")
         self._listener_was = now_on
@@ -626,7 +629,7 @@ class Engine:
             if last is not None and now < last + every:
                 continue
             self._event_last[key] = now
-            if last is None:
+            if last is None and not ev.get("fire_immediately"):
                 continue  # first tick just arms the timer (delay before first fire)
             one_shot = (ev.get("mode") or "loop").lower() == "once"
             count = self._event_fires.get(key, 0) + 1
@@ -648,8 +651,10 @@ class Engine:
             except Exception as e:  # noqa: BLE001
                 self._log("error", f"event {name} failed: {e}")
             if ending:
-                # Loop finished: leave runtime-on, start its cooldown, post end message.
+                # Loop finished: leave runtime-on, drop the activator, start its
+                # cooldown, post the end message.
                 self._runtime_events_on.discard(key)
+                self._event_activator.pop(key, None)
                 try:
                     cdn = float(ev.get("cooldown") or 0)
                 except (TypeError, ValueError):
@@ -667,6 +672,8 @@ class Engine:
         name = ev.get("name", "event")
         action = (ev.get("action") or "message").lower()
         msg = (ev.get("message") or "").strip()
+        # If a command started this event, credit that person's leaderboard for its pumps.
+        act_uid, act_who = self._event_activator.get(name.strip().lower(), (None, ""))
 
         if action == "chance":
             # Per-loop gamble: win fires `fires` + posts success_message; miss fires
@@ -685,7 +692,8 @@ class Engine:
                 win = True
             elif luck < 0 and random.random() * 100 < min(100.0, -luck):
                 win = False
-            fired = await self._run_fires(ev.get("fires") if win else ev.get("fail_fires"), f"event {name}", None)
+            fired = await self._run_fires(ev.get("fires") if win else ev.get("fail_fires"),
+                                          act_who or f"event {name}", act_uid)
             total_secs = round(sum(f["duration"] for f in fired), 1)
             self._log("bot", f"event '{name}': chance rolled {roll} vs {chance:.0f}% → {'WIN' if win else 'miss'}")
             base = {"roll": roll, "chance": f"{chance:.0f}", "luck": f"{luck:.0f}", "won": win,
@@ -714,11 +722,14 @@ class Engine:
                 dice = int(ev.get("dice") or rd)
                 sides = int(ev.get("sides") or rs)
                 total, _ = self._roll_total(dice, sides)
-                self._begin_or_extend(target, self._duration_from_total(total), f"event {name}")
+                dur = self._duration_from_total(total)
+                self._begin_or_extend(target, dur, f"event {name}")
+                self.credit_pump(act_uid, act_who, dur, target)
                 self._log("bot", f"event '{name}': rolled {dice}d{sides}={total}")
             else:
                 secs = round(max(0.1, min(self._hard_cap(), float(ev.get("seconds") or 3))), 1)
                 self._begin_or_extend(target, secs, f"event {name}")
+                self.credit_pump(act_uid, act_who, secs, target)
                 self._log("bot", f"event '{name}': fired {secs}s")
         else:
             self._log("bot", f"event '{name}': message")
@@ -927,7 +938,7 @@ class Engine:
             return "unlimited" if r is None else r
 
         if typ == "say":
-            await self.start_events(cmd.get("start_events"))
+            await self.start_events(cmd.get("start_events"), uid, who)
             _spend_use()
             anon = self._anon_label()
             return {"ok": True, "device": False, "started": False,
@@ -969,7 +980,7 @@ class Engine:
             # Win fires the `fires` rows; a miss fires the `fail_fires` rows (if any).
             fired = await self._run_fires(cmd.get("fires") if win else cmd.get("fail_fires"), who, uid)
             if win:
-                await self.start_events(cmd.get("start_events"))
+                await self.start_events(cmd.get("start_events"), uid, who)
             total_secs = round(sum(f["duration"] for f in fired), 1)
             self._log("roll", f"{who} gambled {name}: rolled {roll} vs {chance:.0f}%"
                       + (f" (luck {luck:+.0f})" if luck else "")
@@ -1019,7 +1030,7 @@ class Engine:
             duration = round(max(0.1, min(hi, float(cmd.get("seconds") or 3))), 1)
             detail = f"{duration:.1f}s"
 
-        await self.start_events(cmd.get("start_events"))
+        await self.start_events(cmd.get("start_events"), uid, who)
         fr = self._begin_or_extend(target, duration, f"{name} by {who}")
         extended = fr["status"] == "extended"
         self.credit_pump(uid, who, duration, target)
@@ -1211,11 +1222,12 @@ class Engine:
         self._milestones_fired.clear()
         self._log("capacity", "reset to 0%")
 
-    async def start_events(self, names) -> None:
+    async def start_events(self, names, uid=None, who: str = "") -> None:
         """A command activates events by name — intelligently: an already-running
         event posts the global 'in process' message; one still on cooldown posts
         the global 'cooldown' message; otherwise it switches on (re-armed) and its
-        own activation message is posted."""
+        own activation message is posted. The activator (uid, who) is remembered so
+        the event's pump fires credit that person's leaderboard."""
         now = time.monotonic()
         for n in (names or []):
             key = str(n).strip().lower()
@@ -1243,6 +1255,8 @@ class Engine:
             self._event_last.pop(key, None)    # re-arm the timer from now
             self._events_done.discard(key)
             self._event_fires.pop(key, None)   # fresh loop count for this activation
+            if uid is not None:
+                self._event_activator[key] = (uid, who)   # credit this person for the event's pumps
             am = (ev.get("activation_message") or "").strip()
             if am:
                 await self._announce(self.render(am, self._event_ctx(ev)), None)
@@ -1280,6 +1294,7 @@ class Engine:
         self._events_done.clear()
         self._event_fires.clear()
         self._event_cooldown_until.clear()
+        self._event_activator.clear()
         self._perfect.clear()
         self._prize_uses.clear()
         self._pump_time.clear()

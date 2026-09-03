@@ -1,6 +1,6 @@
 {
-  "version": "3.0.2",
-  "versionCode": 36,
+  "version": "3.0.3",
+  "versionCode": 37,
   "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk",
-  "notes": "DiscoFlate v3.0.2 \u2014 PumpRoulette 30s rounds + [next_round] placeholder (blank on final round); cointoss & pumproulette 300s cooldown"
+  "notes": "DiscoFlate v3.0.3 \u2014 command-triggered events credit the triggerers leaderboard; Trigger First Loop Immediately tickbox (on for PumpRoulette)"
 }

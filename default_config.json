@@ -410,7 +410,8 @@
       "sides": null,
       "device_id": null,
       "capacity_op": "add",
-      "capacity_value": 0
+      "capacity_value": 0,
+      "fire_immediately": true
     }
   ],
   "max_roll_prize": {
