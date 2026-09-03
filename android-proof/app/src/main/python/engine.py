@@ -978,15 +978,19 @@ class Engine:
                 counts[idx] += 1
         return counts
 
-    def _poll_text(self, pd: dict, opts: list, counts: list | None = None) -> str:
+    def _poll_text(self, pd: dict, opts: list, counts: list | None = None,
+                   remaining: float | None = None) -> str:
         prefix = self.cfg.get("command_prefix", "!")
         vote = self.builtin_names()["vote"]
         body = self.render((pd.get("body") or "").strip())
         lines = [f"**{i + 1}.** {o.get('label', '')}"
                  + (f" — {counts[i]} vote{'s' if counts[i] != 1 else ''}" if counts else "")
                  for i, o in enumerate(opts)]
-        return ((body + "\n\n") if body else "") + "\n".join(lines) + \
+        out = ((body + "\n\n") if body else "") + "\n".join(lines) + \
             f"\n\nVote with `{prefix}{vote} 1`–`{prefix}{vote} {len(opts)}`"
+        if remaining is not None:
+            out += f"\n⏳ **{self._fmt_duration(remaining)}** remaining"
+        return out
 
     async def _run_poll(self, pd: dict, source: str = "poll") -> None:
         """Run one poll start-to-finish: post the embed, collect votes for the
@@ -1002,7 +1006,6 @@ class Engine:
             self._log("error", f"{source}: poll '{name}' has no options")
             return
         title = f"Poll: {(pd.get('title') or name).strip()}"
-        text = self._poll_text(pd, opts)
         try:
             duration = max(5.0, min(3600.0, float(pd.get("duration") or 60)))
         except (TypeError, ValueError):
@@ -1018,17 +1021,20 @@ class Engine:
         winner_idx = None
         labels = [o.get("label", "") for o in opts]
         try:
-            await self._announce_poll(title, text, options=labels)
             end = time.monotonic() + duration
+            await self._announce_poll(title, self._poll_text(pd, opts, remaining=duration),
+                                      options=labels)
             while True:
                 remaining = end - time.monotonic()
                 if remaining <= 0:
                     break
                 await asyncio.sleep(min(remaining, repeat) if repeat else remaining)
                 if repeat and time.monotonic() < end - 1:
-                    # reposts carry the live tally next to each option
-                    await self._announce_poll(title, self._poll_text(pd, opts, self._poll_counts(opts)),
-                                              options=labels)
+                    # reposts carry the live tally + time left
+                    await self._announce_poll(
+                        title, self._poll_text(pd, opts, self._poll_counts(opts),
+                                               remaining=max(0.0, end - time.monotonic())),
+                        options=labels)
             # tally
             counts = self._poll_counts(opts)
             total = sum(counts)
