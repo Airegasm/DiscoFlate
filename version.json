@@ -1,6 +1,6 @@
 {
-  "version": "3.9.2",
-  "versionCode": 66,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.9.2/discoflate.apk",
-  "notes": "DiscoFlate v3.9.2 \u2014 session uptime now means what it says: 0 until Activation turns on, ticks during the session, freezes at the final value when Activation goes off (so the OFF message's [uptime] still reports the full run). It no longer counts time the app merely sat open."
+  "version": "3.10.0",
+  "versionCode": 67,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.10.0/discoflate.apk",
+  "notes": "DiscoFlate v3.10.0 \u2014 Capacity Events: one-shot triggers at any capacity threshold (1-999%) with Stop All Devices, chat-command disables (until-event / session-remainder), a temporary Enable list, Pause All Timed Events, and a sequential 'During the Event' action block. Events tab reorganized into collapsible sections (Timed events / Capacity events / Polls)."
 }

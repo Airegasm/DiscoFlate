@@ -248,6 +248,22 @@ DEFAULTS = {
     "event_in_process_message": "⏳ [event] is already running.",
     "event_cooldown_message": "⏳ [event] is on cooldown — [cooldown]s left.",
 
+    # Capacity Events — one-shot triggers at a capacity threshold (1-999%),
+    # independent of ranges (their effects beat normal range behaviour; the
+    # End / End Sequence overrules them). Each:
+    #   {name, enabled, at (1-999),
+    #    stop_devices,                                   # abort all fires once, at trigger
+    #    disable_range_cmds, disable_range_cmds_scope,   # chat-only; scope: "event"|"session"
+    #    disable_always_on, disable_always_on_scope,
+    #    pause_events, pause_events_scope,
+    #    enable_commands_on, enable_commands: [names],   # usable during the event regardless
+    #    actions: [{type: message|fire|roll|capacity|wait, message, seconds,
+    #               device_id, dice, sides, capacity_op, capacity_value}]}
+    # The action block runs sequentially; the event is "running" (its effects
+    # active) until the block finishes. One-shot per session (re-armed by
+    # session reset / activation).
+    "capacity_events": [],
+
     # Preset broadcast messages — pick one from the Dashboard → Controls dropdown
     # and hit "Broadcast Custom" to post it to the channel. Each: {name, message}.
     "broadcasts": [],

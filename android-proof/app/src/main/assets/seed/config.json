@@ -928,5 +928,6 @@
   "remote_access": {
     "enabled": false,
     "allowed_ips": []
-  }
+  },
+  "capacity_events": []
 }

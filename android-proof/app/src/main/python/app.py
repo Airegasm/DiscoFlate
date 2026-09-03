@@ -67,6 +67,7 @@ _DEFAULT_LIST_KEYS = {
     "prizes": lambda p: (p.get("command") or "").strip().lower(),
     "modes": lambda m: (m.get("name") or "").strip().lower(),
     "events": lambda e: (e.get("name") or "").strip().lower(),
+    "capacity_events": lambda e: ((e.get("name") or "").strip() or str(e.get("at") or "")).lower(),
     "capacity_ranges": lambda r: f"{r.get('min')}-{r.get('max')}",
     "always_on_commands": lambda a: (a.get("name") if isinstance(a, dict) else str(a) or "").strip().lower(),
 }
@@ -138,6 +139,7 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "always_on_commands": cfg.get("always_on_commands", []),
         "modes": cfg.get("modes", []),
         "events": cfg.get("events", []),
+        "capacity_events": cfg.get("capacity_events", []),
         "event_in_process_message": cfg.get("event_in_process_message", ""),
         "event_cooldown_message": cfg.get("event_cooldown_message", ""),
         "broadcasts": cfg.get("broadcasts", []),
@@ -375,6 +377,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     # Minimum shape per key — a patch with the wrong container type is refused
     # (a malformed import/tab can't put a string where the engine expects a list).
     _TYPE_FLOOR = {"commands": list, "events": list, "modes": list, "prizes": list,
+                   "capacity_events": list,
                    "capacity_ranges": list, "listen_targets": list, "broadcasts": list,
                    "always_on_commands": list, "cooldown_exempt_user_ids": list,
                    "cooldown_exempt_names": list, "command_names": dict, "roll": dict,
@@ -398,6 +401,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         for key in ("command_prefix", "command_names", "capacity_message",
                     "roll_enabled", "system_buffer_seconds", "cooldown_message", "cooldown_reset_message", "pumptimer_message", "pump_message",
                     "roll", "max_roll_prize", "prizes", "capacity_ranges", "commands", "modes", "events",
+                    "capacity_events",
                     "allow", "pumpdirect_path", "cooldown_seconds",
                     "cooldown_exempt_user_ids", "cooldown_exempt_names", "operator_name", "auto_report",
                     "announce_channel_id", "listen_guild_id", "listen_channel_id",

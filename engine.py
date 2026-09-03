@@ -74,6 +74,15 @@ class Engine:
         # Events temporarily switched on by a command. Reverts on session reset
         # / app restart (it's in-memory only), never persisted to config.
         self._runtime_events_on: set = set()
+        # Capacity Events: one-shot at a capacity threshold (1-999%). While one
+        # runs (its action block), its effects gate commands/events; "session
+        # remainder" effects persist after it until session reset. Normal
+        # ranges yield to these; End / End Sequence overrules them.
+        self._capev_done: set = set()                    # keys fired this session
+        self._capev_tasks: dict[str, asyncio.Task] = {}  # running action blocks
+        self._capev_fx: dict[str, set] = {}              # key -> effects while it runs
+        self._capev_session_fx: set = set()              # effects locked for the session
+        self._capev_enable: dict[str, set] = {}          # key -> commands enabled during it
         # Max Roll Prize tracking (in-memory; resets on session reset / restart).
         self._perfect: dict[str, int] = {}       # uid -> perfect-roll count
         self._prize_uses: dict[str, int] = {}    # uid -> remaining uses (present = unlocked)
@@ -136,6 +145,7 @@ class Engine:
             # can still report the full run.
             self._session_start = time.monotonic()
             self._session_frozen = 0.0
+            self._capev_cancel_all(clear_session=True)
             self._event_last.clear()
             self._events_done.clear()
             self._event_fires.clear()
@@ -150,6 +160,7 @@ class Engine:
             if self._session_start is not None:
                 self._session_frozen = max(0.0, time.monotonic() - self._session_start)
                 self._session_start = None
+            self._capev_cancel_all(clear_session=True)
             self._cooldowns.clear()
             self._event_last.clear()
             self._events_done.clear()
@@ -310,6 +321,7 @@ class Engine:
                 await self._check_end_sequence()
                 await self._check_cooldown_resets()
                 await self._check_events()
+                await self._check_capacity_events()
             except asyncio.CancelledError:
                 break
             except Exception as e:  # never let the loop die
@@ -784,12 +796,141 @@ class Engine:
         self._cooldowns.clear()
         self._log("bot", "user tracking reset")
 
+    # -- capacity events ------------------------------------------------------ #
+    def _capev_effect(self, fx: str) -> bool:
+        """True if any running capacity event (or a session-remainder lock)
+        currently imposes this effect: disable_range | disable_ao | pause_events."""
+        return fx in self._capev_session_fx or any(fx in s for s in self._capev_fx.values())
+
+    def _capev_enabled_cmds(self) -> set:
+        out = set()
+        for s in self._capev_enable.values():
+            out |= s
+        return out
+
+    def _capev_cmd_blocked(self, cmdkey: str) -> bool:
+        """Chat-side gate: is this custom command disabled by a capacity event?
+        Its own enable-list always wins; otherwise always-on and range-member
+        commands answer to their respective disable effects."""
+        if cmdkey in self._capev_enabled_cmds():
+            return False
+        if self._is_always_on(cmdkey):
+            return self._capev_effect("disable_ao")
+        return self._capev_effect("disable_range")
+
+    def _capev_cancel_all(self, clear_session: bool) -> None:
+        for t in self._capev_tasks.values():
+            t.cancel()
+        self._capev_tasks.clear()
+        self._capev_fx.clear()
+        self._capev_enable.clear()
+        if clear_session:
+            self._capev_session_fx.clear()
+            self._capev_done.clear()
+
+    async def _check_capacity_events(self) -> None:
+        """One-shot triggers at a capacity threshold (1-999%). Independent of
+        ranges — their effects take precedence over normal range behaviour —
+        but the End / End Sequence overrules them (nothing fires once the end
+        has triggered, and the session end cancels them)."""
+        if not self.cfg.get("listener_enabled") or self._end_triggered:
+            return
+        for ev in self.cfg.get("capacity_events", []):
+            if not ev.get("enabled"):
+                continue
+            try:
+                at = float(ev.get("at") or 0)
+            except (TypeError, ValueError):
+                continue
+            if not (1 <= at <= 999):
+                continue
+            name = (ev.get("name") or "").strip() or f"capacity-{at:g}"
+            key = name.lower()
+            if key in self._capev_done or self.capacity < at:
+                continue
+            self._capev_done.add(key)
+            self._log("bot", f"CAPACITY EVENT '{name}' triggered at {at:g}%")
+            # Effects: event-scoped ones lift when the action block finishes;
+            # "session remainder" ones stick until session reset / deactivation.
+            fx = set()
+            for flag, effect in (("disable_range_cmds", "disable_range"),
+                                 ("disable_always_on", "disable_ao"),
+                                 ("pause_events", "pause_events")):
+                if ev.get(flag):
+                    if (ev.get(flag + "_scope") or "event") == "session":
+                        self._capev_session_fx.add(effect)
+                    else:
+                        fx.add(effect)
+            if fx:
+                self._capev_fx[key] = fx
+            if ev.get("enable_commands_on"):
+                en = {str(n).strip().lower() for n in (ev.get("enable_commands") or []) if str(n).strip()}
+                if en:
+                    self._capev_enable[key] = en
+            if ev.get("stop_devices"):
+                await self.abort(reason=f"capacity event {name}")
+            self._capev_tasks[key] = asyncio.create_task(self._run_capev(ev, key, name))
+
+    async def _run_capev(self, ev: dict, key: str, name: str) -> None:
+        """Execute the event's action block sequentially. The event counts as
+        'running' (its effects active) until the block finishes."""
+        try:
+            for a in (ev.get("actions") or []):
+                if self._paused or self._end_triggered:
+                    break
+                typ = (a.get("type") or "message").lower()
+                try:
+                    if typ == "wait":
+                        await asyncio.sleep(max(0.0, float(a.get("seconds") or 0)))
+                        continue
+                    if typ == "message":
+                        msg = (a.get("message") or "").strip()
+                        if msg:
+                            await self._announce(self._evt_hdr(name) + self.render(msg), None)
+                        continue
+                    if typ == "capacity":
+                        op = (a.get("capacity_op") or "add").lower()
+                        val = float(a.get("capacity_value") or 0)
+                        self.set_capacity(val if op == "set" else self.capacity + val)
+                        continue
+                    if typ in ("fire", "roll"):
+                        target = a.get("device_id") or self._active_id()
+                        if self._device(target) is None:
+                            self._log("error", f"capacity event {name}: no target device")
+                            continue
+                        if typ == "roll":
+                            rd, rs = self.range_dice(self.range_for(self.capacity))
+                            dice = int(a.get("dice") or rd)
+                            sides = int(a.get("sides") or rs)
+                            total, _ = self._roll_total(dice, sides)
+                            dur = self._duration_from_total(total)
+                        else:
+                            dur = round(max(0.1, min(self._hard_cap(), float(a.get("seconds") or 3))), 1)
+                        self._begin_or_extend(target, dur, f"capacity event {name}")
+                        msg = (a.get("message") or "").strip()
+                        if msg:
+                            await self._announce(self._evt_hdr(name) + self.render(
+                                msg, {"secs": f"{dur:.1f}", "seconds": f"{dur:.1f}"}), None)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:  # noqa: BLE001 — one bad action shouldn't kill the block
+                    self._log("error", f"capacity event {name} action failed: {e}")
+        except asyncio.CancelledError:
+            pass
+        finally:
+            self._capev_fx.pop(key, None)
+            self._capev_enable.pop(key, None)
+            self._capev_tasks.pop(key, None)
+            self._log("bot", f"CAPACITY EVENT '{name}' complete")
+
     # -- timed events -------------------------------------------------------- #
     async def _check_events(self) -> None:
         """Fire each enabled event when its interval elapses. Events only run
         while the listener is enabled (so they don't fire on a paused/off bot)."""
         if not self.cfg.get("listener_enabled"):
             return
+        if self._capev_effect("pause_events"):
+            return   # a capacity event has paused all timed events
         now = time.monotonic()
         for ev in self.cfg.get("events", []):
             name = (ev.get("name") or "").strip()
@@ -827,6 +968,8 @@ class Engine:
         final round drop the activator, start its cooldown and post the end message.
         With `sink` set, messages go into that list (used for the immediate first
         round so it follows the command reply) instead of broadcasting now."""
+        if self._capev_effect("pause_events"):
+            return   # covers the fire_immediately path too
         name = (ev.get("name") or "").strip()
         one_shot = (ev.get("mode") or "loop").lower() == "once"
         try:
@@ -1186,9 +1329,16 @@ class Engine:
         if self._paused:
             return self._paused_result(who, uid)
 
-        if not self.cmd_enabled_in_range(name.lower()):
+        cmdkey0 = name.lower()
+        capev_enabled = cmdkey0 in self._capev_enabled_cmds()
+        # Capacity-event gate (chat only — uid is None for range-start/system
+        # calls). An event's enable-list wins over its own disables AND over
+        # range membership; normal ranges yield to capacity events here.
+        if uid is not None and self._capev_cmd_blocked(cmdkey0):
+            return {"ok": False, "silent": True}
+        if not self.cmd_enabled_in_range(cmdkey0) and not capev_enabled:
             return {"ok": False, "silent": True}  # not a member of the current range → ignore quietly
-        if not self._range_gate_ok(cmd.get("range_gate")):
+        if not self._range_gate_ok(cmd.get("range_gate")) and not capev_enabled:
             return {"ok": False, "silent": True}  # gated to a different capacity band
         # The owner is never limited by cooldowns or per-person max-uses (they're
         # still subject to the in-progress event guard).
@@ -1643,6 +1793,9 @@ class Engine:
                 await self._force_off(self._device(did))
         # 4. Cancel timed events: in-flight loops die (no end message) and enabled
         #    events re-arm fresh after resume. "Once" events that ran stay done.
+        #    Running capacity-event blocks are cancelled too (their session-
+        #    remainder locks and fired-markers survive the pause).
+        self._capev_cancel_all(clear_session=False)
         self._event_last.clear()
         self._event_fires.clear()
         self._event_cooldown_until.clear()
@@ -1839,6 +1992,7 @@ class Engine:
         command-started events, and re-arm every timed event."""
         self.capacity = 0.0
         self._milestones_fired.clear()
+        self._capev_cancel_all(clear_session=True)
         self._cooldowns.clear()
         self._runtime_events_on.clear()
         self._event_last.clear()
