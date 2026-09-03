@@ -142,11 +142,13 @@ DEFAULTS = {
     # type "chance" → gamble: roll 1–100 vs `chance`% (± `luck`); win posts
     #                 `success_reply` + fires the `fires` rows, miss posts `failure_reply`
     #   fires: [{device_id, seconds}] — independent, concurrent device fires
-    # type "game-pushluck" / "game-simon" → button/ephemeral minigames (minigames.py).
-    #   Params: pl_bust_start/pl_bust_step/pl_max_pumps/pl_points (pushluck),
-    #   sm_symbols/sm_max_rounds/sm_reveal (simon). game_intro = message with the
-    #   Play button. game_tiers = [{min, message, fires}] score→outcome; the
-    #   highest `min` the final score reaches broadcasts + fires (credited to player).
+    # type "game-pushluck" / "game-simon" / "game-balloon" / "game-rps" → button/
+    #   ephemeral minigames (minigames.py). Params: pl_* (pushluck), sm_* (simon),
+    #   bl_cells/bl_pops/bl_points (balloon), rps_wins (rps). game_intro = message
+    #   with the Play button. game_tiers = [{min, message, fires}] score→outcome;
+    #   the highest `min` the final score reaches broadcasts + fires (credited to
+    #   the player). Every result is labelled with the game and respects cross-
+    #   server anonymity (real name only where the player is a member).
     "commands": [],
 
     # Custom commands that work in EVERY capacity range (bypass per-range

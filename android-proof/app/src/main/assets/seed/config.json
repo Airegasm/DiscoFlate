@@ -488,6 +488,123 @@
           ]
         }
       ]
+    },
+    {
+      "name": "agpopit",
+      "type": "game-balloon",
+      "description": "don't-pop-it minigame \u2014 reveal safe cells, avoid the balloons",
+      "enabled": true,
+      "owner_only": false,
+      "mention": false,
+      "hide_in_list": false,
+      "range_gate": "all",
+      "start_events": [],
+      "reply": "",
+      "seconds": null,
+      "dice": null,
+      "sides": null,
+      "device_id": null,
+      "fires": [],
+      "fail_fires": [],
+      "chance": null,
+      "luck": null,
+      "success_reply": "",
+      "failure_reply": "",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "game_intro": "\ud83c\udf88 **[user]** plays **Don't Pop It** \u2014 reveal safe cells for points, or cash out before you hit a balloon!",
+      "game_tiers": [
+        {
+          "min": 0,
+          "message": "\ud83d\udca5 **[user]** popped a balloon and walked away with nothing.",
+          "fires": []
+        },
+        {
+          "min": 3,
+          "message": "\ud83c\udf88 **[user]** cashed out **[score]** \u2014 nice haul: **+[secs]s**",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 6
+            }
+          ]
+        },
+        {
+          "min": 5,
+          "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**! **+[secs]s** pump!",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 18
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "agrps",
+      "type": "game-rps",
+      "description": "rock-paper-scissors vs the bot, best of 5",
+      "enabled": true,
+      "owner_only": false,
+      "mention": false,
+      "hide_in_list": false,
+      "range_gate": "all",
+      "start_events": [],
+      "reply": "",
+      "seconds": null,
+      "dice": null,
+      "sides": null,
+      "device_id": null,
+      "fires": [],
+      "fail_fires": [],
+      "chance": null,
+      "luck": null,
+      "success_reply": "",
+      "failure_reply": "",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "game_intro": "\u270a\u270b\u270c\ufe0f **[user]** challenges the bot to **Rock-Paper-Scissors** \u2014 first to 3!",
+      "game_tiers": [
+        {
+          "min": 0,
+          "message": "\ud83d\udc80 **[user]** got swept by the bot.",
+          "fires": []
+        },
+        {
+          "min": 1,
+          "message": "\ud83d\ude05 **[user]** fought to **[score]** round(s) but lost the match.",
+          "fires": []
+        },
+        {
+          "min": 3,
+          "message": "\ud83c\udfc6 **[user]** BEAT the bot! **+[secs]s** pump!",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 12
+            }
+          ]
+        }
+      ]
     }
   ],
   "modes": [],
@@ -613,6 +730,16 @@
     },
     {
       "name": "agsimon",
+      "cooldown": 300,
+      "max_uses": null
+    },
+    {
+      "name": "agpopit",
+      "cooldown": 300,
+      "max_uses": null
+    },
+    {
+      "name": "agrps",
       "cooldown": 300,
       "max_uses": null
     }

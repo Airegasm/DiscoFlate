@@ -1124,20 +1124,27 @@ class Engine:
                 best = (m, t)
         return best[1] if best else {}
 
-    async def game_result(self, cmd: dict, score, who: str, uid) -> str:
-        """Fire the winning tier's devices (credited to the player) and return the
-        public broadcast message for a finished minigame."""
+    async def game_result(self, cmd: dict, score, who: str, uid) -> dict:
+        """Fire the winning tier's devices (credited to the player) and build the
+        public broadcast for a finished minigame. Always labels which game it was
+        and returns both a real (named) and an anonymized version so the bot can
+        respect cross-server anonymity (real name only where the player is a member)."""
         tier = self.game_tier_for(cmd, score)
         fired = await self._run_fires(tier.get("fires"), who, uid)
         total = round(sum(f["duration"] for f in fired), 1)
-        ctx = {"user": who, "mention": self._mention(uid, who), "score": score,
-               "secs": f"{total:.1f}", "seconds": f"{total:.1f}",
-               "secs2capacity": (self._secs_to_capacity(total, self._active_id()) if fired else "0"),
-               "game": cmd.get("name", "game")}
-        self._log("roll", f"{who} finished {cmd.get('name')} — score {score}"
-                  + (f", fired {total}s" if fired else ""))
-        return self.render(tier.get("message") or "", ctx) or \
-            f"🎮 **{who}** scored **{score}** in {cmd.get('name', 'the game')}."
+        name = cmd.get("name", "game")
+        base = {"score": score, "secs": f"{total:.1f}", "seconds": f"{total:.1f}",
+                "secs2capacity": (self._secs_to_capacity(total, self._active_id()) if fired else "0"),
+                "game": name}
+        header = f"🎮 **{name}**\n"   # every result says which game it was for
+        tmpl = tier.get("message") or ""
+        real = header + (self.render(tmpl, {"user": who, "mention": self._mention(uid, who), **base})
+                         or f"**{who}** scored **{score}**.")
+        anon = self._anon_label()
+        anon_msg = header + (self.render(tmpl, {"user": anon, "mention": anon, **base})
+                             or f"**{anon}** scored **{score}**.")
+        self._log("roll", f"{who} finished {name} — score {score}" + (f", fired {total}s" if fired else ""))
+        return {"real": real, "anon": anon_msg}
 
     async def _run_fires(self, fires, who: str, uid: str | None) -> list:
         """Fire each {device_id, seconds} row independently and concurrently.

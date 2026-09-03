@@ -1,6 +1,6 @@
 {
-  "version": "3.2.2",
-  "versionCode": 46,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=46",
-  "notes": "DiscoFlate v3.2.2 \u2014 fix stuck updates (cache-busted per-version download URL); config Backup/Restore"
+  "version": "3.2.3",
+  "versionCode": 47,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=47",
+  "notes": "DiscoFlate v3.2.3 \u2014 two new minigames (game-balloon/Do not Pop It, game-rps); default !agpopit & !agrps always-on; results now labelled by game + respect cross-server anonymity"
 }

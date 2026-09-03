@@ -333,13 +333,33 @@ class BotManager:
         await self.broadcast(self.engine.leaderboard_text(), None)
         return {"ok": True}
 
+    async def _broadcast_named(self, real: str, anon: str, uid, exclude_channel_id=None) -> None:
+        """Broadcast a per-player result: each destination shows the real name if
+        the player is a member of that server, else the anonymized version (same
+        cross-server rule as command echoes)."""
+        cfg = self.get_config()
+        try:
+            author_id = int(uid) if uid else None
+        except (TypeError, ValueError):
+            author_id = None
+        for t in self._targets(cfg):
+            cid = str(t.get("channel_id") or "")
+            if not cid or (exclude_channel_id and cid == str(exclude_channel_id)):
+                continue
+            ch = await self._channel(cid)
+            if ch is None:
+                continue
+            show_real = bool(real) and author_id is not None and await self._is_member(getattr(ch, "guild", None), author_id)
+            text = real if show_real else (anon or real)
+            if text:
+                await self._send(ch, text, None)
+
     async def game_payoff(self, cmd: dict, score, who: str, uid) -> None:
         """A minigame finished — fire the tier's devices (credited to the player)
-        and broadcast the tiered result to the channels."""
+        and broadcast the game-labeled result, respecting cross-server anonymity."""
         try:
-            msg = await self.engine.game_result(cmd, score, who, uid)
-            if msg:
-                await self.broadcast(msg, None)
+            res = await self.engine.game_result(cmd, score, who, uid)
+            await self._broadcast_named(res.get("real"), res.get("anon"), uid)
         except Exception as e:  # noqa: BLE001
             self.engine._log("error", f"game payoff failed: {e}")
 
