@@ -969,6 +969,8 @@ class Engine:
             tmp = self._lifetime_path() + ".tmp"
             with open(tmp, "w", encoding="utf-8") as fh:
                 json.dump(self._pump_life, fh, indent=2)
+                fh.flush()
+                os.fsync(fh.fileno())
             os.replace(tmp, self._lifetime_path())
         except OSError as e:  # noqa: BLE001
             self._log("error", f"couldn't save lifetime stats: {e}")

@@ -10,13 +10,22 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import tempfile
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # DISCOFLATE_DATA_DIR lets tests use a throwaway directory so they can never
 # touch the real data/config.json (which holds your saved token).
 DATA_DIR = os.environ.get("DISCOFLATE_DATA_DIR") or os.path.join(HERE, "data")
 CONFIG_PATH = os.path.join(DATA_DIR, "config.json")
+BACKUP_DIR = os.path.join(DATA_DIR, "backups")
+KEEP_BACKUPS = 10   # rolling ring of pre-save snapshots (max one per minute)
+KEEP_DAILY = 7      # plus one snapshot per day
+
+# Set when load() found a corrupt config and moved it aside — the UI surfaces
+# this so a boot-into-defaults never masquerades as a factory reset.
+RECOVERED_FROM: str | None = None
 
 # Default location of PumpDirect's device registry (device list + calibration).
 DEFAULT_PUMPDIRECT_PATH = os.path.normpath(
@@ -25,6 +34,9 @@ DEFAULT_PUMPDIRECT_PATH = os.path.normpath(
 
 DEFAULTS = {
     "discord_token": "",
+    # Bumped on every save; the UI sends the rev it last saw with each config
+    # write so a stale tab's snapshot is rejected instead of clobbering.
+    "config_rev": 0,
     "command_prefix": "!",
     "listener_enabled": False,
     # Master toggle for the built-in roll (dice) command. Off = dice disabled.
@@ -297,26 +309,91 @@ def _deep_merge(base: dict, patch: dict) -> dict:
 
 
 def load() -> dict:
+    global RECOVERED_FROM
     os.makedirs(DATA_DIR, exist_ok=True)
     try:
         with open(CONFIG_PATH, "r", encoding="utf-8") as fh:
             stored = json.load(fh)
-    except (FileNotFoundError, ValueError):
+        if not isinstance(stored, dict):
+            raise ValueError(f"config root is a {type(stored).__name__}, expected an object")
+    except FileNotFoundError:
+        stored = {}
+    except ValueError as e:
+        # Corrupt config: NEVER run silently on defaults — the next save would
+        # make the wipe permanent. Move the bad file aside for recovery and
+        # flag it so the UI can warn.
+        aside = CONFIG_PATH + f".corrupt-{int(time.time())}"
+        try:
+            os.replace(CONFIG_PATH, aside)
+        except OSError:
+            aside = "(couldn't move the corrupt file aside)"
+        RECOVERED_FROM = aside
+        print(f"!! config.json is corrupt ({e}) — moved to {aside}; check data/backups/ to restore")
         stored = {}
     return _deep_merge(DEFAULTS, stored)
 
 
+def _prune(paths: list[str], keep: int) -> None:
+    for p in sorted(paths)[:-keep] if len(paths) > keep else []:
+        try:
+            os.remove(p)
+        except OSError:
+            pass
+
+
+def _rotate_backups() -> None:
+    """Copy the current config aside before it's overwritten: a rolling ring of
+    the last KEEP_BACKUPS saves (throttled to one per minute so a burst of
+    autosaves doesn't flush the whole ring) plus one snapshot per day."""
+    if not os.path.exists(CONFIG_PATH):
+        return
+    try:
+        os.makedirs(BACKUP_DIR, exist_ok=True)
+        ring = [os.path.join(BACKUP_DIR, f) for f in os.listdir(BACKUP_DIR)
+                if f.startswith("config.ring-")]
+        newest = max((os.path.getmtime(p) for p in ring), default=0)
+        if time.time() - newest >= 60:
+            shutil.copy2(CONFIG_PATH, os.path.join(BACKUP_DIR, f"config.ring-{int(time.time())}.json"))
+            _prune([os.path.join(BACKUP_DIR, f) for f in os.listdir(BACKUP_DIR)
+                    if f.startswith("config.ring-")], KEEP_BACKUPS)
+        daily = os.path.join(BACKUP_DIR, f"config.daily-{time.strftime('%Y-%m-%d')}.json")
+        if not os.path.exists(daily):
+            shutil.copy2(CONFIG_PATH, daily)
+            _prune([os.path.join(BACKUP_DIR, f) for f in os.listdir(BACKUP_DIR)
+                    if f.startswith("config.daily-")], KEEP_DAILY)
+    except OSError as e:
+        print(f"!! config backup rotation failed: {e}")
+
+
+def _fsync_dir(path: str) -> None:
+    """fsync the directory so the rename itself survives power loss (no-op on
+    platforms that can't fsync a directory, e.g. Windows)."""
+    try:
+        fd = os.open(path, os.O_RDONLY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    except OSError:
+        pass
+
+
 def save(cfg: dict) -> dict:
     os.makedirs(DATA_DIR, exist_ok=True)
+    cfg["config_rev"] = int(cfg.get("config_rev") or 0) + 1
+    _rotate_backups()
     fd, tmp = tempfile.mkstemp(dir=DATA_DIR, prefix=".config-", suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             json.dump(cfg, fh, indent=2)
+            fh.flush()
+            os.fsync(fh.fileno())   # data on disk BEFORE the rename makes it live
         try:
             os.chmod(tmp, 0o600)   # protect the token on desktop; best-effort on
         except OSError:            # Android, where app-private storage is already isolated
             pass
         os.replace(tmp, CONFIG_PATH)
+        _fsync_dir(DATA_DIR)
     finally:
         if os.path.exists(tmp):
             os.remove(tmp)

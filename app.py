@@ -140,6 +140,8 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "pumpdirect_path": cfg.get("pumpdirect_path"),
         "has_token": bool(cfg.get("discord_token")),
         "bot_error": botmgr.last_error,
+        "config_rev": cfg.get("config_rev", 0),
+        "recovered_config": config_store.RECOVERED_FROM,
         "silence_onoff_log": cfg.get("silence_onoff_log", False),
         "mock_mode": cfg.get("mock_mode", False),
         "mock_calibration_seconds_to_100": cfg.get("mock_calibration_seconds_to_100", 60),
@@ -182,9 +184,28 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
             raise web.HTTPForbidden(text="bad origin")
 
     # ---- config -----------------------------------------------------------
+    # Minimum shape per key — a patch with the wrong container type is refused
+    # (a malformed import/tab can't put a string where the engine expects a list).
+    _TYPE_FLOOR = {"commands": list, "events": list, "modes": list, "prizes": list,
+                   "capacity_ranges": list, "listen_targets": list, "broadcasts": list,
+                   "always_on_commands": list, "cooldown_exempt_user_ids": list,
+                   "cooldown_exempt_names": list, "command_names": dict, "roll": dict,
+                   "max_roll_prize": dict, "auto_report": dict, "templates": dict,
+                   "vendors": dict, "allow": dict, "server_channels": dict}
+
     async def set_config(request):
         await guard(request)
         body = await _json(request)
+        # Optimistic concurrency: a client that sends the rev it last saw is
+        # rejected if someone else saved since — the fix for the stale-tab
+        # full-snapshot clobber. Clients that send no rev skip the check.
+        if "config_rev" in body:
+            try:
+                client_rev = int(body.get("config_rev") or 0)
+            except (TypeError, ValueError):
+                client_rev = -1
+            if client_rev != config_store.load().get("config_rev", 0):
+                raise web.HTTPConflict(text="config changed elsewhere — reload and retry")
         patch = {}
         for key in ("command_prefix", "command_names", "capacity_message",
                     "roll_enabled", "system_buffer_seconds", "cooldown_message", "cooldown_reset_message", "pumptimer_message", "pump_message",
@@ -200,6 +221,9 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
                     "listener_message_on", "listener_message_off",
                     "pause_message", "resume_message", "paused_notice_message"):
             if key in body:
+                want = _TYPE_FLOOR.get(key)
+                if want and not isinstance(body[key], want):
+                    raise web.HTTPBadRequest(text=f"{key} must be a {want.__name__}")
                 patch[key] = body[key]
         cfg = config_store.update(patch)
         engine.set_config(cfg)
