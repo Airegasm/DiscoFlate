@@ -1,6 +1,6 @@
 {
-  "version": "3.0.4",
-  "versionCode": 38,
+  "version": "3.0.5",
+  "versionCode": 39,
   "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk",
-  "notes": "DiscoFlate v3.0.4 \u2014 event activation/in-process/cooldown lines post AFTER the command reply; owner bypasses cooldowns + max-uses (still limited by in-progress events)"
+  "notes": "DiscoFlate v3.0.5 \u2014 fix event message ordering: activation + fire-immediately first round now post in order after the reply (no tick race)"
 }

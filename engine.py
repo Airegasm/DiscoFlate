@@ -631,44 +631,62 @@ class Engine:
             self._event_last[key] = now
             if last is None and not ev.get("fire_immediately"):
                 continue  # first tick just arms the timer (delay before first fire)
-            one_shot = (ev.get("mode") or "loop").lower() == "once"
-            count = self._event_fires.get(key, 0) + 1
-            self._event_fires[key] = count
-            try:
-                cap = int(ev.get("max_repeats") or 0)   # loop cap; 0/blank = unlimited
-            except (TypeError, ValueError):
-                cap = 0
-            ending = one_shot or (cap > 0 and count >= cap)
-            if ending:
-                self._events_done.add(key)   # "once", or a loop that hit its repeat cap → stop
-            # Loop placeholders for the event's message(s). [next_round] is a
-            # smart line: "Next Round in N seconds" on every round except the last.
-            next_round = "" if ending else f"Next Round in {every:g} seconds"
-            loop_ctx = {"current_loop": count, "total_loops": ("∞" if cap <= 0 else str(cap)),
-                        "loop_timer": f"{every:g}", "event": name, "next_round": next_round}
-            try:
-                await self._run_event(ev, loop_ctx)
-            except Exception as e:  # noqa: BLE001
-                self._log("error", f"event {name} failed: {e}")
-            if ending:
-                # Loop finished: leave runtime-on, drop the activator, start its
-                # cooldown, post the end message.
-                self._runtime_events_on.discard(key)
-                self._event_activator.pop(key, None)
-                try:
-                    cdn = float(ev.get("cooldown") or 0)
-                except (TypeError, ValueError):
-                    cdn = 0.0
-                if cdn > 0:
-                    self._event_cooldown_until[key] = time.monotonic() + cdn
-                em = (ev.get("end_message") or "").strip()
-                if em:
-                    try:
-                        await self._announce(self.render(em, loop_ctx), None)
-                    except Exception as e:  # noqa: BLE001
-                        self._log("error", f"event {name} end msg failed: {e}")
+            await self._fire_event_once(ev, key)
 
-    async def _run_event(self, ev: dict, extra: dict | None = None) -> None:
+    async def _emit(self, text: str, sink: list | None = None) -> None:
+        """Append to `sink` (in-order, for the immediate first round) or broadcast."""
+        if sink is not None:
+            sink.append(text)
+        else:
+            await self._announce(text, None)
+
+    async def _fire_event_once(self, ev: dict, key: str, sink: list | None = None) -> None:
+        """Run one iteration of an event: bump the loop count, fire it, and on the
+        final round drop the activator, start its cooldown and post the end message.
+        With `sink` set, messages go into that list (used for the immediate first
+        round so it follows the command reply) instead of broadcasting now."""
+        name = (ev.get("name") or "").strip()
+        one_shot = (ev.get("mode") or "loop").lower() == "once"
+        try:
+            every = float(ev.get("every") or 0)
+        except (TypeError, ValueError):
+            every = 0
+        try:
+            cap = int(ev.get("max_repeats") or 0)   # loop cap; 0/blank = unlimited
+        except (TypeError, ValueError):
+            cap = 0
+        count = self._event_fires.get(key, 0) + 1
+        self._event_fires[key] = count
+        ending = one_shot or (cap > 0 and count >= cap)
+        if ending:
+            self._events_done.add(key)   # "once", or a loop that hit its repeat cap → stop
+        # [next_round] is a smart line: "Next Round in N seconds" except the last round.
+        next_round = "" if ending else f"Next Round in {every:g} seconds"
+        loop_ctx = {"current_loop": count, "total_loops": ("∞" if cap <= 0 else str(cap)),
+                    "loop_timer": f"{every:g}", "event": name, "next_round": next_round}
+        try:
+            await self._run_event(ev, loop_ctx, sink=sink)
+        except Exception as e:  # noqa: BLE001
+            self._log("error", f"event {name} failed: {e}")
+        if ending:
+            # Loop finished: leave runtime-on, drop the activator, start its
+            # cooldown, post the end message.
+            self._runtime_events_on.discard(key)
+            self._event_activator.pop(key, None)
+            try:
+                cdn = float(ev.get("cooldown") or 0)
+            except (TypeError, ValueError):
+                cdn = 0.0
+            if cdn > 0:
+                self._event_cooldown_until[key] = time.monotonic() + cdn
+            em = (ev.get("end_message") or "").strip()
+            if em:
+                try:
+                    await self._emit(self.render(em, loop_ctx), sink)
+                except Exception as e:  # noqa: BLE001
+                    self._log("error", f"event {name} end msg failed: {e}")
+
+    async def _run_event(self, ev: dict, extra: dict | None = None, sink: list | None = None) -> None:
         name = ev.get("name", "event")
         action = (ev.get("action") or "message").lower()
         msg = (ev.get("message") or "").strip()
@@ -702,7 +720,7 @@ class Engine:
                     **(extra or {})}
             tmpl = (ev.get("success_message") if win else ev.get("failure_message")) or msg
             if tmpl:
-                await self._announce(self.render(tmpl, base), None)
+                await self._emit(self.render(tmpl, base), sink)
             return
 
         if action == "capacity":
@@ -735,7 +753,7 @@ class Engine:
             self._log("bot", f"event '{name}': message")
 
         if msg:
-            await self._announce(self.render(msg, extra), None)
+            await self._emit(self.render(msg, extra), sink)
 
     def _cooldown_reply(self, who: str, remaining: float, uid=None, cmdkey: str = "") -> str:
         tmpl = self.cfg.get("cooldown_message") or "⏳ [mention], [cmd] is on cooldown — [cooldown]s left"
@@ -1268,6 +1286,11 @@ class Engine:
             am = (ev.get("activation_message") or "").strip()
             if am:
                 posts.append(self.render(am, self._event_ctx(ev)))
+            if ev.get("fire_immediately"):
+                # Fire round 1 right now, in order (after the activation line),
+                # instead of racing the async tick loop. The tick then waits `every`.
+                self._event_last[key] = now
+                await self._fire_event_once(ev, key, sink=posts)
         return posts
 
     def _event_by_name(self, key: str) -> dict | None:

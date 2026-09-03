@@ -46,7 +46,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setTitle("DiscoFlate · v3.0.4");
+        setTitle("DiscoFlate · v3.0.5");
 
         try {
             PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
