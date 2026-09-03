@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("com.chaquo.python")
@@ -23,7 +25,7 @@ android {
         create("release") {
             // Created once; keystore.properties + the .keystore are git-ignored.
             // BACK BOTH UP — losing them breaks every user's in-place updates.
-            val props = java.util.Properties()
+            val props = Properties()
             val f = rootProject.file("keystore.properties")
             if (f.exists()) {
                 f.inputStream().use { props.load(it) }
@@ -54,7 +56,7 @@ chaquopy {
         version = "3.12"
         // Machine-specific path comes from local.properties (buildPython=…);
         // falls back to python3.12 on PATH.
-        val lp = java.util.Properties()
+        val lp = Properties()
         val lf = rootProject.file("local.properties")
         if (lf.exists()) lf.inputStream().use { lp.load(it) }
         buildPython(lp.getProperty("buildPython") ?: "python3.12")
