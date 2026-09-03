@@ -953,6 +953,16 @@ async function api(path, body){
 // next autosave 409s with a bogus "changed in another tab".
 function adoptRev(s){ if(s && s.config_rev!=null) configRev = s.config_rev; return s; }
 async function syncRev(){ try{ adoptRev(await (await fetch('/api/state')).json()); }catch(e){} }
+// Rev-bumping calls can be SLOW (e.g. activation-ON broadcasts to Discord
+// before responding). While one is in flight the debounced autosave must wait,
+// or it posts the old rev and 409s against our own call. pendingRev counts
+// in-flight rev-bumping requests; doSave defers while it's non-zero.
+let pendingRev = 0;
+async function apiRev(path, body){
+  pendingRev++;
+  try{ return adoptRev(await api(path, body)); }
+  finally{ pendingRev--; }
+}
 async function act(path){
   try{ await api(path); }catch(e){ toastMsg('⚠ failed: '+(e.message||e)); }
   refresh();
@@ -960,6 +970,7 @@ async function act(path){
 // Config saves from the explicit Save buttons: carries the concurrency rev and
 // surfaces failures (a 409 means another tab/process saved first — reload).
 async function saveCfg(patch){
+  pendingRev++;
   try{
     const s = await api('/api/config', {...patch, config_rev: configRev});
     applyState(s, true);
@@ -971,7 +982,7 @@ async function saveCfg(patch){
     } else {
       toastMsg('⚠ save failed: '+(e.message||e));
     }
-  }
+  }finally{ pendingRev--; }
 }
 
 // ---- snapshot / camera (uses this machine's cameras via the browser) ----
@@ -1074,13 +1085,15 @@ let ctrlInit = false;
 function operatorName(){ return ctrlOperatorDefault || ''; }
 async function ctl(path, body){
   const msg=$('#ctrlMsg');
+  pendingRev++;   // stop/resume persist the pause latch → rev bumps server-side
   try{
     const r = await api(path, {who: operatorName(), ...(body||{})});
     if(msg){ msg.textContent = r && r.ok ? 'sent ✓' : ('✗ '+((r&&r.error)||'failed')); setTimeout(()=>{ if(msg) msg.textContent=''; }, 3500); }
-    await syncRev();   // stop/resume persist the pause latch → rev bumped server-side
+    await syncRev();
     refresh();
     return r;
   }catch(e){ if(msg){ msg.textContent='✗ '+(e.message||e); } }
+  finally{ pendingRev--; }
 }
 async function controlRoll(){ ctl('/api/control/roll', {dice:+$('#ctrlDice').value, sides:+$('#ctrlSides').value}); }
 let sessionPaused = false;
@@ -1151,6 +1164,7 @@ function renderRemoteAccess(st){
 }
 async function saveRemoteAccess(){
   const m=$('#raMsg');
+  pendingRev++;
   try{
     const s = await api('/api/remote-access', {enabled: $('#raEnabled').checked, allowed_ips: remoteIps});
     applyState(s, true);
@@ -1159,7 +1173,7 @@ async function saveRemoteAccess(){
     if(m) m.textContent='✗ '+(e.message||e);
     toastMsg('⚠ remote access: '+(e.message||e));
     try{ applyState(await (await fetch('/api/state')).json(), true); }catch(_){ }
-  }
+  }finally{ pendingRev--; }
 }
 function addRemoteIp(){
   const inp=$('#raNewIp'); const v=(inp.value||'').trim();
@@ -1250,10 +1264,10 @@ async function pullUpdates(){
 }
 
 $('#listener').addEventListener('change', async e => {
-  adoptRev(await api('/api/listener', {enabled: e.target.checked})); refresh();
+  await apiRev('/api/listener', {enabled: e.target.checked}); refresh();
 });
 $('#mock').addEventListener('change', async e => {
-  adoptRev(await api('/api/mock', {enabled: e.target.checked})); refresh();
+  await apiRev('/api/mock', {enabled: e.target.checked}); refresh();
 });
 
 async function saveToken(){
@@ -1928,7 +1942,7 @@ async function saveCommands(){ await saveCfg({commands: cleanCommands()}); }
 function toggleCmd(i, on){
   commandRows[i].enabled = on;
   const nm=(commandRows[i].name||'').trim().toLowerCase();
-  if(savedCmdNames.has(nm)) api('/api/command-toggle', {name:nm, enabled:on}).then(adoptRev).catch(e=>toastMsg('⚠ '+(e.message||e)));  // live for saved cmds
+  if(savedCmdNames.has(nm)) apiRev('/api/command-toggle', {name:nm, enabled:on}).catch(e=>toastMsg('⚠ '+(e.message||e)));  // live for saved cmds
   scheduleSave();   // renamed-but-unsaved commands persist via the full save
 }
 
@@ -2090,10 +2104,12 @@ function _tplList(kind){ templatesData[kind]=templatesData[kind]||[]; return tem
 // persist just the templates map — DON'T full-applyState (that would reload the
 // editor rows from the server and could revert unsaved command/event edits).
 async function saveTemplates(){
+  pendingRev++;
   try{
     const s = await api('/api/config', {templates: templatesData, config_rev: configRev});
     configRev = s.config_rev ?? configRev;
   }catch(e){ toastMsg('⚠ template save failed: '+(e.message||e)); }
+  finally{ pendingRev--; }
   renderTemplates();
 }
 // pick a name not already taken (case-insensitive): foo → foo-copy → foo-copy-2 …
@@ -2252,7 +2268,7 @@ function renderVendorCreds(){
 }
 async function setCred(v,f,val){
   try{
-    const s = adoptRev(await api('/api/vendors', {vendor:v, creds:{[f]:val}}));
+    const s = await apiRev('/api/vendors', {vendor:v, creds:{[f]:val}});
     vendorsSet = JSON.parse(JSON.stringify(s.vendors_set||{}));
     renderVendorCreds();
   }catch(e){ toastMsg('⚠ credential save failed: '+(e.message||e)); }
@@ -2301,8 +2317,10 @@ function renderDevices(st){
 }
 // device endpoints share one wrapper so failures surface instead of vanishing
 async function devApi(path, body){
+  pendingRev++;
   try{ applyState(await api(path, body), true); }
   catch(e){ toastMsg('⚠ '+(e.message||e)); }
+  finally{ pendingRev--; }
 }
 async function setActive(id){ await devApi('/api/devices/active',{id}); }
 async function setDevType(id,type){ await devApi('/api/devices/type',{id,type}); }
@@ -2590,8 +2608,8 @@ function openExternal(url, ev){
   if(window.Android && window.Android.openUrl){ if(ev) ev.preventDefault(); window.Android.openUrl(url); return false; }
   return true;
 }
-function setSilence(v){ api('/api/config', {silence_onoff_log: !!v}).then(adoptRev).catch(()=>{}); }
-function setMockCal(v){ api('/api/config', {mock_calibration_seconds_to_100: parseFloat(v)||60}).then(adoptRev).catch(()=>{}); }
+function setSilence(v){ apiRev('/api/config', {silence_onoff_log: !!v}).catch(()=>{}); }
+function setMockCal(v){ apiRev('/api/config', {mock_calibration_seconds_to_100: parseFloat(v)||60}).catch(()=>{}); }
 function fallbackCopy(text,done){
   try{
     const ta=document.createElement('textarea'); ta.value=text;
@@ -2651,6 +2669,10 @@ function saveBadge(ok){
 }
 async function doSave(){
   saveT = null;
+  if(pendingRev > 0){                 // a rev-bumping call is in flight — wait
+    saveT = setTimeout(doSave, 300);  // for its response so we save with the
+    return;                           // fresh rev instead of 409ing against it
+  }
   const payload = gatherConfig();
   if(configRev != null) payload.config_rev = configRev;
   try{
@@ -2672,9 +2694,15 @@ async function doSave(){
     clearTimeout(saveT); saveT = setTimeout(doSave, 3000);   // keep retrying
   }
 }
-// any edit to a config field schedules a debounced save (token/device fields save via their own endpoints)
-document.addEventListener('input', scheduleSave);
-document.addEventListener('change', scheduleSave);
+// any edit to a config field schedules a debounced save. Controls that save
+// through their OWN endpoint (or are pure runtime state) are excluded — a full
+// config save for them is pointless and used to race their endpoint's rev bump.
+const NO_AUTOSAVE_IDS = new Set(['mock','listener','silenceOnOff','token','announceChan',
+  'raEnabled','raNewIp','capSlider','capInput','ctrlDice','ctrlSides','ctrlPump',
+  'ctrlBroadcast','camSelect','camMirror','camZoomSlider','snapCaption','importFile']);
+function maybeSave(e){ if(e.target && NO_AUTOSAVE_IDS.has(e.target.id)) return; scheduleSave(); }
+document.addEventListener('input', maybeSave);
+document.addEventListener('change', maybeSave);
 // tab closing with a save still debounced → flush it now (best-effort beacon)
 window.addEventListener('beforeunload', ()=>{
   if(!saveT) return;

@@ -1,6 +1,6 @@
 {
-  "version": "3.9.0",
-  "versionCode": 64,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.9.0/discoflate.apk",
-  "notes": "DiscoFlate v3.9.0 \u2014 remediation complete: announce channel works (gets every broadcast), games can start events, per-command Range gate, operator Pump message editable, live per-device fire timers, Minigames guide in Help, fixed the false 'config changed in another tab' popup, dead endpoints removed, importer hardening."
+  "version": "3.9.1",
+  "versionCode": 65,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.9.1/discoflate.apk",
+  "notes": "DiscoFlate v3.9.1 \u2014 properly kills the false 'config changed in another tab' popup: autosave now waits for in-flight saves (e.g. Activation-ON broadcasts) instead of racing them, and runtime toggles no longer trigger config autosaves at all."
 }
