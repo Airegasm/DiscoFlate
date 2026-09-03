@@ -522,6 +522,17 @@ class BotManager:
         view = PollVoteView(self, options) if options else None
         await self.broadcast("", None, embed=e, view=view)
 
+    async def post_broadcast_embed(self, text: str) -> None:
+        """A broadcast-preset action → a rich embed card (always an embed, like
+        the operator Broadcast Custom's, regardless of rich_output)."""
+        try:
+            e = discord.Embed(description=(text or "")[:4096],
+                              color=self._EMBED_COLORS.get("broadcast", 0x9B59B6))
+        except Exception:  # noqa: BLE001 — no embed support → plain text
+            await self.broadcast(text, None)
+            return
+        await self.broadcast("", None, embed=e)
+
     async def handle_vote_interaction(self, interaction, option_number: int) -> None:
         """Shared by the vote buttons and the /vote slash command: cast the
         ballot, confirm privately (ephemeral), broadcast the quiet notice."""

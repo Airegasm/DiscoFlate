@@ -1,6 +1,6 @@
 {
-  "version": "3.15.1",
-  "versionCode": 81,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.15.1/discoflate.apk",
-  "notes": "DiscoFlate v3.15.1 \u2014 capacity-event messages now tag as [CAPACITY EVENT] (when output headers are on) instead of the internal '[capacity event <name>]'."
+  "version": "3.16.0",
+  "versionCode": 82,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.16.0/discoflate.apk",
+  "notes": "DiscoFlate v3.16.0 \u2014 timed events no longer prefix an output header; broadcast actions (timed events, capacity-event blocks, poll outcomes) now post as rich embed cards."
 }

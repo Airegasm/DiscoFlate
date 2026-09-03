@@ -131,6 +131,7 @@ class Engine:
         self.end_session_cb = None             # async () -> None : deactivate without the off-message
         self.cancel_games_cb = None            # async () -> None : cancel all live minigame views
         self.embed_cb = None                   # async (title, text) -> None : rich embed post (polls)
+        self.broadcast_embed_cb = None         # async (text) -> None : broadcast-preset embed
         self.bot_connected: bool = False
 
         # Device add/search/use debug flows into the Activity log too (not just stdout).
@@ -952,7 +953,7 @@ class Engine:
                     if row is None:
                         self._log("error", f"{name}: no broadcast named '{a.get('broadcast')}'")
                     elif (row.get("message") or "").strip():
-                        await self._announce(self._evt_hdr(hdr) + self.render(row["message"].strip()), None)
+                        await self._post_broadcast(self.render(row["message"].strip()))
                     continue
                 if typ == "poll":
                     pd = self.find_poll(a.get("poll"))
@@ -1037,6 +1038,18 @@ class Engine:
 
     def poll_active(self) -> bool:
         return self._poll is not None
+
+    async def _post_broadcast(self, text: str) -> None:
+        """Post a Broadcast-preset action as a rich embed (falls back to text)."""
+        if not (text or "").strip():
+            return
+        if self.broadcast_embed_cb:
+            try:
+                await self.broadcast_embed_cb(text)
+                return
+            except Exception as e:  # noqa: BLE001
+                self._log("error", f"broadcast embed failed: {e}")
+        await self._announce(text, None)
 
     async def _announce_poll(self, title: str, text: str, options: list | None = None) -> None:
         """Post the poll as a rich embed (falls back to plain text). `options`
@@ -1282,13 +1295,13 @@ class Engine:
                 try:
                     # Same replace_key: the end message deletes the final round and
                     # stays put (the next run uses a new run id, so it's never wiped).
-                    await self._emit(self._evt_hdr(name) + self.render(em, loop_ctx), sink, replace_key=replace_key)
+                    await self._emit(self.render(em, loop_ctx), sink, replace_key=replace_key)
                 except Exception as e:  # noqa: BLE001
                     self._log("error", f"event {name} end msg failed: {e}")
             # The event has ended and cleared — queue its post-event commands
             # detached (they run on their own timeline, not part of the event).
             if not self._paused and not self._end_triggered:
-                self._spawn_post_actions(ev.get("post_actions"), f"event {name} (post)", hdr=name)
+                self._spawn_post_actions(ev.get("post_actions"), f"event {name} (post)", hdr="")
 
     async def _run_event(self, ev: dict, extra: dict | None = None, sink: list | None = None,
                          replace_key: str | None = None) -> None:
@@ -1325,7 +1338,7 @@ class Engine:
                     **(extra or {})}
             tmpl = (ev.get("success_message") if win else ev.get("failure_message")) or msg
             if tmpl:
-                await self._emit(self._evt_hdr(name) + self.render(tmpl, base), sink, replace_key=replace_key)
+                await self._emit(self.render(tmpl, base), sink, replace_key=replace_key)
             return
 
         if action == "broadcast":
@@ -1335,10 +1348,10 @@ class Engine:
             if row is None:
                 self._log("error", f"event '{name}': no broadcast named '{ev.get('broadcast')}'")
             elif (row.get("message") or "").strip():
-                await self._emit(self._evt_hdr(name) + self.render(row["message"].strip(), extra),
-                                 sink, replace_key=replace_key)
+                # broadcast actions post as a rich embed (not sink text)
+                await self._post_broadcast(self.render(row["message"].strip(), extra))
             if msg:
-                await self._emit(self._evt_hdr(name) + self.render(msg, extra), sink, replace_key=replace_key)
+                await self._emit(self.render(msg, extra), sink, replace_key=replace_key)
             return
 
         if action == "poll":
@@ -1353,7 +1366,7 @@ class Engine:
             if not res.get("ok"):
                 self._log("error", f"event '{name}': {res.get('error')}")
             if msg:
-                await self._emit(self._evt_hdr(name) + self.render(msg, extra), sink, replace_key=replace_key)
+                await self._emit(self.render(msg, extra), sink, replace_key=replace_key)
             return
 
         if action == "capacity":
@@ -1388,7 +1401,7 @@ class Engine:
             self._log("bot", f"event '{name}': message")
 
         if msg:
-            await self._emit(self._evt_hdr(name) + self.render(msg, extra), sink, replace_key=replace_key)
+            await self._emit(self.render(msg, extra), sink, replace_key=replace_key)
 
     def _cooldown_reply(self, who: str, remaining: float, uid=None, cmdkey: str = "") -> str:
         tmpl = self.cfg.get("cooldown_message") or "⏳ [mention], [cmd] is on cooldown — [cooldown]s left"
