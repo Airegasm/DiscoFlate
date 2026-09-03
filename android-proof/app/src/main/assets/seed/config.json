@@ -350,10 +350,69 @@
       "description": "flip a coin",
       "start_events": [],
       "range_gate": "all"
+    },
+    {
+      "name": "pumproulette",
+      "type": "say",
+      "reply": "\ud83c\udfb0 **[user]** pulls the trigger on **[prefix]pumproulette**\u2026",
+      "start_events": [
+        "PumpRoulette"
+      ],
+      "enabled": true,
+      "owner_only": false,
+      "mention": false,
+      "hide_in_list": false,
+      "description": "spin the pump roulette \u2014 3 rounds of 50/50 +5s or +20s",
+      "seconds": null,
+      "dice": null,
+      "sides": null,
+      "device_id": null,
+      "fires": [],
+      "fail_fires": [],
+      "chance": null,
+      "luck": null,
+      "success_reply": "",
+      "failure_reply": "",
+      "range_gate": "all"
     }
   ],
   "modes": [],
-  "events": [],
+  "events": [
+    {
+      "name": "PumpRoulette",
+      "enabled": false,
+      "mode": "loop",
+      "every": 5,
+      "max_repeats": 3,
+      "action": "chance",
+      "chance": 50,
+      "luck": null,
+      "fires": [
+        {
+          "device_id": null,
+          "seconds": 20
+        }
+      ],
+      "fail_fires": [
+        {
+          "device_id": null,
+          "seconds": 5
+        }
+      ],
+      "success_message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udd34 **BIG HIT!** +20s pump! (Capacity now [capacity]%)",
+      "failure_message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udfe2 lucky, only +5s. (Capacity now [capacity]%)",
+      "activation_message": "\ud83c\udfb0 **PumpRoulette** begins \u2014 [total_loops] spins, each a 50/50 gamble between **+5s** and **+20s**. Hold on!",
+      "end_message": "\ud83c\udfb0 **PumpRoulette** complete!",
+      "cooldown": 30,
+      "message": "",
+      "seconds": null,
+      "dice": null,
+      "sides": null,
+      "device_id": null,
+      "capacity_op": "add",
+      "capacity_value": 0
+    }
+  ],
   "max_roll_prize": {
     "enabled": false,
     "goal": 3,
@@ -422,6 +481,17 @@
   "pumpdirect_path": "",
   "always_on_enabled": true,
   "always_on_commands": [
-    "cointoss"
-  ]
+    {
+      "name": "cointoss",
+      "cooldown": null,
+      "max_uses": null
+    },
+    {
+      "name": "pumproulette",
+      "cooldown": null,
+      "max_uses": 1
+    }
+  ],
+  "event_in_process_message": "\u23f3 [event] is already running.",
+  "event_cooldown_message": "\u23f3 [event] is on cooldown \u2014 [cooldown]s left."
 }

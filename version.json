@@ -1,6 +1,6 @@
 {
-  "version": "3.0.0",
-  "versionCode": 34,
+  "version": "3.0.1",
+  "versionCode": 35,
   "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk",
-  "notes": "DiscoFlate v3.0.0 \u2014 event overhaul: intelligent activation, per-event cooldown + activation/end messages, global in-process/cooldown messages, event chance action with win/fail fires; aligned Pump Timer"
+  "notes": "DiscoFlate v3.0.1 \u2014 Always-On per-command cooldown + max-uses; default PumpRoulette event + !pumproulette (always-on, max 1); always-on shown in [commands]; Restore Defaults on Events"
 }

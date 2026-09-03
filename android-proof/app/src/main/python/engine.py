@@ -417,12 +417,25 @@ class Engine:
         sides = e.get("sides") if e.get("sides") not in (None, "", 0) else r.get("sides")
         return int(dice or 1), int(sides or 6)
 
+    def _always_on_map(self) -> dict:
+        """{name_lower: entry} for always-on commands (when enabled). Each entry is
+        either a bare name string or {name, cooldown, max_uses}."""
+        if not self.cfg.get("always_on_enabled"):
+            return {}
+        out = {}
+        for item in (self.cfg.get("always_on_commands") or []):
+            if isinstance(item, dict):
+                nm = str(item.get("name") or "").strip().lower()
+                if nm:
+                    out[nm] = item
+            elif item:
+                out[str(item).strip().lower()] = {}
+        return out
+
     def _is_always_on(self, cmdkey: str) -> bool:
         """True if this custom command is in the global Always-On set — active in
         every range, bypassing per-range membership (when always_on_enabled)."""
-        if not self.cfg.get("always_on_enabled"):
-            return False
-        return cmdkey in {str(n).strip().lower() for n in (self.cfg.get("always_on_commands") or [])}
+        return cmdkey in self._always_on_map()
 
     def cmd_enabled_in_range(self, cmdkey: str) -> bool:
         """Roll: active in every range unless toggled off. Custom command: active
@@ -437,8 +450,15 @@ class Engine:
         return e is not None and e.get("enabled", True) is not False
 
     def cmd_max_uses(self, cmdkey: str) -> int | None:
-        """Per-person session use budget for a command. Defined once (the first
-        range that sets it, low→high); it carries over ranges (never replenishes)."""
+        """Per-person session use budget for a command. An always-on command can
+        set its own; otherwise it's defined once (the first range that sets it,
+        low→high) and carries over ranges (never replenishes)."""
+        ao = self._always_on_map().get(cmdkey)
+        if ao and ao.get("max_uses") not in (None, "", 0):
+            try:
+                return int(ao["max_uses"])
+            except (TypeError, ValueError):
+                pass
         for r in sorted(self.cfg.get("capacity_ranges", []), key=lambda r: r.get("min", 0)):
             mu = self._range_entry(r, cmdkey).get("max_uses")
             if mu not in (None, "", 0):
@@ -521,6 +541,13 @@ class Engine:
             else:
                 cd = self._cooldown()
             return cd, (e.get("scope") or "user").lower()
+        # No range entry — an always-on command may set its own cooldown.
+        ao = self._always_on_map().get(cmdkey)
+        if ao and ao.get("cooldown") not in (None, ""):
+            try:
+                return max(0.0, float(ao["cooldown"])), "user"
+            except (TypeError, ValueError):
+                pass
         return self._cooldown(), "user"
 
     def cooldown_remaining(self, key_uid: str, cmdkey: str, cd: float | None = None) -> float:
@@ -1392,14 +1419,15 @@ class Engine:
         return f"{r.get('min')}%-{r.get('max')}%"
 
     def _custom_command_lines(self, prefix: str) -> list[str]:
-        """Non-system commands active in the CURRENT range (member + enabled)."""
+        """Non-system commands usable right now — members of the CURRENT range OR
+        always-on (cmd_enabled_in_range covers both), enabled and not hidden."""
         lines = []
         for c in self.cfg.get("commands", []):
             nm = (c.get("name") or "").strip()
             if not nm or not c.get("enabled", True) or c.get("hide_in_list"):
                 continue
             if not self.cmd_enabled_in_range(nm.lower()):
-                continue  # not a member of the current range
+                continue  # not in this range (always-on commands always pass)
             line = f"**{prefix}{nm}**"
             desc = (c.get("description") or "").strip()
             if desc:
@@ -1427,8 +1455,8 @@ class Engine:
         return header + ("\n" + "\n".join(lines) if lines else "")
 
     def _commands_str(self, prefix: str) -> str:
-        """[commands] — the custom commands for the CURRENT range on top, then the
-        system commands underneath, each under its own header."""
+        """[commands] — the custom commands usable now (current range + always-on)
+        on top, then the system commands underneath, each under its own header."""
         parts = [self.custom_commands_str(prefix)]
         sys_lines = self._system_command_lines(prefix)
         if sys_lines:

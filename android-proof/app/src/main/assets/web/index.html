@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.0.0</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.0.1</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -473,6 +473,7 @@
       <div id="events"></div>
       <div class="row" style="margin-top:10px">
         <button class="ghost" onclick="addEvent()">+ Add event</button>
+        <button class="warn" onclick="restoreDefaults()">↻ Restore Default Config</button>
         <div style="flex:1"></div>
         <button onclick="saveEvents()">Save events</button>
       </div>
@@ -497,7 +498,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v3.0.0.</span>
+        <span class="muted" id="updMsg">You're on v3.0.1.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -1302,22 +1303,37 @@ function rangeGateOptions(sel){
 }
 
 // ---- always-on commands (work in every range, bypass membership) ----
+// alwaysOnList holds {name, cooldown, max_uses} objects (legacy string names are normalised on load).
 let alwaysOnList = [];
+function aoName(a){ return (typeof a==='string') ? a : (a && a.name || ''); }
 function renderAlwaysOn(){
   const box=$('#alwaysOnBox'); if(!box) return;
   const on = $('#alwaysOnEnabled') && $('#alwaysOnEnabled').checked;
-  const chips = alwaysOnList.map(n=>
-    `<span class="pill" style="display:inline-flex;align-items:center;gap:6px;margin:0 6px 6px 0">!${esc(n)} <button class="ghost" style="padding:0 6px" onclick="removeAlwaysOn('${esc(n)}')">✕</button></span>`).join('');
-  const avail = commandRows.map(c=>(c.name||'').trim()).filter(Boolean)
-    .filter(n=>!alwaysOnList.includes(n.toLowerCase()));
+  const rows = alwaysOnList.map((a,idx)=>{
+    const cd = (typeof a==='object' && a.cooldown!=null)?a.cooldown:'';
+    const mu = (typeof a==='object' && a.max_uses!=null)?a.max_uses:'';
+    return `<div class="row" style="gap:8px;align-items:center;margin-bottom:4px;flex-wrap:wrap">`+
+      `<b style="min-width:120px">!${esc(aoName(a))}</b>`+
+      `<span class="muted">cooldown</span><input type="number" min="0" step="1" value="${cd}" placeholder="def" style="width:70px" onchange="setAlwaysOn(${idx},'cooldown',this.value)"><span class="muted">s</span>`+
+      `<span class="muted">max/person</span><input type="number" min="0" step="1" value="${mu}" placeholder="∞" style="width:70px" onchange="setAlwaysOn(${idx},'max_uses',this.value)">`+
+      `<button class="ghost" onclick="removeAlwaysOnIdx(${idx})">✕</button>`+
+    `</div>`;
+  }).join('');
+  const names = new Set(alwaysOnList.map(a=>aoName(a).toLowerCase()));
+  const avail = commandRows.map(c=>(c.name||'').trim()).filter(Boolean).filter(n=>!names.has(n.toLowerCase()));
   const addSel = avail.length
     ? `<select onchange="addAlwaysOn(this.value); this.selectedIndex=0"><option value="">+ Add command…</option>`+
       avail.map(n=>`<option value="${esc(n)}">!${esc(n)}</option>`).join('')+`</select>`
     : `<span class="muted">No custom commands to add — create some in <b>Custom commands</b>.</span>`;
-  box.innerHTML = `<div style="opacity:${on?1:0.5}"><div style="margin-bottom:4px">${chips||'<span class="muted">none yet</span>'}</div>${addSel}</div>`;
+  box.innerHTML = `<div style="opacity:${on?1:0.5}">${rows||'<span class="muted">none yet</span>'}<div style="margin-top:6px">${addSel}</div></div>`;
 }
-function addAlwaysOn(name){ name=(name||'').trim().toLowerCase(); if(!name) return; if(!alwaysOnList.includes(name)) alwaysOnList.push(name); renderAlwaysOn(); scheduleSave(); }
-function removeAlwaysOn(name){ name=(name||'').trim().toLowerCase(); alwaysOnList=alwaysOnList.filter(n=>String(n).toLowerCase()!==name); renderAlwaysOn(); scheduleSave(); }
+function addAlwaysOn(name){ name=(name||'').trim().toLowerCase(); if(!name) return;
+  if(!alwaysOnList.some(a=>aoName(a).toLowerCase()===name)) alwaysOnList.push({name:name, cooldown:null, max_uses:null});
+  renderAlwaysOn(); scheduleSave(); }
+function removeAlwaysOnIdx(idx){ alwaysOnList.splice(idx,1); renderAlwaysOn(); scheduleSave(); }
+function setAlwaysOn(idx, field, val){ let a=alwaysOnList[idx];
+  if(typeof a==='string'){ a={name:a, cooldown:null, max_uses:null}; alwaysOnList[idx]=a; }
+  a[field] = (val===''?null:+val); scheduleSave(); }
 
 // ---- custom commands (client-side editable, two rows each) ----
 let commandRows = [];
@@ -1867,7 +1883,10 @@ function applyState(st, full){
     commandRows = JSON.parse(JSON.stringify(st.commands||[]));
     savedCmdNames = new Set(commandRows.map(c=>(c.name||'').trim().toLowerCase()));
     if(pruneOrphanMemberships()) api('/api/config', {capacity_ranges: rangeRows});  // clean up stale renamed-command leftovers
-    alwaysOnList = (st.always_on_commands||[]).map(n=>String(n).trim().toLowerCase()).filter(Boolean);
+    alwaysOnList = (st.always_on_commands||[]).map(a=> (typeof a==='string')
+        ? {name:a.trim().toLowerCase(), cooldown:null, max_uses:null}
+        : {name:String(a.name||'').trim().toLowerCase(), cooldown:(a.cooldown??null), max_uses:(a.max_uses??null)})
+      .filter(a=>a.name);
     if($('#alwaysOnEnabled')) $('#alwaysOnEnabled').checked = !!st.always_on_enabled;
     modeRows = JSON.parse(JSON.stringify(st.modes||[]));
     savedModeNames = new Set(modeRows.map(m=>(m.name||'').trim().toLowerCase()));
