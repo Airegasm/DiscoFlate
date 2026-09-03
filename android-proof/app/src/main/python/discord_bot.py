@@ -330,6 +330,17 @@ class BotManager:
         await self.broadcast(self.engine.leaderboard_text(), None)
         return {"ok": True}
 
+    async def operator_broadcast_custom(self, message: str) -> dict:
+        cfg = self.get_config()
+        err = self._operator_ready(cfg)
+        if err:
+            return {"ok": False, "error": err}
+        text = (message or "").strip()
+        if not text:
+            return {"ok": False, "error": "no message selected"}
+        await self.broadcast(self.engine.render(text), None)
+        return {"ok": True}
+
     async def _handle(self, client: discord.Client, message: discord.Message) -> None:
         if message.author.bot or (client.user and message.author.id == client.user.id):
             return

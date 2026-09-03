@@ -38,8 +38,8 @@ PORT = int(os.getenv("DISCOFLATE_PORT", "8765"))
 HOST = "127.0.0.1"
 
 # App version — keep in sync with android versionCode + version.json in the repo.
-VERSION = "3.0.5"
-VERSION_CODE = 39
+VERSION = "3.1.0"
+VERSION_CODE = 40
 VERSION_URL = "https://raw.githubusercontent.com/Airegasm/DiscoFlate/main/version.json"
 
 # Config keys "Restore Default Config" touches (game content). Everything else —
@@ -106,6 +106,7 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "events": cfg.get("events", []),
         "event_in_process_message": cfg.get("event_in_process_message", ""),
         "event_cooldown_message": cfg.get("event_cooldown_message", ""),
+        "broadcasts": cfg.get("broadcasts", []),
         "devices": cfg.get("devices", []),
         "active_device_id": cfg.get("active_device_id"),
         "vendors": cfg.get("vendors", {}),
@@ -184,7 +185,7 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
                     "allow_dms", "server_channels", "vendors", "silence_onoff_log",
                     "mock_calibration_seconds_to_100",
                     "always_on_enabled", "always_on_commands",
-                    "event_in_process_message", "event_cooldown_message",
+                    "event_in_process_message", "event_cooldown_message", "broadcasts",
                     "listener_message_on", "listener_message_off"):
             if key in body:
                 patch[key] = body[key]
@@ -469,6 +470,11 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
         await guard(request)
         return web.json_response(await botmgr.operator_broadcast_leaderboard())
 
+    async def control_broadcast(request):
+        await guard(request)
+        b = await _json(request)
+        return web.json_response(await botmgr.operator_broadcast_custom((b.get("message") or "")))
+
     async def restore_defaults(request):
         await guard(request)
         try:
@@ -624,6 +630,7 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
         web.post("/api/control/stop", control_stop),
         web.post("/api/control/capacity", control_capacity),
         web.post("/api/control/leaderboard", control_leaderboard),
+        web.post("/api/control/broadcast", control_broadcast),
         web.post("/api/restore-defaults", restore_defaults),
         web.post("/api/check-updates", check_updates),
         web.post("/api/pull-updates", pull_updates),

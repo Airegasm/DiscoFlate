@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.0.5</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.1.0</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -189,8 +189,10 @@
           <span class="muted">secs</span>
           <button onclick="controlPump()">💨 Pump</button>
         </div>
-        <div class="row" style="gap:8px;margin-top:10px">
+        <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
           <button class="ghost" onclick="controlCapacity()">📊 Broadcast Capacity</button>
+          <select id="ctrlBroadcast" style="max-width:220px"></select>
+          <button class="ghost" onclick="controlBroadcast()">📢 Broadcast Custom</button>
           <div style="flex:1"></div>
           <span class="muted" id="ctrlMsg"></span>
         </div>
@@ -453,6 +455,18 @@
         switches on temporarily (they revert on Session reset or app restart).</div>
     </div>
 
+    <!-- broadcasts -->
+    <div class="card span" data-tab="commands">
+      <h2>Broadcasts</h2>
+      <div id="broadcasts"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" onclick="addBroadcast()">+ Add broadcast</button>
+        <div style="flex:1"></div>
+        <button onclick="saveBroadcasts()">Save broadcasts</button>
+      </div>
+      <div class="hint">Preset messages you can fire from the <b>Dashboard → Controls</b> (“Broadcast Custom”). Placeholders work (<code>[capacity]</code>, <code>[operator]</code>, …). Posted to your channel as the owner.</div>
+    </div>
+
     <!-- modes -->
     <div class="card span" data-tab="commands">
       <h2>Modes</h2>
@@ -498,7 +512,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v3.0.5.</span>
+        <span class="muted" id="updMsg">You're on v3.1.0.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -865,6 +879,41 @@ async function controlStop(){ ctl('/api/control/stop', {}); }
 async function controlPump(){ ctl('/api/control/pump', {seconds: parseFloat($('#ctrlPump').value)||5}); }
 async function controlCapacity(){ ctl('/api/control/capacity', {}); }
 async function controlLeaderboard(){ ctl('/api/control/leaderboard', {}); }
+async function controlBroadcast(){
+  const sel=$('#ctrlBroadcast'); const name = sel ? sel.value : '';
+  const b = broadcastRows.find(x=>(x.name||'')===name);
+  if(!b){ const m=$('#ctrlMsg'); if(m){ m.textContent='pick a broadcast first'; setTimeout(()=>{if(m)m.textContent='';},2500);} return; }
+  ctl('/api/control/broadcast', {message: b.message||''});
+}
+
+// ---- broadcasts (preset messages) ----
+let broadcastRows = [];
+function renderBroadcasts(){
+  const box=$('#broadcasts'); if(!box) return; box.innerHTML='';
+  if(!broadcastRows.length){ box.innerHTML='<div class="muted">No broadcasts yet.</div>'; }
+  broadcastRows.forEach((b,i)=>{
+    const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap='6px';
+    el.innerHTML =
+      `<div class="row" style="gap:8px">`+
+        `<input value="${esc(b.name||'')}" placeholder="name (shown in the dropdown)" style="width:240px" onchange="broadcastRows[${i}].name=this.value;renderBroadcastDropdown()">`+
+        `<div style="flex:1"></div>`+
+        `<button class="ghost" onclick="broadcastRows.splice(${i},1);renderBroadcasts();renderBroadcastDropdown();scheduleSave()">✕</button>`+
+      `</div>`+
+      `<textarea rows="3" placeholder="message · [capacity] [operator] [commands] …" onchange="broadcastRows[${i}].message=this.value">${esc(b.message||'')}</textarea>`;
+    box.appendChild(el);
+  });
+}
+function addBroadcast(){ broadcastRows.push({name:'',message:''}); renderBroadcasts(); renderBroadcastDropdown(); scheduleSave(); }
+function cleanBroadcasts(){ return broadcastRows.filter(b=>(b.name||'').trim()||(b.message||'').trim()).map(b=>({name:(b.name||'').trim(), message:b.message||''})); }
+async function saveBroadcasts(){ applyState(await api('/api/config', {broadcasts: cleanBroadcasts()}), true); }
+function renderBroadcastDropdown(){
+  const sel=$('#ctrlBroadcast'); if(!sel) return;
+  const prev=sel.value;
+  const opts = broadcastRows.filter(b=>(b.name||'').trim());
+  sel.innerHTML = opts.length ? opts.map(b=>`<option value="${esc(b.name)}">${esc(b.name)}</option>`).join('')
+                              : `<option value="">(no broadcasts — add on Commands)</option>`;
+  if(prev) sel.value = prev;
+}
 
 // ---- restore defaults + check for updates ----
 async function restoreDefaults(){
@@ -1546,47 +1595,65 @@ function evtFiresEditor(i, e, arr, label){
 function evtAddFire(i, arr){ arr=arr||'fires'; eventRows[i][arr]=eventRows[i][arr]||[]; eventRows[i][arr].push({device_id:null,seconds:3}); renderEvents(); scheduleSave(); }
 function evtRemoveFire(i, arr, j){ arr=arr||'fires'; (eventRows[i][arr]||[]).splice(j,1); renderEvents(); scheduleSave(); }
 function evtSetFire(i, arr, j, key, val){ const f=(eventRows[i][arr]||[])[j]; if(!f) return; f[key]=(key==='seconds')?(val===''?null:+val):(val||null); scheduleSave(); }
+let evtOpen = new Set();
+function toggleEvtOpen(i){ if(evtOpen.has(i)) evtOpen.delete(i); else evtOpen.add(i); renderEvents(); }
 function renderEvents(){
   const box=$('#events'); box.innerHTML='';
   if(!eventRows.length){ box.innerHTML='<div class="muted">No events yet.</div>'; return; }
   eventRows.forEach((e,i)=>{
-    const act=e.action||'message';
-    const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap='6px';
-    const deviceSel = `<span class="muted">device</span><select onchange="eventRows[${i}].device_id=this.value||null">${cmdDeviceOpts(e.device_id)}</select>`;
-    el.innerHTML =
-      `<div class="row" style="gap:8px;flex-wrap:wrap">`+
-        `<label class="row" style="gap:6px"><input type="checkbox" ${e.enabled!==false?'checked':''} onchange="eventRows[${i}].enabled=this.checked"> on</label>`+
-        `<input value="${esc(e.name||'')}" placeholder="event name" style="width:130px" onchange="eventRows[${i}].name=this.value;renderModes()">`+
-        `<select onchange="eventRows[${i}].mode=this.value;renderEvents()">`+
-          `<option value="loop" ${(e.mode||'loop')!=='once'?'selected':''}>loop</option>`+
-          `<option value="once" ${e.mode==='once'?'selected':''}>once</option></select>`+
-        `<span class="muted">every</span><input type="number" min="1" step="1" value="${e.every??''}" style="width:80px" onchange="eventRows[${i}].every=+this.value"><span class="muted">s</span>`+
-        ((e.mode||'loop')!=='once'?`<span class="muted">max</span><input type="number" min="0" step="1" value="${e.max_repeats??''}" style="width:64px" placeholder="∞" title="stop this loop after N repeats (blank = unlimited)" onchange="eventRows[${i}].max_repeats=(this.value===''?null:+this.value)"><span class="muted">×</span>`:'')+
-        `<span class="muted">action</span><select onchange="eventRows[${i}].action=this.value;renderEvents()">`+
-          ['message','fire','roll','capacity','chance'].map(a=>`<option value="${a}" ${act===a?'selected':''}>${a}</option>`).join('')+
-        `</select>`+
-        (act==='fire'?`<span class="muted">secs</span><input type="number" min="0" step="0.5" value="${e.seconds??''}" style="width:70px" onchange="eventRows[${i}].seconds=+this.value">`+deviceSel:'')+
-        (act==='roll'?`<span class="muted">dice</span><input type="number" min="1" value="${e.dice??''}" style="width:56px" placeholder="rng" onchange="eventRows[${i}].dice=+this.value"><input type="number" min="1" value="${e.sides??''}" style="width:56px" placeholder="rng" onchange="eventRows[${i}].sides=+this.value">`+deviceSel:'')+
-        (act==='capacity'?`<select onchange="eventRows[${i}].capacity_op=this.value">`+
-            `<option value="add" ${e.capacity_op!=='set'?'selected':''}>add</option><option value="set" ${e.capacity_op==='set'?'selected':''}>set</option></select>`+
-            `<input type="number" step="1" value="${e.capacity_value??''}" style="width:70px" placeholder="%" onchange="eventRows[${i}].capacity_value=+this.value">`:'')+
-        (act==='chance'?`<span class="muted">chance</span><input type="number" min="0" max="100" step="1" value="${e.chance??50}" style="width:64px" onchange="eventRows[${i}].chance=Math.max(0,Math.min(100,+this.value||0))"><span class="muted">%</span>`+
-            `<span class="muted">luck</span><input type="number" min="-100" max="100" step="1" value="${e.luck??''}" style="width:64px" placeholder="0" onchange="eventRows[${i}].luck=(this.value===''?null:+this.value)"><span class="muted">%</span>`:'')+
-        `<div style="flex:1"></div><button class="ghost" onclick="eventRows.splice(${i},1);renderEvents();scheduleSave()">✕</button>`+
-      `</div>`+
-      (act==='chance'
-        ? `<textarea rows="2" placeholder="success message · [roll] [chance] [luck] [secs] [current_loop] …" onchange="eventRows[${i}].success_message=this.value">${esc(e.success_message||'')}</textarea>`+
-          evtFiresEditor(i, e, 'fires', '🟢 Fires on WIN')+
-          `<textarea rows="2" placeholder="failure message" onchange="eventRows[${i}].failure_message=this.value">${esc(e.failure_message||'')}</textarea>`+
-          evtFiresEditor(i, e, 'fail_fires', '🔴 Fires on FAILURE')
-        : `<textarea rows="3" placeholder="optional message · [capacity] [announce] [current_loop] [total_loops] [loop_timer] …" onchange="eventRows[${i}].message=this.value">${esc(e.message||'')}</textarea>`)+
-      `<div class="row" style="gap:8px;align-items:center;flex-wrap:wrap">`+
-        `<label class="row" style="gap:6px" title="fire the first loop the moment it's activated, instead of waiting one interval"><input type="checkbox" ${e.fire_immediately?'checked':''} onchange="eventRows[${i}].fire_immediately=this.checked"> Trigger First Loop Immediately</label>`+
-        `<span class="muted">cooldown</span><input type="number" min="0" step="1" value="${e.cooldown??''}" style="width:70px" placeholder="0" title="after it finishes, block re-activation for N seconds" onchange="eventRows[${i}].cooldown=(this.value===''?null:+this.value)"><span class="muted">s</span>`+
-        `<input style="flex:1;min-width:180px" placeholder="activation message (posted when a command turns it on)" value="${esc(e.activation_message||'')}" onchange="eventRows[${i}].activation_message=this.value">`+
-        `<input style="flex:1;min-width:180px" placeholder="end message (optional, when it finishes)" value="${esc(e.end_message||'')}" onchange="eventRows[${i}].end_message=this.value">`+
+    const act=e.action||'message', mode=e.mode||'loop', open=evtOpen.has(i);
+    const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap='10px';
+    // COMPACT HEADER (always shown)
+    const summary = [mode, act, (mode!=='once' && e.max_repeats)?('×'+e.max_repeats):'', e.every?('every '+e.every+'s'):'']
+      .filter(Boolean).join(' · ');
+    let html =
+      `<div class="row" style="gap:10px">`+
+        `<label class="row" style="gap:5px" title="enabled"><input type="checkbox" ${e.enabled!==false?'checked':''} onchange="eventRows[${i}].enabled=this.checked"></label>`+
+        `<b style="min-width:120px">${esc(e.name||'(unnamed)')}</b>`+
+        `<span class="muted">${esc(summary)}</span>`+
+        `<div style="flex:1"></div>`+
+        `<button class="ghost" onclick="toggleEvtOpen(${i})">${open?'Done ▾':'Edit ▸'}</button>`+
+        `<button class="ghost" onclick="eventRows.splice(${i},1);evtOpen.delete(${i});renderEvents();scheduleSave()">✕</button>`+
       `</div>`;
-    box.appendChild(el);
+    if(open){
+      const deviceField = `<label class="field">Device <select onchange="eventRows[${i}].device_id=this.value||null">${cmdDeviceOpts(e.device_id)}</select></label>`;
+      html +=
+      // --- timing ---
+      `<div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end">`+
+        `<label class="field">Name <input value="${esc(e.name||'')}" placeholder="event name" style="width:150px" onchange="eventRows[${i}].name=this.value;renderModes()"></label>`+
+        `<label class="field">Mode <select onchange="eventRows[${i}].mode=this.value;renderEvents()">`+
+          `<option value="loop" ${mode!=='once'?'selected':''}>loop</option><option value="once" ${mode==='once'?'selected':''}>once</option></select></label>`+
+        `<label class="field">Every (s) <input type="number" min="1" step="1" value="${e.every??''}" style="width:90px" onchange="eventRows[${i}].every=+this.value"></label>`+
+        (mode!=='once'?`<label class="field">Max repeats <input type="number" min="0" step="1" value="${e.max_repeats??''}" placeholder="∞" style="width:90px" title="stop after N repeats (blank = unlimited)" onchange="eventRows[${i}].max_repeats=(this.value===''?null:+this.value)"></label>`:'')+
+      `</div>`+
+      // --- action ---
+      `<div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end">`+
+        `<label class="field">Action <select onchange="eventRows[${i}].action=this.value;renderEvents()">`+
+          ['message','fire','roll','capacity','chance'].map(a=>`<option value="${a}" ${act===a?'selected':''}>${a}</option>`).join('')+`</select></label>`+
+        (act==='fire'?`<label class="field">Seconds <input type="number" min="0" step="0.5" value="${e.seconds??''}" style="width:80px" onchange="eventRows[${i}].seconds=+this.value"></label>`+deviceField:'')+
+        (act==='roll'?`<label class="field">Dice <input type="number" min="1" value="${e.dice??''}" placeholder="rng" style="width:70px" onchange="eventRows[${i}].dice=+this.value"></label>`+
+            `<label class="field">Sides <input type="number" min="1" value="${e.sides??''}" placeholder="rng" style="width:70px" onchange="eventRows[${i}].sides=+this.value"></label>`+deviceField:'')+
+        (act==='capacity'?`<label class="field">Op <select onchange="eventRows[${i}].capacity_op=this.value"><option value="add" ${e.capacity_op!=='set'?'selected':''}>add</option><option value="set" ${e.capacity_op==='set'?'selected':''}>set</option></select></label>`+
+            `<label class="field">Value (%) <input type="number" step="1" value="${e.capacity_value??''}" style="width:80px" onchange="eventRows[${i}].capacity_value=+this.value"></label>`:'')+
+        (act==='chance'?`<label class="field">Chance % <input type="number" min="0" max="100" step="1" value="${e.chance??50}" style="width:80px" onchange="eventRows[${i}].chance=Math.max(0,Math.min(100,+this.value||0))"></label>`+
+            `<label class="field">Luck % <span class="muted">(±force)</span> <input type="number" min="-100" max="100" step="1" value="${e.luck??''}" placeholder="0" style="width:80px" onchange="eventRows[${i}].luck=(this.value===''?null:+this.value)"></label>`:'')+
+      `</div>`+
+      // --- message(s) ---
+      (act==='chance'
+        ? `<label class="field">🟢 Success message <span class="muted">([roll] [chance] [luck] [secs] [current_loop] …)</span><textarea rows="2" onchange="eventRows[${i}].success_message=this.value">${esc(e.success_message||'')}</textarea></label>`+
+          evtFiresEditor(i, e, 'fires', '🟢 Fires on WIN')+
+          `<label class="field">🔴 Failure message<textarea rows="2" onchange="eventRows[${i}].failure_message=this.value">${esc(e.failure_message||'')}</textarea></label>`+
+          evtFiresEditor(i, e, 'fail_fires', '🔴 Fires on FAILURE')
+        : `<label class="field">Message <span class="muted">(optional · [capacity] [announce] [current_loop] [total_loops] [loop_timer] [next_round] …)</span><textarea rows="3" onchange="eventRows[${i}].message=this.value">${esc(e.message||'')}</textarea></label>`)+
+      // --- behaviour ---
+      `<div class="row" style="gap:16px;flex-wrap:wrap;align-items:flex-end">`+
+        `<label class="row" style="gap:6px" title="fire the first loop the moment it's activated, instead of waiting one interval"><input type="checkbox" ${e.fire_immediately?'checked':''} onchange="eventRows[${i}].fire_immediately=this.checked"> Trigger First Loop Immediately</label>`+
+        `<label class="field">Cooldown (s) <span class="muted">(after it finishes)</span> <input type="number" min="0" step="1" value="${e.cooldown??''}" placeholder="0" style="width:90px" onchange="eventRows[${i}].cooldown=(this.value===''?null:+this.value)"></label>`+
+      `</div>`+
+      `<label class="field">Activation message <span class="muted">(posted when a command turns it on)</span><input value="${esc(e.activation_message||'')}" onchange="eventRows[${i}].activation_message=this.value"></label>`+
+      `<label class="field">End message <span class="muted">(optional, when it finishes)</span><input value="${esc(e.end_message||'')}" onchange="eventRows[${i}].end_message=this.value"></label>`;
+    }
+    el.innerHTML=html; box.appendChild(el);
   });
 }
 function addEvent(){ eventRows.push({name:'',enabled:false,mode:'loop',every:60,max_repeats:null,fire_immediately:false,action:'message',message:'',seconds:5,dice:'',sides:'',capacity_op:'add',capacity_value:0,device_id:null,cooldown:null,activation_message:'',end_message:'',chance:50,luck:null,fires:[],fail_fires:[],success_message:'',failure_message:''}); renderEvents(); scheduleSave(); }
@@ -1897,12 +1964,15 @@ function applyState(st, full){
     eventRows = JSON.parse(JSON.stringify(st.events||[]));
     if($('#eventInProcessMsg')) $('#eventInProcessMsg').value = st.event_in_process_message||'';
     if($('#eventCooldownMsg')) $('#eventCooldownMsg').value = st.event_cooldown_message||'';
+    broadcastRows = JSON.parse(JSON.stringify(st.broadcasts||[]));
     // Max Roll Prizes (list) — migrate legacy single prize if the list is empty
     prizeRows = (st.prizes && st.prizes.length) ? JSON.parse(JSON.stringify(st.prizes))
       : ((st.max_roll_prize && st.max_roll_prize.enabled) ? [JSON.parse(JSON.stringify(st.max_roll_prize))] : []);
     renderCommands();
     renderAlwaysOn();
     renderEvents();
+    renderBroadcasts();
+    renderBroadcastDropdown();
     renderModes();
     renderRanges();   // after commands + events so its dropdowns populate
     renderPrizes();
@@ -1978,6 +2048,7 @@ function gatherConfig(){
     capacity_ranges:rangeRows, commands:cleanCommands(), modes:cleanModes(), events:cleanEvents(),
     event_in_process_message: $('#eventInProcessMsg') ? $('#eventInProcessMsg').value : '',
     event_cooldown_message: $('#eventCooldownMsg') ? $('#eventCooldownMsg').value : '',
+    broadcasts: cleanBroadcasts(),
     always_on_enabled: $('#alwaysOnEnabled') ? $('#alwaysOnEnabled').checked : false,
     always_on_commands: alwaysOnList,
   };

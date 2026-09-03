@@ -177,6 +177,10 @@ DEFAULTS = {
     "event_in_process_message": "⏳ [event] is already running.",
     "event_cooldown_message": "⏳ [event] is on cooldown — [cooldown]s left.",
 
+    # Preset broadcast messages — pick one from the Dashboard → Controls dropdown
+    # and hit "Broadcast Custom" to post it to the channel. Each: {name, message}.
+    "broadcasts": [],
+
     # Max Roll Prize — hitting a "perfect" roll (max possible total) `goal`
     # times unlocks a limited-use bonus command for that person. Progress and
     # per-user unlock/uses are tracked in memory and reset on session reset /
