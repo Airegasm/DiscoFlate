@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.6.0</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v3.6.1</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -341,7 +341,7 @@
       <label class="row" style="gap:8px;margin-bottom:8px"><input type="checkbox" id="outputHeaders" style="width:auto"> <b>Display output headers</b>
         <span class="muted">— prefix each command / minigame / event message with a <code>[label · user]</code> tag so interleaved output stays readable (cross-server shows <code>ANON</code>).</span></label>
       <label class="row" style="gap:8px;margin-bottom:12px"><input type="checkbox" id="richOutput" style="width:auto"> <b>Rich status embeds</b>
-        <span class="muted">— post the capacity check, both leaderboards, and the auto-report as bordered embed cards so those status blocks stand apart from command chatter.</span></label>
+        <span class="muted">— post the capacity check, both leaderboards, the auto-report, and custom Broadcasts as bordered embed cards so those blocks stand apart from command chatter.</span></label>
       <div class="row" style="gap:24px;align-items:flex-start">
         <div class="colsec" style="min-width:240px;max-width:320px;flex:1">
           <h3>Owner ID &amp; cooldown</h3>
@@ -542,7 +542,7 @@
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v3.6.0.</span>
+        <span class="muted" id="updMsg">You're on v3.6.1.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
@@ -808,7 +808,7 @@ esphome dashboard config/</code></pre>
             <code>*italic*</code>, <code>`code`</code>. A literal <code>\n</code> also becomes a newline.</div>
           <h3 style="margin-top:14px">Readability — Display output headers</h3>
           <div class="hint" style="margin-top:0">When several people fire commands and multi-stage minigames at once, the lines braid together. Turn on <b>Display output headers</b> (Game → <b>Limits &amp; announcements</b>, at the top) and every command / minigame / event message is prefixed with a <code>**[label · user]**</code> tag, so each line is traceable to who and what it belongs to. The user portion respects cross-server anonymity — servers where the actor isn't a member see <code>ANON</code> instead of the name.</div>
-          <div class="hint">Turn on <b>Rich status embeds</b> (same spot) to post the <b>capacity check</b>, both <b>leaderboards</b>, and the <b>auto-report</b> as bordered embed cards instead of plain text — the border and color stripe make those status blocks stand apart from rapid command chatter. Per-command replies stay plain (use <b>react only</b> or <b>Display output headers</b> for those).</div>
+          <div class="hint">Turn on <b>Rich status embeds</b> (same spot) to post the <b>capacity check</b>, both <b>leaderboards</b>, the <b>auto-report</b>, and custom <b>Broadcasts</b> as bordered embed cards instead of plain text — the border and color stripe make those status blocks stand apart from rapid command chatter. Per-command replies stay plain (use <b>react only</b> or <b>Display output headers</b> for those).</div>
         </div>
       </div>
       </details>

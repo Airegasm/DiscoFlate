@@ -256,7 +256,8 @@ class BotManager:
 
     # Embed accent colors per status kind (a colored stripe helps them read apart).
     _EMBED_COLORS = {"capacity": 0x5865F2, "leaderboard": 0xF1C40F,
-                     "leaderboard_life": 0xE67E22, "auto": 0x2ECC71}
+                     "leaderboard_life": 0xE67E22, "auto": 0x2ECC71,
+                     "broadcast": 0x9B59B6}
 
     def _status_embed(self, kind: str, text: str, title: str | None = None):
         """Wrap a status/report block in a bordered, colored embed card. Returns None
@@ -437,7 +438,8 @@ class BotManager:
         text = (message or "").strip()
         if not text:
             return {"ok": False, "error": "no message selected"}
-        await self.broadcast(self.engine.render(text), None)
+        rendered = self.engine.render(text)
+        await self.broadcast(rendered, None, embed=self._status_embed("broadcast", rendered))
         return {"ok": True}
 
     async def _handle(self, client: discord.Client, message: discord.Message) -> None:

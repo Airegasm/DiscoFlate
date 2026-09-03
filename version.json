@@ -1,6 +1,6 @@
 {
-  "version": "3.6.0",
-  "versionCode": 57,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=57",
-  "notes": "DiscoFlate v3.6.0 — rich embed cards for the capacity/leaderboard/auto-report status posts (toggle in Game); new Templates tab + per-row Copy / Save-as-Template / pencil-edit on Commands, Events, and Ranges, with clash-safe naming"
+  "version": "3.6.1",
+  "versionCode": 58,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=58",
+  "notes": "DiscoFlate v3.6.1 — custom Broadcasts also post as rich embed cards when Rich status embeds is on"
 }

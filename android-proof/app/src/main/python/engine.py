@@ -914,7 +914,7 @@ class Engine:
         return "\n".join(lines)
 
     def leaderboard_text(self) -> str:
-        return self._format_board(self._pump_time.values(), "***TOP PUMPERS***",
+        return self._format_board(self._pump_time.values(), "***TOP PUMPERS — THIS SESSION***",
                                   "Nobody has pumped yet this session.")
 
     def leaderboard_life_text(self) -> str:

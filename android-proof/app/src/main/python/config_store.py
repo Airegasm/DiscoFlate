@@ -88,10 +88,11 @@ DEFAULTS = {
     # would). Events tag with just the event name (no user).
     "output_headers": False,
 
-    # Post the status/report outputs (capacity check, the two leaderboards, and the
-    # auto-report) as rich embed cards — a bordered, colored container — instead of
-    # plain text, so those blocks stand apart from the rapid command chatter. Only
-    # affects those status posts; per-command replies stay plain text.
+    # Post the status/report outputs (capacity check, the two leaderboards, the
+    # auto-report, and custom Broadcasts) as rich embed cards — a bordered, colored
+    # container — instead of plain text, so those blocks stand apart from the rapid
+    # command chatter. Only affects those status posts; per-command replies stay
+    # plain text.
     "rich_output": False,
 
     # Reusable templates saved from the Commands / Events / Ranges editors, kept per
