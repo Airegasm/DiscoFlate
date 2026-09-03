@@ -132,6 +132,9 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "operator_name": cfg.get("operator_name", ""),
         "listener_message_on": cfg.get("listener_message_on", ""),
         "listener_message_off": cfg.get("listener_message_off", ""),
+        "pause_message": cfg.get("pause_message", ""),
+        "resume_message": cfg.get("resume_message", ""),
+        "paused_notice_message": cfg.get("paused_notice_message", ""),
         "auto_report": cfg.get("auto_report", {}),
         "announce_channel_id": cfg.get("announce_channel_id", ""),
         "pumpdirect_path": cfg.get("pumpdirect_path"),
@@ -194,7 +197,8 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
                     "mock_calibration_seconds_to_100",
                     "always_on_enabled", "always_on_commands",
                     "event_in_process_message", "event_cooldown_message", "broadcasts",
-                    "listener_message_on", "listener_message_off"):
+                    "listener_message_on", "listener_message_off",
+                    "pause_message", "resume_message", "paused_notice_message"):
             if key in body:
                 patch[key] = body[key]
         cfg = config_store.update(patch)
@@ -428,7 +432,7 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
 
     async def abort(request):
         await guard(request)
-        await engine.abort("web")
+        await engine.abort(reason="web")
         return web.json_response({"ok": True})
 
     async def reset(request):
@@ -469,6 +473,11 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
         await guard(request)
         b = await _json(request)
         return web.json_response(await botmgr.operator_stop((b.get("who") or "").strip()))
+
+    async def control_resume(request):
+        await guard(request)
+        b = await _json(request)
+        return web.json_response(await botmgr.operator_resume((b.get("who") or "").strip()))
 
     async def control_capacity(request):
         await guard(request)
@@ -651,6 +660,7 @@ def build_app(engine: Engine, botmgr: BotManager) -> web.Application:
         web.post("/api/control/roll", control_roll),
         web.post("/api/control/pump", control_pump),
         web.post("/api/control/stop", control_stop),
+        web.post("/api/control/resume", control_resume),
         web.post("/api/control/capacity", control_capacity),
         web.post("/api/control/leaderboard", control_leaderboard),
         web.post("/api/control/broadcast", control_broadcast),
@@ -682,6 +692,7 @@ async def main() -> None:
 
     botmgr = BotManager(engine, config_store.load)
     engine.announce_cb = botmgr.announce  # milestone / image posting
+    engine.cancel_games_cb = botmgr.cancel_all_games  # session pause kills live games
 
     async def _end_session():
         # Deactivate WITHOUT posting the activation-off message (End Sequence).

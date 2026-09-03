@@ -41,6 +41,42 @@ class BotManager:
         # replace_key -> {channel_id: Message} for loop events with clean_previous,
         # so the next round can delete the message it replaces. Bounded (see _track_msg).
         self._loop_msgs: "dict[str, dict[str, discord.Message]]" = {}
+        # Every live minigame View (Play buttons + the ephemeral games behind
+        # them), so a session pause can cancel them all. Views are pruned once
+        # finished; a pause disables + refunds whatever is still live.
+        self._active_views: set = set()
+
+    # -- minigame view registry ---------------------------------------------- #
+    def _register_view(self, view) -> None:
+        self._active_views = {v for v in self._active_views if not v.is_finished()}
+        self._active_views.add(view)
+
+    async def cancel_all_games(self) -> None:
+        """Session pause: stop every live game view, grey its buttons, tell the
+        player, and refund the use+cooldown their command charged (once per
+        player+command, even when a Play button and its game are both live)."""
+        views, self._active_views = list(self._active_views), set()
+        refunded = set()
+        for v in views:
+            if v.is_finished():
+                continue
+            v.stop()
+            for c in v.children:
+                c.disabled = True
+            uid, cmd = getattr(v, "uid", None), getattr(v, "cmd", None) or {}
+            key = (str(uid), (cmd.get("name") or "").strip().lower())
+            if uid is not None and key[1] and key not in refunded:
+                refunded.add(key)
+                self.engine.refund_use(uid, key[1])
+            note = "⏸️ Session paused — game cancelled (your use was refunded)."
+            try:
+                msg = getattr(v, "message", None)
+                if msg is not None:
+                    await msg.edit(content=note, view=v)
+                elif getattr(v, "_interaction", None) is not None:
+                    await v._interaction.edit_original_response(content=note, view=v)
+            except Exception as e:  # noqa: BLE001
+                self.engine._log("error", f"couldn't grey a cancelled game: {e}")
 
     # -- lifecycle ----------------------------------------------------------- #
     def _alive(self) -> bool:
@@ -360,14 +396,15 @@ class BotManager:
         return res
 
     async def operator_stop(self, who: str) -> dict:
-        cfg = self.get_config()
-        err = self._operator_ready(cfg)
-        if err:
-            return {"ok": False, "error": err}
+        """STOP = pause the whole session. Deliberately NOT gated on
+        _operator_ready: stopping the pump must work even with activation off or
+        the bot down (the broadcast is simply best-effort then)."""
         who = (who or "").strip() or self._bot_name()
-        await self.engine.abort(f"stop by {who}")
-        await self.broadcast(f"🛑 **{who}** stopped the pump.", None)
-        return {"ok": True}
+        return await self.engine.pause(who)
+
+    async def operator_resume(self, who: str) -> dict:
+        who = (who or "").strip() or self._bot_name()
+        return await self.engine.resume(who)
 
     async def operator_broadcast_capacity(self) -> dict:
         cfg = self.get_config()
@@ -483,7 +520,8 @@ class BotManager:
             if res.get("silent"):
                 return  # not unlocked / used up → ignore quietly
             if not res.get("ok"):
-                await _reply(message, f"⚠️ {res.get('error', 'could not run')}")
+                await _reply(message, res["error"] if res.get("paused")
+                             else f"⚠️ {res.get('error', 'could not run')}")
                 return
             await _reply(message, res["reply"])
             await self._echo(message, res.get("reply_anon"), "", res.get("reply"))
@@ -531,8 +569,8 @@ class BotManager:
             if res.get("silent"):
                 return  # gated out (wrong range) → ignore quietly
             if not res.get("ok"):
-                # cooldown + out-of-uses messages go through as-is; other errors get a ⚠️
-                await _reply(message, res["error"] if (res.get("cooldown") or res.get("used_up"))
+                # cooldown/out-of-uses/paused messages go through as-is; other errors get a ⚠️
+                await _reply(message, res["error"] if (res.get("cooldown") or res.get("used_up") or res.get("paused"))
                              else f"⚠️ {res.get('error', 'could not run')}")
                 return
             if res.get("game"):
@@ -542,7 +580,7 @@ class BotManager:
                 intro = (res.get("reply") or "").strip() or f"🎮 **{who}** started **{custom.get('name')}** — press Play!"
                 view = minigames.make_play_view(self, custom, who, str(message.author.id))
                 try:
-                    await message.channel.send(self._hdr(cfg, glabel, who) + intro, view=view)
+                    view.message = await message.channel.send(self._hdr(cfg, glabel, who) + intro, view=view)
                 except Exception as e:  # noqa: BLE001
                     await _reply(message, f"⚠️ couldn't start the game: {e}")
                 return
@@ -579,7 +617,7 @@ class BotManager:
         if res.get("silent"):
             return  # dice disabled in this range → ignore quietly
         if not res.get("ok"):
-            await _reply(message, res["error"] if res.get("cooldown")
+            await _reply(message, res["error"] if (res.get("cooldown") or res.get("paused"))
                          else f"⚠️ {res.get('error', 'could not roll')}")
             return
         line = res["reply"]

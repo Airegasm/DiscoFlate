@@ -24,8 +24,11 @@ def make_play_view(bot, cmd, who, uid):
     # Slots plays out publicly (pull → reels shown in-channel); the rest open an
     # ephemeral game behind the ▶ Play button.
     if (cmd.get("type") or "").lower() == "game-slots":
-        return SlotsView(bot, cmd, who, uid)
-    return PlayView(bot, cmd, who, uid)
+        view = SlotsView(bot, cmd, who, uid)
+    else:
+        view = PlayView(bot, cmd, who, uid)
+    bot._register_view(view)   # so a session pause can cancel it
+    return view
 
 
 class SlotsView(discord.ui.View):
@@ -90,7 +93,10 @@ class PlayView(discord.ui.View):
         if game is None:
             await interaction.response.send_message("Unknown game.", ephemeral=True)
             return
-        await game(self.bot, self.cmd, self.who, self.uid).begin(interaction)
+        g = game(self.bot, self.cmd, self.who, self.uid)
+        g._interaction = interaction   # a pause needs a handle to edit the ephemeral
+        self.bot._register_view(g)
+        await g.begin(interaction)
         button.disabled = True
         try:
             await interaction.message.edit(view=self)   # grey out the public Play button

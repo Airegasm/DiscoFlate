@@ -84,6 +84,16 @@ class Engine:
         self._last_fired: dict[str, float] = {}  # cmdkey -> last-fired monotonic (anti-spam buffer)
         self._current_range_key = None           # (min,max) of the range we're in, for entry detection
         self._end_triggered = False               # End Sequence final threshold already fired
+        # Session pause: a global latch that blocks EVERY device-on path until the
+        # operator resumes. Mirrors cfg["session_paused"] so it survives restarts.
+        self._paused: bool = False
+        self._paused_by: str = ""
+        # Failsafe OFF bookkeeping: the last state we COMMANDED per device (True
+        # only until a successful OFF), windows where ON outside _fires is fine
+        # (calibration/test), and per-device watchdog retry pacing.
+        self._last_commanded: dict[str, bool] = {}
+        self._on_sanctioned: dict[str, float] = {}   # device_id -> monotonic ok-until
+        self._watchdog_next: dict[str, float] = {}
         # Session uptime: monotonic marker set when the engine starts ticking and
         # re-stamped on every session_reset (matches the "this session" scope used
         # by the leaderboard / use budgets). In-memory only; resets on app restart.
@@ -91,6 +101,7 @@ class Engine:
 
         self.announce_cb = None                # async (text, image) -> None
         self.end_session_cb = None             # async () -> None : deactivate without the off-message
+        self.cancel_games_cb = None            # async () -> None : cancel all live minigame views
         self.bot_connected: bool = False
 
         # Device add/search/use debug flows into the Activity log too (not just stdout).
@@ -99,6 +110,10 @@ class Engine:
     # -- config / device lookup --------------------------------------------- #
     def set_config(self, cfg: dict) -> None:
         self.cfg = cfg
+        # The pause latch persists (a crash while paused comes back paused). Only
+        # pause()/resume() write these keys — set_config just mirrors them.
+        self._paused = bool(cfg.get("session_paused"))
+        self._paused_by = str(cfg.get("session_paused_by") or "")
         now_on = bool(cfg.get("listener_enabled"))
         if now_on and not self._listener_was:
             # Activation: re-arm all event timers so loops/once start fresh, and
@@ -175,7 +190,53 @@ class Engine:
             device_control._dbg(f"USE  set_state vendor={(dev.get('vendor') or 'kasa')} "
                                 f"target={device_control._ident(dev)} on={on} (MOCK — not fired)")
             return
+        did = dev.get("id")
+        if on and did:
+            # Record intent BEFORE the network call: if it half-succeeds (timeout
+            # after the relay switched), the watchdog still knows to force it off.
+            self._last_commanded[did] = True
         await device_control.set_state(dev, on, self._vendor_creds(dev))
+        if not on and did:
+            self._last_commanded[did] = False   # cleared only on a CONFIRMED off
+
+    @property
+    def paused(self) -> bool:
+        return self._paused
+
+    async def _force_off(self, dev: dict | None, attempts: int = 3, delay: float = 1.0) -> bool:
+        """OFF with retries — the one command that must not silently fail. Returns
+        True once the device confirms off; False if every attempt errored."""
+        if dev is None:
+            return False
+        alias = dev.get("label") or dev.get("host") or dev.get("id") or "device"
+        for i in range(max(1, attempts)):
+            try:
+                await self._set_state(dev, False)
+                return True
+            except Exception as e:  # noqa: BLE001
+                self._log("error", f"turn-off failed on {alias} (try {i + 1}/{attempts}): {e}")
+                if i + 1 < attempts:
+                    await asyncio.sleep(delay)
+        return False
+
+    async def _watchdog_sweep(self) -> None:
+        """Failsafe: any device we commanded ON that no longer has a tracked fire
+        (and isn't in a sanctioned calibration/test window) gets forced OFF."""
+        now = time.monotonic()
+        for did, on in list(self._last_commanded.items()):
+            if not on or did in self._fires:
+                continue
+            if now <= self._on_sanctioned.get(did, 0.0):
+                continue
+            if now < self._watchdog_next.get(did, 0.0):
+                continue
+            self._watchdog_next[did] = now + 10.0   # pace retries per device
+            dev = self._device(did)
+            if dev is None:
+                self._last_commanded.pop(did, None)   # device was removed from config
+                continue
+            self._log("device", f"watchdog: {dev.get('label') or did} believed ON with no fire — forcing OFF")
+            await self._force_off(dev)
 
     # -- lifecycle ----------------------------------------------------------- #
     def start(self) -> None:
@@ -188,8 +249,20 @@ class Engine:
             self._tick_task.cancel()
             self._tick_task = None
         await self.abort(reason="shutdown")
+        # Wait for the fire tasks' own OFF handling to finish (bounded), then a
+        # final forced-OFF sweep so shutdown can never strand a relay ON.
+        tasks = [f["task"] for f in self._fires.values() if f.get("task")]
+        if tasks:
+            try:
+                await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=8)
+            except asyncio.TimeoutError:
+                self._log("error", "shutdown: fire tasks didn't finish in time")
+        for did, on in list(self._last_commanded.items()):
+            if on:
+                await self._force_off(self._device(did))
 
     async def _capacity_loop(self) -> None:
+        watchdog_at = 0.0
         while True:
             try:
                 await asyncio.sleep(0.2)
@@ -203,6 +276,11 @@ class Engine:
                     self._cap_since = now
                 else:
                     self._cap_since = None
+                if now >= watchdog_at:
+                    watchdog_at = now + 5.0
+                    await self._watchdog_sweep()
+                if self._paused:
+                    continue   # paused: no milestones/events/end-sequence/reset notices
                 await self._check_milestones()
                 await self._check_range_entry()
                 await self._check_end_sequence()
@@ -945,8 +1023,20 @@ class Engine:
                 return c
         return None
 
+    def _paused_result(self, who: str, uid) -> dict:
+        """The quiet 'session is paused' reply for a command that arrived while
+        paused. One notice per user per buffer window; repeats are silent. Never
+        consumes a use or touches a cooldown."""
+        if not self.buffer_ok(f"pausednote:{uid if uid is not None else who}"):
+            return {"ok": False, "paused": True, "silent": True}
+        tmpl = self.cfg.get("paused_notice_message") or "⏸️ [mention], the session is paused — hang tight until the operator resumes."
+        return {"ok": False, "paused": True,
+                "error": self.render(tmpl, {"user": who, "mention": self._mention(uid, who)})}
+
     async def roll_and_fire(self, who: str, uid: str | None = None,
                             dice: int | None = None, sides: int | None = None) -> dict:
+        if self._paused:
+            return self._paused_result(who, uid)
         target = self._active_id()
         if self._device(target) is None:
             return {"ok": False, "error": "no active device selected"}
@@ -1002,6 +1092,9 @@ class Engine:
     async def run_custom(self, cmd: dict, who: str, uid: str | None) -> dict:
         typ = (cmd.get("type") or "fire").lower()
         name = cmd.get("name", "command")
+
+        if self._paused:
+            return self._paused_result(who, uid)
 
         if not self.cmd_enabled_in_range(name.lower()):
             return {"ok": False, "silent": True}  # not a member of the current range → ignore quietly
@@ -1291,6 +1384,8 @@ class Engine:
             except (TypeError, ValueError):
                 dur = 3.0
             fr = self._begin_or_extend(dev_id, dur, f"{who}'s device fire")
+            if fr.get("status") not in ("started", "extended"):
+                continue   # paused / no device → nothing fired, credit nothing
             self.credit_pump(uid, who, dur, dev_id)
             out.append({"device_id": dev_id, "duration": dur, "status": fr.get("status")})
         return out
@@ -1304,6 +1399,11 @@ class Engine:
         return max(0.0, f["deadline"] - time.monotonic()) if f else 0.0
 
     def _begin_or_extend(self, device_id: str, duration: float, reason: str) -> dict:
+        # THE pause gate. Every path that can energize a device funnels through
+        # here (rolls, commands, events, payoffs, prizes, web fires) — so nothing
+        # can switch a pump on while the session is paused, even code added later.
+        if self._paused:
+            return {"status": "paused"}
         dev = self._device(device_id)
         if dev is None:
             return {"status": "no_device"}
@@ -1354,11 +1454,11 @@ class Engine:
         except Exception as e:  # noqa: BLE001
             self._log("error", f"fire failed on {f['alias'] if f else device_id}: {e}")
         finally:
-            try:
-                if dev:
-                    await self._set_state(dev, False)
-            except Exception as e:  # noqa: BLE001
-                self._log("error", f"turn-off failed: {e}")
+            # Give the retrying OFF below room to finish before the watchdog
+            # piles on with its own force-off for the same device.
+            self._on_sanctioned[device_id] = time.monotonic() + 15.0
+            if dev:
+                await self._force_off(dev)
             self._fires.pop(device_id, None)
             if self._pump_id() == device_id:
                 self._cap_since = None
@@ -1369,9 +1469,10 @@ class Engine:
         target = device_id or self._active_id()
         res = self._begin_or_extend(target, round(float(duration), 1), reason) if target else {"status": "no_device"}
         ok = res["status"] in ("started", "extended")
-        return {"ok": ok, "status": res["status"], "error": None if ok else "no active device"}
+        err = None if ok else ("session is paused" if res["status"] == "paused" else "no active device")
+        return {"ok": ok, "status": res["status"], "error": err}
 
-    async def abort(self, device_id: str | None = None, reason: str = "aborted") -> None:
+    async def abort(self, device_id: str | None = None, *, reason: str = "aborted") -> None:
         ids = [device_id] if device_id else list(self._fires.keys())
         if ids and self._fires:
             self._log("device", f"abort ({reason})")
@@ -1388,9 +1489,87 @@ class Engine:
                 except Exception:
                     pass
 
+    # -- session pause / resume ---------------------------------------------- #
+    async def pause(self, who: str = "") -> dict:
+        """PAUSE the session: stop every running fire, force all relays OFF,
+        cancel running timed events and live minigames, latch out every device-on
+        path until resume(), and broadcast the pause notice to all listen channels.
+        The latch persists in config so a crash/restart comes back paused."""
+        if self._paused:
+            return {"ok": False, "already": True, "error": "session is already paused"}
+        who = (who or "").strip() or "the operator"
+        # 1. Close the gate FIRST (before anything awaits) and persist it.
+        self._paused = True
+        self._paused_by = who
+        cfg = config_store.update({"session_paused": True, "session_paused_by": who})
+        self.cfg = cfg
+        self._log("bot", f"SESSION PAUSED by {who}")
+        # 2. Abort every running fire (their tasks handle their own retried OFF).
+        await self.abort(reason=f"paused by {who}")
+        # 3. Belt and braces: force OFF anything we believe is ON (covers fires
+        #    whose OFF is still in flight, calibration runs, and test pulses).
+        self._on_sanctioned.clear()
+        for did, on in list(self._last_commanded.items()):
+            if on:
+                await self._force_off(self._device(did))
+        # 4. Cancel timed events: in-flight loops die (no end message) and enabled
+        #    events re-arm fresh after resume. "Once" events that ran stay done.
+        self._event_last.clear()
+        self._event_fires.clear()
+        self._event_cooldown_until.clear()
+        self._event_activator.clear()
+        self._runtime_events_on.clear()
+        self._event_run_id.clear()
+        # 5. Cancel live minigames (the bot layer disables their views + refunds).
+        if self.cancel_games_cb:
+            try:
+                await self.cancel_games_cb()
+            except Exception as e:  # noqa: BLE001
+                self._log("error", f"cancelling games failed: {e}")
+        # 6. Tell every listen channel.
+        tmpl = self.cfg.get("pause_message") or (
+            "⏸️ **Session paused** by [user] — pumps are off and commands are "
+            "disabled until the operator resumes.")
+        await self._announce(self.render(tmpl, {"user": who, "mention": who}), None)
+        return {"ok": True, "paused": True}
+
+    async def resume(self, who: str = "") -> dict:
+        """Lift the pause latch and broadcast the resume notice. Cancelled events
+        do NOT auto-restart mid-loop — enabled ones re-arm on their own timers."""
+        if not self._paused:
+            return {"ok": False, "already": True, "error": "session is not paused"}
+        who = (who or "").strip() or "the operator"
+        self._paused = False
+        self._paused_by = ""
+        cfg = config_store.update({"session_paused": False, "session_paused_by": ""})
+        self.cfg = cfg
+        self._log("bot", f"SESSION RESUMED by {who}")
+        tmpl = self.cfg.get("resume_message") or "▶️ **Session resumed** by [user] — pump away!"
+        await self._announce(self.render(tmpl, {"user": who, "mention": who}), None)
+        return {"ok": True, "paused": False}
+
+    def refund_use(self, uid, cmdkey: str) -> None:
+        """Return the use + cooldown a command charged (a pause cancelled the
+        game before the player got anything)."""
+        cmdkey = (cmdkey or "").strip().lower()
+        if not cmdkey or uid is None:
+            return
+        d = self._cmd_uses.get(str(uid))
+        if d and d.get(cmdkey, 0) > 0:
+            d[cmdkey] -= 1
+        for scope_key in (str(uid), "*"):
+            recs = self._cooldowns.get(scope_key)
+            if recs:
+                recs.pop(cmdkey, None)
+
     async def test_device(self, dev: dict, seconds: float = 2.0) -> dict:
         """Raw on→wait→off on a SPECIFIC device. No capacity, no fire state."""
+        if self._paused:
+            return {"ok": False, "error": "session is paused"}
         alias = dev.get("label") or dev.get("host") or dev.get("id") or "device"
+        if dev.get("id"):
+            # Sanction the ON window so the watchdog doesn't kill the test pulse.
+            self._on_sanctioned[dev["id"]] = time.monotonic() + seconds + 10.0
 
         async def _pulse():
             try:
@@ -1400,25 +1579,28 @@ class Engine:
             except Exception as e:  # noqa: BLE001
                 self._log("error", f"test failed on {alias}: {e}")
             finally:
-                try:
-                    await self._set_state(dev, False)
-                except Exception as e:  # noqa: BLE001
-                    self._log("error", f"test off failed: {e}")
+                await self._force_off(dev)
                 self._log("device", f"TEST {alias} OFF")
 
-        asyncio.create_task(_pulse())
+        self._pulse_task = asyncio.create_task(_pulse())
         return {"ok": True}
 
     async def device_on(self, device_id: str) -> dict:
         """Turn a specific device ON and leave it on (used by the calibration
         'time it to 100%' flow). No capacity tracking."""
+        if self._paused:
+            return {"ok": False, "error": "session is paused"}
         dev = self._device(device_id)
         if dev is None:
             return {"ok": False, "error": "device not found"}
+        # Calibration deliberately leaves the relay ON — exempt it from the
+        # watchdog until device_off ends the run.
+        self._on_sanctioned[device_id] = float("inf")
         try:
             await self._set_state(dev, True)
         except Exception as e:  # noqa: BLE001
             self._log("error", f"calibration on failed: {e}")
+            self._on_sanctioned.pop(device_id, None)
             return {"ok": False, "error": str(e)}
         self._log("device", f"{dev.get('label') or device_id} ON (calibration)")
         return {"ok": True}
@@ -1428,6 +1610,7 @@ class Engine:
         dev = self._device(device_id)
         if dev is None:
             return {"ok": False, "error": "device not found"}
+        self._on_sanctioned.pop(device_id, None)
         try:
             await self._set_state(dev, False)
         except Exception as e:  # noqa: BLE001
@@ -1452,6 +1635,8 @@ class Engine:
         own reply (so 'already running' / 'on cooldown' / activation lines follow
         it), and a count of events that actually switched on. `activated` lets a
         pure event-trigger command skip charging a use when the event was blocked."""
+        if self._paused:
+            return [], 0
         now = time.monotonic()
         posts = []
         activated = 0
@@ -1612,6 +1797,8 @@ class Engine:
     async def use_prize_command(self, who: str, uid: str | None, prize: dict) -> dict:
         """Run an unlocked prize command (the person keeps uses across ranges;
         the prize's own range gate controls where it may be USED)."""
+        if self._paused:
+            return self._paused_result(who, uid)
         pkey = self._prize_key(prize)
         left = self._uses_left(uid, pkey)
         if left <= 0:
@@ -1770,6 +1957,8 @@ class Engine:
             "active_device": self._active_device_dict(),
             "current_range": self.range_for(self.capacity),
             "bot_connected": self.bot_connected,
+            "paused": self._paused,
+            "paused_by": self._paused_by,
             "mock_mode": bool(self.cfg.get("mock_mode")),
             "listener_enabled": bool(self.cfg.get("listener_enabled")),
             "users": self._users_view(),

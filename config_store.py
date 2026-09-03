@@ -67,6 +67,18 @@ DEFAULTS = {
     "listener_message_on": "",
     "listener_message_off": "",
 
+    # Session pause (the dashboard STOP/RESUME button). While paused every
+    # device-on path is latched off, running fires/events/minigames are
+    # cancelled, and commands get the paused notice. The latch persists so a
+    # crash or restart comes back paused. Placeholders: [user] (who acted).
+    "session_paused": False,
+    "session_paused_by": "",
+    "pause_message": ("⏸️ **Session paused** by [user] — pumps are off and "
+                      "commands are disabled until the operator resumes."),
+    "resume_message": "▶️ **Session resumed** by [user] — pump away!",
+    # Reply to someone who runs a command while paused (per-user, buffered).
+    "paused_notice_message": "⏸️ [mention], the session is paused — hang tight until the operator resumes.",
+
     # The single server + channel the bot listens on (legacy / primary).
     # listen_channel_id "" = any channel in the selected server.
     # listen_guild_id "" = listen nowhere yet (pick one in the UI).
