@@ -559,7 +559,18 @@
     <!-- polls -->
     <div class="card span" data-tab="events">
       <details class="help"><summary><h2>🗳 Polls</h2></summary>
-      <div class="hint" style="margin-top:8px">Coming soon — chat polls that let the channel vote on what happens next. This section is reserved; tell me how you want them to work and they'll appear here.</div>
+      <div class="row" style="gap:10px;align-items:flex-end;margin-top:8px">
+        <label class="field">Poll vote command <span class="muted">(only active while a poll runs)</span>
+          <input id="cmdVote" value="agvote" style="width:130px"></label>
+        <span class="muted">People vote with <code>!agvote 1</code>, <code>!agvote 2</code>, …</span>
+      </div>
+      <div class="hint" style="max-width:860px">A poll is an <b>action</b>: reference it from a command (type <b>poll</b>), a timed event (action <b>poll</b>), a capacity event's block, or even a winning option of another poll. It posts as a rich embed — <b>Poll: &lt;title&gt;</b> with the body and numbered options — runs for its duration (optionally reposting every N seconds), then the <b>winning option's actions execute</b>. Ties break at random; with no votes the <b>Fallback</b> option wins (none marked = nothing happens). One poll at a time. A poll inside an event's action block keeps that event <b>running</b> until the poll completes, then the event's remaining actions resolve.</div>
+      <div id="polls" style="margin-top:10px"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" onclick="addPoll()">+ Add poll</button>
+        <div style="flex:1"></div>
+        <button onclick="saveEvents()">Save events</button>
+      </div>
       </details>
     </div>
 
@@ -1309,6 +1320,7 @@ async function saveDiscord(){
       leaderboard: ($('#cmdLeaderboard').value||'leaderboard').trim().toLowerCase(),
       leaderboard_life: ($('#cmdLeaderboardLife').value||'toppumpers-life').trim().toLowerCase(),
       pumptimer: ($('#cmdPumptimer').value||'pumptimer').trim().toLowerCase(),
+      vote: (($('#cmdVote')&&$('#cmdVote').value)||'agvote').trim().toLowerCase(),
     },
     listen_targets: listenTargets,
     announce_channel_id: announceChanId,
@@ -1883,7 +1895,8 @@ function renderCommands(){
       `<div class="row" style="gap:10px">`+
         `<label class="field">Name <input value="${esc(c.name||'')}" placeholder="spin" style="width:140px" onchange="renameCommand(${i}, this.value)"></label>`+
         `<label class="field">Type <select onchange="commandRows[${i}].type=this.value;renderCommands()">`+
-          ['fire','roll','say','chance','game-pushluck','game-simon','game-balloon','game-rps','game-slots','game-blackjack'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`+
+          ['fire','roll','say','chance','poll','game-pushluck','game-simon','game-balloon','game-rps','game-slots','game-blackjack'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`+
+        (typ==='poll'?`<label class="field">Poll <select onchange="commandRows[${i}].poll=this.value;scheduleSave()">${pollNameOpts(c.poll)}</select></label>`:'')+
         (typ==='fire'?`<label class="field">Seconds <input type="number" value="${c.seconds??''}" min="0" step="0.5" style="width:80px" onchange="commandRows[${i}].seconds=+this.value"></label>`:'')+
         (typ==='roll'?`<label class="field">Dice <select onchange="commandRows[${i}].dice=+this.value"><option value="">rng</option>${d20Options(c.dice)}</select></label>`+
           `<label class="field">Sides <select onchange="commandRows[${i}].sides=+this.value"><option value="">rng</option>${d20Options(c.sides)}</select></label>`:'')+
@@ -1946,6 +1959,7 @@ function cleanCommands(){
     range_gate: c.range_gate||'all',
     description: c.description||'', hide_in_list: !!c.hide_in_list, mention: !!c.mention,
     react_only: !!c.react_only, react_emoji: (c.react_emoji||'').trim(),
+    poll: (c.poll||'').trim()||null,
     // chance + multi-device fire
     fires: cleanFires(c.fires),
     fail_fires: cleanFires(c.fail_fires),
@@ -2074,7 +2088,8 @@ function renderEvents(){
       // --- action ---
       `<div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end;border-top:1px solid var(--line);padding-top:10px">`+
         `<label class="field">Action <select onchange="eventRows[${i}].action=this.value;renderEvents()">`+
-          ['message','fire','roll','capacity','chance'].map(a=>`<option value="${a}" ${act===a?'selected':''}>${a}</option>`).join('')+`</select></label>`+
+          ['message','fire','roll','capacity','chance','poll'].map(a=>`<option value="${a}" ${act===a?'selected':''}>${a}</option>`).join('')+`</select></label>`+
+        (act==='poll'?`<label class="field">Poll <span class="muted">(the event stays running until it completes)</span> <select onchange="eventRows[${i}].poll=this.value;scheduleSave()">${pollNameOpts(e.poll)}</select></label>`:'')+
         (act==='fire'?`<label class="field">Seconds <input type="number" min="0" step="0.5" value="${e.seconds??''}" style="width:80px" onchange="eventRows[${i}].seconds=+this.value"></label>`+deviceField:'')+
         (act==='roll'?`<label class="field">Dice <input type="number" min="1" value="${e.dice??''}" placeholder="rng" style="width:70px" onchange="eventRows[${i}].dice=+this.value"></label>`+
             `<label class="field">Sides <input type="number" min="1" value="${e.sides??''}" placeholder="rng" style="width:70px" onchange="eventRows[${i}].sides=+this.value"></label>`+deviceField:'')+
@@ -2111,6 +2126,7 @@ function cleanEvents(){
     max_repeats:(e.max_repeats==null||e.max_repeats===''||+e.max_repeats<0)?null:+e.max_repeats, fire_immediately:!!e.fire_immediately, clean_previous:!!e.clean_previous, action:e.action||'message',
     message:e.message||'', seconds:(e.seconds>0)?+e.seconds:null, dice:(e.dice>0)?+e.dice:null, sides:(e.sides>0)?+e.sides:null,
     capacity_op:e.capacity_op||'add', capacity_value:e.capacity_value??0, device_id:e.device_id||null,
+    poll:(e.poll||'').trim()||null,
     cooldown:(e.cooldown==null||e.cooldown==='')?null:+e.cooldown,
     activation_message:e.activation_message||'', end_message:e.end_message||'',
     chance:(e.chance==null||e.chance==='')?null:+e.chance, luck:(e.luck==null||e.luck==='')?null:+e.luck,
@@ -2118,7 +2134,10 @@ function cleanEvents(){
     success_message:e.success_message||'', failure_message:e.failure_message||'',
   }));
 }
-async function saveEvents(){ await saveCfg({events: cleanEvents(), capacity_events: cleanCapEvents()}); }
+async function saveEvents(){
+  await saveCfg({events: cleanEvents(), capacity_events: cleanCapEvents(), polls: cleanPolls(),
+                 command_names: gatherConfig().command_names});
+}
 
 // ---- capacity events (one-shot threshold triggers) ----
 let capEvRows = [];
@@ -2134,27 +2153,40 @@ function capScopeRadio(i, field){
     `<label class="row" style="gap:5px"><input type="radio" name="${nm}" style="width:auto" ${cur==='session'?'checked':''} onchange="capEvRows[${i}]['${sf}']='session';scheduleSave()"> For Session Remainder</label>`+
   `</span>`;
 }
-function capEvActionRow(i, j, a){
+// Poll-name dropdown for "poll" actions / poll-type commands.
+function pollNameOpts(sel){
+  const names = pollRows.map(p=>(p.name||'').trim()).filter(Boolean);
+  return `<option value="">— pick a poll —</option>`+
+    names.map(n=>`<option value="${esc(n)}" ${sel===n?'selected':''}>${esc(n)}</option>`).join('')+
+    ((sel&&!names.includes(sel))?`<option value="${esc(sel)}" selected>${esc(sel)} (missing)</option>`:'');
+}
+// Generic action-block row shared by capacity events and poll options.
+// `base` = the JS expression for the actions array; `rr` = re-render fn name.
+function actionRow(base, rr, j, a){
   const typ=(a.type||'message');
-  const typeSel = `<label class="field">Action <select onchange="capEvRows[${i}].actions[${j}].type=this.value;renderCapEvents();scheduleSave()">`+
-    ['message','fire','roll','capacity','wait'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`;
+  const T = f=>`${base}[${j}].${f}`;
+  const typeSel = `<label class="field">Action <select onchange="${T('type')}=this.value;${rr}();scheduleSave()">`+
+    ['message','fire','roll','capacity','wait','poll'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`;
   let fields='';
   if(typ==='fire'||typ==='wait')
-    fields += `<label class="field">Seconds <input type="number" min="0" step="0.5" value="${a.seconds??(typ==='wait'?10:3)}" style="width:80px" onchange="capEvRows[${i}].actions[${j}].seconds=+this.value;scheduleSave()"></label>`;
+    fields += `<label class="field">Seconds <input type="number" min="0" step="0.5" value="${a.seconds??(typ==='wait'?10:3)}" style="width:80px" onchange="${T('seconds')}=+this.value;scheduleSave()"></label>`;
   if(typ==='roll')
-    fields += `<label class="field">Dice <input type="number" min="1" value="${a.dice??''}" placeholder="rng" style="width:70px" onchange="capEvRows[${i}].actions[${j}].dice=(this.value===''?null:+this.value);scheduleSave()"></label>`+
-      `<label class="field">Sides <input type="number" min="1" value="${a.sides??''}" placeholder="rng" style="width:70px" onchange="capEvRows[${i}].actions[${j}].sides=(this.value===''?null:+this.value);scheduleSave()"></label>`;
+    fields += `<label class="field">Dice <input type="number" min="1" value="${a.dice??''}" placeholder="rng" style="width:70px" onchange="${T('dice')}=(this.value===''?null:+this.value);scheduleSave()"></label>`+
+      `<label class="field">Sides <input type="number" min="1" value="${a.sides??''}" placeholder="rng" style="width:70px" onchange="${T('sides')}=(this.value===''?null:+this.value);scheduleSave()"></label>`;
   if(typ==='fire'||typ==='roll')
-    fields += `<label class="field">Device <select onchange="capEvRows[${i}].actions[${j}].device_id=this.value||null">${cmdDeviceOpts(a.device_id)}</select></label>`;
+    fields += `<label class="field">Device <select onchange="${T('device_id')}=this.value||null">${cmdDeviceOpts(a.device_id)}</select></label>`;
   if(typ==='capacity')
-    fields += `<label class="field">Op <select onchange="capEvRows[${i}].actions[${j}].capacity_op=this.value;scheduleSave()"><option value="add" ${a.capacity_op!=='set'?'selected':''}>add</option><option value="set" ${a.capacity_op==='set'?'selected':''}>set</option></select></label>`+
-      `<label class="field">Value (%) <input type="number" step="1" value="${a.capacity_value??''}" style="width:80px" onchange="capEvRows[${i}].actions[${j}].capacity_value=+this.value;scheduleSave()"></label>`;
+    fields += `<label class="field">Op <select onchange="${T('capacity_op')}=this.value;scheduleSave()"><option value="add" ${a.capacity_op!=='set'?'selected':''}>add</option><option value="set" ${a.capacity_op==='set'?'selected':''}>set</option></select></label>`+
+      `<label class="field">Value (%) <input type="number" step="1" value="${a.capacity_value??''}" style="width:80px" onchange="${T('capacity_value')}=+this.value;scheduleSave()"></label>`;
+  if(typ==='poll')
+    fields += `<label class="field">Poll <select onchange="${T('poll')}=this.value;scheduleSave()">${pollNameOpts(a.poll)}</select></label>`;
   const msg = (typ==='message'||typ==='fire'||typ==='roll')
-    ? `<textarea rows="2" placeholder="${typ==='message'?'message to post · placeholders work':'optional message · [secs] works'}" onchange="capEvRows[${i}].actions[${j}].message=this.value">${esc(a.message||'')}</textarea>` : '';
+    ? `<textarea rows="2" placeholder="${typ==='message'?'message to post · placeholders work':'optional message · [secs] works'}" onchange="${T('message')}=this.value">${esc(a.message||'')}</textarea>` : '';
   return `<div class="dev" style="flex-direction:column;align-items:stretch;gap:6px">`+
     `<div class="row" style="gap:10px;align-items:flex-end">${typeSel}${fields}`+
-    `<div style="flex:1"></div><button class="ghost" onclick="capEvRows[${i}].actions.splice(${j},1);renderCapEvents();scheduleSave()">✕</button></div>`+msg+`</div>`;
+    `<div style="flex:1"></div><button class="ghost" onclick="${base}.splice(${j},1);${rr}();scheduleSave()">✕</button></div>`+msg+`</div>`;
 }
+function capEvActionRow(i, j, a){ return actionRow(`capEvRows[${i}].actions`, 'renderCapEvents', j, a); }
 function renderCapEvents(){
   const box=$('#capEvents'); if(!box) return; box.innerHTML='';
   if(!capEvRows.length){ box.innerHTML='<div class="muted">No capacity events yet.</div>'; return; }
@@ -2218,6 +2250,88 @@ function delCapEvent(i){
   const e=capEvRows[i]||{};
   if(!confirm(`Delete capacity event "${e.name||('at '+(e.at??'?')+'%')}"? This can't be undone.`)) return;
   capEvRows.splice(i,1); capEvOpen=shiftSet(capEvOpen,i); renderCapEvents(); scheduleSave();
+}
+// ---- polls (named; started by commands / events / action blocks) ----
+let pollRows = [];
+let pollOpen = new Set();
+function togglePollOpen(i){ if(pollOpen.has(i)) pollOpen.delete(i); else pollOpen.add(i); renderPolls(); }
+function setPollFallback(i,k){ (pollRows[i].options||[]).forEach((o,x)=>o.fallback=(x===k)); scheduleSave(); }
+function clearPollFallback(i){ (pollRows[i].options||[]).forEach(o=>o.fallback=false); renderPolls(); scheduleSave(); }
+function renderPolls(){
+  const box=$('#polls'); if(!box) return; box.innerHTML='';
+  if(!pollRows.length){ box.innerHTML='<div class="muted">No polls yet.</div>'; return; }
+  pollRows.forEach((p,i)=>{
+    const open=pollOpen.has(i);
+    const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap='10px';
+    const nopts=(p.options||[]).length;
+    let html =
+      `<div class="row" style="gap:10px">`+
+        `<b style="min-width:120px">${esc(p.name||'(unnamed)')}</b>`+
+        `<span class="muted" style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(p.title||'')} · ${nopts} option${nopts===1?'':'s'} · ${p.duration??60}s</span>`+
+        `<button class="ghost" title="${open?'Collapse':'Edit'}" onclick="togglePollOpen(${i})">${open?'▾':'✏️'}</button>`+
+        `<button class="ghost" title="Delete" onclick="delPoll(${i})">✕</button>`+
+      `</div>`;
+    if(open){
+      html +=
+      `<div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end">`+
+        `<label class="field">Name <span class="muted">(how actions reference it)</span> <input value="${esc(p.name||'')}" placeholder="chaos-vote" style="width:150px" onchange="renamePoll(${i},this.value)"></label>`+
+        `<label class="field">Duration (s) <input type="number" min="5" max="3600" value="${p.duration??60}" style="width:90px" onchange="pollRows[${i}].duration=Math.max(5,Math.min(3600,+this.value||60));scheduleSave()"></label>`+
+        `<label class="field">Repeat message every (s) <span class="muted">(0 = off)</span> <input type="number" min="0" step="5" value="${p.repeat_every??0}" style="width:90px" onchange="pollRows[${i}].repeat_every=Math.max(0,+this.value||0);scheduleSave()"></label>`+
+      `</div>`+
+      `<label class="field">Title <span class="muted">(embed shows “Poll: &lt;title&gt;”)</span><input value="${esc(p.title||'')}" placeholder="What happens next?" onchange="pollRows[${i}].title=this.value"></label>`+
+      `<label class="field">Body <span class="muted">(under the title · placeholders work)</span><textarea rows="3" onchange="pollRows[${i}].body=this.value">${esc(p.body||'')}</textarea></label>`;
+      (p.options||[]).forEach((o,k)=>{
+        html += `<div class="dev" style="flex-direction:column;align-items:stretch;gap:6px;border-color:${o.fallback?'var(--warn)':'var(--line)'}">`+
+          `<div class="row" style="gap:10px;align-items:center">`+
+            `<b>Option ${k+1}</b>`+
+            `<input value="${esc(o.label||'')}" placeholder="what this choice does" style="flex:1" onchange="pollRows[${i}].options[${k}].label=this.value">`+
+            `<label class="row" style="gap:5px" title="wins if nobody votes"><input type="radio" name="pollfb-${i}" style="width:auto" ${o.fallback?'checked':''} onchange="setPollFallback(${i},${k})"> Fallback</label>`+
+            `<button class="ghost" onclick="if(confirm('Remove option ${k+1} and its actions?')){pollRows[${i}].options.splice(${k},1);renderPolls();scheduleSave();}">✕</button>`+
+          `</div>`+
+          `<div class="muted" style="font-size:12px">Actions when this option <b>wins</b>:</div>`+
+          ((o.actions||[]).map((a,j)=>actionRow(`pollRows[${i}].options[${k}].actions`,'renderPolls',j,a)).join('')||'<div class="muted">none yet</div>')+
+          `<button class="ghost" style="align-self:flex-start" onclick="pollRows[${i}].options[${k}].actions=pollRows[${i}].options[${k}].actions||[];pollRows[${i}].options[${k}].actions.push({type:'message',message:''});renderPolls();scheduleSave()">+ Add action</button>`+
+        `</div>`;
+      });
+      html += `<div class="row" style="gap:10px">`+
+        ((p.options||[]).length<4?`<button class="ghost" onclick="pollRows[${i}].options=pollRows[${i}].options||[];pollRows[${i}].options.push({label:'',fallback:false,actions:[]});renderPolls();scheduleSave()">+ Add option</button>`:`<span class="muted">4 options max</span>`)+
+        ((p.options||[]).some(o=>o.fallback)?`<button class="ghost" onclick="clearPollFallback(${i})">clear fallback</button>`:'')+
+      `</div>`;
+    }
+    el.innerHTML=html; box.appendChild(el);
+  });
+}
+function renamePoll(i, val){
+  const neu=(val||'').trim().toLowerCase(), old=(pollRows[i].name||'').trim().toLowerCase();
+  if(neu && neu!==old && pollRows.some((p,j)=>j!==i && (p.name||'').trim().toLowerCase()===neu)){
+    toastMsg(`⚠ A poll named "${neu}" already exists — pick another name.`); renderPolls(); return;
+  }
+  pollRows[i].name=val;
+}
+function addPoll(){
+  pollRows.push({name:'',title:'',body:'',duration:60,repeat_every:0,
+    options:[{label:'',fallback:false,actions:[]},{label:'',fallback:false,actions:[]}]});
+  pollOpen.add(pollRows.length-1); renderPolls(); scheduleSave();
+}
+function delPoll(i){
+  const p=pollRows[i]||{};
+  if(!confirm(`Delete poll "${p.name||'(unnamed)'}"? This can't be undone.`)) return;
+  pollRows.splice(i,1); pollOpen=shiftSet(pollOpen,i); renderPolls(); scheduleSave();
+}
+function cleanPolls(){
+  return pollRows.filter(p=>(p.name||'').trim()).map(p=>({
+    name:(p.name||'').trim(), title:p.title||'', body:p.body||'',
+    duration:Math.max(5,Math.min(3600,+p.duration||60)),
+    repeat_every:Math.max(0,+p.repeat_every||0),
+    options:(p.options||[]).slice(0,4).filter(o=>(o.label||'').trim()).map(o=>({
+      label:(o.label||'').trim(), fallback:!!o.fallback,
+      actions:(o.actions||[]).map(a=>({type:a.type||'message', message:a.message||'',
+        seconds:(a.seconds>0)?+a.seconds:null, device_id:a.device_id||null,
+        dice:(a.dice>0)?+a.dice:null, sides:(a.sides>0)?+a.sides:null,
+        capacity_op:a.capacity_op==='set'?'set':'add', capacity_value:+a.capacity_value||0,
+        poll:(a.poll||'').trim()||null})),
+    })),
+  }));
 }
 function cleanCapEvents(){
   return capEvRows.filter(e=>e.at!=null&&e.at!=='').map(e=>({
@@ -2685,6 +2799,8 @@ function applyState(st, full){
     savedModeNames = new Set(modeRows.map(m=>(m.name||'').trim().toLowerCase()));
     eventRows = JSON.parse(JSON.stringify(st.events||[]));
     capEvRows = JSON.parse(JSON.stringify(st.capacity_events||[]));
+    pollRows = JSON.parse(JSON.stringify(st.polls||[]));
+    if($('#cmdVote')) $('#cmdVote').value = (st.command_names||{}).vote||'agvote';
     if($('#eventInProcessMsg')) $('#eventInProcessMsg').value = st.event_in_process_message||'';
     if($('#eventCooldownMsg')) $('#eventCooldownMsg').value = st.event_cooldown_message||'';
     { const t = st.templates || {}; templatesData = {commands:t.commands||[], events:t.events||[], ranges:t.ranges||[]}; }
@@ -2696,6 +2812,7 @@ function applyState(st, full){
     renderAlwaysOn();
     renderEvents();
     renderCapEvents();
+    renderPolls();
     renderTemplates();
     renderBroadcasts();
     renderBroadcastDropdown();
@@ -2768,7 +2885,8 @@ function gatherConfig(){
       help:($('#cmdHelp').value||'aghelp').trim().toLowerCase(),
       leaderboard:($('#cmdLeaderboard').value||'leaderboard').trim().toLowerCase(),
       leaderboard_life:($('#cmdLeaderboardLife').value||'toppumpers-life').trim().toLowerCase(),
-      pumptimer:($('#cmdPumptimer').value||'pumptimer').trim().toLowerCase() },
+      pumptimer:($('#cmdPumptimer').value||'pumptimer').trim().toLowerCase(),
+      vote:(($('#cmdVote')&&$('#cmdVote').value)||'agvote').trim().toLowerCase() },
     capacity_message:$('#capacityMsg').value, pumptimer_message:$('#pumptimerMsg').value,
     pump_message: $('#pumpMsg') ? $('#pumpMsg').value : '',
     listen_targets:listenTargets, announce_channel_id: announceChanId,
@@ -2791,7 +2909,7 @@ function gatherConfig(){
     rich_output: $('#richOutput') ? $('#richOutput').checked : false,
     prizes:cleanPrizes(),
     capacity_ranges:rangeRows, commands:cleanCommands(), modes:cleanModes(), events:cleanEvents(),
-    capacity_events:cleanCapEvents(),
+    capacity_events:cleanCapEvents(), polls:cleanPolls(),
     event_in_process_message: $('#eventInProcessMsg') ? $('#eventInProcessMsg').value : '',
     event_cooldown_message: $('#eventCooldownMsg') ? $('#eventCooldownMsg').value : '',
     broadcasts: cleanBroadcasts(),

@@ -1,6 +1,6 @@
 {
-  "version": "3.10.0",
-  "versionCode": 67,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.10.0/discoflate.apk",
-  "notes": "DiscoFlate v3.10.0 \u2014 Capacity Events: one-shot triggers at any capacity threshold (1-999%) with Stop All Devices, chat-command disables (until-event / session-remainder), a temporary Enable list, Pause All Timed Events, and a sequential 'During the Event' action block. Events tab reorganized into collapsible sections (Timed events / Capacity events / Polls)."
+  "version": "3.11.0",
+  "versionCode": 68,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.11.0/discoflate.apk",
+  "notes": "DiscoFlate v3.11.0 \u2014 Polls: named chat polls posted as rich embeds (Poll: <title> + up to 4 options), started by commands (type 'poll'), timed events, capacity-event blocks, or even a winning option of another poll. Vote with !agvote N (renameable; only active during a poll). Winner's action block executes on completion; fallback option wins when nobody votes; a poll inside an event keeps that event running until it completes."
 }

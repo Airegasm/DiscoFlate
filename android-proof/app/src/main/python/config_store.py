@@ -65,7 +65,8 @@ DEFAULTS = {
     # bots — e.g. another dice bot already using !roll).
     "command_names": {"roll": "agroll", "capacity": "capacity",
                       "help": "aghelp", "leaderboard": "toppumpers",
-                      "leaderboard_life": "toppumpers-life", "pumptimer": "pumptimer"},
+                      "leaderboard_life": "toppumpers-life", "pumptimer": "pumptimer",
+                      "vote": "agvote"},
     # The !pumptimer built-in reply (always available). Placeholders: [timer]/[total_secs].
     "pumptimer_message": "⏱️ [timer] seconds left on the pump timer.",
 
@@ -263,6 +264,17 @@ DEFAULTS = {
     # active) until the block finishes. One-shot per session (re-armed by
     # session reset / activation).
     "capacity_events": [],
+
+    # Polls — named, referenced by a "poll" action (in timed events, capacity-
+    # event blocks, poll winners) or a command of type "poll". Posted as a rich
+    # embed ("Poll: <title>" + body + numbered options); people vote with the
+    # vote system command (!agvote N). One poll runs at a time; a poll inside
+    # an event's action block keeps that event 'running' until it completes.
+    # Each: {name, title, body, duration (s), repeat_every (s, 0=off),
+    #        options: [up to 4 of {label, fallback, actions: [action rows]}]}
+    # The winning option's actions execute on completion; the fallback option
+    # wins when nobody votes (else nothing happens).
+    "polls": [],
 
     # Preset broadcast messages — pick one from the Dashboard → Controls dropdown
     # and hit "Broadcast Custom" to post it to the channel. Each: {name, message}.

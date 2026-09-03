@@ -83,6 +83,12 @@ class Engine:
         self._capev_fx: dict[str, set] = {}              # key -> effects while it runs
         self._capev_session_fx: set = set()              # effects locked for the session
         self._capev_enable: dict[str, set] = {}          # key -> commands enabled during it
+        # Polls: at most ONE runs at a time. While active, the vote system
+        # command works (!agvote N); a poll inside an event/capacity-event
+        # action block BLOCKS that block, so the event counts as still running
+        # for the poll's whole duration and resumes its remaining actions after.
+        self._poll: dict | None = None                   # {def, opts, votes:{uid:idx}, voters:{uid:name}}
+        self._poll_task: asyncio.Task | None = None      # command-started (background) polls
         # Max Roll Prize tracking (in-memory; resets on session reset / restart).
         self._perfect: dict[str, int] = {}       # uid -> perfect-roll count
         self._prize_uses: dict[str, int] = {}    # uid -> remaining uses (present = unlocked)
@@ -117,6 +123,7 @@ class Engine:
         self.announce_cb = None                # async (text, image) -> None
         self.end_session_cb = None             # async () -> None : deactivate without the off-message
         self.cancel_games_cb = None            # async () -> None : cancel all live minigame views
+        self.embed_cb = None                   # async (title, text) -> None : rich embed post (polls)
         self.bot_connected: bool = False
 
         # Device add/search/use debug flows into the Activity log too (not just stdout).
@@ -146,6 +153,7 @@ class Engine:
             self._session_start = time.monotonic()
             self._session_frozen = 0.0
             self._capev_cancel_all(clear_session=True)
+            self._cancel_poll_task()
             self._event_last.clear()
             self._events_done.clear()
             self._event_fires.clear()
@@ -161,6 +169,7 @@ class Engine:
                 self._session_frozen = max(0.0, time.monotonic() - self._session_start)
                 self._session_start = None
             self._capev_cancel_all(clear_session=True)
+            self._cancel_poll_task()
             self._cooldowns.clear()
             self._event_last.clear()
             self._events_done.clear()
@@ -871,50 +880,64 @@ class Engine:
                 await self.abort(reason=f"capacity event {name}")
             self._capev_tasks[key] = asyncio.create_task(self._run_capev(ev, key, name))
 
+    async def _run_action_block(self, actions, name: str) -> None:
+        """Execute an ordered action block: message | fire | roll | capacity |
+        wait | poll. Shared by capacity events and poll winner outcomes. A poll
+        action BLOCKS the caller until the poll (and its winner's actions)
+        finish — that's what keeps a surrounding event 'running' throughout."""
+        for a in (actions or []):
+            if self._paused or self._end_triggered:
+                break
+            typ = ((a or {}).get("type") or "message").lower()
+            try:
+                if typ == "wait":
+                    await asyncio.sleep(max(0.0, float(a.get("seconds") or 0)))
+                    continue
+                if typ == "message":
+                    msg = (a.get("message") or "").strip()
+                    if msg:
+                        await self._announce(self._evt_hdr(name) + self.render(msg), None)
+                    continue
+                if typ == "capacity":
+                    op = (a.get("capacity_op") or "add").lower()
+                    val = float(a.get("capacity_value") or 0)
+                    self.set_capacity(val if op == "set" else self.capacity + val)
+                    continue
+                if typ == "poll":
+                    pd = self.find_poll(a.get("poll"))
+                    if pd is None:
+                        self._log("error", f"{name}: no poll named '{a.get('poll')}'")
+                    else:
+                        await self._run_poll(pd, source=name)
+                    continue
+                if typ in ("fire", "roll"):
+                    target = a.get("device_id") or self._active_id()
+                    if self._device(target) is None:
+                        self._log("error", f"{name}: no target device")
+                        continue
+                    if typ == "roll":
+                        rd, rs = self.range_dice(self.range_for(self.capacity))
+                        dice = int(a.get("dice") or rd)
+                        sides = int(a.get("sides") or rs)
+                        total, _ = self._roll_total(dice, sides)
+                        dur = self._duration_from_total(total)
+                    else:
+                        dur = round(max(0.1, min(self._hard_cap(), float(a.get("seconds") or 3))), 1)
+                    self._begin_or_extend(target, dur, name)
+                    msg = (a.get("message") or "").strip()
+                    if msg:
+                        await self._announce(self._evt_hdr(name) + self.render(
+                            msg, {"secs": f"{dur:.1f}", "seconds": f"{dur:.1f}"}), None)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:  # noqa: BLE001 — one bad action shouldn't kill the block
+                self._log("error", f"{name} action failed: {e}")
+
     async def _run_capev(self, ev: dict, key: str, name: str) -> None:
         """Execute the event's action block sequentially. The event counts as
         'running' (its effects active) until the block finishes."""
         try:
-            for a in (ev.get("actions") or []):
-                if self._paused or self._end_triggered:
-                    break
-                typ = (a.get("type") or "message").lower()
-                try:
-                    if typ == "wait":
-                        await asyncio.sleep(max(0.0, float(a.get("seconds") or 0)))
-                        continue
-                    if typ == "message":
-                        msg = (a.get("message") or "").strip()
-                        if msg:
-                            await self._announce(self._evt_hdr(name) + self.render(msg), None)
-                        continue
-                    if typ == "capacity":
-                        op = (a.get("capacity_op") or "add").lower()
-                        val = float(a.get("capacity_value") or 0)
-                        self.set_capacity(val if op == "set" else self.capacity + val)
-                        continue
-                    if typ in ("fire", "roll"):
-                        target = a.get("device_id") or self._active_id()
-                        if self._device(target) is None:
-                            self._log("error", f"capacity event {name}: no target device")
-                            continue
-                        if typ == "roll":
-                            rd, rs = self.range_dice(self.range_for(self.capacity))
-                            dice = int(a.get("dice") or rd)
-                            sides = int(a.get("sides") or rs)
-                            total, _ = self._roll_total(dice, sides)
-                            dur = self._duration_from_total(total)
-                        else:
-                            dur = round(max(0.1, min(self._hard_cap(), float(a.get("seconds") or 3))), 1)
-                        self._begin_or_extend(target, dur, f"capacity event {name}")
-                        msg = (a.get("message") or "").strip()
-                        if msg:
-                            await self._announce(self._evt_hdr(name) + self.render(
-                                msg, {"secs": f"{dur:.1f}", "seconds": f"{dur:.1f}"}), None)
-                except asyncio.CancelledError:
-                    raise
-                except Exception as e:  # noqa: BLE001 — one bad action shouldn't kill the block
-                    self._log("error", f"capacity event {name} action failed: {e}")
+            await self._run_action_block(ev.get("actions"), f"capacity event {name}")
         except asyncio.CancelledError:
             pass
         finally:
@@ -922,6 +945,130 @@ class Engine:
             self._capev_enable.pop(key, None)
             self._capev_tasks.pop(key, None)
             self._log("bot", f"CAPACITY EVENT '{name}' complete")
+
+    # -- polls ---------------------------------------------------------------- #
+    def find_poll(self, name) -> dict | None:
+        key = str(name or "").strip().lower()
+        if not key:
+            return None
+        for p in self.cfg.get("polls", []):
+            if (p.get("name") or "").strip().lower() == key:
+                return p
+        return None
+
+    def poll_active(self) -> bool:
+        return self._poll is not None
+
+    async def _announce_poll(self, title: str, text: str) -> None:
+        """Post the poll as a rich embed (falls back to plain text)."""
+        if self.embed_cb:
+            try:
+                await self.embed_cb(title, text)
+                return
+            except Exception as e:  # noqa: BLE001
+                self._log("error", f"poll embed failed: {e}")
+        await self._announce(f"**{title}**\n{text}", None)
+
+    def _poll_text(self, pd: dict, opts: list) -> str:
+        prefix = self.cfg.get("command_prefix", "!")
+        vote = self.builtin_names()["vote"]
+        body = self.render((pd.get("body") or "").strip())
+        lines = [f"**{i + 1}.** {o.get('label', '')}" for i, o in enumerate(opts)]
+        return ((body + "\n\n") if body else "") + "\n".join(lines) + \
+            f"\n\nVote with `{prefix}{vote} 1`–`{prefix}{vote} {len(opts)}`"
+
+    async def _run_poll(self, pd: dict, source: str = "poll") -> None:
+        """Run one poll start-to-finish: post the embed, collect votes for the
+        duration (reposting every repeat_every seconds), tally, announce the
+        result, and execute the winning option's action block. BLOCKING — a
+        caller inside an event's action block stays 'running' throughout."""
+        name = (pd.get("name") or "poll").strip()
+        if self._poll is not None:
+            self._log("error", f"{source}: poll '{name}' skipped — another poll is already running")
+            return
+        opts = [o for o in (pd.get("options") or [])[:4] if (o.get("label") or "").strip()]
+        if not opts:
+            self._log("error", f"{source}: poll '{name}' has no options")
+            return
+        title = f"Poll: {(pd.get('title') or name).strip()}"
+        text = self._poll_text(pd, opts)
+        try:
+            duration = max(5.0, min(3600.0, float(pd.get("duration") or 60)))
+        except (TypeError, ValueError):
+            duration = 60.0
+        try:
+            repeat = max(0.0, float(pd.get("repeat_every") or 0))
+        except (TypeError, ValueError):
+            repeat = 0.0
+        if repeat and repeat < 5:
+            repeat = 5.0
+        self._poll = {"def": pd, "opts": opts, "votes": {}, "voters": {}}
+        self._log("bot", f"POLL '{name}' started ({duration:g}s, {len(opts)} options) [{source}]")
+        winner_idx = None
+        try:
+            await self._announce_poll(title, text)
+            end = time.monotonic() + duration
+            while True:
+                remaining = end - time.monotonic()
+                if remaining <= 0:
+                    break
+                await asyncio.sleep(min(remaining, repeat) if repeat else remaining)
+                if repeat and time.monotonic() < end - 1:
+                    await self._announce_poll(title, text)
+            # tally
+            counts = [0] * len(opts)
+            for idx in self._poll["votes"].values():
+                if 0 <= idx < len(opts):
+                    counts[idx] += 1
+            total = sum(counts)
+            if total == 0:
+                winner_idx = next((i for i, o in enumerate(opts) if o.get("fallback")), None)
+                note = ("No votes — the fallback option wins." if winner_idx is not None
+                        else "No votes — no outcome.")
+            else:
+                top = max(counts)
+                winner_idx = random.choice([i for i, c in enumerate(counts) if c == top])
+                tied = counts.count(top) > 1
+                note = f"{total} vote{'s' if total != 1 else ''} in." + (" Tie broken at random!" if tied else "")
+            lines = [f"{'🏆 ' if i == winner_idx else ''}**{i + 1}.** {o.get('label', '')} — "
+                     f"{counts[i]} vote{'s' if counts[i] != 1 else ''}"
+                     for i, o in enumerate(opts)]
+            await self._announce_poll(title + " — RESULTS", "\n".join(lines) + f"\n\n{note}")
+            self._log("bot", f"POLL '{name}' finished — " +
+                      (f"winner: option {winner_idx + 1}" if winner_idx is not None else "no outcome"))
+        except asyncio.CancelledError:
+            self._log("bot", f"POLL '{name}' cancelled")
+            raise
+        finally:
+            self._poll = None
+        if winner_idx is not None:
+            await self._run_action_block(opts[winner_idx].get("actions"), f"poll {name}")
+
+    def cast_vote(self, uid, who: str, arg: str) -> str | None:
+        """Handle the vote system command. None = no poll running (stay silent
+        — the command only exists during a poll). Otherwise a reply string."""
+        if self._poll is None:
+            return None
+        opts = self._poll["opts"]
+        prefix = self.cfg.get("command_prefix", "!")
+        vote = self.builtin_names()["vote"]
+        try:
+            n = int(str(arg).strip())
+        except (TypeError, ValueError):
+            return f"🗳 Vote with `{prefix}{vote} 1`–`{prefix}{vote} {len(opts)}`"
+        if not (1 <= n <= len(opts)):
+            return f"🗳 That poll has options 1–{len(opts)}."
+        changed = str(uid) in self._poll["votes"]
+        self._poll["votes"][str(uid)] = n - 1
+        self._poll["voters"][str(uid)] = who
+        label = opts[n - 1].get("label", "")
+        return f"🗳 **{who}** {'changed their vote to' if changed else 'voted for'} **{label}**!"
+
+    def _cancel_poll_task(self) -> None:
+        if self._poll_task is not None:
+            self._poll_task.cancel()
+            self._poll_task = None
+        self._poll = None
 
     # -- timed events -------------------------------------------------------- #
     async def _check_events(self) -> None:
@@ -1058,6 +1205,19 @@ class Engine:
                 await self._emit(self._evt_hdr(name) + self.render(tmpl, base), sink, replace_key=replace_key)
             return
 
+        if action == "poll":
+            # BLOCKING by design: the event counts as still running for the
+            # poll's whole duration, and its remaining rounds/messages resume
+            # only after the poll (and its winner's actions) complete.
+            pd = self.find_poll(ev.get("poll"))
+            if pd is None:
+                self._log("error", f"event '{name}': no poll named '{ev.get('poll')}'")
+            else:
+                await self._run_poll(pd, source=f"event {name}")
+            if msg:
+                await self._emit(self._evt_hdr(name) + self.render(msg, extra), sink, replace_key=replace_key)
+            return
+
         if action == "capacity":
             op = (ev.get("capacity_op") or "add").lower()
             try:
@@ -1105,7 +1265,8 @@ class Engine:
                 "help": (n.get("help") or "aghelp").strip().lower(),
                 "leaderboard": (n.get("leaderboard") or "leaderboard").strip().lower(),
                 "leaderboard_life": (n.get("leaderboard_life") or "toppumpers-life").strip().lower(),
-                "pumptimer": (n.get("pumptimer") or "pumptimer").strip().lower()}
+                "pumptimer": (n.get("pumptimer") or "pumptimer").strip().lower(),
+                "vote": (n.get("vote") or "agvote").strip().lower()}
 
     # -- pump-time leaderboard (per session) --------------------------------- #
     def buffer_ok(self, cmdkey: str) -> bool:
@@ -1387,6 +1548,33 @@ class Engine:
             return {"ok": True, "device": False, "started": False, "events_posted": ev_posts,
                     "reply": self.render(cmd.get("reply") or "", {"user": who, "mention": self._mention(uid, who), "cmd_remain": _remain()}) or f"{name}!",
                     "reply_anon": self.render(cmd.get("reply") or "", {"user": anon, "mention": anon, "cmd_remain": _remain()}) or f"{name}!"}
+
+        if typ == "poll":
+            # Starts a named poll (same gating as other commands; the poll
+            # itself runs in the background — its embed posts separately).
+            cmdkey = name.lower()
+            cd, scope = self._range_cd_scope(self.range_for(self.capacity), cmdkey)
+            key_uid = str(uid) if scope == "user" else "*"
+            if uid is not None and not owner_exempt:
+                remaining = self.cooldown_remaining(key_uid, cmdkey)
+                if remaining > 0:
+                    return {"ok": False, "cooldown": True, "error": self._cooldown_reply(who, remaining, uid, cmdkey)}
+            pd = self.find_poll(cmd.get("poll"))
+            if pd is None:
+                return {"ok": False, "error": f"no poll named '{cmd.get('poll')}' — pick one in Events → Polls"}
+            if self._poll is not None:
+                return {"ok": False, "error": "🗳 A poll is already running — wait for it to finish."}
+            if uid is not None:
+                self._track_user(uid, who)
+                if scope == "command" or not owner_exempt:
+                    self._touch_cooldown(key_uid, cmdkey, cd)
+            _spend_use()
+            self._poll_task = asyncio.create_task(self._run_poll(pd, source=f"command {name}"))
+            anon = self._anon_label()
+            tmpl = cmd.get("reply") or ""
+            return {"ok": True, "device": False, "started": False,
+                    "reply": self.render(tmpl, {"user": who, "mention": self._mention(uid, who), "cmd_remain": _remain()}),
+                    "reply_anon": self.render(tmpl, {"user": anon, "mention": anon, "cmd_remain": _remain()})}
 
         if typ.startswith("game-"):
             # Minigames run interactively via Discord buttons — here we only gate
@@ -1796,6 +1984,7 @@ class Engine:
         #    Running capacity-event blocks are cancelled too (their session-
         #    remainder locks and fired-markers survive the pause).
         self._capev_cancel_all(clear_session=False)
+        self._cancel_poll_task()
         self._event_last.clear()
         self._event_fires.clear()
         self._event_cooldown_until.clear()
@@ -1993,6 +2182,7 @@ class Engine:
         self.capacity = 0.0
         self._milestones_fired.clear()
         self._capev_cancel_all(clear_session=True)
+        self._cancel_poll_task()
         self._cooldowns.clear()
         self._runtime_events_on.clear()
         self._event_last.clear()
@@ -2175,6 +2365,8 @@ class Engine:
         lines.append(f"**{prefix}{bn['leaderboard']}** - show the leaderboard (this session)")
         lines.append(f"**{prefix}{bn['leaderboard_life']}** - all-time top pumpers")
         lines.append(f"**{prefix}{bn['pumptimer']}** - time left on the pump")
+        if self._poll is not None:
+            lines.append(f"**{prefix}{bn['vote']} <1-{len(self._poll['opts'])}>** - vote in the running poll")
         return lines
 
     def custom_commands_str(self, prefix: str) -> str:

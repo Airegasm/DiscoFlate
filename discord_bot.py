@@ -456,6 +456,17 @@ class BotManager:
         await self.broadcast(txt, None, embed=self._status_embed("leaderboard", txt))
         return {"ok": True}
 
+    async def post_embed(self, title: str, text: str) -> None:
+        """Broadcast a rich embed (polls). Always an embed — not gated on
+        rich_output — because the content is designed as a card."""
+        try:
+            e = discord.Embed(title=(title or "")[:256], description=(text or "")[:4096],
+                              color=0x9B59B6)
+        except Exception:  # noqa: BLE001 — no embed support → plain text
+            await self.broadcast(f"**{title}**\n{text}", None)
+            return
+        await self.broadcast("", None, embed=e)
+
     def _hdr(self, cfg: dict, label: str | None, name: str | None) -> str:
         """The **[label · name]** output-header prefix (empty unless output_headers
         is on). `name` is the actor name the destination is allowed to see, so the
@@ -564,6 +575,15 @@ class BotManager:
             await self._echo(message, res.get("reply_anon"), "", res.get("reply"))
             return
 
+
+        if action == "vote":
+            # only live during a poll — cast_vote returns None otherwise (silent)
+            parts = content[len(prefix):].split(None, 1)
+            arg = parts[1].strip() if len(parts) > 1 else ""
+            reply = self.engine.cast_vote(str(message.author.id), who, arg)
+            if reply:
+                await _reply(message, reply)
+            return
 
         if action == "help":
             text = self.engine.help_text(prefix)

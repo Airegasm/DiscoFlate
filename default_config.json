@@ -11,7 +11,8 @@
     "help": "aghelp",
     "leaderboard": "toppumpers",
     "leaderboard_life": "toppumpers-life",
-    "pumptimer": "pumptimer"
+    "pumptimer": "pumptimer",
+    "vote": "agvote"
   },
   "pumptimer_message": "⏱️ [timer] seconds left on the pump timer.",
   "capacity_message": "[announce] - Current Capacity: **[capacity]%**\n[capacity_bar]",
@@ -929,5 +930,6 @@
     "enabled": false,
     "allowed_ips": []
   },
-  "capacity_events": []
+  "capacity_events": [],
+  "polls": []
 }
