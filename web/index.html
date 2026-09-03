@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v2.3 by AireGasm</span></div>
+    <div class="logo">Disco<span>Flate</span> <span class="muted" style="font-size:13px;font-weight:400">v2.4 by AireGasm</span></div>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
@@ -495,10 +495,68 @@
     </div>
 
     <div class="card span" data-tab="help">
+      <details class="help"><summary><h2>Custom commands — how to set them up</h2></summary>
+      <div class="hint" style="max-width:820px;margin-top:8px">A custom command is a chat trigger you invent (e.g. <code>!spin</code>). You build it once on the <b>Commands</b> tab, then switch it on for the capacity ranges where it should work.</div>
+      <h3 style="margin:14px 0 6px">The three types</h3>
+      <ul style="line-height:1.7;padding-left:22px;margin:0;max-width:820px">
+        <li><b>fire</b> — turns the device on for a fixed number of <b>Seconds</b>. (Drives capacity if the device is a pump.)</li>
+        <li><b>roll</b> — rolls dice and fires for the total. Leave <b>Dice/Sides</b> on <code>rng</code> to use the <i>current range's</i> dice, or pin specific dice (e.g. 2 d 6).</li>
+        <li><b>say</b> — text-only reply, no device. Good for lore, hints, or status.</li>
+      </ul>
+      <h3 style="margin:14px 0 6px">Per-command options</h3>
+      <ul style="line-height:1.7;padding-left:22px;margin:0;max-width:820px">
+        <li><b>Device</b> — <i>(active pump)</i> or a specific device you've added.</li>
+        <li><b>owner-only</b> — only the Owner can use it. <b>reply pings user</b> — the reply @-mentions the caller. <b>hide from command list</b> — keep it out of <code>[commands]</code>.</li>
+        <li><b>Description</b> — shown next to the command in <code>[commands]</code>. <b>Reply</b> — the templated message it posts (see <b>Placeholders</b> below).</li>
+        <li><b>Starts events</b> — comma-separated names of (off-by-default) timed events this command switches on temporarily. They revert on Session reset / app restart.</li>
+      </ul>
+      <div class="hint" style="max-width:820px"><b>⚠️ Two-step setup — this trips people up:</b> creating a command does <b>nothing</b> on its own. A command only works in a range after you <b>add it to that range</b> (Game → <b>Capacity ranges</b> → open a range → “<b>+ Add command to this range</b>”). Its <b>cooldown</b>, <b>max uses/person</b>, and <b>scope</b> are set there, per range — not on the command itself.</div>
+      <div class="hint" style="max-width:820px"><b>Example — a <code>!spin</code> roll command:</b> Commands tab → <b>+ Add command</b> → Name <code>spin</code>, Type <b>roll</b>, Dice/Sides left on <code>rng</code>, Reply <code>🌀 [user] spun [dice] = [result] → +[secs2capacity]%</code>. Save. Then Game → Capacity ranges → open the <b>66–100%</b> range → <b>+ Add command to this range</b> → <code>!spin</code>, and set Max/person <code>3</code>, Cooldown <code>30</code>, Scope <b>per-user</b>. Now <code>!spin</code> is live only in the top band.</div>
+      </details>
+    </div>
+
+    <div class="card span" data-tab="help">
+      <details class="help"><summary><h2>Capacity ranges — how to set them up</h2></summary>
+      <div class="hint" style="max-width:820px;margin-top:8px">Ranges are capacity bands (<b>From %</b> → <b>To %</b>) that change the game as the meter climbs. They're evaluated top-down — the <b>first band that contains the current capacity wins</b>. Edit them in Game → <b>Capacity ranges</b>.</div>
+      <h3 style="margin:14px 0 6px">Each range holds</h3>
+      <ul style="line-height:1.7;padding-left:22px;margin:0;max-width:820px">
+        <li><b>Dice + Luck</b> — the built-in 🎲 roll for this band (e.g. 1 d 4 low, 2 d 6 high). Luck is a ± % nudge on the result.</li>
+        <li><b>Announce</b> — ongoing text shown with roll/capacity while you're in the band. <b>Milestone</b> + <b>Image</b> — posted <i>once</i> the moment capacity enters the band.</li>
+        <li><b>The command table</b> — the 🎲 dice roll (always present) plus every custom command you've <b>added to this range</b>. Per command, per range: <b>Max/person</b> (blank = unlimited; <code>[cmd_remain]</code> then reads “unlimited”; a value set in an earlier band carries forward), <b>Cooldown</b> (blank = the default), and <b>Scope</b> (<b>per-user</b> = each person waits their own cooldown; <b>per-command</b> = one shared cooldown for everyone).</li>
+        <li><b>Range Start Command</b> — one command auto-fired once when the band is entered.</li>
+        <li><b>Event actions on entry</b> — Enable/Disable named timed events as the band is entered.</li>
+      </ul>
+      <h3 style="margin:14px 0 6px">End &amp; End Sequence</h3>
+      <div class="hint" style="max-width:820px;margin-top:0"><b>+ Add End Sequence</b> = a buildup band with a final threshold; reaching it posts a final message/image, then <b>ends &amp; resets the session</b>. <b>+ Add End</b> = just that terminal threshold, no buildup. Capacity may tick <b>above 100%</b> up to the End threshold. Only <b>one</b> End / End Sequence is allowed, and nothing comes after it.</div>
+      <div class="hint" style="max-width:820px"><b>Example:</b> three bands — <b>0–33%</b> rolls 1 d 4, <b>33–66%</b> rolls 1 d 6, <b>66–100%</b> rolls 2 d 6 with a Milestone “🎉 Two-thirds full!”. Add <code>!spin</code> to the 66–100% band only. Then <b>+ Add End Sequence</b> at <b>120%</b> with a final message “💥 Full burst!” — capacity can climb past 100% until it hits 120% and the session ends.</div>
+      </details>
+    </div>
+
+    <div class="card span" data-tab="help">
+      <details class="help"><summary><h2>Timed events — how to set them up</h2></summary>
+      <div class="hint" style="max-width:820px;margin-top:8px">Events are automatic actions on a timer — no one has to type anything. Build them on the <b>Events</b> tab. They only run while <b>Activation</b> is on; turning Activation off cancels every event and clears cooldowns.</div>
+      <h3 style="margin:14px 0 6px">Two timing modes</h3>
+      <ul style="line-height:1.7;padding-left:22px;margin:0;max-width:820px">
+        <li><b>loop</b> — fires <b>every N seconds</b>, repeatedly.</li>
+        <li><b>once</b> — fires a <b>single</b> time, N seconds after Activation turns on (re-arms on the next off→on).</li>
+      </ul>
+      <h3 style="margin:14px 0 6px">Four actions</h3>
+      <ul style="line-height:1.7;padding-left:22px;margin:0;max-width:820px">
+        <li><b>message</b> — post its text to the announce channel.</li>
+        <li><b>fire</b> — run a device for N seconds.</li>
+        <li><b>roll</b> — auto-roll a device (its own dice/sides, or the current range's).</li>
+        <li><b>capacity</b> — <b>add</b> or <b>set</b> the meter by a value.</li>
+      </ul>
+      <div class="hint" style="max-width:820px">Every action can <i>also</i> post a message, and placeholders work everywhere. <b>Events are OFF by default</b> — turn one on three ways: tick it here, list its name in a command's <b>Starts events</b>, or have a range <b>Enable</b> it on entry.</div>
+      <div class="hint" style="max-width:820px"><b>Example — a slow drip only in the top band:</b> Events tab → <b>+ Add event</b> → Name <code>drip</code>, mode <b>loop</b>, every <code>45</code> s, action <b>fire</b>, <code>2</code> seconds on the active pump, message <code>💧 a slow drip…</code>. Leave it <b>OFF</b>. Then Game → Capacity ranges → the <b>66–100%</b> band → <b>+ Add event</b> (on entry) → <code>drip</code> / <b>Enable</b>. Now the drip only runs once the meter is two-thirds full, and stops when it drops back out.</div>
+      </details>
+    </div>
+
+    <div class="card span" data-tab="help">
       <h2>Updates</h2>
       <div class="row" style="gap:10px;align-items:center">
         <button class="ghost" onclick="checkUpdates()">⟳ Check for Updates</button>
-        <span class="muted" id="updMsg">You're on v2.3.</span>
+        <span class="muted" id="updMsg">You're on v2.4.</span>
         <div style="flex:1"></div>
         <span id="updAction"></span>
       </div>
