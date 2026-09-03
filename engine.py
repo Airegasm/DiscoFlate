@@ -32,6 +32,15 @@ import kasa_legacy as kasa
 import device_control
 import config_store
 
+# Friendly display names for minigame command types (shown in announcements +
+# the [game] placeholder), independent of what the command itself is named.
+GAME_DISPLAY_NAMES = {
+    "game-pushluck": "Push Your Luck",
+    "game-simon": "Simon",
+    "game-balloon": "Don't Pop It",
+    "game-rps": "Rock Paper Scissors",
+}
+
 
 class Engine:
     def __init__(self) -> None:
@@ -1112,6 +1121,11 @@ class Engine:
             step = 12.0
         return max(0.0, min(100.0, start + step * max(0, int(pumps))))
 
+    def game_display_name(self, cmd: dict) -> str:
+        """The full game name from the command type (e.g. 'Rock Paper Scissors'),
+        falling back to the command's own name for non-game commands."""
+        return GAME_DISPLAY_NAMES.get((cmd.get("type") or "").lower(), cmd.get("name", "game"))
+
     def game_tier_for(self, cmd: dict, score) -> dict:
         """The highest score→outcome tier whose `min` the score reaches."""
         best = None
@@ -1132,7 +1146,7 @@ class Engine:
         tier = self.game_tier_for(cmd, score)
         fired = await self._run_fires(tier.get("fires"), who, uid)
         total = round(sum(f["duration"] for f in fired), 1)
-        name = cmd.get("name", "game")
+        name = self.game_display_name(cmd)   # full game name (Rock Paper Scissors, …)
         base = {"score": score, "secs": f"{total:.1f}", "seconds": f"{total:.1f}",
                 "secs2capacity": (self._secs_to_capacity(total, self._active_id()) if fired else "0"),
                 "game": name}

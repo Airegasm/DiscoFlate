@@ -1,6 +1,6 @@
 {
-  "version": "3.2.4",
-  "versionCode": 48,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=48",
-  "notes": "DiscoFlate v3.2.4 \u2014 Restore Defaults is now additive: keeps your edited/custom commands + system-command renames, only adds what is missing"
+  "version": "3.2.5",
+  "versionCode": 49,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/raw/main/dist/discoflate.apk?v=49",
+  "notes": "DiscoFlate v3.2.5 \u2014 minigame announcements use the full game name (Rock Paper Scissors, Do not Pop It, \u2026) from the command type"
 }

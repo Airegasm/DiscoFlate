@@ -81,7 +81,7 @@ class PushLuckView(discord.ui.View):
         return self.bot.engine.pushluck_bust_pct(self.cmd, self.pumps)
 
     def _state(self):
-        return (f"💨 **{self.cmd.get('name', 'Push Your Luck')}**\n"
+        return (f"💨 **{self.bot.engine.game_display_name(self.cmd)}**\n"
                 f"Pumps: **{self.pumps}** · Score: **{self.score:g}**\n"
                 f"Next pump busts at **{self._bust_pct():.0f}%** — Pump for more, or Bank it?")
 
@@ -142,7 +142,7 @@ class SimonView(discord.ui.View):
         self.sequence.append(random.choice(self.symbols))
 
     def _reveal_text(self, prefix=""):
-        return (f"{prefix}🧠 **{self.cmd.get('name', 'Simon')}** — memorize (round {len(self.sequence)}):\n\n"
+        return (f"{prefix}🧠 **{self.bot.engine.game_display_name(self.cmd)}** — memorize (round {len(self.sequence)}):\n\n"
                 f"# {'  '.join(self.sequence)}\n\n*(hiding in {self.reveal:g}s…)*")
 
     async def begin(self, interaction: discord.Interaction):
@@ -157,7 +157,7 @@ class SimonView(discord.ui.View):
             self.entered = []
             self._build_buttons()
             await self._interaction.edit_original_response(
-                content=f"🧠 **{self.cmd.get('name', 'Simon')}** — now repeat it! (round {len(self.sequence)})",
+                content=f"🧠 **{self.bot.engine.game_display_name(self.cmd)}** — now repeat it! (round {len(self.sequence)})",
                 view=self)
         except Exception:
             pass
@@ -181,7 +181,7 @@ class SimonView(discord.ui.View):
         self.entered.append(sym)
         if len(self.entered) < len(self.sequence):
             await interaction.response.edit_message(
-                content=f"🧠 **{self.cmd.get('name', 'Simon')}** — keep going… "
+                content=f"🧠 **{self.bot.engine.game_display_name(self.cmd)}** — keep going… "
                         f"({len(self.entered)}/{len(self.sequence)})", view=self)
             return
         # round cleared
@@ -244,7 +244,7 @@ class BalloonView(discord.ui.View):
         self.add_item(CashOutButton(self._cash_row()))
 
     def _state(self):
-        return (f"🎈 **{self.cmd.get('name', 'Balloons')}** — {len(self.mines)} balloons hidden.\n"
+        return (f"🎈 **{self.bot.engine.game_display_name(self.cmd)}** — {len(self.mines)} balloons hidden.\n"
                 f"Reveal a safe cell (+{self.points:g}) or 🏦 Cash Out.  Score: **{self.score:g}**")
 
     async def begin(self, interaction: discord.Interaction):
@@ -314,7 +314,7 @@ class RpsView(discord.ui.View):
 
     def _state(self, last=""):
         tail = ("\n" + last) if last else ""
-        return (f"✊✋✌️ **{self.cmd.get('name', 'RPS')}** — first to **{self.target}**.\n"
+        return (f"✊✋✌️ **{self.bot.engine.game_display_name(self.cmd)}** — first to **{self.target}**.\n"
                 f"You **{self.pw}** – **{self.bw}** Bot{tail}\nPick your throw:")
 
     async def begin(self, interaction: discord.Interaction):
