@@ -34,7 +34,7 @@ DEFAULT_PUMPDIRECT_PATH = os.path.normpath(
 
 # Schema version of the stored config. Bump it + add a _migrate step whenever a
 # key is renamed/moved, so old configs upgrade instead of silently stranding data.
-CONFIG_VERSION = 5
+CONFIG_VERSION = 6
 
 # The dead "dice recharged" default that a remediation migration accidentally
 # promoted to the live cooldown-ready message. Migration v3 undoes that.
@@ -263,24 +263,28 @@ DEFAULTS = {
     #    disable_always_on, disable_always_on_scope,
     #    pause_events, pause_events_scope,
     #    enable_commands_on, enable_commands: [names],   # usable during the event regardless
-    #    actions: [{type: message|embed_message|broadcast|command|fire|roll|
-    #               capacity|wait|poll|competition|bonus_round|award_prize|
-    #               award_amount|winner_button|session_leader_event|command_gate|
-    #               end_session, command (run a named custom command),
-    #               title (embed_message/*_button titlebar),
+    #    actions: [{type: message|embed|broadcast|command|fire|roll|capacity|wait|
+    #               poll|competition|bonus_round|award_prize|award_amount|
+    #               command_gate|end_session,
+    #               command (run a named custom command),
+    #               title + message,   # embed: titlebar + body
+    #               target (embed button gate: ""=no button / winner / runnerup /
+    #                 range_leader / session_leader / top_bonus_holder / everyone /
+    #                 allowlist) + allow:[…] + label + freeze + deadline +
+    #                 deadline_message + timeout_message + actions:[…] (run on press
+    #                 or deadline). Folds in the old embed_message/winner_button/
+    #                 session_leader_event.
     #               bonus_round (name),   # start a named Bonus Round
     #               unit (secs|pct) + amount,   # award_amount: bank a bonus amount
-    #               message, seconds (number OR [placeholder]),
+    #               seconds (number OR [placeholder]),
     #               device_id, dice, sides, capacity_op, capacity_value,
     #               poll, broadcast, competition,
     #               fire_mode (seconds|add|to) + fill_pct (fire: pump until N%
-    #                 added / reached; [secs] = the computed time),
-    #               target, command, charges, stash, lock, deadline,
-    #               deadline_message, timeout_message,   # award_prize
-    #               gate_mode (block_all|remove_block),  # command_gate
-    #               label, freeze, deadline, actions:[…]}]}  # winner_button:
-    #               a one-press button for a target (e.g. [winner]) that runs its
-    #               own nested action block; freeze blocks others until pressed
+    #                 added / reached; [secs] = the computed time) + block_during +
+    #                 post_actions:[…],
+    #               charges, stash, lock, deadline,
+    #                 deadline_message, timeout_message,   # award_prize
+    #               gate_mode (block_all|remove_block)}]}  # command_gate
     # The action block runs sequentially; the event is "running" (its effects
     # active) until the block finishes. One-shot per session (re-armed by
     # session reset / activation).
@@ -299,8 +303,8 @@ DEFAULTS = {
     #    repeat_every, repeat_message, title, body, intro, entry_message,
     #    win_message, no_winner_message,
     #    add_all_totals (bool: fire EVERY finisher's total, each credited),
-    #    win_actions: [action rows run on a win — fire [winner_score], hand a
-    #      winner_button, award_prize a command, command_gate others, …],
+    #    win_actions: [action rows run on a win — fire [winner_score], an embed
+    #      with a gated button, award_prize a command, command_gate others, …],
     #    no_winner_actions: [action rows run when nobody qualified]}
     #    Legacy award_pump/bonus_command/lock/deadline fields migrate to
     #    win_actions (config_version 4).
@@ -469,6 +473,35 @@ def load() -> dict:
     return _coerce_numbers(_deep_merge(DEFAULTS, _migrate(stored)))
 
 
+_LEGACY_EMBED_TYPES = {"embed_message", "winner_button", "session_leader_event"}
+_KNOWN_BUTTON_TARGETS = {"winner", "runnerup", "range_leader", "session_leader",
+                         "top_bonus_holder", "everyone", "all", "anyone"}
+
+
+def _walk_migrate_embeds(node) -> None:
+    """Recursively fold legacy embed_message/winner_button/session_leader_event
+    action rows (anywhere — nested blocks, templates) into the unified `embed`."""
+    if isinstance(node, dict):
+        t = (node.get("type") or "").lower()
+        if t == "embed_message":
+            node["type"] = "embed"; node.setdefault("target", ""); node.setdefault("actions", [])
+        elif t == "session_leader_event":
+            node["type"] = "embed"; node["target"] = "session_leader"; node.setdefault("actions", [])
+        elif t == "winner_button":
+            raw = node.get("target") or "winner"
+            tok = str(raw).strip().strip("[]").lower()
+            if tok in _KNOWN_BUTTON_TARGETS:
+                node["target"] = tok
+            else:
+                node["target"] = "allowlist"; node["allow"] = [raw]
+            node["type"] = "embed"; node.setdefault("actions", [])
+        for v in node.values():
+            _walk_migrate_embeds(v)
+    elif isinstance(node, list):
+        for item in node:
+            _walk_migrate_embeds(item)
+
+
 def _migrate(cfg: dict) -> dict:
     """Ordered upgrades for configs written by older versions. Each step bumps
     config_version; unknown future keys always pass through untouched."""
@@ -528,6 +561,10 @@ def _migrate(cfg: dict) -> dict:
         for c in (cfg.get("competitions") or []):
             if isinstance(c, dict) and (c.get("type") or "").lower() in ("race", "raffle"):
                 c["type"] = "rolloff"
+    if v < 6:
+        # v6: embed_message + winner_button + session_leader_event collapsed into
+        # one unified `embed` action (title/body + optional gated button + block).
+        _walk_migrate_embeds(cfg)
     cfg["config_version"] = CONFIG_VERSION
     return cfg
 

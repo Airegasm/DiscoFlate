@@ -1,6 +1,6 @@
 {
-  "version": "3.33.0",
-  "versionCode": 103,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.33.0/discoflate.apk",
-  "notes": "DiscoFlate v3.33.0 (consolidation, part 1) — new 'command' action runs a named custom command from any action block (recursion-guarded). Race & raffle competition types removed pending a proper redesign (they forced pointless dice rolls and race had a winner-selection bug); competitions are roll-off for now, and any legacy race/raffle auto-migrates to roll-off."
+  "version": "3.34.0",
+  "versionCode": 104,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.34.0/discoflate.apk",
+  "notes": "DiscoFlate v3.34.0 (consolidation, part 2) — embed_message, winner_button and session_leader_event collapse into ONE 'embed' action: a titlebar + body, with an OPTIONAL button gated to a target (winner / runner-up / range-leader / session-leader / top-bonus-holder / everyone / a custom allowlist) that runs a nested action block, with freeze + timer/fallback. Existing setups auto-migrate. Also new [runnerup]/[top_bonus_holder] button targets."
 }

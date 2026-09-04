@@ -1090,18 +1090,84 @@ class Engine:
                     if msg:
                         await self._announce(self._evt_hdr(hdr) + R(msg), None)
                     continue
-                if typ == "embed_message":
-                    # a plain message, but posted as a rich embed (titlebar + body)
-                    title = R((a.get("title") or "").strip())
-                    body = R((a.get("message") or "").strip())
-                    if self.embed_cb:
-                        try:
-                            await self.embed_cb(title or "​", body)
-                        except Exception as e:  # noqa: BLE001
-                            self._log("error", f"embed_message failed: {e}")
+                if typ in ("embed", "embed_message", "winner_button", "session_leader_event"):
+                    # Unified embed action: a titlebar + body embed, OPTIONALLY
+                    # with a button gated to a target (winner/runnerup/range_leader/
+                    # session_leader/top_bonus_holder/everyone/allowlist) that runs
+                    # a nested action block. Legacy embed_message/winner_button/
+                    # session_leader_event map onto it (also handled by migration).
+                    if typ == "embed_message":
+                        tgt, acts = "", []
+                    elif typ == "session_leader_event":
+                        tgt, acts = "session_leader", (a.get("actions") or [])
+                    elif typ == "winner_button":
+                        tgt = (a.get("target") or "[winner]").strip().strip("[]").lower()
+                        acts = a.get("actions") or []
+                    else:  # embed
+                        tgt = (a.get("target") or "").strip().strip("[]").lower()
+                        acts = a.get("actions") or []
+                    has_button = bool(tgt) and bool(acts)
+                    allowed = None; primary_uid = None; primary_who = ""
+                    if has_button:
+                        if tgt in ("everyone", "all", "anyone"):
+                            allowed = None   # anyone may press (single-use)
+                        elif tgt == "allowlist":
+                            allowed = set()
+                            for row in (a.get("allow") or []):
+                                u, w = self._resolve_award_target(row)
+                                if u:
+                                    allowed.add(str(u))
+                                    if primary_uid is None:
+                                        primary_uid, primary_who = u, w
+                            if not allowed:
+                                has_button = False   # nobody resolvable → plain embed
+                        else:
+                            u, w = self._resolve_award_target(f"[{tgt}]")
+                            if u:
+                                allowed = {str(u)}; primary_uid, primary_who = u, w
+                            else:
+                                has_button = False
+                    # [target]/[mention] = the button's target; [winner] is left to
+                    # the global last-winner so a plain embed's [winner] still works.
+                    bctx = {"target": primary_who,
+                            "mention": self._mention(primary_uid, primary_who) if primary_uid else ""}
+                    title = R((a.get("title") or "").strip(), bctx)
+                    body = R((a.get("message") or "").strip(), bctx)
+                    if not has_button:
+                        if self.embed_cb:
+                            try:
+                                await self.embed_cb(title or "​", body)
+                            except Exception as e:  # noqa: BLE001
+                                self._log("error", f"embed failed: {e}")
+                                await self._announce((f"**{title}**\n" if title else "") + body, None)
+                        else:
                             await self._announce((f"**{title}**\n" if title else "") + body, None)
+                        continue
+                    label = (a.get("label") or "").strip() or "🎁 Claim"
+                    freeze = bool(a.get("freeze"))
+                    self._cancel_winner_button()   # only one live at a time
+                    self._winner_button = {"allowed": allowed, "actions": acts, "freeze": freeze,
+                                           "name": name, "used": False, "label": label,
+                                           "primary_uid": primary_uid, "primary_who": primary_who,
+                                           "mention": bctx["mention"]}
+                    if freeze:
+                        self._cmd_gate_block = True
+                    text = body or "🎁 Press the button!"
+                    if self.winner_button_cb:
+                        try:
+                            await self.winner_button_cb(title or ("🏆 " + name), text, {"label": label, "name": name})
+                        except Exception as e:  # noqa: BLE001
+                            self._log("error", f"embed button post failed: {e}")
+                            await self._announce(text, None)
                     else:
-                        await self._announce((f"**{title}**\n" if title else "") + body, None)
+                        await self._announce(text, None)
+                    deadline = self._num_expr(a.get("deadline"), xc)
+                    if deadline > 0:
+                        dmsg = (a.get("deadline_message") or "").strip()
+                        if dmsg:
+                            await self._announce(R(dmsg, {**bctx, "seconds": f"{deadline:g}"}), None)
+                        self._winner_button_task = asyncio.create_task(
+                            self._winner_button_deadline(deadline, a.get("timeout_message")))
                     continue
                 if typ == "command":
                     # run another custom command by name (credited to the block's
@@ -1259,50 +1325,6 @@ class Engine:
                     msg = (a.get("message") or "").strip()
                     if msg:
                         await self._announce(self._evt_hdr(hdr) + R(msg), None)
-                    continue
-                if typ in ("winner_button", "session_leader_event"):
-                    # Hand a target a one-press button. winner_button targets
-                    # a.target (default [winner]); session_leader_event locks it to
-                    # the session leader. Pressing runs this action's own mini
-                    # block; `freeze` blocks others until pressed; a deadline
-                    # auto-runs the block if it's never pressed (timer + fallback).
-                    tgt = "[session_leader]" if typ == "session_leader_event" else (a.get("target") or "[winner]")
-                    uid_t, who_t = self._resolve_award_target(tgt)
-                    if uid_t is None:
-                        self._log("bot", f"{name}: {typ} — no target for '{tgt}', skipped")
-                        continue
-                    freeze = bool(a.get("freeze", True))
-                    label = (a.get("label") or "").strip() or "🎁 Claim your prize"
-                    mention = self._mention(uid_t, who_t)
-                    self._cancel_winner_button()   # only one live at a time
-                    self._winner_button = {"uid": str(uid_t), "who": who_t,
-                                           "actions": a.get("actions") or [], "freeze": freeze,
-                                           "name": name, "used": False, "mention": mention,
-                                           "label": label}
-                    if freeze:
-                        self._cmd_gate_block = True
-                    bctx = {"winner": who_t, "target": who_t, "mention": mention}
-                    default_body = ("🏆 **[target]**, you're the session leader — press the button!"
-                                    if typ == "session_leader_event"
-                                    else "🎁 **[target]**, you won — press the button to claim it!")
-                    text = R((a.get("message") or "").strip() or default_body, bctx)
-                    title = R((a.get("title") or "").strip()) or ("🏆 " + name)
-                    if self.winner_button_cb:
-                        try:
-                            await self.winner_button_cb(title, text,
-                                                        {"uid": str(uid_t), "label": label, "name": name})
-                        except Exception as e:  # noqa: BLE001
-                            self._log("error", f"winner button post failed: {e}")
-                            await self._announce(text, None)
-                    else:
-                        await self._announce(text, None)
-                    deadline = self._num_expr(a.get("deadline"), xc)
-                    if deadline > 0:
-                        dmsg = (a.get("deadline_message") or "").strip()
-                        if dmsg:
-                            await self._announce(R(dmsg, {**bctx, "seconds": f"{deadline:g}"}), None)
-                        self._winner_button_task = asyncio.create_task(
-                            self._winner_button_deadline(deadline, a.get("timeout_message")))
                     continue
                 if typ in ("fire", "roll"):
                     target = a.get("device_id") or self._active_id()
@@ -1965,35 +1987,40 @@ class Engine:
 
     # -- Winner Button (one-press prize) ------------------------------------- #
     def winner_button_can_press(self, uid) -> bool:
+        """An embed button is pressable by: anyone (allowed is None = 'everyone'),
+        or a uid in its allow-set."""
         wb = self._winner_button
-        return bool(wb and not wb.get("used") and str(uid) == wb.get("uid"))
+        if not wb or wb.get("used"):
+            return False
+        allowed = wb.get("allowed")
+        return allowed is None or str(uid) in allowed
 
     def winner_button_label(self) -> str:
         wb = self._winner_button
         return (wb or {}).get("label", "") if wb else ""
 
-    async def _run_winner_button(self, wb: dict, tag: str) -> None:
-        """Run a claimed/expired Winner Button's mini action block, crediting the
-        winner and exposing [winner]/[target]/[mention] inside it."""
+    async def _run_winner_button(self, wb: dict, uid, who: str, tag: str) -> None:
+        """Run a claimed/expired embed button's action block, credited to the
+        person who triggered it, exposing [winner]/[target]/[mention]."""
         if wb.get("freeze"):
             self._cmd_gate_block = False
-        await self._run_action_block(wb.get("actions"), f"winner button ({wb['name']}) {tag}",
-                                     hdr="WINNER", uid=wb["uid"], who=wb["who"],
-                                     extra_ctx={"winner": wb["who"], "target": wb["who"],
-                                                "mention": wb.get("mention", wb["who"])})
+        mention = self._mention(uid, who) if uid else (wb.get("mention") or who or "")
+        await self._run_action_block(wb.get("actions"), f"embed button ({wb['name']}) {tag}",
+                                     hdr="EMBED", uid=(str(uid) if uid else None), who=who or wb.get("primary_who") or "",
+                                     extra_ctx={"target": who or "", "mention": mention})
 
     async def press_winner_button(self, uid, who: str) -> dict:
-        """The target pressed their button → run its block once (lifting any
-        freeze). Idempotent: a second press / a press after the deadline no-ops."""
+        """An eligible person pressed the button → run its block once (crediting
+        the presser, lifting any freeze). Idempotent."""
         wb = self._winner_button
         if not wb or wb.get("used"):
             return {"ok": False, "error": "no button"}
-        if str(uid) != wb.get("uid"):
-            return {"ok": False, "error": "not your button"}
+        if not self.winner_button_can_press(uid):
+            return {"ok": False, "error": "not for you"}
         wb["used"] = True
         self._cancel_winner_button_deadline()
         self._winner_button = None
-        await self._run_winner_button(wb, "pressed")
+        await self._run_winner_button(wb, str(uid), who, "pressed")
         return {"ok": True}
 
     async def _winner_button_deadline(self, seconds: float, timeout_message) -> None:
@@ -2005,12 +2032,13 @@ class Engine:
         if not wb or wb.get("used"):
             return
         wb["used"] = True
+        who = wb.get("primary_who") or ""
         tmsg = (timeout_message or "").strip() or \
-            "⌛ Time's up — **[target]**'s prize triggers automatically!"
-        await self._announce(self.render(tmsg, {"winner": wb["who"], "target": wb["who"],
-                                                "mention": wb.get("mention", wb["who"])}), None)
+            "⌛ Time's up — the prize triggers automatically!"
+        await self._announce(self.render(tmsg, {"winner": who, "target": who,
+                                                "mention": wb.get("mention") or who}), None)
         self._winner_button = None
-        await self._run_winner_button(wb, "timeout")
+        await self._run_winner_button(wb, wb.get("primary_uid"), who, "timeout")
 
     def _cancel_winner_button_deadline(self) -> None:
         if self._winner_button_task is not None:
@@ -2651,6 +2679,18 @@ class Engine:
         if "[session_leader]" in low or low in ("session_leader", "session leader"):
             uid, nm, _ = self.session_leader()
             return (uid, nm) if uid else (None, "")
+        if "[top_bonus_holder]" in low or low in ("top_bonus_holder", "top bonus holder"):
+            uid = self._top_bonus_holder()
+            return (str(uid), self._name_for(uid) or "?") if uid else (None, "")
+        if "[runnerup]" in low or low == "runnerup":
+            rname = (self._last_runnerup or "").strip().lower()
+            if rname:
+                for board in (self._pump_time, self._users):
+                    for uid, rec in board.items():
+                        if (rec.get("name") or "").strip().lower() == rname:
+                            return (str(uid), rec.get("name"))
+                return (None, self._last_runnerup)
+            return (None, "")
         if "[winner]" in low or low == "winner":
             # match the last competition winner's name to a known uid
             wname = (self._last_winner or "").strip().lower()
