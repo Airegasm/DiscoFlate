@@ -29,7 +29,7 @@
   "cooldown_exempt_names": [],
   "operator_name": "",
   "cooldown_message": "⏳ [mention], [cmd] is on cooldown — [cooldown]s left until you can use it again.",
-  "cooldown_reset_message": "🎲 [mention], your dice are recharged — roll again with [roll_cmd]!",
+  "cooldown_reset_message": "",
   "auto_report": {
     "enabled": true,
     "seconds": 300,

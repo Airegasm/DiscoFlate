@@ -34,7 +34,11 @@ DEFAULT_PUMPDIRECT_PATH = os.path.normpath(
 
 # Schema version of the stored config. Bump it + add a _migrate step whenever a
 # key is renamed/moved, so old configs upgrade instead of silently stranding data.
-CONFIG_VERSION = 2
+CONFIG_VERSION = 3
+
+# The dead "dice recharged" default that a remediation migration accidentally
+# promoted to the live cooldown-ready message. Migration v3 undoes that.
+_DEAD_RECHARGE_MSG = "🎲 [mention], your dice are recharged — roll again with [roll_cmd]!"
 
 DEFAULTS = {
     "discord_token": "",
@@ -416,17 +420,23 @@ def _migrate(cfg: dict) -> dict:
     config_version; unknown future keys always pass through untouched."""
     v = int(cfg.get("config_version") or 0)
     if v < 1:
-        # v1: roll.cooldown_reset_message was a dead nested key (nothing ever
-        # read it) — hoist it to the live top-level key if that one is blank.
-        nested = (cfg.get("roll") or {}).pop("cooldown_reset_message", None)
-        if nested and not cfg.get("cooldown_reset_message"):
-            cfg["cooldown_reset_message"] = nested
+        # v1: roll.cooldown_reset_message was always a DEAD nested key (nothing
+        # ever read it). Just drop it — do NOT promote it to the live top-level
+        # key; the cooldown-ready message stays silent by default.
+        (cfg.get("roll") or {}).pop("cooldown_reset_message", None)
     if v < 2:
         # v2: allow.guild_ids / allow.channel_ids were never read (listen_targets
         # is the real scoping) — drop them so nobody edits a dead knob.
         if isinstance(cfg.get("allow"), dict):
             cfg["allow"].pop("guild_ids", None)
             cfg["allow"].pop("channel_ids", None)
+    if v < 3:
+        # v3: undo the earlier accidental promotion of the dead "dice recharged"
+        # message. Drop the dead nested copy, and clear the top-level ONLY if it
+        # still holds that exact promoted default (a custom message is kept).
+        (cfg.get("roll") or {}).pop("cooldown_reset_message", None)
+        if (cfg.get("cooldown_reset_message") or "").strip() == _DEAD_RECHARGE_MSG:
+            cfg["cooldown_reset_message"] = ""
     cfg["config_version"] = CONFIG_VERSION
     return cfg
 
