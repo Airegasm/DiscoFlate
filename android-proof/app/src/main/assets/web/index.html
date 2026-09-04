@@ -141,6 +141,8 @@
     border-top:1px solid var(--line);box-shadow:0 -2px 8px rgba(0,0,0,.18)}
   #saveBar button{min-width:180px}
   body{padding-bottom:58px}
+  .draghandle{cursor:grab;user-select:none;color:var(--dim);font-size:16px;line-height:1;padding:0 2px;letter-spacing:-2px}
+  .draghandle:active{cursor:grabbing}
 </style>
 </head>
 <body>
@@ -2707,9 +2709,29 @@ function actionRow(base, rr, j, a, condLabels){
       `<button class="ghost" style="margin-top:4px;align-self:flex-start" onclick="${nb}=${nb}||[];${nb}.push({op:'block_all'});${rr}();scheduleSave()">+ Add modifier</button>`+
     `</div>`;
   }
-  return `<div class="dev" style="flex-direction:column;align-items:stretch;gap:6px">`+
-    `<div class="row" style="gap:10px;align-items:flex-end">${typeSel}${fields}`+
-    `<div style="flex:1"></div><button class="ghost" onclick="${base}.splice(${j},1);${rr}();scheduleSave()">✕</button></div>`+msg+nested+`</div>`;
+  const bAttr=esc(base);
+  return `<div class="dev" style="flex-direction:column;align-items:stretch;gap:6px" ondragover="actDragOver(event)" ondrop="actDrop(event,'${bAttr}',${j},'${rr}')">`+
+    `<div class="row" style="gap:8px;align-items:flex-end">`+
+    `<span class="draghandle" draggable="true" title="Drag to reorder" ondragstart="actDragStart(event,'${bAttr}',${j})" ondragend="actDragEnd(event)">⋮⋮</span>`+
+    `${typeSel}${fields}`+
+    `<div style="flex:1"></div>`+
+    `<button class="ghost" title="Duplicate" onclick="actCopy('${bAttr}',${j},'${rr}')">📋</button>`+
+    `<button class="ghost" onclick="${base}.splice(${j},1);${rr}();scheduleSave()">✕</button></div>`+msg+nested+`</div>`;
+}
+// action-row copy + drag-reorder (works within one action block, at any nesting)
+let _actDrag=null;
+function _arrAt(base){ try{ return eval(base); }catch(e){ return null; } }
+function actCopy(base, j, rr){ const arr=_arrAt(base); if(!arr) return; arr.splice(j+1,0,JSON.parse(JSON.stringify(arr[j]))); eval(rr+'()'); scheduleSave(); }
+function actDragStart(e, base, i){ _actDrag={base,i}; e.dataTransfer.effectAllowed='move'; e.stopPropagation(); }
+function actDragEnd(e){ _actDrag=null; }
+function actDragOver(e){ if(_actDrag) e.preventDefault(); }
+function actDrop(e, base, j, rr){
+  e.preventDefault(); e.stopPropagation();
+  if(!_actDrag || _actDrag.base!==base){ _actDrag=null; return; }
+  const arr=_arrAt(base), from=_actDrag.i; _actDrag=null;
+  if(!arr || from===j) return;
+  const [it]=arr.splice(from,1); arr.splice(from<j?j-1:j,0,it);
+  eval(rr+'()'); scheduleSave();
 }
 function capEvActionRow(i, j, a){ return actionRow(`capEvRows[${i}].actions`, 'renderCapEvents', j, a); }
 // A collapsible "Post Event Commands" block: actions that run AFTER the event
