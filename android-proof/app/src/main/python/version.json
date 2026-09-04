@@ -1,6 +1,6 @@
 {
-  "version": "3.23.0",
-  "versionCode": 92,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.23.0/discoflate.apk",
-  "notes": "DiscoFlate v3.23.0 \u2014 roll-off competitions define each roll as a row (its own NdN dice + per-roll luck) instead of a plain roll count; the number of rows is the number of rolls. Entry command dropped for roll-offs (the Enter button drives it)."
+  "version": "3.24.0",
+  "versionCode": 93,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.24.0/discoflate.apk",
+  "notes": "DiscoFlate v3.24.0 — competitions expose [results], a full scoreboard of everyone who entered and their final scores (live during a run, final afterward). Win/no-winner announcements now post as rich embed cards. Custom [remaining]/[standings] repeat messages for the in-progress reposts."
 }

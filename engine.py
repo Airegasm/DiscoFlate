@@ -99,6 +99,7 @@ class Engine:
         self._comp_task: asyncio.Task | None = None
         self._last_winner: str = ""             # [winner] placeholder (most recent competition winner)
         self._last_winner_score: float = 0.0
+        self._last_results: str = ""            # [results] placeholder (last competition's scoreboard)
         # Winner-only command grants: cmdkey -> uid. Only that user may run the
         # command, and only within the current range (cleared on range change /
         # session reset). The 'progression lock' freezes everyone else's
@@ -410,6 +411,8 @@ class Engine:
         ctx["operator"] = op
         ctx["winner"] = self._last_winner           # most recent competition winner
         ctx["winner_score"] = f"{self._last_winner_score:g}" if self._last_winner else ""
+        # live scoreboard during a competition, else the last competition's final results
+        ctx["results"] = self._comp_results() if self._comp is not None else self._last_results
         pz = self.active_prize() or {}
         ctx["max_roll_goal"] = pz.get("goal") if pz.get("goal") not in (None, "") else ""
         ctx["max_roll_command"] = f"{prefix}{(pz.get('command') or '').strip()}" if pz.get("command") else ""
@@ -1484,19 +1487,28 @@ class Engine:
         self._log("bot", f"COMPETITION '{name}' ({typ}) started [{source}]")
         winner_uid = winner = None
 
-        async def _post(extra=""):
-            t = f"{body}\n\n{extra}".strip() if extra else body
+        async def _post(text):
             if self.comp_embed_cb:
                 try:
-                    await self.comp_embed_cb(title, t, meta)
+                    await self.comp_embed_cb(title, text, meta)
                     return
                 except Exception as e:  # noqa: BLE001
                     self._log("error", f"competition embed failed: {e}")
-            await self._announce_poll(title, t)   # fallback: plain embed, !enter flow
+            await self._announce_poll(title, text)   # fallback: plain embed, !enter flow
+
+        def _repost_text(rem):
+            # custom repeat message ([remaining]/[remaining_seconds]/[standings])
+            # or the default body + standings + countdown.
+            rmsg = (cd.get("repeat_message") or "").strip()
+            ctx = {"remaining": self._fmt_duration(rem), "remaining_seconds": int(rem),
+                   "standings": self._comp_standings()}
+            if rmsg:
+                return self.render(rmsg, ctx)
+            return f"{body}\n\n{self._comp_standings()}\n⏳ **{self._fmt_duration(rem)}** left"
 
         try:
             end = time.monotonic() + duration
-            await _post(f"⏳ **{self._fmt_duration(duration)}** to enter & roll!")
+            await _post(f"{body}\n\n⏳ **{self._fmt_duration(duration)}** to enter & roll!")
             while True:
                 remaining = end - time.monotonic()
                 if remaining <= 0:
@@ -1506,7 +1518,7 @@ class Engine:
                     break
                 await asyncio.sleep(min(remaining, repeat) if repeat else min(remaining, 1.0))
                 if repeat and time.monotonic() < end - 1 and typ != "race":
-                    await _post(self._comp_standings() + f"\n⏳ **{self._fmt_duration(max(0, end - time.monotonic()))}** left")
+                    await _post(_repost_text(max(0, end - time.monotonic())))
             # decide winner among eligible players
             elig = self._comp_eligible()
             if elig:
@@ -1522,8 +1534,10 @@ class Engine:
             self._log("bot", f"COMPETITION '{name}' cancelled")
             self._comp = None
             raise
+        results_text = self._comp_results()   # capture the scoreboard before clearing
         self._comp = None
-        await self._finish_competition(cd, name, entry, winner_uid, winner)
+        self._last_results = results_text
+        await self._finish_competition(cd, name, entry, winner_uid, winner, results_text)
 
     def _comp_intro(self, cd: dict, entry_key: str, duration: float) -> str:
         prefix = self.cfg.get("command_prefix", "!")
@@ -1540,24 +1554,49 @@ class Engine:
         rows = sorted(self._comp["players"].values(), key=lambda p: p["score"], reverse=True)
         rows = [p for p in rows if p["entered"] or not self._comp["def"].get("require_enter", True)]
         if not rows:
-            return "No entrants yet — type the enter command to join!"
+            return "No entrants yet — press Enter Challenge to join!"
         lines = [f"**{p['name']}** — {p['score']:g} ({p['entries']} in)" for p in rows[:10]]
         return "\n".join(lines)
 
-    async def _finish_competition(self, cd: dict, name: str, entry, winner_uid, winner) -> None:
+    def _comp_results(self) -> str:
+        """Final scoreboard of everyone who entered (the [results] placeholder).
+        Finished players first (by score), then any who entered but didn't
+        finish, marked eliminated."""
+        if self._comp is None:
+            return ""
+        players = list(self._comp["players"].values())
+        done = sorted([p for p in players if p["done_at"] is not None],
+                      key=lambda p: p["score"], reverse=True)
+        dnf = [p for p in players if p["entered"] and p["done_at"] is None]
+        if not done and not dnf:
+            return "Nobody entered."
+        lines = [f"**{i}.** {p['name']} — **{p['score']:g}**" for i, p in enumerate(done, 1)]
+        lines += [f"• {p['name']} — did not finish" for p in dnf]
+        return "\n".join(lines)
+
+    async def _finish_competition(self, cd: dict, name: str, entry, winner_uid, winner,
+                                  results: str = "") -> None:
+        async def _result_embed(title, text):
+            if self.embed_cb:
+                try:
+                    await self.embed_cb(f"🏁 {title}", text)
+                    return
+                except Exception as e:  # noqa: BLE001
+                    self._log("error", f"result embed failed: {e}")
+            await self._announce(text, None)
         if winner is None:
             self._last_winner, self._last_winner_score = "", 0.0
-            msg = (cd.get("no_winner_message") or "").strip() or f"🏁 **{name}**: no qualifying winner."
-            await self._announce(self.render(msg), None)
+            msg = (cd.get("no_winner_message") or "").strip() or f"**{name}**: no qualifying winner."
+            await _result_embed(name, self.render(msg, {"results": results}))
             self._log("bot", f"COMPETITION '{name}' — no winner")
             return
         self._last_winner = winner["name"]
         self._last_winner_score = winner["score"]
         base = {"winner": winner["name"], "winner_score": f"{winner['score']:g}",
-                "mention": self._mention(winner_uid, winner["name"])}
-        # announce the win immediately
-        msg = (cd.get("win_message") or "").strip() or "🏆 **[winner]** wins with **[winner_score]**!"
-        await self._announce(self.render(msg, base), None)
+                "mention": self._mention(winner_uid, winner["name"]), "results": results}
+        # announce the win as a results embed
+        msg = (cd.get("win_message") or "").strip() or "🏆 **[winner]** wins with **[winner_score]**!\n\n[results]"
+        await _result_embed(name, self.render(msg, base))
         self._log("bot", f"COMPETITION '{name}' — winner {winner['name']} ({winner['score']:g})")
         bonus_on = bool(cd.get("bonus_command_on") and (cd.get("bonus_command") or "").strip())
         bkey = cd["bonus_command"].strip().lower() if bonus_on else None

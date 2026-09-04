@@ -584,7 +584,7 @@
           <input id="cmdEnter" value="enter" style="width:130px"></label>
         <span class="muted">Players type <code>!enter</code> to join, then compete.</span>
       </div>
-      <div class="hint" style="max-width:880px">A competition is an <b>action</b> (start it from a timed event or capacity-event block). Players <b>!enter</b> during the window, then compete via an entry command; enter AND meet the required entries or you're eliminated. Winner gets rewards. Types: <b>Roll-off</b> (highest score by total / highest single / most uses), <b>Race</b> (first to finish the required entries), <b>Raffle</b> (random winner among qualifiers). Placeholders: <code>[winner]</code> <code>[winner_score]</code>.</div>
+      <div class="hint" style="max-width:880px">A competition is an <b>action</b> (start it from a timed event or capacity-event block). Players <b>!enter</b> during the window, then compete via an entry command; enter AND meet the required entries or you're eliminated. Winner gets rewards. Types: <b>Roll-off</b> (highest score by total / highest single / most uses), <b>Race</b> (first to finish the required entries), <b>Raffle</b> (random winner among qualifiers). Placeholders: <code>[winner]</code> <code>[winner_score]</code> <code>[results]</code> (full scoreboard).</div>
       <div id="competitions" style="margin-top:10px"></div>
       <div class="row" style="margin-top:10px">
         <button class="ghost" onclick="addCompetition()">+ Add competition</button>
@@ -895,6 +895,7 @@ esphome dashboard config/</code></pre>
             <tr><td><code>[mention]</code></td><td>@pings the person (a real Discord mention)</td></tr>
             <tr><td><code>[operator]</code></td><td>the bot operator's name</td></tr>
             <tr><td><code>[winner]</code> / <code>[winner_score]</code></td><td>the most recent competition's winner and their winning score</td></tr>
+            <tr><td><code>[results]</code></td><td>competition scoreboard — everyone who entered and their final scores (live during a run, final afterward); best in a win-message embed</td></tr>
             <tr><td><code>[pump_msg]</code></td><td>the operator Pump message (rendered), for reuse in other messages</td></tr>
             <tr><td><code>[capacity]</code></td><td>current capacity %, e.g. 47.5</td></tr>
             <tr><td><code>[capacity_bar]</code></td><td>emoji bar 🟩🟩🟩⬛⬛</td></tr>
@@ -2585,8 +2586,9 @@ function renderCompetitions(){
         `<label class="field">Type <select onchange="compRows[${i}].type=this.value;renderCompetitions();scheduleSave()">`+
           ['rolloff','race','raffle'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`+
         `<label class="field">Duration (s) <input type="number" min="5" max="3600" value="${cd.duration??60}" style="width:90px" onchange="compRows[${i}].duration=Math.max(5,Math.min(3600,+this.value||60));scheduleSave()"></label>`+
-        `<label class="field">Repeat standings (s) <input type="number" min="0" step="5" value="${cd.repeat_every??0}" style="width:90px" onchange="compRows[${i}].repeat_every=Math.max(0,+this.value||0);scheduleSave()"></label>`+
+        `<label class="field">Repeat every (s) <input type="number" min="0" step="5" value="${cd.repeat_every??0}" style="width:90px" onchange="compRows[${i}].repeat_every=Math.max(0,+this.value||0);scheduleSave()"></label>`+
       `</div>`+
+      ((cd.repeat_every>0)?`<label class="field">Repeat message <span class="muted">(blank = default · [remaining] time left · [standings] the board)</span><textarea rows="2" placeholder="⏳ [remaining] left! Standings:\n[standings]" onchange="compRows[${i}].repeat_message=this.value">${esc(cd.repeat_message||'')}</textarea></label>`:'')+
       (typ==='rolloff'?`<div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end">`+
         `<label class="field">Win by <select onchange="compRows[${i}].metric=this.value;scheduleSave()">`+
           [['total','highest total'],['highest','highest single'],['count','most rolls']].map(([v,t])=>`<option value="${v}" ${(cd.metric||'total')===v?'selected':''}>${t}</option>`).join('')+`</select></label>`+
@@ -2613,7 +2615,7 @@ function renderCompetitions(){
       `<label class="field">Titlebar <input value="${esc(cd.title||'')}" placeholder="ROLL-OFF!" onchange="compRows[${i}].title=this.value"></label>`+
       `<label class="field">Body <span class="muted">(embed text under the titlebar · placeholders work)</span><textarea rows="3" onchange="compRows[${i}].body=this.value">${esc(cd.body||'')}</textarea></label>`+
       (typ!=='raffle'?`<label class="field">Entry reply <span class="muted">([user] [value] [score] [entries])</span><input value="${esc(cd.entry_message||'')}" placeholder="🎲 [user] entered [value] — total [score]" onchange="compRows[${i}].entry_message=this.value"></label>`:'')+
-      `<label class="field">Win message <span class="muted">([winner] [winner_score])</span><textarea rows="2" onchange="compRows[${i}].win_message=this.value">${esc(cd.win_message||'')}</textarea></label>`+
+      `<label class="field">Win message <span class="muted">([winner] [winner_score] · [results] the scoreboard · posts as an embed)</span><textarea rows="2" onchange="compRows[${i}].win_message=this.value">${esc(cd.win_message||'')}</textarea></label>`+
       `<label class="field">No-winner message<input value="${esc(cd.no_winner_message||'')}" placeholder="🏁 nobody qualified." onchange="compRows[${i}].no_winner_message=this.value"></label>`+
       // rewards
       `<div style="border-top:1px solid var(--line);padding-top:8px">`+
@@ -2640,7 +2642,7 @@ function addCompetition(){
   compRows.push({name:'',type:'rolloff',command:'',duration:60,repeat_every:15,metric:'total',
     max_entries:3,required_entries:1,require_enter:true,title:'',body:'',intro:'',entry_message:'',
     allow_reroll:false,reroll_count:1,roll_specs:[{dice:1,sides:6,luck:0},{dice:1,sides:6,luck:0},{dice:1,sides:6,luck:0}],
-    win_message:'🏆 [winner] wins with [winner_score]!',no_winner_message:'',
+    win_message:'🏆 [winner] wins with [winner_score]!\n\n[results]',no_winner_message:'',
     award_pump:true,award_seconds:10,bonus_command_on:false,bonus_command:'',bonus_stashable:false,
     lock_progression:false,bonus_after_pump:true,bonus_message:'🎁 [winner] now holds [bonus_cmd]!',
     winner_deadline:0,deadline_message:'',timeout_message:''});
@@ -2659,6 +2661,7 @@ function cleanCompetitions(){
     max_entries:Math.max(0,+c.max_entries||0), required_entries:Math.max(0,+c.required_entries||0),
     require_enter:c.require_enter!==false, title:c.title||'', body:c.body||'', intro:c.intro||'', entry_message:c.entry_message||'',
     allow_reroll:!!c.allow_reroll, reroll_count:Math.max(0,+c.reroll_count||0),
+    repeat_message:c.repeat_message||'',
     roll_specs:(c.roll_specs||[]).map(r=>({dice:+r.dice||1, sides:+r.sides||6, luck:+r.luck||0})),
     win_message:c.win_message||'', no_winner_message:c.no_winner_message||'',
     award_pump:!!c.award_pump, award_seconds:Math.max(0,+c.award_seconds||0),
