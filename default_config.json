@@ -933,5 +933,6 @@
   "capacity_events": [],
   "polls": [],
   "gameplay_presets": [],
-  "competitions": []
+  "competitions": [],
+  "bonus_rounds": []
 }

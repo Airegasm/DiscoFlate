@@ -592,6 +592,16 @@
         <button onclick="saveEvents()">Save events</button>
       </div>
       </details>
+
+      <details class="help"><summary><h2>🤝 Bonus Rounds</h2></summary>
+      <div class="hint" style="max-width:880px">A Bonus Round is a <b>teamwork cash-in</b>, started by a <b>bonus_round</b> action. First bank amounts with the <b>award_amount</b> action (pump <b>seconds</b> or <b>capacity %</b>, on <code>[winner]</code>/<code>[range_leader]</code>/<code>[session_leader]</code>/…). The round posts an embed with a <b>Confirm</b> button for bonus holders; once the needed holders confirm (<b>all</b>, or just the <b>top holder</b>) before the timer, your action block runs with the pooled <code>[total_bonus_secs]</code> / <code>[total_bonus_pct]</code> — then the banks are spent. Use <code>fire [total_bonus_secs]</code> or <code>add % [total_bonus_pct]</code> to apply them.</div>
+      <div id="bonusRounds" style="margin-top:10px"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" onclick="addBonusRound()">+ Add bonus round</button>
+        <div style="flex:1"></div>
+        <button onclick="saveEvents()">Save events</button>
+      </div>
+      </details>
     </div>
 
     <!-- templates -->
@@ -699,7 +709,7 @@
         <li><b>roll</b> — rolls dice and fires for the total. Leave <b>Dice/Sides</b> on <code>rng</code> to use the <i>current range's</i> dice, or pin specific dice (e.g. 2 d 6).</li>
         <li><b>say</b> — text-only reply, no device. Good for lore, hints, or status.</li>
         <li><b>chance</b> — a gamble. Rolls 1–100 against your <b>Chance %</b>; <b>Luck %</b> is a ± chance to force the outcome (positive = force a win, negative = force a miss). A <b>win</b> posts the <b>Success message</b> and fires the <b>🟢 win</b> device rows; a <b>miss</b> posts the <b>Failure message</b> and fires the separate <b>🔴 failure</b> device rows (leave them empty to fire nothing on a miss). Placeholders <code>[roll]</code>, <code>[chance]</code>, <code>[luck]</code>, <code>[secs]</code> work in both. Like every command it's range-gated, cooldownable, and <b>exhaustable</b> (Max/person, set per range).</li>
-        <li><b>actions</b> — a full <b>action sequence</b>, exactly like an event's: add any number of steps by type (<b>message</b> · <b>broadcast</b> a saved preset · <b>fire</b> · <b>roll</b> · <b>capacity</b> add/set · <b>wait</b> · start a <b>poll</b> · start a <b>competition</b> · <b>award_prize</b> (grant a target — e.g. <code>[range_leader]</code> — N charges of a command, cooldown bypassed) · <b>winner_button</b> (hand a target a one-press button that runs a nested block) · <b>command_gate</b> (block_all / remove_block) · <b>end_session</b>), executed in order. <b>fire</b> can pump a fixed time OR until a % is added/reached. Fires credit the person who ran it. Use this when one command should do several things — e.g. <i>message → wait 3s → fire → start a competition</i>.</li>
+        <li><b>actions</b> — a full <b>action sequence</b>, exactly like an event's: add any number of steps by type (<b>message</b> · <b>broadcast</b> a saved preset · <b>fire</b> · <b>roll</b> · <b>capacity</b> add/set · <b>wait</b> · <b>embed_message</b> (title + body as an embed) · start a <b>poll</b> / <b>competition</b> / <b>bonus_round</b> · <b>award_prize</b> (grant a target — e.g. <code>[range_leader]</code> — N charges of a command, cooldown bypassed) · <b>award_amount</b> (bank bonus seconds/% for a Bonus Round) · <b>winner_button</b> / <b>session_leader_event</b> (hand a target a one-press button that runs a nested block, with freeze + timer/fallback) · <b>command_gate</b> (block_all / remove_block) · <b>end_session</b>), executed in order. <b>fire</b> can pump a fixed time OR until a % is added/reached, block others while pumping, and run Post-Pump Actions. Fires credit the person who ran it. Use this when one command should do several things — e.g. <i>message → wait 3s → fire → start a competition</i>.</li>
         <li><b>game-pushluck</b> — a private button minigame: the player presses <b>💨 Pump</b> for points at a rising bust chance (starts at <b>Bust start %</b>, <b>+% / pump</b>) or <b>🏦 Bank</b> to lock in. Bust = 0. You set max pumps + points/pump and the <b>outcome tiers</b> (score → broadcast message + optional pump fire credited to the player).</li>
         <li><b>game-simon</b> — a private memory minigame: the bot shows a growing emoji sequence for <b>Reveal (s)</b>, hides it, and the player repeats it with buttons. Score = rounds survived. Set # symbols + max rounds and the same <b>outcome tiers</b>.</li>
         <li><b>game-balloon</b> (Don't Pop It) — a button grid; reveal safe cells for points, or 🏦 Cash Out before you hit a hidden balloon (pop = 0). Set # cells, # balloons, points/cell. Score = points cashed out.</li>
@@ -898,6 +908,8 @@ esphome dashboard config/</code></pre>
             <tr><td><code>[runnerup]</code> / <code>[runnerup_score]</code></td><td>the most recent competition's 2nd place and their score</td></tr>
             <tr><td><code>[results]</code></td><td>competition scoreboard — everyone who entered and their final scores (live during a run, final afterward); best in a win-message embed</td></tr>
             <tr><td><code>[bonus_holders]</code></td><td>roster of who currently holds which bonus/prize command(s), what each does, and how many charges remain (best in an embed)</td></tr>
+            <tr><td><code>[total_bonus_secs]</code> / <code>[total_bonus_pct]</code></td><td>pooled bonus AMOUNTS banked by everyone (pump seconds / capacity %) — what a Bonus Round cashes in</td></tr>
+            <tr><td><code>[user_bonus_secs]</code> / <code>[user_bonus_pct]</code></td><td>the current person's own banked bonus (in a per-user context — action blocks, award_amount announces)</td></tr>
             <tr><td><code>[pump_msg]</code></td><td>the operator Pump message (rendered), for reuse in other messages</td></tr>
             <tr><td><code>[capacity]</code></td><td>current capacity %, e.g. 47.5</td></tr>
             <tr><td><code>[capacity_bar]</code></td><td>emoji bar 🟩🟩🟩⬛⬛</td></tr>
@@ -1424,15 +1436,19 @@ async function importPresetFile(input){
 // ---- share gameplay settings (safe subset: Game/Commands/Events/Templates) ----
 function setGameplayMsg(t){ const m=$('#gameplayMsg'); if(m){ m.textContent=t; clearTimeout(m._t); m._t=setTimeout(()=>{ if(m) m.textContent=''; }, 4000); } }
 async function exportGameplay(){
+  // name the file (so shared setups are identifiable) — the filename matches it
+  const raw=(prompt('Name this gameplay export:', 'my-setup')||'').trim();
+  if(!raw) return;
+  const fn=raw.replace(/[^\w.-]+/g,'_').replace(/\.json$/i,'')+'.json';
   try{
     const data = await api('/api/gameplay/export', {});
     const text = JSON.stringify(data, null, 2);
-    if(saveToDownloads('discoflate-gameplay.json', text)){ setGameplayMsg('saving to Downloads…'); return; }
+    if(saveToDownloads(fn, text)){ setGameplayMsg('saving '+fn+' to Downloads…'); return; }
     const blob=new Blob([text],{type:'application/json'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-    a.download='discoflate-gameplay.json'; document.body.appendChild(a); a.click();
+    a.download=fn; document.body.appendChild(a); a.click();
     setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-    setGameplayMsg('downloaded discoflate-gameplay.json ✓');
+    setGameplayMsg('downloaded '+fn+' ✓');
   }catch(e){ setGameplayMsg('export failed: '+(e.message||e)); }
 }
 // 3-way chooser: replace / add-missing / cancel
@@ -2341,7 +2357,8 @@ function cleanEvents(){
 }
 async function saveEvents(){
   await saveCfg({events: cleanEvents(), capacity_events: cleanCapEvents(), polls: cleanPolls(),
-                 competitions: cleanCompetitions(), command_names: gatherConfig().command_names});
+                 competitions: cleanCompetitions(), bonus_rounds: cleanBonusRounds(),
+                 command_names: gatherConfig().command_names});
 }
 
 // ---- capacity events (one-shot threshold triggers) ----
@@ -2410,7 +2427,7 @@ function actionRow(base, rr, j, a, condLabels){
     cond=`<label class="field">Run <select onchange="${T('if_option')}=+this.value;scheduleSave()">${opts}</select></label>`;
   }
   const typeSel = cond + `<label class="field">Action <select onchange="${T('type')}=this.value;${rr}();scheduleSave()">`+
-    ['message','broadcast','fire','roll','capacity','wait','poll','competition','award_prize','winner_button','command_gate','end_session'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`;
+    ['message','embed_message','broadcast','fire','roll','capacity','wait','poll','competition','bonus_round','award_prize','award_amount','winner_button','session_leader_event','command_gate','end_session'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`;
   let fields='';
   if(typ==='wait')
     fields += `<label class="field">Seconds <span class="muted">(number or [placeholder])</span> <input value="${esc(String(a.seconds??10))}" placeholder="10 or [winner_score]" style="width:150px" onchange="${T('seconds')}=this.value;scheduleSave()"></label>`;
@@ -2429,6 +2446,8 @@ function actionRow(base, rr, j, a, condLabels){
       `<label class="field">Sides <input type="number" min="1" value="${a.sides??''}" placeholder="rng" style="width:70px" onchange="${T('sides')}=(this.value===''?null:+this.value);scheduleSave()"></label>`;
   if(typ==='fire'||typ==='roll')
     fields += `<label class="field">Device <select onchange="${T('device_id')}=this.value||null">${cmdDeviceOpts(a.device_id)}</select></label>`;
+  if(typ==='embed_message')
+    fields += `<label class="field">Titlebar <input value="${esc(a.title||'')}" placeholder="📢 Notice" style="width:200px" onchange="${T('title')}=this.value;scheduleSave()"></label>`;
   if(typ==='capacity')
     fields += `<label class="field">Op <select onchange="${T('capacity_op')}=this.value;scheduleSave()"><option value="add" ${a.capacity_op!=='set'?'selected':''}>add</option><option value="set" ${a.capacity_op==='set'?'selected':''}>set</option></select></label>`+
       `<label class="field">Value (%) <input type="number" step="1" value="${a.capacity_value??''}" style="width:80px" onchange="${T('capacity_value')}=+this.value;scheduleSave()"></label>`;
@@ -2436,8 +2455,15 @@ function actionRow(base, rr, j, a, condLabels){
     fields += `<label class="field">Poll <select onchange="${T('poll')}=this.value;scheduleSave()">${pollNameOpts(a.poll)}</select></label>`;
   if(typ==='competition')
     fields += `<label class="field">Competition <select onchange="${T('competition')}=this.value;scheduleSave()">${compNameOpts(a.competition)}</select></label>`;
+  if(typ==='bonus_round')
+    fields += `<label class="field">Bonus round <select onchange="${T('bonus_round')}=this.value;scheduleSave()">${bonusRoundNameOpts(a.bonus_round)}</select></label>`;
   if(typ==='broadcast')
     fields += `<label class="field">Broadcast <select onchange="${T('broadcast')}=this.value;scheduleSave()">${broadcastNameOpts(a.broadcast)}</select></label>`;
+  if(typ==='award_amount')
+    fields += `<label class="field">Target <input value="${esc(a.target||'[winner]')}" placeholder="[winner]" style="width:150px" onchange="${T('target')}=this.value;scheduleSave()"></label>`+
+      `<label class="field">Unit <select onchange="${T('unit')}=this.value;scheduleSave()">`+
+        [['secs','pump seconds'],['pct','capacity %']].map(([v,l])=>`<option value="${v}" ${(a.unit||'secs')===v?'selected':''}>${l}</option>`).join('')+`</select></label>`+
+      `<label class="field">Amount <span class="muted">(number or [placeholder])</span> <input value="${esc(String(a.amount??10))}" placeholder="10 or [winner_score]" style="width:150px" onchange="${T('amount')}=this.value;scheduleSave()"></label>`;
   if(typ==='award_prize')
     fields += `<label class="field">Target <input value="${esc(a.target||'[range_leader]')}" placeholder="[range_leader]" style="width:150px" onchange="${T('target')}=this.value;scheduleSave()"></label>`+
       `<label class="field">Command <select onchange="${T('command')}=this.value;scheduleSave()">${cmdNameOpts(a.command)}</select></label>`+
@@ -2450,26 +2476,35 @@ function actionRow(base, rr, j, a, condLabels){
       [['block_all','block all custom + roll'],['remove_block','remove block']].map(([v,l])=>`<option value="${v}" ${(a.gate_mode||'block_all')===v?'selected':''}>${l}</option>`).join('')+`</select></label>`;
   if(typ==='winner_button')
     fields += `<label class="field">Target <input value="${esc(a.target||'[winner]')}" placeholder="[winner]" style="width:150px" onchange="${T('target')}=this.value;scheduleSave()"></label>`+
+      `<label class="field">Titlebar <input value="${esc(a.title||'')}" placeholder="🏆 Winner!" style="width:150px" onchange="${T('title')}=this.value;scheduleSave()"></label>`+
       `<label class="field">Button label <input value="${esc(a.label||'')}" placeholder="🎁 Claim your prize" style="width:170px" onchange="${T('label')}=this.value;scheduleSave()"></label>`+
       `<label class="row" style="gap:6px"><input type="checkbox" ${a.freeze!==false?'checked':''} onchange="${T('freeze')}=this.checked;scheduleSave()"> Freeze everyone else until pressed</label>`+
+      `<label class="field">Deadline (s) <span class="muted">(0=none · auto-runs if unpressed)</span> <input type="number" min="0" step="1" value="${a.deadline??0}" style="width:80px" onchange="${T('deadline')}=+this.value;scheduleSave()"></label>`;
+  if(typ==='session_leader_event')
+    fields += `<label class="field">Titlebar <input value="${esc(a.title||'')}" placeholder="👑 Session Leader!" style="width:170px" onchange="${T('title')}=this.value;scheduleSave()"></label>`+
+      `<label class="field">Button label <input value="${esc(a.label||'')}" placeholder="👑 Claim" style="width:150px" onchange="${T('label')}=this.value;scheduleSave()"></label>`+
+      `<label class="row" style="gap:6px"><input type="checkbox" ${a.freeze!==false?'checked':''} onchange="${T('freeze')}=this.checked;scheduleSave()"> Block everyone else until pressed</label>`+
       `<label class="field">Deadline (s) <span class="muted">(0=none · auto-runs if unpressed)</span> <input type="number" min="0" step="1" value="${a.deadline??0}" style="width:80px" onchange="${T('deadline')}=+this.value;scheduleSave()"></label>`;
   if(typ==='end_session')
     fields += `<span class="muted">ends the session · posts your OFF message ${'⚠ nothing after this runs'}</span>`;
   const msgTypes = {message:'message to post · placeholders work',
+    embed_message:'embed body · placeholders work',
     fire:'optional message · [secs] works', roll:'optional message · [secs] works',
     award_prize:'optional announce · [target] [mention] [bonus_cmd] [charges] work',
+    award_amount:'optional announce · [target] [mention] [amount] [user_bonus_secs] [user_bonus_pct] work',
     command_gate:'optional announce · placeholders work',
     winner_button:'button prompt · [target] [mention] [winner] work',
+    session_leader_event:'button prompt · [target] [mention] [session_leader] work',
     end_session:'optional extra line, posted before your OFF message'};
   const msg = msgTypes[typ]
     ? `<textarea rows="2" placeholder="${msgTypes[typ]}" onchange="${T('message')}=this.value">${esc(a.message||'')}</textarea>` : '';
   // some actions carry their OWN nested block: winner_button (what pressing it
   // runs) and fire (Post-Pump Actions, run once the pump expires).
   let nested='';
-  if(typ==='winner_button'){
+  if(typ==='winner_button'||typ==='session_leader_event'){
     const nb=`${base}[${j}].actions`;
     nested = `<div class="colsec" style="margin-left:12px;border-left:2px solid var(--line);padding-left:10px;margin-top:6px;gap:6px">`+
-      `<div class="muted">When pressed (or on deadline), run — fires credit the winner:</div>`+
+      `<div class="muted">When pressed (or on deadline), run:</div>`+
       ((a.actions||[]).map((x,k)=>actionRow(nb,rr,k,x)).join('')||'<div class="muted">no actions yet</div>')+
       `<button class="ghost" style="margin-top:4px;align-self:flex-start" onclick="${nb}=${nb}||[];${nb}.push({type:'fire',fire_mode:'to',fill_pct:100});${rr}();scheduleSave()">+ Add button action</button>`+
     `</div>`;
@@ -2727,6 +2762,69 @@ function cleanCompetitions(){
     no_winner_actions:cleanActionRows(c.no_winner_actions),
   }));
 }
+// ---- bonus rounds (teamwork cash-in) ----
+let bonusRoundRows = [];
+let bonusOpen = new Set();
+function toggleBonusOpen(i){ if(bonusOpen.has(i)) bonusOpen.delete(i); else bonusOpen.add(i); renderBonusRounds(); }
+function bonusRoundNameOpts(sel){
+  const names = bonusRoundRows.map(b=>(b.name||'').trim()).filter(Boolean);
+  return `<option value="">— pick a bonus round —</option>`+
+    names.map(n=>`<option value="${esc(n)}" ${sel===n?'selected':''}>${esc(n)}</option>`).join('')+
+    ((sel&&!names.includes(sel))?`<option value="${esc(sel)}" selected>${esc(sel)} (missing)</option>`:'');
+}
+function renderBonusRounds(){
+  const box=$('#bonusRounds'); if(!box) return; box.innerHTML='';
+  if(!bonusRoundRows.length){ box.innerHTML='<div class="muted">No bonus rounds yet.</div>'; return; }
+  bonusRoundRows.forEach((b,i)=>{
+    const open=bonusOpen.has(i);
+    const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap='10px';
+    let html=`<div class="row" style="gap:10px;cursor:pointer" onclick="toggleBonusOpen(${i})">`+
+      `<span class="muted" style="width:14px">${open?'▾':'▸'}</span>`+
+      `<b style="min-width:120px">${esc(b.name||'(unnamed)')}</b>`+
+      `<span class="pill" style="padding:2px 10px;font-size:11px">teamwork</span>`+
+      `<span class="muted" style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">confirm: ${esc(b.confirm||'all')} · ${b.duration??60}s</span>`+
+      `<button class="ghost" onclick="event.stopPropagation();delBonusRound(${i})">✕</button></div>`;
+    if(open){
+      html+=`<div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end">`+
+        `<label class="field">Name <input value="${esc(b.name||'')}" style="width:150px" onchange="bonusRoundRows[${i}].name=this.value"></label>`+
+        `<label class="field">Type <select disabled><option>teamwork</option></select></label>`+
+        `<label class="field">Duration (s) <input type="number" min="5" max="3600" value="${b.duration??60}" style="width:90px" onchange="bonusRoundRows[${i}].duration=Math.max(5,Math.min(3600,+this.value||60));scheduleSave()"></label>`+
+        `<label class="field">Confirm from <select onchange="bonusRoundRows[${i}].confirm=this.value;scheduleSave()">`+
+          [['all','all bonus holders'],['leader','top bonus holder']].map(([v,l])=>`<option value="${v}" ${(b.confirm||'all')===v?'selected':''}>${l}</option>`).join('')+`</select></label>`+
+      `</div>`+
+      `<label class="field">Titlebar <input value="${esc(b.title||'')}" placeholder="BONUS ROUND!" onchange="bonusRoundRows[${i}].title=this.value"></label>`+
+      `<label class="field">Body <span class="muted">(embed text · [total_bonus_secs] [total_bonus_pct] work)</span><textarea rows="2" onchange="bonusRoundRows[${i}].body=this.value">${esc(b.body||'')}</textarea></label>`+
+      `<label class="field">No-holders message <span class="muted">(nobody has a banked bonus)</span><input value="${esc(b.no_holders_message||'')}" placeholder="(silent)" onchange="bonusRoundRows[${i}].no_holders_message=this.value"></label>`+
+      `<label class="field">Expired message <span class="muted">(not confirmed in time)</span><input value="${esc(b.expire_message||'')}" placeholder="(silent)" onchange="bonusRoundRows[${i}].expire_message=this.value"></label>`+
+      `<div style="border-top:1px solid var(--line);padding-top:8px">`+
+        `<div class="muted" style="margin-bottom:6px"><b>On activation</b> — run when confirmed. Pooled: <code>[total_bonus_secs]</code> <code>[total_bonus_pct]</code> (then banks are spent).</div>`+
+        ((b.actions||[]).map((a,j)=>actionRow(`bonusRoundRows[${i}].actions`,'renderBonusRounds',j,a)).join('')||'<div class="muted" style="margin-bottom:6px">no actions yet</div>')+
+        `<button class="ghost" style="margin-top:6px" onclick="bonusRoundRows[${i}].actions=bonusRoundRows[${i}].actions||[];bonusRoundRows[${i}].actions.push({type:'fire',seconds:'[total_bonus_secs]',message:'🎉 Teamwork! +[secs]s'});renderBonusRounds();scheduleSave()">+ Add activation action</button>`+
+      `</div>`;
+    }
+    el.innerHTML=html; box.appendChild(el);
+  });
+}
+function addBonusRound(){
+  bonusRoundRows.push({name:'',type:'teamwork',title:'',body:'',duration:60,confirm:'all',
+    no_holders_message:'',expire_message:'',
+    actions:[{type:'fire',seconds:'[total_bonus_secs]',message:'🎉 Teamwork bonus! +[secs]s'}]});
+  bonusOpen.add(bonusRoundRows.length-1); renderBonusRounds(); scheduleSave();
+}
+function delBonusRound(i){
+  const b=bonusRoundRows[i]||{};
+  if(!confirm(`Delete bonus round "${b.name||'(unnamed)'}"? This can't be undone.`)) return;
+  bonusRoundRows.splice(i,1); bonusOpen=shiftSet(bonusOpen,i); renderBonusRounds(); scheduleSave();
+}
+function cleanBonusRounds(){
+  return bonusRoundRows.filter(b=>(b.name||'').trim()).map(b=>({
+    name:(b.name||'').trim(), type:'teamwork', title:b.title||'', body:b.body||'',
+    duration:Math.max(5,Math.min(3600,+b.duration||60)),
+    confirm:b.confirm==='leader'?'leader':'all',
+    no_holders_message:b.no_holders_message||'', expire_message:b.expire_message||'',
+    actions:cleanActionRows(b.actions),
+  }));
+}
 function renamePoll(i, val){
   const neu=(val||'').trim().toLowerCase(), old=(pollRows[i].name||'').trim().toLowerCase();
   if(neu && neu!==old && pollRows.some((p,j)=>j!==i && (p.name||'').trim().toLowerCase()===neu)){
@@ -2765,8 +2863,13 @@ function cleanActionRows(arr){
       o.block_during=!!a.block_during; o.post_actions=cleanActionRows(a.post_actions); }
     if(t==='award_prize'){ o.stash=a.stash!==false; o.lock=!!a.lock; o.deadline=Math.max(0,+a.deadline||0);
       o.deadline_message=a.deadline_message||''; o.timeout_message=a.timeout_message||''; }
+    if(t==='award_amount'){ o.unit=a.unit==='pct'?'pct':'secs';
+      o.amount=(typeof a.amount==='string'&&a.amount.includes('['))?a.amount:(+a.amount||0); }
+    if(t==='bonus_round'){ o.bonus_round=(a.bonus_round||'').trim()||null; }
+    if(t==='embed_message'){ o.title=a.title||''; }
     if(t==='command_gate'){ o.gate_mode=a.gate_mode==='remove_block'?'remove_block':'block_all'; }
-    if(t==='winner_button'){ o.label=a.label||''; o.freeze=a.freeze!==false; o.deadline=Math.max(0,+a.deadline||0);
+    if(t==='winner_button'||t==='session_leader_event'){ o.title=a.title||''; o.label=a.label||'';
+      o.freeze=a.freeze!==false; o.deadline=Math.max(0,+a.deadline||0);
       o.deadline_message=a.deadline_message||''; o.timeout_message=a.timeout_message||'';
       o.actions=cleanActionRows(a.actions); }
     return o;
@@ -3249,6 +3352,7 @@ function applyState(st, full){
     capEvRows = JSON.parse(JSON.stringify(st.capacity_events||[]));
     pollRows = JSON.parse(JSON.stringify(st.polls||[]));
     compRows = JSON.parse(JSON.stringify(st.competitions||[]));
+    bonusRoundRows = JSON.parse(JSON.stringify(st.bonus_rounds||[]));
     if($('#cmdVote')) $('#cmdVote').value = (st.command_names||{}).vote||'agvote';
     if($('#cmdEnter')) $('#cmdEnter').value = (st.command_names||{}).enter||'enter';
     if($('#eventInProcessMsg')) $('#eventInProcessMsg').value = st.event_in_process_message||'';
@@ -3264,6 +3368,7 @@ function applyState(st, full){
     renderCapEvents();
     renderPolls();
     renderCompetitions();
+    renderBonusRounds();
     renderPollDropdown();
     renderTemplates();
     renderBroadcasts();
@@ -3365,6 +3470,7 @@ function gatherConfig(){
     prizes:cleanPrizes(),
     capacity_ranges:rangeRows, commands:cleanCommands(), modes:cleanModes(), events:cleanEvents(),
     capacity_events:cleanCapEvents(), polls:cleanPolls(), competitions:cleanCompetitions(),
+    bonus_rounds:cleanBonusRounds(),
     event_in_process_message: $('#eventInProcessMsg') ? $('#eventInProcessMsg').value : '',
     event_cooldown_message: $('#eventCooldownMsg') ? $('#eventCooldownMsg').value : '',
     broadcasts: cleanBroadcasts(),

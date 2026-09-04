@@ -128,6 +128,15 @@ class Engine:
         # presses it, a deadline auto-runs the block so the game can't stall.
         self._winner_button: dict | None = None      # {"uid","who","actions","freeze","name","used"}
         self._winner_button_task: asyncio.Task | None = None
+        # Bonus bank: award_amount stacks per-player bonus AMOUNTS (pump seconds
+        # and/or capacity %) that a Bonus Round later pools & cashes in. Session-
+        # scoped (cleared on session reset; a round activation spends them).
+        self._bonus_bank: dict[str, dict] = {}       # uid -> {"name","secs","pct"}
+        # Bonus Round (teamwork): an embed with a confirm button for bonus holders;
+        # once the needed holders confirm (all, or the top holder), its action
+        # block runs with the pooled [total_bonus_*] totals.
+        self._bonus_round: dict | None = None
+        self._bonus_round_task: asyncio.Task | None = None
         # Post-event action blocks: run AFTER an event completes, detached — the
         # event has already cleared (effects lifted, marked done), so these are
         # NOT part of it. Session-scoped: cancelled on pause / reset / off.
@@ -174,6 +183,7 @@ class Engine:
         self.broadcast_embed_cb = None         # async (text) -> None : broadcast-preset embed
         self.comp_embed_cb = None              # async (title, text, meta) -> None : competition embed + Enter button
         self.winner_button_cb = None           # async (title, text, meta) -> None : one-press Winner Button embed
+        self.bonus_round_cb = None             # async (title, text, meta) -> None : Bonus Round embed + confirm button
         self.bot_connected: bool = False
 
         # Device add/search/use debug flows into the Activity log too (not just stdout).
@@ -448,6 +458,13 @@ class Engine:
         ctx["session_leader_score"] = f"{sl_score:.1f}" if sl_uid else ""
         # who currently holds which bonus command(s) + charges (best in an embed)
         ctx["bonus_holders"] = self.bonus_holders_text()
+        # pooled bonus AMOUNTS across everyone; [user_bonus_*] default blank
+        # (filled in per-user contexts — action blocks, command replies)
+        tb_secs, tb_pct = self.total_bonus()
+        ctx["total_bonus_secs"] = f"{tb_secs:g}"
+        ctx["total_bonus_pct"] = f"{tb_pct:g}"
+        ctx.setdefault("user_bonus_secs", "")
+        ctx.setdefault("user_bonus_pct", "")
         pz = self.active_prize() or {}
         ctx["max_roll_goal"] = pz.get("goal") if pz.get("goal") not in (None, "") else ""
         ctx["max_roll_command"] = f"{prefix}{(pz.get('command') or '').strip()}" if pz.get("command") else ""
@@ -1030,7 +1047,11 @@ class Engine:
         winner/mention placeholders resolve inside the block."""
         if hdr is None:
             hdr = name
-        xc = extra_ctx or {}
+        xc = dict(extra_ctx or {})
+        if uid is not None and "user_bonus_secs" not in xc:
+            ubs, ubp = self.user_bonus(uid)   # [user_bonus_*] for the block's runner
+            xc["user_bonus_secs"] = f"{ubs:g}"
+            xc["user_bonus_pct"] = f"{ubp:g}"
 
         def R(template, more=None):
             return self.render(template, {**xc, **(more or {})})
@@ -1059,6 +1080,19 @@ class Engine:
                     if msg:
                         await self._announce(self._evt_hdr(hdr) + R(msg), None)
                     continue
+                if typ == "embed_message":
+                    # a plain message, but posted as a rich embed (titlebar + body)
+                    title = R((a.get("title") or "").strip())
+                    body = R((a.get("message") or "").strip())
+                    if self.embed_cb:
+                        try:
+                            await self.embed_cb(title or "​", body)
+                        except Exception as e:  # noqa: BLE001
+                            self._log("error", f"embed_message failed: {e}")
+                            await self._announce((f"**{title}**\n" if title else "") + body, None)
+                    else:
+                        await self._announce((f"**{title}**\n" if title else "") + body, None)
+                    continue
                 if typ == "capacity":
                     op = (a.get("capacity_op") or "add").lower()
                     val = float(a.get("capacity_value") or 0)
@@ -1084,6 +1118,11 @@ class Engine:
                 if typ == "competition":
                     # non-blocking: start it in the background, block continues
                     res = self.start_competition_bg(a.get("competition"), source=name)
+                    if not res.get("ok"):
+                        self._log("error", f"{name}: {res.get('error')}")
+                    continue
+                if typ == "bonus_round":
+                    res = self.start_bonus_round_bg(a.get("bonus_round"), source=name)
                     if not res.get("ok"):
                         self._log("error", f"{name}: {res.get('error')}")
                     continue
@@ -1148,6 +1187,31 @@ class Engine:
                             self._winner_deadline(deadline, bkey,
                                                   {"timeout_message": a.get("timeout_message")}))
                     continue
+                if typ == "award_amount":
+                    # Bank a bonus AMOUNT (pump seconds or capacity %) on a target;
+                    # a Bonus Round later pools & spends everyone's banks.
+                    uid_t, who_t = self._resolve_award_target(a.get("target") or "[winner]")
+                    if uid_t is None:
+                        self._log("bot", f"{name}: award_amount — no target for '{a.get('target')}', skipped")
+                        continue
+                    unit = (a.get("unit") or "secs").lower()
+                    amt = round(self._num_expr(a.get("amount"), xc), 1)
+                    rec = self._bonus_bank.setdefault(str(uid_t),
+                                                      {"name": who_t, "secs": 0.0, "pct": 0.0})
+                    rec["name"] = who_t
+                    if unit in ("pct", "%", "cap", "capacity"):
+                        rec["pct"] += amt
+                    else:
+                        rec["secs"] += amt
+                    self._log("bot", f"{name}: banked {amt:g}{'%' if unit.startswith(('p','%','c')) else 's'} bonus for {who_t}")
+                    msg = (a.get("message") or "").strip()
+                    if msg:
+                        await self._announce(self._evt_hdr(hdr) + R(msg, {
+                            "target": who_t, "winner": who_t,
+                            "mention": self._mention(uid_t, who_t),
+                            "amount": f"{amt:g}",
+                            "user_bonus_secs": f"{rec['secs']:g}", "user_bonus_pct": f"{rec['pct']:g}"}), None)
+                    continue
                 if typ == "command_gate":
                     # block_all: freeze every custom command AND the builtin roll
                     # for everyone but the owner / bot-internal / granted commands
@@ -1163,14 +1227,16 @@ class Engine:
                     if msg:
                         await self._announce(self._evt_hdr(hdr) + R(msg), None)
                     continue
-                if typ == "winner_button":
-                    # Hand a target (default [winner]) a one-press button. Pressing
-                    # it runs this action's own mini action block; if `freeze`, all
-                    # others are blocked until it's pressed; if it's never pressed,
-                    # a deadline auto-runs the block so the game can't stall.
-                    uid_t, who_t = self._resolve_award_target(a.get("target") or "[winner]")
+                if typ in ("winner_button", "session_leader_event"):
+                    # Hand a target a one-press button. winner_button targets
+                    # a.target (default [winner]); session_leader_event locks it to
+                    # the session leader. Pressing runs this action's own mini
+                    # block; `freeze` blocks others until pressed; a deadline
+                    # auto-runs the block if it's never pressed (timer + fallback).
+                    tgt = "[session_leader]" if typ == "session_leader_event" else (a.get("target") or "[winner]")
+                    uid_t, who_t = self._resolve_award_target(tgt)
                     if uid_t is None:
-                        self._log("bot", f"{name}: winner_button — no target for '{a.get('target')}', skipped")
+                        self._log("bot", f"{name}: {typ} — no target for '{tgt}', skipped")
                         continue
                     freeze = bool(a.get("freeze", True))
                     label = (a.get("label") or "").strip() or "🎁 Claim your prize"
@@ -1183,11 +1249,14 @@ class Engine:
                     if freeze:
                         self._cmd_gate_block = True
                     bctx = {"winner": who_t, "target": who_t, "mention": mention}
-                    text = R((a.get("message") or "").strip()
-                             or "🎁 **[target]**, you won — press the button to claim it!", bctx)
+                    default_body = ("🏆 **[target]**, you're the session leader — press the button!"
+                                    if typ == "session_leader_event"
+                                    else "🎁 **[target]**, you won — press the button to claim it!")
+                    text = R((a.get("message") or "").strip() or default_body, bctx)
+                    title = R((a.get("title") or "").strip()) or ("🏆 " + name)
                     if self.winner_button_cb:
                         try:
-                            await self.winner_button_cb("🏆 " + name, text,
+                            await self.winner_button_cb(title, text,
                                                         {"uid": str(uid_t), "label": label, "name": name})
                         except Exception as e:  # noqa: BLE001
                             self._log("error", f"winner button post failed: {e}")
@@ -1929,6 +1998,136 @@ class Engine:
             self._comp_task = None
         self._comp = None
 
+    # -- Bonus Round (teamwork cash-in) -------------------------------------- #
+    def find_bonus_round(self, name) -> dict | None:
+        key = (name or "").strip().lower()
+        for b in self.cfg.get("bonus_rounds", []):
+            if (b.get("name") or "").strip().lower() == key:
+                return b
+        return None
+
+    def start_bonus_round_bg(self, name, source: str = "manual") -> dict:
+        brd = self.find_bonus_round(name)
+        if brd is None:
+            return {"ok": False, "error": f"no bonus round named '{name}'"}
+        if self._bonus_round is not None:
+            return {"ok": False, "error": "a bonus round is already running"}
+        if self._paused:
+            return {"ok": False, "error": "session is paused"}
+        self._bonus_round_task = asyncio.create_task(self._run_bonus_round(brd, source))
+        return {"ok": True}
+
+    async def _run_bonus_round(self, brd: dict, source: str = "bonus") -> None:
+        name = (brd.get("name") or "bonus round").strip()
+        holders = self._bonus_holder_uids()
+        if not holders:
+            self._log("bot", f"BONUS ROUND '{name}' — nobody holds a bonus, skipped")
+            miss = (brd.get("no_holders_message") or "").strip()
+            if miss:
+                await self._announce(self.render(miss), None)
+            self._bonus_round = None
+            return
+        confirm = (brd.get("confirm") or "all").lower()
+        if confirm == "leader":
+            top = self._top_bonus_holder()
+            needed = {top} if top else set()
+        else:
+            needed = set(holders)
+        try:
+            duration = max(5.0, min(3600.0, float(brd.get("duration") or 60)))
+        except (TypeError, ValueError):
+            duration = 60.0
+        self._bonus_round = {"def": brd, "name": name, "holders": set(holders),
+                             "needed": set(needed), "pressed": set(), "done": False}
+        title = "🤝 " + self.render((brd.get("title") or name).strip())
+        body = self.render((brd.get("body") or "").strip()) or self._bonus_round_intro(confirm, needed)
+        meta = {"name": name, "holders": [self._name_for(u) or "?" for u in holders]}
+        self._log("bot", f"BONUS ROUND '{name}' started [{source}] — need {len(needed)}/{len(holders)}")
+        if self.bonus_round_cb:
+            try:
+                await self.bonus_round_cb(title, f"{body}\n\n{self._bonus_round_status()}", meta)
+            except Exception as e:  # noqa: BLE001
+                self._log("error", f"bonus round embed failed: {e}")
+                await self._announce(f"**{title}**\n{body}", None)
+        else:
+            await self._announce(f"**{title}**\n{body}", None)
+        try:
+            end = time.monotonic() + duration
+            while self._bonus_round is not None and not self._bonus_round["done"]:
+                if self._bonus_round["needed"] <= self._bonus_round["pressed"]:
+                    await self._activate_bonus_round()
+                    return
+                if time.monotonic() >= end:
+                    break
+                await asyncio.sleep(0.25)
+        except asyncio.CancelledError:
+            self._bonus_round = None
+            raise
+        # expired without full confirmation
+        if self._bonus_round is not None and not self._bonus_round["done"]:
+            self._bonus_round = None
+            fmsg = (brd.get("expire_message") or "").strip()
+            if fmsg:
+                await self._announce(self.render(fmsg), None)
+            self._log("bot", f"BONUS ROUND '{name}' expired without confirmation")
+
+    def _bonus_round_intro(self, confirm: str, needed: set) -> str:
+        if confirm == "leader":
+            return "The top bonus holder can press to cash in everyone's bonus!"
+        return f"All {len(needed)} bonus holders must press before time runs out to cash in!"
+
+    def _bonus_round_status(self) -> str:
+        br = self._bonus_round
+        if not br:
+            return ""
+        done = [self._name_for(u) or "?" for u in br["pressed"] if u in br["needed"]]
+        line = f"✅ Confirmed **{len(br['pressed'] & br['needed'])}/{len(br['needed'])}**"
+        if done:
+            line += " — " + ", ".join(done)
+        return line
+
+    def bonus_round_can_press(self, uid) -> bool:
+        br = self._bonus_round
+        return bool(br and not br["done"] and str(uid) in br["holders"])
+
+    async def bonus_round_press(self, uid, who: str) -> dict:
+        """A bonus holder confirms. Returns status; activates when the needed set
+        is satisfied. Non-holders are rejected (they've nothing to contribute)."""
+        br = self._bonus_round
+        if not br or br["done"]:
+            return {"ok": False, "error": "no round"}
+        if str(uid) not in br["holders"]:
+            return {"ok": False, "error": "not a holder"}
+        br["pressed"].add(str(uid))
+        status = self._bonus_round_status()
+        if br["needed"] <= br["pressed"]:
+            await self._activate_bonus_round()
+            return {"ok": True, "activated": True, "status": status}
+        return {"ok": True, "activated": False, "status": status,
+                "have": len(br["pressed"] & br["needed"]), "need": len(br["needed"])}
+
+    async def _activate_bonus_round(self) -> None:
+        br = self._bonus_round
+        if not br or br["done"]:
+            return
+        br["done"] = True
+        brd = br["def"]
+        name = br["name"]
+        secs, pct = self.total_bonus()   # pooled totals BEFORE clearing
+        self._bonus_round = None
+        self._log("bot", f"BONUS ROUND '{name}' ACTIVATED — pooled {secs:g}s / {pct:g}%")
+        xc = {"total_bonus_secs": f"{secs:g}", "total_bonus_pct": f"{pct:g}"}
+        # spent & cleared: the block sees the pooled totals, then banks reset
+        self._bonus_bank.clear()
+        await self._run_action_block(brd.get("actions"), f"bonus round {name}",
+                                     hdr="BONUS ROUND", extra_ctx=xc)
+
+    def _cancel_bonus_round(self) -> None:
+        if self._bonus_round_task is not None:
+            self._bonus_round_task.cancel()
+            self._bonus_round_task = None
+        self._bonus_round = None
+
     def _clear_winner_grants(self, all_incl_stash: bool = False) -> None:
         """Range change clears range-locked grants; session reset clears all."""
         if all_incl_stash:
@@ -2376,6 +2575,31 @@ class Engine:
                 line = f"• {prefix}{k}" + (f" — {desc}" if desc else "")
                 out.append(line + f" · {chs} charge" + ("" if ch == 1 else "s"))
         return "\n".join(out)
+
+    # -- bonus amounts (award_amount → Bonus Round) -------------------------- #
+    def total_bonus(self):
+        """(secs, pct) pooled across every player's bank."""
+        secs = sum(float(r.get("secs") or 0) for r in self._bonus_bank.values())
+        pct = sum(float(r.get("pct") or 0) for r in self._bonus_bank.values())
+        return (secs, pct)
+
+    def user_bonus(self, uid):
+        """(secs, pct) banked by one player."""
+        r = self._bonus_bank.get(str(uid)) or {}
+        return (float(r.get("secs") or 0), float(r.get("pct") or 0))
+
+    def _bonus_holder_uids(self) -> list:
+        """uids that currently hold any bonus (secs or pct)."""
+        return [u for u, r in self._bonus_bank.items()
+                if (r.get("secs") or 0) > 0 or (r.get("pct") or 0) > 0]
+
+    def _top_bonus_holder(self):
+        """uid of the biggest bonus holder (secs + pct), or None."""
+        holders = self._bonus_holder_uids()
+        if not holders:
+            return None
+        return max(holders, key=lambda u: (self._bonus_bank[u].get("secs") or 0)
+                   + (self._bonus_bank[u].get("pct") or 0))
 
     def _resolve_award_target(self, target: str):
         """Resolve an award_prize/winner_button target string to (uid, name).
@@ -3131,6 +3355,7 @@ class Engine:
         self._cancel_poll_task()
         self._cancel_competition()
         self._cancel_winner_button()   # a pending Winner Button dies with the pause (lifts its freeze)
+        self._cancel_bonus_round()     # a live Bonus Round dies too (banks survive the pause)
         self._cmd_gate_block = False    # STOP lifts any command gate; resume starts clean
         self._cancel_deadline()   # keep the grant, but don't auto-fire into a paused session
         self._event_last.clear()
@@ -3348,6 +3573,8 @@ class Engine:
         self._last_poll_winner = None
         self._cancel_competition()
         self._cancel_winner_button()
+        self._cancel_bonus_round()
+        self._bonus_bank.clear()
         self._cmd_gate_block = False
         self._clear_winner_grants(all_incl_stash=True)
         self._last_winner = ""; self._last_winner_score = 0.0

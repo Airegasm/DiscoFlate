@@ -1,6 +1,6 @@
 {
-  "version": "3.26.0",
-  "versionCode": 95,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.26.0/discoflate.apk",
-  "notes": "DiscoFlate v3.26.0 — competition endings are now an ACTION BLOCK (Winner reward actions): fire [winner_score] to the pump, hand the winner a one-press Winner Button (runs its own mini-block, optional freeze + deadline), award_prize a command, or command_gate everyone else. New action types winner_button + command_gate (block_all_custom incl. roll / remove_block). Fire actions can pump until N% added or reached, block others while pumping, and run Post-Pump Actions when done. New placeholders [runnerup]/[runnerup_score], [session_leader]/[session_leader_score], [bonus_holders]. Per-range 'Allow Prize Commands' + 'Only' gates. Roll-offs can 'Add ALL player totals to the timer'. Legacy competition awards auto-migrate."
+  "version": "3.27.0",
+  "versionCode": 96,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.27.0/discoflate.apk",
+  "notes": "DiscoFlate v3.27.0 — Bonus amounts & teamwork Bonus Rounds. New award_amount action banks pump-seconds or capacity-% on a target; a new Bonus Round (teamwork) posts a Confirm button to bonus holders and, once all (or the top holder) confirm, cashes in the pooled [total_bonus_secs]/[total_bonus_pct] via your action block, then clears the banks. New action types: bonus_round, award_amount, session_leader_event (a Winner-Button locked to the session leader, with freeze + timer/fallback), and embed_message (title + body embed). New placeholders [total_bonus_secs]/[total_bonus_pct] and [user_bonus_secs]/[user_bonus_pct]. Winner buttons gained a titlebar field."
 }

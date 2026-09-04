@@ -262,9 +262,13 @@ DEFAULTS = {
     #    disable_always_on, disable_always_on_scope,
     #    pause_events, pause_events_scope,
     #    enable_commands_on, enable_commands: [names],   # usable during the event regardless
-    #    actions: [{type: message|broadcast|fire|roll|capacity|wait|poll|
-    #               competition|award_prize|winner_button|command_gate|
-    #               end_session, message, seconds (number OR [placeholder]),
+    #    actions: [{type: message|embed_message|broadcast|fire|roll|capacity|wait|
+    #               poll|competition|bonus_round|award_prize|award_amount|
+    #               winner_button|session_leader_event|command_gate|end_session,
+    #               title (embed_message/*_button titlebar),
+    #               bonus_round (name),   # start a named Bonus Round
+    #               unit (secs|pct) + amount,   # award_amount: bank a bonus amount
+    #               message, seconds (number OR [placeholder]),
     #               device_id, dice, sides, capacity_op, capacity_value,
     #               poll, broadcast, competition,
     #               fire_mode (seconds|add|to) + fill_pct (fire: pump until N%
@@ -299,6 +303,16 @@ DEFAULTS = {
     #    Legacy award_pump/bonus_command/lock/deadline fields migrate to
     #    win_actions (config_version 4).
     "competitions": [],
+
+    # Bonus Rounds ("teamwork" cash-ins) — named, started by a "bonus_round"
+    # action. award_amount banks per-player bonus AMOUNTS (pump secs / cap %); a
+    # Bonus Round posts an embed with a Confirm button for bonus holders. When the
+    # needed holders confirm (all, or the top holder) before the timer, its action
+    # block runs with the pooled [total_bonus_secs]/[total_bonus_pct], then the
+    # banks are spent (cleared). Each: {name, type ("teamwork"), title, body,
+    # duration (s), confirm ("all"|"leader"), actions: [action rows],
+    # no_holders_message, expire_message}
+    "bonus_rounds": [],
 
     # Polls — named, referenced by a "poll" action (in timed events, capacity-
     # event blocks, poll winners) or a command of type "poll". Posted as a rich

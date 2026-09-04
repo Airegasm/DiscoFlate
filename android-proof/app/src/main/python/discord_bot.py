@@ -183,6 +183,44 @@ class WinnerButtonView(discord.ui.View):
         await eng.press_winner_button(uid, interaction.user.display_name)
 
 
+class BonusRoundView(discord.ui.View):
+    """A teamwork Bonus Round's confirm button. Only players holding a banked
+    bonus can press; once the needed holders confirm, the round's action block
+    runs (pooling everyone's [total_bonus_*]). Non-holders get a private notice."""
+
+    def __init__(self, bot, meta):
+        super().__init__(timeout=None)
+        self.bot = bot
+        self.meta = meta or {}
+        btn = discord.ui.Button(label="🤝 Confirm bonus", style=discord.ButtonStyle.success)
+        btn.callback = self._press
+        self.add_item(btn)
+
+    async def _press(self, interaction: discord.Interaction):
+        eng = self.bot.engine
+        uid = str(interaction.user.id)
+        if not eng.bonus_round_can_press(uid):
+            await interaction.response.send_message(
+                "🚫 You have no banked bonus to contribute to this round.", ephemeral=True)
+            return
+        res = await eng.bonus_round_press(uid, interaction.user.display_name)
+        if not res.get("ok"):
+            await interaction.response.send_message("🚫 This round has ended.", ephemeral=True)
+            return
+        try:
+            if res.get("activated"):
+                for c in self.children:
+                    c.disabled = True
+                self.stop()
+                await interaction.response.send_message("✅ Confirmed — bonus cashed in!", ephemeral=True)
+            else:
+                await interaction.response.send_message(
+                    f"✅ Confirmed ({res.get('have')}/{res.get('need')}). Waiting on the rest…",
+                    ephemeral=True)
+        except Exception:  # noqa: BLE001
+            pass
+
+
 class BotManager:
     def __init__(self, engine, get_config) -> None:
         self.engine = engine
@@ -674,6 +712,15 @@ class BotManager:
             await self.broadcast(f"**{title}**\n{text}", None)
             return
         await self.broadcast("", None, embed=e, view=WinnerButtonView(self, meta))
+
+    async def post_bonus_round_embed(self, title: str, text: str, meta: dict) -> None:
+        """A teamwork Bonus Round embed with a Confirm button for bonus holders."""
+        try:
+            e = discord.Embed(title=(title or "")[:256], description=(text or "")[:4096], color=0x2ECC71)
+        except Exception:  # noqa: BLE001
+            await self.broadcast(f"**{title}**\n{text}", None)
+            return
+        await self.broadcast("", None, embed=e, view=BonusRoundView(self, meta))
 
     async def handle_vote_interaction(self, interaction, option_number: int) -> None:
         """Shared by the vote buttons and the /vote slash command: cast the
