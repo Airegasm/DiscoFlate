@@ -1097,7 +1097,7 @@ class Engine:
         if not opts:
             self._log("error", f"{source}: poll '{name}' has no options")
             return
-        title = f"Poll: {(pd.get('title') or name).strip()}"
+        title = "Poll: " + self.render((pd.get("title") or name).strip())
         try:
             duration = max(5.0, min(3600.0, float(pd.get("duration") or 60)))
         except (TypeError, ValueError):

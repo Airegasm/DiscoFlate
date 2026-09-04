@@ -1,6 +1,6 @@
 {
-  "version": "3.17.2",
-  "versionCode": 85,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.17.2/discoflate.apk",
-  "notes": "DiscoFlate v3.17.2 \u2014 fix: on Android, Export Gameplay Settings now saves as discoflate-gameplay.json instead of overwriting your discoflate-backup.json (a filename-aware save bridge)."
+  "version": "3.18.0",
+  "versionCode": 86,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.18.0/discoflate.apk",
+  "notes": "DiscoFlate v3.18.0 \u2014 bulletproof autosave: every field commits on entry/blur and on tab switch (Save buttons are now just reassurance); fixes Always-On max/person not sticking; the live refresh no longer rebuilds a field you're editing. Poll titles now resolve [placeholders]."
 }

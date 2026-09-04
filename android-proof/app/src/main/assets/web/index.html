@@ -958,6 +958,7 @@ let configRev = null;       // last config revision this tab saw (concurrency ch
 
 // ---- fluid tabs (no page navigation) ----
 function showTab(name){
+  try{ if(typeof flushSave==='function') flushSave(); }catch(e){}   // save everything before leaving the tab
   document.querySelectorAll('.card[data-tab]').forEach(c=>{
     c.classList.toggle('show', c.getAttribute('data-tab')===name);
   });
@@ -1810,12 +1811,12 @@ function renderAlwaysOn(){
     const cmdObj = commandRows.find(c=>(c.name||'').trim().toLowerCase()===aoName(a).toLowerCase());
     const isGameCmd = !!cmdObj && (cmdObj.type||'').indexOf('game-')===0;
     const luckField = isGameCmd
-      ? `<span class="muted">luck</span><input type="number" min="-1000" max="1000" step="1" value="${lk}" placeholder="0" style="width:60px" title="± added to the minigame score (a range this game is in overrides this)" onchange="setAlwaysOn(${idx},'luck',this.value)">`
+      ? `<span class="muted">luck</span><input type="number" min="-1000" max="1000" step="1" value="${lk}" placeholder="0" style="width:60px" title="± added to the minigame score (a range this game is in overrides this)" oninput="setAlwaysOn(${idx},'luck',this.value)">`
       : '';
     return `<div class="row" style="gap:8px;align-items:center;margin-bottom:4px;flex-wrap:wrap">`+
       `<b style="min-width:120px">!${esc(aoName(a))}</b>`+
-      `<span class="muted">cooldown</span><input type="number" min="0" step="1" value="${cd}" placeholder="def" style="width:70px" onchange="setAlwaysOn(${idx},'cooldown',this.value)"><span class="muted">s</span>`+
-      `<span class="muted">max/person</span><input type="number" min="0" step="1" value="${mu}" placeholder="∞" style="width:70px" onchange="setAlwaysOn(${idx},'max_uses',this.value)">`+
+      `<span class="muted">cooldown</span><input type="number" min="0" step="1" value="${cd}" placeholder="def" style="width:70px" oninput="setAlwaysOn(${idx},'cooldown',this.value)"><span class="muted">s</span>`+
+      `<span class="muted">max/person</span><input type="number" min="0" step="1" value="${mu}" placeholder="∞" style="width:70px" oninput="setAlwaysOn(${idx},'max_uses',this.value)">`+
       luckField+
       `<button class="ghost" onclick="removeAlwaysOnIdx(${idx})">✕</button>`+
     `</div>`;
@@ -3066,7 +3067,18 @@ function gatherConfig(){
   };
 }
 let saveT=null;
-function scheduleSave(){ if(!editingForms) return; clearTimeout(saveT); saveT=setTimeout(doSave, 600); }
+function scheduleSave(){ if(!editingForms) return; clearTimeout(saveT); saveT=setTimeout(doSave, 400); }
+// Commit any pending autosave RIGHT NOW (tab switch, focus loss, before an
+// explicit save). The Save buttons are just reassurance — this is what makes
+// every field persist on its own.
+function flushSave(){ if(saveT){ clearTimeout(saveT); saveT=null; doSave(); } }
+// True while the user is typing in a field — the 1s poll must not rebuild the
+// forms out from under an in-progress edit (that's what dropped values).
+function isEditingField(){
+  const el=document.activeElement; if(!el) return false;
+  const t=(el.tagName||'').toLowerCase();
+  return t==='input' || t==='textarea' || t==='select';
+}
 function saveBadge(ok){
   const el=$('#saveStatus'); if(!el) return;
   el.textContent = ok ? 'saved ✓' : '⚠ NOT saved — retrying';
@@ -3119,14 +3131,17 @@ window.addEventListener('beforeunload', ()=>{
     navigator.sendBeacon('/api/config', new Blob([JSON.stringify(payload)], {type:'application/json'}));
   }catch(e){}
 });
+// Losing focus (switching apps/windows) or hiding the tab → commit pending edits.
+window.addEventListener('blur', flushSave);
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden) flushSave(); });
 
 let refreshFails = 0;
 async function refresh(){
   try{
     const st = await (await fetch('/api/state')).json();
     refreshFails = 0; offlineBanner(false);
-    if(configRev != null && st.config_rev !== configRev && !saveT){
-      applyState(st, true);   // config changed elsewhere → adopt it fully
+    if(configRev != null && st.config_rev !== configRev && !saveT && !isEditingField()){
+      applyState(st, true);   // config changed elsewhere → adopt it fully (never mid-edit)
     } else {
       applyState(st, false);
     }
