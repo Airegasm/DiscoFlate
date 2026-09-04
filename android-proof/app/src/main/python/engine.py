@@ -124,6 +124,11 @@ class Engine:
         # command_gate action or a Winner Button's freeze; cleared by remove_block,
         # a Winner Button press/deadline, or session reset.
         self._cmd_gate_block: bool = False
+        # command_gate refinements: commands whitelisted THROUGH a block_all, and
+        # specific commands blocked. (disable_range / disable_always_on /
+        # pause_events modifiers reuse the capacity-event session-effect set.)
+        self._cmd_gate_allow: set = set()
+        self._cmd_gate_blocked_cmds: set = set()
         # Winner Button: a one-press button handed to a competition winner (or any
         # target). Pressing it runs a mini action block; if the target never
         # presses it, a deadline auto-runs the block so the game can't stall.
@@ -1350,16 +1355,43 @@ class Engine:
                                                   {"timeout_message": a.get("timeout_message")}))
                     continue
                 if typ == "command_gate":
-                    # block_all: freeze every custom command AND the builtin roll
-                    # for everyone but the owner / bot-internal / granted commands
-                    # / a live Winner Button target. remove_block: back to normal.
-                    mode = (a.get("gate_mode") or "block_all").lower()
-                    if mode in ("remove_block", "remove", "off", "none", "unblock"):
-                        self._cmd_gate_block = False
-                        self._log("bot", f"{name}: command gate REMOVED — gating back to the range")
-                    else:
-                        self._cmd_gate_block = True
-                        self._log("bot", f"{name}: command gate BLOCK_ALL")
+                    # Stackable gate modifiers (one action, many rows). Persist until
+                    # a remove_block / resume / session reset. Exemptions: owner,
+                    # bot-internal, granted commands, a live Winner Button target.
+                    mods = a.get("modifiers")
+                    if not mods:   # legacy single gate_mode
+                        mods = [{"op": (a.get("gate_mode") or "block_all").lower()}]
+                    for m in mods:
+                        op = (m.get("op") or "").lower()
+                        ck = (m.get("command") or "").strip().lower()
+                        if op == "block_all":
+                            self._cmd_gate_block = True
+                        elif op in ("remove_block", "remove", "off", "none"):
+                            self._cmd_gate_block = False
+                            self._cmd_gate_allow.clear()
+                            self._cmd_gate_blocked_cmds.clear()
+                            self._capev_session_fx.discard("disable_range")
+                            self._capev_session_fx.discard("disable_ao")
+                            self._capev_session_fx.discard("pause_events")
+                        elif op == "allow" and ck:
+                            self._cmd_gate_allow.add(ck)
+                        elif op == "block" and ck:
+                            self._cmd_gate_blocked_cmds.add(ck)
+                        elif op == "unblock" and ck:
+                            self._cmd_gate_blocked_cmds.discard(ck)
+                        elif op == "disable_range_cmds":
+                            self._capev_session_fx.add("disable_range")
+                        elif op == "resume_range_cmds":
+                            self._capev_session_fx.discard("disable_range")
+                        elif op == "disable_always_on":
+                            self._capev_session_fx.add("disable_ao")
+                        elif op == "resume_always_on":
+                            self._capev_session_fx.discard("disable_ao")
+                        elif op == "pause_events":
+                            self._capev_session_fx.add("pause_events")
+                        elif op == "resume_events":
+                            self._capev_session_fx.discard("pause_events")
+                    self._log("bot", f"{name}: command_gate applied {len(mods)} modifier(s)")
                     msg = (a.get("message") or "").strip()
                     if msg:
                         await self._announce(self._evt_hdr(hdr) + R(msg), None)
@@ -2801,12 +2833,13 @@ class Engine:
             return self._paused_result(who, uid)
         if self._progression_lock is not None:
             return {"ok": False, "silent": True}  # frozen until the competition winner acts
-        # command_gate block_all (or a per-range 'Only prize commands' band)
-        # freezes the builtin roll too, for everyone but the owner (a granted
-        # command / Winner Button is the only way through).
-        if (uid is not None and not self._is_exempt(uid, who)
-                and (self._cmd_gate_block or self._range_prizes_only())):
-            return {"ok": False, "silent": True}
+        # command_gate: a specific block on 'roll', or a block_all / 'Only prize
+        # commands' band that 'roll' isn't allow-listed through. Owner exempt.
+        if uid is not None and not self._is_exempt(uid, who):
+            if "roll" in self._cmd_gate_blocked_cmds:
+                return {"ok": False, "silent": True}
+            if (self._cmd_gate_block or self._range_prizes_only()) and "roll" not in self._cmd_gate_allow:
+                return {"ok": False, "silent": True}
         target = self._active_id()
         if self._device(target) is None:
             return {"ok": False, "error": "no active device selected"}
@@ -2903,13 +2936,14 @@ class Engine:
                     self._winner_grants.pop(cmdkey0, None)
                     self._winner_grants.pop(cmdkey0 + "\x00stash", None)
         capev_enabled = cmdkey0 in self._capev_enabled_cmds() or winner_granted
-        # command_gate block_all (session flag) OR a per-range 'Only prize
-        # commands' band: freeze every custom command for chat users but the
-        # owner and granted commands (a Winner Button target uses their button,
-        # not a chat command). Overrides range membership just like a capev.
-        if (uid is not None and not winner_granted and not self._is_exempt(uid, who)
-                and (self._cmd_gate_block or self._range_prizes_only())):
-            return {"ok": False, "silent": True}
+        # command_gate: a specific block on this command, or a block_all / 'Only
+        # prize commands' band it isn't allow-listed through. Owner + granted
+        # commands (incl. a Winner Button target) pass.
+        if uid is not None and not winner_granted and not self._is_exempt(uid, who):
+            if cmdkey0 in self._cmd_gate_blocked_cmds:
+                return {"ok": False, "silent": True}
+            if (self._cmd_gate_block or self._range_prizes_only()) and cmdkey0 not in self._cmd_gate_allow:
+                return {"ok": False, "silent": True}
         # Capacity-event gate (chat only — uid is None for range-start/system
         # calls). An event's enable-list wins over its own disables AND over
         # range membership; normal ranges yield to capacity events here. A
@@ -3507,6 +3541,7 @@ class Engine:
         self._cancel_winner_button()   # a pending Winner Button dies with the pause (lifts its freeze)
         self._cancel_bonus_round()     # a live Bonus Round dies too (banks survive the pause)
         self._cmd_gate_block = False    # STOP lifts any command gate; resume starts clean
+        self._cmd_gate_allow.clear(); self._cmd_gate_blocked_cmds.clear()
         self._cancel_deadline()   # keep the grant, but don't auto-fire into a paused session
         self._event_last.clear()
         self._event_fires.clear()
@@ -3726,6 +3761,7 @@ class Engine:
         self._cancel_bonus_round()
         self._bonus_bank.clear()
         self._cmd_gate_block = False
+        self._cmd_gate_allow.clear(); self._cmd_gate_blocked_cmds.clear()
         self._clear_winner_grants(all_incl_stash=True)
         self._last_winner = ""; self._last_winner_score = 0.0
         self._last_runnerup = ""; self._last_runnerup_score = 0.0

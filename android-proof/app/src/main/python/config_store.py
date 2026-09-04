@@ -287,7 +287,9 @@ DEFAULTS = {
     #               fire_mode (seconds|add|to) + fill_pct (fire: pump until N%
     #                 added / reached; [secs] = the computed time) + block_during +
     #                 post_actions:[…],
-    #               gate_mode (block_all|remove_block)}]}  # command_gate
+    #               modifiers:[{op,command}] (command_gate: block_all|remove_block|allow|
+    #                 block|unblock|disable_range_cmds|resume_range_cmds|
+    #                 disable_always_on|resume_always_on|pause_events|resume_events)}]}
     # The action block runs sequentially; the event is "running" (its effects
     # active) until the block finishes. One-shot per session (re-armed by
     # session reset / activation).

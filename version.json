@@ -1,6 +1,6 @@
 {
-  "version": "3.39.0",
-  "versionCode": 109,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.39.0/discoflate.apk",
-  "notes": "DiscoFlate v3.39.0 (consolidation, part 5) — Timed Events gain an 'actions' action type: a full action block run each round (message/embed/fire/award/competition/command_gate/…), with loop placeholders ([current_loop]/[event]/[next_round]) — just like a command's actions. The simple single-action types stay for the common case + clean-previous loops. Also: Competitions and Bonus Rounds are now clearly separated collapsible sections."
+  "version": "3.40.0",
+  "versionCode": 110,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.40.0/discoflate.apk",
+  "notes": "DiscoFlate v3.40.0 — command_gate now takes STACKABLE modifier rows in one action: block-all, allow a command through, block/unblock a specific command, disable/resume this range's commands, disable/resume always-on commands, pause/resume timed events, and remove-all. No more chaining three gate actions — and the old event gating tickboxes are converging here. Legacy single-mode command_gate still works."
 }
