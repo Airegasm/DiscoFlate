@@ -233,6 +233,16 @@
             </label>
           </div>
 
+          <h3 style="margin-top:8px">Bot appearance</h3>
+          <div class="row" style="gap:10px;align-items:center">
+            <img id="pfpPreview" alt="" style="width:56px;height:56px;border-radius:50%;object-fit:cover;background:var(--panel);border:1px solid var(--line);display:none">
+            <input type="file" id="pfpFile" accept="image/png,image/jpeg,image/gif" style="display:none" onchange="onPfpPick(this)">
+            <button class="ghost" onclick="document.getElementById('pfpFile').click()">Choose image…</button>
+            <button id="pfpSet" onclick="setBotAvatar()" disabled>Set bot avatar</button>
+            <span class="muted" id="pfpState"></span>
+          </div>
+          <div class="hint" style="margin-top:0">Sets the bot's Discord <b>profile picture</b> (needs the bot connected). PNG/JPG/GIF, square looks best. Discord rate-limits avatar changes, so don't spam it.</div>
+
           <h3 style="margin-top:8px">Access</h3>
           <label class="field">Restrict to user IDs <span class="muted">(optional, comma-separated)</span>
             <input id="allowUsers" placeholder="blank = anyone in the channel"></label>
@@ -607,14 +617,20 @@
     <!-- templates -->
     <div class="card span" data-tab="templates">
       <h2>Templates</h2>
-      <div class="hint">Reusable snapshots saved from the <b>Commands</b>, <b>Events</b>, and <b>Ranges</b> editors — hit the <b>💾</b> on any row to save it here. <b>＋ Add to Config</b> ports one back into your live setup, renaming to dodge clashes. Templates are stored with your config and included in backup/restore.</div>
+      <div class="hint">Reusable snapshots saved from the <b>Commands</b>, <b>Events</b>, <b>Ranges</b> (incl. <b>End</b> / <b>End Sequence</b>), <b>Polls</b>, <b>Competitions</b>, and <b>Capacity Events</b> editors — hit the <b>💾</b> on any row to save it here. <b>＋ Add to Config</b> ports one back into your live setup, renaming to dodge clashes. Templates are stored with your config and included in backup/restore.</div>
       <details class="help" open style="margin-top:12px"><summary><b>Commands</b> (<span id="tplCmdCount">0</span>)</summary>
         <div id="tplCommands" style="margin-top:8px"></div></details>
       <details class="help"><summary><b>Events</b> (<span id="tplEvtCount">0</span>)</summary>
         <div id="tplEvents" style="margin-top:8px"></div></details>
       <details class="help"><summary><b>Ranges</b> (<span id="tplRangeCount">0</span>)</summary>
         <div id="tplRanges" style="margin-top:8px"></div>
-        <div class="hint" style="margin-top:6px">A range template is a full snapshot — dice, announce, milestone, its <b>From/To band</b>, in-range commands and event actions. After adding, check its <b>From %</b> / <b>To %</b> in <b>Game → Capacity ranges</b> and adjust if it overlaps an existing band (bands are matched top-down). Custom commands it references must also exist in this config to work.</div></details>
+        <div class="hint" style="margin-top:6px">A range template is a full snapshot — dice, announce, milestone, its <b>From/To band</b>, in-range commands and event actions. <b>End</b> / <b>End Sequence</b> snapshots work too (only one End can exist, so delete the current one before adding). After adding, check its <b>From %</b> / <b>To %</b> in <b>Game → Capacity ranges</b> and adjust if it overlaps an existing band (bands are matched top-down). Custom commands it references must also exist in this config to work.</div></details>
+      <details class="help"><summary><b>Polls</b> (<span id="tplPollCount">0</span>)</summary>
+        <div id="tplPolls" style="margin-top:8px"></div></details>
+      <details class="help"><summary><b>Competitions</b> (<span id="tplCompCount">0</span>)</summary>
+        <div id="tplComps" style="margin-top:8px"></div></details>
+      <details class="help"><summary><b>Capacity Events</b> (<span id="tplCapEvtCount">0</span>)</summary>
+        <div id="tplCapEvts" style="margin-top:8px"></div></details>
     </div>
 
     <!-- system -->
@@ -1099,11 +1115,15 @@ async function listCameras(selected){
 async function startCamera(deviceId){
   stopCamera();
   try{
-    // Default to the FRONT camera on phones (portrait); an explicit deviceId
-    // (desktop multi-cam picker) overrides. facingMode is best-effort.
+    // Default to the REAR camera (the good sensor — parity with the stock camera
+    // app); the dropdown can pick front + Mirror for selfies. ALWAYS request a
+    // high resolution — WITHOUT this the browser hands back ~640×480, which is
+    // why captures used to look terrible. The camera gives the best it supports
+    // up to the ideal; we downscale (never upscale) at snap time.
+    const HD = {width:{ideal:3840}, height:{ideal:2160}};
     const constraints = { audio:false, video: deviceId
-      ? {deviceId:{exact:deviceId}}
-      : {facingMode:{ideal:'user'}, width:{ideal:1280}, height:{ideal:1280}} };
+      ? {deviceId:{exact:deviceId}, ...HD}
+      : {facingMode:{ideal:'environment'}, ...HD} };
     camStream = await navigator.mediaDevices.getUserMedia(constraints);
     $('#camPreview').srcObject = camStream;
     camZoom = 1; const zs=$('#camZoomSlider'); if(zs) zs.value = 1; applyPreviewTransform();
@@ -1147,9 +1167,13 @@ function snapPhoto(){
   // …then centre-crop by the zoom factor.
   const z=Math.max(1, camZoom||1); sw/=z; sh/=z;
   const sx=(vw-sw)/2, sy=(vh-sh)/2;
-  const OUT_W=720, OUT_H=Math.round(OUT_W*16/9);   // 720×1280 portrait
+  // Output at the cropped region's NATIVE resolution (never upscale), capped so
+  // files stay under the 8 MB send limit. ~8× the old hard 720×1280 at best.
+  const MAX_W=2160;
+  const OUT_W=Math.max(1, Math.min(MAX_W, Math.round(sw))), OUT_H=Math.round(OUT_W*16/9);
   const cv=$('#snapCanvas'); cv.width=OUT_W; cv.height=OUT_H;
   const ctx=cv.getContext('2d');
+  ctx.imageSmoothingQuality='high';
   if($('#camMirror').checked){ ctx.translate(OUT_W,0); ctx.scale(-1,1); }
   ctx.drawImage(v, sx, sy, sw, sh, 0, 0, OUT_W, OUT_H);
   cv.toBlob(blob=>{
@@ -1158,7 +1182,7 @@ function snapPhoto(){
     snapBlob=blob; snapBlobUrl=URL.createObjectURL(blob);
     $('#snapImg').src=snapBlobUrl; $('#snapReview').style.display=''; setSnapMsg('📸 snapped — review below');
     $('#snapReview').scrollIntoView({behavior:'smooth', block:'nearest'});
-  }, 'image/jpeg', 0.9);
+  }, 'image/jpeg', 0.92);
 }
 function discardSnap(){
   if(snapBlobUrl){ URL.revokeObjectURL(snapBlobUrl); snapBlobUrl=null; }
@@ -1513,6 +1537,29 @@ async function saveToken(){
     $('#token').value=''; applyState(s, true);
   }catch(e){ toastMsg('⚠ token save failed: '+(e.message||e)); }
 }
+// ---- bot avatar (PFP) ----
+let _pfpFile=null;
+function onPfpPick(input){
+  const f=input.files&&input.files[0];
+  const set=$('#pfpSet'), prev=$('#pfpPreview'), st=$('#pfpState');
+  if(!f){ _pfpFile=null; if(set) set.disabled=true; return; }
+  if(f.size > 8*1024*1024){ if(st) st.textContent='image too big (max 8MB)'; input.value=''; return; }
+  _pfpFile=f;
+  const r=new FileReader(); r.onload=()=>{ if(prev){ prev.src=r.result; prev.style.display=''; } }; r.readAsDataURL(f);
+  if(set) set.disabled=false; if(st) st.textContent='';
+}
+async function setBotAvatar(){
+  if(!_pfpFile) return;
+  const st=$('#pfpState'), btn=$('#pfpSet');
+  if(st) st.textContent='setting…'; if(btn) btn.disabled=true;
+  try{
+    const fd=new FormData(); fd.append('file', _pfpFile);
+    const resp=await fetch('/api/discord/avatar', {method:'POST', body:fd});
+    if(!resp.ok){ if(st) st.textContent='⚠ '+(await resp.text().catch(()=>resp.statusText)); return; }
+    if(st) st.textContent='✓ avatar updated';
+  }catch(e){ if(st) st.textContent='⚠ '+(e.message||e); }
+  finally{ if(btn) btn.disabled=false; }
+}
 let listenTargets = [];    // [{guild_id, guild_name, channel_id, channel_name}]
 async function saveDiscord(){
   const s = await saveCfg({
@@ -1708,6 +1755,7 @@ function renderRanges(){
           `<div class="name">🏁 ${endOnly?'End':'End Sequence'} <span class="muted">(terminates &amp; resets the session)</span></div>`+
           `<div style="flex:1"></div>`+
           (endOnly?'':`<button class="ghost" onclick="toggleRangeExpand(${i})">⚙ Buildup settings ${open?'▾':'▸'}</button>`)+
+          `<button class="ghost" title="Save as template" onclick="saveTemplate('ranges',${i})">💾</button>`+
           `<button class="ghost" onclick="delRange(${i})">✕</button>`+
         `</div>`+
         `<div class="row" style="gap:12px;align-items:flex-end">`+
@@ -2563,6 +2611,7 @@ function renderCapEvents(){
         `<b style="min-width:120px">${esc(e.name||'(unnamed)')}</b>`+
         `<span class="pill" style="padding:2px 10px;font-size:11px">at ${esc(String(e.at??'?'))}%</span>`+
         `<span class="muted" style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(fx)}</span>`+
+        `<button class="ghost" title="Save as template" onclick="event.stopPropagation();saveTemplate('capevents',${i})">💾</button>`+
         `<button class="ghost" title="Delete" onclick="event.stopPropagation();delCapEvent(${i})">✕</button>`+
       `</div>`;
     if(open){
@@ -2630,6 +2679,7 @@ function renderPolls(){
         `<b style="min-width:120px">${esc(p.name||'(unnamed)')}</b>`+
         `<span class="muted" style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(p.title||'')} · ${nopts} option${nopts===1?'':'s'} · ${p.duration??60}s</span>`+
         `<button class="ghost" title="${open?'Collapse':'Edit'}" onclick="togglePollOpen(${i})">${open?'▾':'✏️'}</button>`+
+        `<button class="ghost" title="Save as template" onclick="saveTemplate('polls',${i})">💾</button>`+
         `<button class="ghost" title="Delete" onclick="delPoll(${i})">✕</button>`+
       `</div>`;
     if(open){
@@ -2679,6 +2729,7 @@ function renderCompetitions(){
       `<b style="min-width:120px">${esc(c.name||'(unnamed)')}</b>`+
       `<span class="pill" style="padding:2px 10px;font-size:11px">${esc(typ)}</span>`+
       `<span class="muted" style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(c.command?('!'+c.command):'')} · ${c.duration??60}s</span>`+
+      `<button class="ghost" title="Save as template" onclick="event.stopPropagation();saveTemplate('competitions',${i})">💾</button>`+
       `<button class="ghost" onclick="event.stopPropagation();delCompetition(${i})">✕</button></div>`;
     if(open){
       const cd=c;
@@ -2903,7 +2954,7 @@ function cleanCapEvents(){
 }
 
 // ---- templates (reusable command / event / range snapshots) ----
-let templatesData = {commands:[], events:[], ranges:[]};
+let templatesData = {commands:[], events:[], ranges:[], polls:[], competitions:[], capevents:[]};
 function _tplList(kind){ templatesData[kind]=templatesData[kind]||[]; return templatesData[kind]; }
 // persist just the templates map — DON'T full-applyState (that would reload the
 // editor rows from the server and could revert unsaved command/event edits).
@@ -2944,44 +2995,60 @@ function shiftSet(s, i){ return new Set([...s].filter(x=>x!==i).map(x=>x>i?x-1:x
 function delCommand(i){ const c=commandRows[i]||{}; if(!confirm(`Delete command "${c.name||'(unnamed)'}"? This can't be undone.`)) return; commandRows.splice(i,1); cmdOpen=shiftSet(cmdOpen,i); renderCommands(); renderRanges(); scheduleSave(); }
 function delEvent(i){ const e=eventRows[i]||{}; if(!confirm(`Delete event "${e.name||'(unnamed)'}"? This can't be undone.`)) return; eventRows.splice(i,1); evtOpen=shiftSet(evtOpen,i); renderEvents(); scheduleSave(); }
 function delRange(i){ const r=rangeRows[i]||{}; const lbl = r.is_end ? (r.end_only?'the End point':'the End Sequence') : `the ${r.min}–${r.max}% range`; if(!confirm(`Delete ${lbl}? This can't be undone.`)) return; rangeRows.splice(i,1); rangeExpanded=shiftSet(rangeExpanded,i); renderRanges(); scheduleSave(); }
+// kind → the live editor array it snapshots to/from
+function _tplRows(kind){
+  return {commands:commandRows, events:eventRows, ranges:rangeRows,
+          polls:pollRows, competitions:compRows, capevents:capEvRows}[kind];
+}
+function _tplLabel(kind, o){
+  if(kind==='ranges') return o.is_end ? (o.end_only?'End point':'End Sequence') : `range ${o.min}–${o.max}%`;
+  return o.name||'(unnamed)';
+}
 function saveTemplate(kind, i){
-  const src = kind==='commands'?commandRows[i] : kind==='events'?eventRows[i] : rangeRows[i];
-  if(!src) return;
+  const src=(_tplRows(kind)||[])[i]; if(!src) return;
   _tplList(kind).push(clone(src));
   saveTemplates();
-  const label = kind==='ranges' ? `range ${src.min}–${src.max}%` : (src.name||'item');
-  toastMsg(`💾 Saved ${label} to Templates`);
+  toastMsg(`💾 Saved ${_tplLabel(kind,src)} to Templates`);
 }
 function addTemplateToConfig(kind, idx){
   const tpl=(templatesData[kind]||[])[idx]; if(!tpl) return;
   const copy=clone(tpl);
-  if(kind==='commands'){
-    copy.name=uniqueName(copy.name, new Set(commandRows.map(c=>(c.name||'').toLowerCase())));
-    commandRows.push(copy); renderCommands(); renderRanges(); scheduleSave(); showTab('commands');
-  } else if(kind==='events'){
-    copy.name=uniqueName(copy.name, new Set(eventRows.map(e=>(e.name||'').toLowerCase())));
-    eventRows.push(copy); renderEvents(); scheduleSave(); showTab('events');
-  } else {
+  if(kind==='ranges'){
+    if(copy.is_end && hasEnd()){ toastMsg('⚠ You already have an End — delete it first'); return; }
     rangeRows.push(copy); renderRanges(); scheduleSave(); showTab('game');
-    toastMsg('Range added — set its From/To % in Capacity ranges');
+    toastMsg(copy.is_end?'End added':'Range added — set its From/To % in Capacity ranges');
+    return;
   }
+  const rows=_tplRows(kind);
+  copy.name=uniqueName(copy.name, new Set(rows.map(r=>(r.name||'').toLowerCase())));
+  rows.push(copy);
+  ({commands:renderCommands, events:renderEvents, polls:renderPolls,
+    competitions:renderCompetitions, capevents:renderCapEvents}[kind])();
+  if(kind==='commands') renderRanges();
+  scheduleSave();
+  showTab(kind==='commands'?'commands':'events');
 }
 function removeTemplate(kind, idx){
   const t=(templatesData[kind]||[])[idx]||{};
-  const label = kind==='ranges' ? `range ${t.min??'?'}–${t.max??'?'}%` : (t.name||'(unnamed)');
-  if(!confirm(`Delete template "${label}"? This can't be undone.`)) return;
+  if(!confirm(`Delete template "${_tplLabel(kind,t)}"? This can't be undone.`)) return;
   (templatesData[kind]||[]).splice(idx,1); saveTemplates();
 }
 function renderTemplates(){
-  [['commands','tplCommands','tplCmdCount'],['events','tplEvents','tplEvtCount'],['ranges','tplRanges','tplRangeCount']]
+  [['commands','tplCommands','tplCmdCount'],['events','tplEvents','tplEvtCount'],['ranges','tplRanges','tplRangeCount'],
+   ['polls','tplPolls','tplPollCount'],['competitions','tplComps','tplCompCount'],['capevents','tplCapEvts','tplCapEvtCount']]
   .forEach(([kind,boxId,cntId])=>{
     const box=$('#'+boxId); if(!box) return;
     const list=templatesData[kind]||[];
     const cnt=$('#'+cntId); if(cnt) cnt.textContent=list.length;
-    if(!list.length){ box.innerHTML='<div class="muted">None saved. Use 💾 on a '+kind.slice(0,-1)+' row to save one here.</div>'; return; }
+    if(!list.length){ box.innerHTML='<div class="muted">None saved. Use 💾 on a row to save one here.</div>'; return; }
     box.innerHTML=list.map((t,idx)=>{
-      const label = kind==='ranges' ? `Range ${t.min??'?'}–${t.max??'?'}%` : (t.name||'(unnamed)');
-      const sub = kind==='commands' ? (t.type||'') : kind==='events' ? [t.mode,t.action].filter(Boolean).join(' · ') : ((t.announce||'').replace(/\n/g,' ').slice(0,50));
+      const label = kind==='ranges' ? (t.is_end?(t.end_only?'End point':'End Sequence'):`Range ${t.min??'?'}–${t.max??'?'}%`) : (t.name||'(unnamed)');
+      const sub = kind==='commands' ? (t.type||'')
+        : kind==='events' ? [t.mode,t.action].filter(Boolean).join(' · ')
+        : kind==='competitions' ? (t.type||'')
+        : kind==='capevents' ? (t.at!=null?`at ${t.at}%`:'')
+        : kind==='polls' ? ((t.title||'').slice(0,50))
+        : ((t.announce||t.final_message||'').replace(/\n/g,' ').slice(0,50));
       return `<div class="row" style="gap:10px;align-items:center;margin-bottom:5px">`+
         `<b style="min-width:150px">${esc(label)}</b>`+
         `<span class="muted" style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(sub)}</span>`+
@@ -3358,7 +3425,7 @@ function applyState(st, full){
     if($('#cmdEnter')) $('#cmdEnter').value = (st.command_names||{}).enter||'enter';
     if($('#eventInProcessMsg')) $('#eventInProcessMsg').value = st.event_in_process_message||'';
     if($('#eventCooldownMsg')) $('#eventCooldownMsg').value = st.event_cooldown_message||'';
-    { const t = st.templates || {}; templatesData = {commands:t.commands||[], events:t.events||[], ranges:t.ranges||[]}; }
+    { const t = st.templates || {}; templatesData = {commands:t.commands||[], events:t.events||[], ranges:t.ranges||[], polls:t.polls||[], competitions:t.competitions||[], capevents:t.capevents||[]}; }
     broadcastRows = JSON.parse(JSON.stringify(st.broadcasts||[]));
     // Max Roll Prizes (list) — migrate legacy single prize if the list is empty
     prizeRows = (st.prizes && st.prizes.length) ? JSON.parse(JSON.stringify(st.prizes))

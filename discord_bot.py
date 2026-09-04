@@ -436,6 +436,13 @@ class BotManager:
         out.sort(key=lambda x: x["name"].lower())
         return out
 
+    async def set_avatar(self, data: bytes) -> None:
+        """Set the bot's Discord profile picture. Raises RuntimeError if the bot
+        isn't connected; discord.HTTPException on a rate limit / invalid image."""
+        if not self._client or not self._client.is_ready() or self._client.user is None:
+            raise RuntimeError("the bot isn't connected — connect it first")
+        await self._client.user.edit(avatar=data)
+
     def invite_url(self) -> str | None:
         """OAuth2 invite URL for this bot, once we know its application id."""
         if not self._client or not self._client.is_ready():

@@ -1,6 +1,6 @@
 {
-  "version": "3.29.0",
-  "versionCode": 98,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.29.0/discoflate.apk",
-  "notes": "DiscoFlate v3.29.0 — fix: [!command] tokens in the Activation ON message now actually fire (like they do in every other announced message). The ON message went straight to the channel and skipped inline-command firing; now it fires them and strips the tokens (an ON message that was only [!command] posts nothing)."
+  "version": "3.30.0",
+  "versionCode": 99,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.30.0/discoflate.apk",
+  "notes": "DiscoFlate v3.30.0 — Templates: save Ends/End Sequences, Polls, Competitions & Capacity Events as templates (new Templates sections). Gameplay presets/export now include Bonus Rounds (were being dropped). Discord tab: set the bot's profile picture (avatar). Camera: much higher capture quality — always requests a high resolution (dropdown-picked cameras used to fall back to ~640×480), defaults to the rear camera, and captures at native resolution instead of a hard 720×1280 cap."
 }

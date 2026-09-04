@@ -129,11 +129,12 @@ DEFAULTS = {
     # plain text.
     "rich_output": False,
 
-    # Reusable templates saved from the Commands / Events / Ranges editors, kept per
-    # install (and included in config backup/restore). "Add to Config" ports one
-    # back into the live config with clash-safe naming. Each list holds whole item
-    # objects (a command / event / range).
-    "templates": {"commands": [], "events": [], "ranges": []},
+    # Reusable templates saved from the Commands / Events / Ranges / Polls /
+    # Competitions / Capacity-Events editors, kept per install (and included in
+    # config backup/restore). "Add to Config" ports one back into the live config
+    # with clash-safe naming. Each list holds whole item objects.
+    "templates": {"commands": [], "events": [], "ranges": [],
+                  "polls": [], "competitions": [], "capevents": []},
 
     # Also accept commands via DM to the bot (opt-in). Anyone who shares a
     # server with the bot can DM it, so pair this with the user allowlist.

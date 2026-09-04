@@ -70,6 +70,7 @@ _DEFAULT_LIST_KEYS = {
     "capacity_events": lambda e: ((e.get("name") or "").strip() or str(e.get("at") or "")).lower(),
     "polls": lambda p: (p.get("name") or "").strip().lower(),
     "competitions": lambda c: (c.get("name") or "").strip().lower(),
+    "bonus_rounds": lambda b: (b.get("name") or "").strip().lower(),
     "capacity_ranges": lambda r: f"{r.get('min')}-{r.get('max')}",
     "always_on_commands": lambda a: (a.get("name") if isinstance(a, dict) else str(a) or "").strip().lower(),
 }
@@ -93,7 +94,7 @@ _GAMEPLAY_KEYS = [
     "output_headers", "rich_output",
     "capacity_ranges", "always_on_enabled", "always_on_commands",
     # Events tab
-    "events", "capacity_events", "polls", "competitions",
+    "events", "capacity_events", "polls", "competitions", "bonus_rounds",
     "event_in_process_message", "event_cooldown_message",
     # Templates tab
     "templates",
@@ -108,6 +109,7 @@ _GAMEPLAY_LIST_KEYS = {
     "capacity_events": lambda e: ((e.get("name") or "").strip() or str(e.get("at") or "")).lower(),
     "polls": lambda p: (p.get("name") or "").strip().lower(),
     "competitions": lambda c: (c.get("name") or "").strip().lower(),
+    "bonus_rounds": lambda b: (b.get("name") or "").strip().lower(),
     "capacity_ranges": lambda r: f"{r.get('min')}-{r.get('max')}",
     "always_on_commands": lambda a: (a.get("name") if isinstance(a, dict) else str(a) or "").strip().lower(),
 }
@@ -140,8 +142,11 @@ def _gameplay_merge(cur: dict, incoming: dict, mode: str) -> dict:
         current += [x for x in (inc[k] or []) if keyfn(x) not in have]
         out[k] = current
     if "templates" in inc:
-        t = dict(cur.get("templates") or {"commands": [], "events": [], "ranges": []})
-        for sub in ("commands", "events", "ranges"):
+        t = dict(cur.get("templates") or {})
+        # merge every template kind present in either side (ranges key by band,
+        # everything else by name) so new kinds — polls, competitions, capevents —
+        # merge without a code change here.
+        for sub in set(t) | set(inc["templates"] or {}):
             cl = list(t.get(sub) or [])
             kf = (lambda x: f"{x.get('min')}-{x.get('max')}") if sub == "ranges" \
                 else (lambda x: (x.get("name") or "").strip().lower())
@@ -1088,6 +1093,34 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         channels = len(botmgr._targets(config_store.load()))
         return web.json_response({"ok": True, "channels": channels})
 
+    async def set_avatar(request):
+        await guard(request)
+        reader = await request.multipart()
+        data = b""
+        while True:
+            field = await reader.next()
+            if field is None:
+                break
+            if field.name == "file":
+                while True:
+                    chunk = await field.read_chunk()
+                    if not chunk:
+                        break
+                    data += chunk
+                    if len(data) > 8 * 1024 * 1024:
+                        raise web.HTTPRequestEntityTooLarge(max_size=8 * 1024 * 1024, actual_size=len(data))
+        if not data:
+            raise web.HTTPBadRequest(text="no image received")
+        try:
+            await botmgr.set_avatar(data)
+        except RuntimeError as e:
+            raise web.HTTPBadRequest(text=str(e))
+        except Exception as e:  # noqa: BLE001 — discord HTTPException (rate limit / bad image)
+            engine._log("error", f"set avatar failed: {e}")
+            raise web.HTTPBadRequest(text=f"Discord rejected it ({e}). Avatar changes are rate-limited — wait a bit and try again.")
+        engine._log("bot", "bot avatar updated")
+        return web.json_response({"ok": True})
+
     async def serve_image(request):
         name = os.path.basename(request.match_info["name"])
         fp = os.path.join(IMAGES_DIR, name)
@@ -1121,6 +1154,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/devices/calibration", set_calibration),
         web.post("/api/upload", upload),
         web.post("/api/snapshot", snapshot),
+        web.post("/api/discord/avatar", set_avatar),
         web.post("/api/abort", abort),
         web.post("/api/capacity", set_capacity),
         web.post("/api/reset-users", reset_users),
