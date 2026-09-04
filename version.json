@@ -1,6 +1,6 @@
 {
-  "version": "3.24.0",
-  "versionCode": 93,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.24.0/discoflate.apk",
-  "notes": "DiscoFlate v3.24.0 — competitions expose [results], a full scoreboard of everyone who entered and their final scores (live during a run, final afterward). Win/no-winner announcements now post as rich embed cards. Custom [remaining]/[standings] repeat messages for the in-progress reposts."
+  "version": "3.25.0",
+  "versionCode": 94,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.25.0/discoflate.apk",
+  "notes": "DiscoFlate v3.25.0 — per-range top-pumper tracking with new [leaderboard_range], [range_leader], and [range_leader_score] placeholders, plus a new 'award_prize' action type that grants a target (e.g. [range_leader]) N charges of a command with the cooldown bypassed — so the range leader can, say, fire a progression command 3× back-to-back."
 }

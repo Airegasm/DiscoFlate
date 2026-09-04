@@ -699,7 +699,7 @@
         <li><b>roll</b> — rolls dice and fires for the total. Leave <b>Dice/Sides</b> on <code>rng</code> to use the <i>current range's</i> dice, or pin specific dice (e.g. 2 d 6).</li>
         <li><b>say</b> — text-only reply, no device. Good for lore, hints, or status.</li>
         <li><b>chance</b> — a gamble. Rolls 1–100 against your <b>Chance %</b>; <b>Luck %</b> is a ± chance to force the outcome (positive = force a win, negative = force a miss). A <b>win</b> posts the <b>Success message</b> and fires the <b>🟢 win</b> device rows; a <b>miss</b> posts the <b>Failure message</b> and fires the separate <b>🔴 failure</b> device rows (leave them empty to fire nothing on a miss). Placeholders <code>[roll]</code>, <code>[chance]</code>, <code>[luck]</code>, <code>[secs]</code> work in both. Like every command it's range-gated, cooldownable, and <b>exhaustable</b> (Max/person, set per range).</li>
-        <li><b>actions</b> — a full <b>action sequence</b>, exactly like an event's: add any number of steps by type (<b>message</b> · <b>broadcast</b> a saved preset · <b>fire</b> · <b>roll</b> · <b>capacity</b> add/set · <b>wait</b> · start a <b>poll</b> · start a <b>competition</b> · <b>end_session</b>), executed in order. Fires credit the person who ran it. Use this when one command should do several things — e.g. <i>message → wait 3s → fire → start a competition</i>.</li>
+        <li><b>actions</b> — a full <b>action sequence</b>, exactly like an event's: add any number of steps by type (<b>message</b> · <b>broadcast</b> a saved preset · <b>fire</b> · <b>roll</b> · <b>capacity</b> add/set · <b>wait</b> · start a <b>poll</b> · start a <b>competition</b> · <b>award_prize</b> (grant a target — e.g. <code>[range_leader]</code> — N charges of a command, cooldown bypassed) · <b>end_session</b>), executed in order. Fires credit the person who ran it. Use this when one command should do several things — e.g. <i>message → wait 3s → fire → start a competition</i>.</li>
         <li><b>game-pushluck</b> — a private button minigame: the player presses <b>💨 Pump</b> for points at a rising bust chance (starts at <b>Bust start %</b>, <b>+% / pump</b>) or <b>🏦 Bank</b> to lock in. Bust = 0. You set max pumps + points/pump and the <b>outcome tiers</b> (score → broadcast message + optional pump fire credited to the player).</li>
         <li><b>game-simon</b> — a private memory minigame: the bot shows a growing emoji sequence for <b>Reveal (s)</b>, hides it, and the player repeats it with buttons. Score = rounds survived. Set # symbols + max rounds and the same <b>outcome tiers</b>.</li>
         <li><b>game-balloon</b> (Don't Pop It) — a button grid; reveal safe cells for points, or 🏦 Cash Out before you hit a hidden balloon (pop = 0). Set # cells, # balloons, points/cell. Score = points cashed out.</li>
@@ -905,6 +905,8 @@ esphome dashboard config/</code></pre>
             <tr><td><code>[commands]</code></td><td>all commands usable right now — <b>Capacity Range Commands</b> (this range's customs) on top, <b>System Commands</b> below</td></tr>
             <tr><td><code>[custom_commands]</code></td><td>just the <b>Capacity Range Commands (start%–stop%)</b> header + this range's custom commands (no system commands)</td></tr>
             <tr><td><code>[toppump]</code> / <code>[toppump-all]</code></td><td>the leaderboard blocks — same output as the session / all-time top-pumpers commands, so you can embed a board inside any message</td></tr>
+            <tr><td><code>[leaderboard_range]</code></td><td>the top-pumper board for the <b>current capacity range</b> only (a per-range leaderboard block)</td></tr>
+            <tr><td><code>[range_leader]</code> / <code>[range_leader_score]</code></td><td>the top pumper in the current range and their capacity % pumped this range — use <code>[range_leader]</code> as an <b>award_prize</b> target</td></tr>
             <tr><td><code>[on_message]</code> / <code>[off_message]</code></td><td>the configured Activation ON / OFF message text (rendered), for reuse in other messages</td></tr>
             <tr><td><code>[prefix]</code> <code>[roll_cmd]</code> <code>[capacity_cmd]</code> <code>[leaderboard_cmd]</code> <code>[pumptimer_cmd]</code></td><td>the command names (e.g. <code>!agroll</code>)</td></tr>
             <tr><td><code>[max_roll_goal]</code> <code>[max_roll_command]</code> <code>[max_roll_desc]</code></td><td>the active prize's goal / command / description</td></tr>
@@ -2369,6 +2371,13 @@ function broadcastNameOpts(sel){
     names.map(n=>`<option value="${esc(n)}" ${sel===n?'selected':''}>${esc(n)}</option>`).join('')+
     ((sel&&!names.includes(sel))?`<option value="${esc(sel)}" selected>${esc(sel)} (missing)</option>`:'');
 }
+// Custom-command dropdown for "award_prize" actions (the command being granted).
+function cmdNameOpts(sel){
+  const names = commandRows.map(c=>(c.name||'').trim()).filter(Boolean);
+  return `<option value="">— pick a command —</option>`+
+    names.map(n=>`<option value="${esc(n)}" ${sel===n?'selected':''}>${esc(n)}</option>`).join('')+
+    ((sel&&!names.includes(sel))?`<option value="${esc(sel)}" selected>${esc(sel)} (missing)</option>`:'');
+}
 // Labels of a poll's options, by poll name (for post-event condition dropdowns).
 function pollLabelsByName(name){
   const p = pollRows.find(x=>(x.name||'').trim().toLowerCase()===String(name||'').trim().toLowerCase());
@@ -2393,7 +2402,7 @@ function actionRow(base, rr, j, a, condLabels){
     cond=`<label class="field">Run <select onchange="${T('if_option')}=+this.value;scheduleSave()">${opts}</select></label>`;
   }
   const typeSel = cond + `<label class="field">Action <select onchange="${T('type')}=this.value;${rr}();scheduleSave()">`+
-    ['message','broadcast','fire','roll','capacity','wait','poll','competition','end_session'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`;
+    ['message','broadcast','fire','roll','capacity','wait','poll','competition','award_prize','end_session'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`;
   let fields='';
   if(typ==='fire'||typ==='wait')
     fields += `<label class="field">Seconds <input type="number" min="0" step="0.5" value="${a.seconds??(typ==='wait'?10:3)}" style="width:80px" onchange="${T('seconds')}=+this.value;scheduleSave()"></label>`;
@@ -2411,10 +2420,15 @@ function actionRow(base, rr, j, a, condLabels){
     fields += `<label class="field">Competition <select onchange="${T('competition')}=this.value;scheduleSave()">${compNameOpts(a.competition)}</select></label>`;
   if(typ==='broadcast')
     fields += `<label class="field">Broadcast <select onchange="${T('broadcast')}=this.value;scheduleSave()">${broadcastNameOpts(a.broadcast)}</select></label>`;
+  if(typ==='award_prize')
+    fields += `<label class="field">Target <input value="${esc(a.target||'[range_leader]')}" placeholder="[range_leader]" style="width:150px" onchange="${T('target')}=this.value;scheduleSave()"></label>`+
+      `<label class="field">Command <select onchange="${T('command')}=this.value;scheduleSave()">${cmdNameOpts(a.command)}</select></label>`+
+      `<label class="field">Charges <input type="number" min="0" step="1" value="${a.charges??1}" placeholder="∞" style="width:70px" onchange="${T('charges')}=+this.value;scheduleSave()"></label>`;
   if(typ==='end_session')
     fields += `<span class="muted">ends the session · posts your OFF message ${'⚠ nothing after this runs'}</span>`;
   const msgTypes = {message:'message to post · placeholders work',
     fire:'optional message · [secs] works', roll:'optional message · [secs] works',
+    award_prize:'optional announce · [target] [mention] [bonus_cmd] [charges] work',
     end_session:'optional extra line, posted before your OFF message'};
   const msg = msgTypes[typ]
     ? `<textarea rows="2" placeholder="${msgTypes[typ]}" onchange="${T('message')}=this.value">${esc(a.message||'')}</textarea>` : '';
@@ -2698,6 +2712,8 @@ function cleanActionRows(arr){
     capacity_op:a.capacity_op==='set'?'set':'add', capacity_value:+a.capacity_value||0,
     poll:(a.poll||'').trim()||null, broadcast:(a.broadcast||'').trim()||null,
     competition:(a.competition||'').trim()||null,
+    target:(a.target||'').trim()||null, command:(a.command||'').trim()||null,
+    charges:(a.type==='award_prize'&&a.charges==null)?1:(a.charges>0?+a.charges:0),
     if_option:(a.if_option>0)?+a.if_option:null}));
 }
 function cleanPolls(){

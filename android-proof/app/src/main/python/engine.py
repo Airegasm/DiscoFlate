@@ -105,6 +105,10 @@ class Engine:
         # session reset). The 'progression lock' freezes everyone else's
         # capacity gains until the winner uses their granted command.
         self._winner_grants: dict[str, str] = {}
+        # award_prize charges: cmdkey -> remaining uses. A key present here caps a
+        # grant to N uses (each use spends one; grant is revoked at 0). Absent =
+        # unlimited (competition winner grants and award_prize charges<=0).
+        self._grant_charges: dict[str, int] = {}
         self._progression_lock: dict | None = None   # {"uid":.., "cmd":..} or None
         self._inline_depth: int = 0                  # recursion guard for [!command] inline fires
         # Winner idle deadline: if the winner doesn't use their granted command
@@ -119,6 +123,10 @@ class Engine:
         self._perfect: dict[str, int] = {}       # uid -> perfect-roll count
         self._prize_uses: dict[str, int] = {}    # uid -> remaining uses (present = unlocked)
         self._pump_time: dict[str, dict] = {}    # uid -> {name, seconds, capacity} (session leaderboard)
+        # Per-range leaderboards: (min,max) -> {uid: {name, seconds, capacity}}.
+        # Same shape as _pump_time but scoped to the range the pump landed in, for
+        # [leaderboard_range]/[range_leader]. In-memory; cleared on session reset.
+        self._pump_range: dict[tuple, dict[str, dict]] = {}
         # Lifetime (all-time) leaderboard — persisted to data/, survives session
         # resets AND app restarts. Separate from the per-session _pump_time above.
         self._pump_life: dict[str, dict] = self._load_lifetime()
@@ -413,6 +421,11 @@ class Engine:
         ctx["winner_score"] = f"{self._last_winner_score:g}" if self._last_winner else ""
         # live scoreboard during a competition, else the last competition's final results
         ctx["results"] = self._comp_results() if self._comp is not None else self._last_results
+        # per-range top-pumper board for the current capacity band
+        rl_uid, rl_name, rl_score = self.range_leader()
+        ctx["leaderboard_range"] = self.range_board_text()
+        ctx["range_leader"] = rl_name
+        ctx["range_leader_score"] = f"{rl_score:.1f}" if rl_uid else ""
         pz = self.active_prize() or {}
         ctx["max_roll_goal"] = pz.get("goal") if pz.get("goal") not in (None, "") else ""
         ctx["max_roll_command"] = f"{prefix}{(pz.get('command') or '').strip()}" if pz.get("command") else ""
@@ -1036,6 +1049,40 @@ class Engine:
                         await self._announce(self._evt_hdr(hdr) + self.render(extra), None)
                     await self.end_session(source=name)
                     break
+                if typ == "award_prize":
+                    # Grant a target user a bonus command they can run N times
+                    # (bypassing cooldown/lock/range), e.g. the range leader gets
+                    # to fire a progression command 3× back-to-back.
+                    bkey = (a.get("command") or "").strip().lower()
+                    cmd = self.find_command(bkey) if bkey else None
+                    if cmd is None:
+                        self._log("error", f"{name}: award_prize — no command '{a.get('command')}'")
+                        continue
+                    uid_t, who_t = self._resolve_award_target(a.get("target"))
+                    if uid_t is None:
+                        self._log("bot", f"{name}: award_prize — no target for '{a.get('target')}', skipped")
+                        continue
+                    try:
+                        charges = int(a.get("charges") or 0)
+                    except (TypeError, ValueError):
+                        charges = 0
+                    self._winner_grants[bkey] = str(uid_t)
+                    self._winner_grants[bkey + "\x00stash"] = "1"   # survives range changes; charges are the limit
+                    if charges > 0:
+                        self._grant_charges[bkey] = charges
+                    else:
+                        self._grant_charges.pop(bkey, None)   # 0/blank → unlimited until session reset
+                    self._log("bot", f"{name}: awarded !{bkey} to {who_t} "
+                                     f"({'∞' if charges <= 0 else charges} charges)")
+                    msg = (a.get("message") or "").strip()
+                    if msg:
+                        prefix = self.cfg.get("command_prefix", "!")
+                        await self._announce(self._evt_hdr(hdr) + self.render(msg, {
+                            "winner": who_t, "target": who_t,
+                            "mention": self._mention(uid_t, who_t),
+                            "bonus_cmd": f"{prefix}{bkey}",
+                            "charges": ("∞" if charges <= 0 else str(charges))}), None)
+                    continue
                 if typ in ("fire", "roll"):
                     target = a.get("device_id") or self._active_id()
                     if self._device(target) is None:
@@ -1683,12 +1730,14 @@ class Engine:
         """Range change clears range-locked grants; session reset clears all."""
         if all_incl_stash:
             self._winner_grants.clear()
+            self._grant_charges.clear()
             self._progression_lock = None
             self._cancel_deadline()
             return
         for k in [k for k in self._winner_grants if not k.endswith("\x00stash")]:
             if (k + "\x00stash") not in self._winner_grants:   # not stashable → range-scoped
                 self._winner_grants.pop(k, None)
+                self._grant_charges.pop(k, None)
         # a cleared progression-lock command means the lock lifts too
         if self._progression_lock and self._progression_lock["cmd"] not in self._winner_grants:
             self._progression_lock = None
@@ -1954,7 +2003,10 @@ class Engine:
             pct = seconds / float(cal) * 100.0 if cal else 0.0
         except (TypeError, ValueError):
             pct = 0.0
-        for board in (self._pump_time, self._pump_life):
+        r = self.range_for(self.capacity)
+        rkey = (r.get("min"), r.get("max"))
+        range_board = self._pump_range.setdefault(rkey, {})
+        for board in (self._pump_time, self._pump_life, range_board):
             rec = board.setdefault(str(uid), {"name": who, "seconds": 0.0, "capacity": 0.0})
             rec["name"] = who
             rec["seconds"] += float(seconds)
@@ -2044,6 +2096,65 @@ class Engine:
     def leaderboard_life_text(self) -> str:
         return self._format_board(self._pump_life.values(), "***ALL-TIME TOP PUMPERS***",
                                   "Nobody has pumped yet.")
+
+    # -- per-range leaderboards (current capacity band) ---------------------- #
+    def _range_board(self, key=None) -> dict:
+        """The {uid: rec} pump board for the given range key, or the current
+        range if none is given (empty dict if nobody's pumped it yet)."""
+        if key is None:
+            r = self.range_for(self.capacity)
+            key = (r.get("min"), r.get("max"))
+        return self._pump_range.get(key, {})
+
+    def range_leader(self):
+        """(uid, name, capacity%) of the top pumper in the CURRENT range, or
+        (None, "", 0.0) if nobody's pumped it yet. Ranked by seconds to match
+        the board's #1; the score reported is their capacity contribution."""
+        board = self._range_board()
+        if not board:
+            return (None, "", 0.0)
+        uid, rec = max(board.items(), key=lambda kv: kv[1].get("seconds", 0.0))
+        return (str(uid), rec.get("name") or "?", float(rec.get("capacity") or 0.0))
+
+    def range_board_text(self) -> str:
+        return self._format_board(self._range_board().values(),
+                                  f"***TOP PUMPERS — {self._range_label()}***",
+                                  "Nobody has pumped this range yet.")
+
+    def _resolve_award_target(self, target: str):
+        """Resolve an award_prize target string to (uid, name). Supports the
+        [range_leader] token (the current range's top pumper), [winner] (the
+        most recent competition winner), a raw <@id>/numeric mention, or a
+        known session pumper's name. Returns (None, "") if unresolvable."""
+        t = (target or "").strip()
+        if not t:
+            return (None, "")
+        low = t.lower()
+        if "[range_leader]" in low or low in ("range_leader", "range leader"):
+            uid, nm, _ = self.range_leader()
+            return (uid, nm) if uid else (None, "")
+        if "[winner]" in low or low == "winner":
+            # match the last competition winner's name to a known uid
+            wname = (self._last_winner or "").strip().lower()
+            if wname:
+                for board in (self._pump_time, self._users):
+                    for uid, rec in board.items():
+                        if (rec.get("name") or "").strip().lower() == wname:
+                            return (str(uid), rec.get("name"))
+                return (None, self._last_winner)   # name known, uid not → no grantable target
+            return (None, "")
+        m = re.search(r"\d{5,}", t)   # raw <@123>/<@!123>/bare id
+        if m:
+            uid = m.group(0)
+            for board in (self._users, self._pump_time):
+                if uid in board:
+                    return (uid, board[uid].get("name") or t)
+            return (uid, t)
+        for board in (self._pump_time, self._users):   # match a known name
+            for uid, rec in board.items():
+                if (rec.get("name") or "").strip().lower() == low:
+                    return (str(uid), rec.get("name"))
+        return (None, "")
 
     def help_text(self, prefix: str) -> str:
         return "Available commands:\n" + self._commands_str(prefix)
@@ -2168,11 +2279,20 @@ class Engine:
             if self._progression_lock and self._progression_lock.get("cmd") == cmdkey0:
                 self._progression_lock = None
                 self._log("bot", "progression lock lifted — winner used their command")
+            # award_prize charges: each accepted use spends one; when they run
+            # out the grant (and its stash marker) is revoked so it re-locks.
+            if cmdkey0 in self._grant_charges:
+                self._grant_charges[cmdkey0] -= 1
+                if self._grant_charges[cmdkey0] <= 0:
+                    self._grant_charges.pop(cmdkey0, None)
+                    self._winner_grants.pop(cmdkey0, None)
+                    self._winner_grants.pop(cmdkey0 + "\x00stash", None)
         capev_enabled = cmdkey0 in self._capev_enabled_cmds() or winner_granted
         # Capacity-event gate (chat only — uid is None for range-start/system
         # calls). An event's enable-list wins over its own disables AND over
-        # range membership; normal ranges yield to capacity events here.
-        if uid is not None and self._capev_cmd_blocked(cmdkey0):
+        # range membership; normal ranges yield to capacity events here. A
+        # granted command (competition/award prize) overrides even a capev block.
+        if uid is not None and not winner_granted and self._capev_cmd_blocked(cmdkey0):
             return {"ok": False, "silent": True}
         if not self.cmd_enabled_in_range(cmdkey0) and not capev_enabled:
             return {"ok": False, "silent": True}  # not a member of the current range → ignore quietly
@@ -2185,8 +2305,10 @@ class Engine:
                 and typ in ("fire", "roll", "chance")):
             return {"ok": False, "silent": True}
         # The owner is never limited by cooldowns or per-person max-uses (they're
-        # still subject to the in-progress event guard).
-        owner_exempt = uid is not None and self._is_exempt(uid, who)
+        # still subject to the in-progress event guard). A granted command runs
+        # under the same exemption so a prize's charges are the ONLY limit — e.g.
+        # 3 back-to-back rolls with the cooldown bypassed.
+        owner_exempt = (uid is not None and self._is_exempt(uid, who)) or winner_granted
         # Per-person session use budget (carries across ranges, never replenishes).
         cmdkey_uses = name.lower()
         left = self.cmd_uses_left(uid, cmdkey_uses) if (uid is not None and not owner_exempt) else None
@@ -2935,6 +3057,7 @@ class Engine:
         self._perfect.clear()
         self._prize_uses.clear()
         self._pump_time.clear()
+        self._pump_range.clear()
         self._cmd_uses.clear()
         self._last_fired.clear()
         self._last_poll_winner = None

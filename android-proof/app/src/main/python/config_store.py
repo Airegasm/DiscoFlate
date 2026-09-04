@@ -262,8 +262,12 @@ DEFAULTS = {
     #    disable_always_on, disable_always_on_scope,
     #    pause_events, pause_events_scope,
     #    enable_commands_on, enable_commands: [names],   # usable during the event regardless
-    #    actions: [{type: message|fire|roll|capacity|wait, message, seconds,
-    #               device_id, dice, sides, capacity_op, capacity_value}]}
+    #    actions: [{type: message|broadcast|fire|roll|capacity|wait|poll|
+    #               competition|award_prize|end_session, message, seconds,
+    #               device_id, dice, sides, capacity_op, capacity_value,
+    #               poll, broadcast, competition,
+    #               target, command, charges}]}   # award_prize: grant a target
+    #               (e.g. [range_leader]) N charges of a command
     # The action block runs sequentially; the event is "running" (its effects
     # active) until the block finishes. One-shot per session (re-armed by
     # session reset / activation).
@@ -371,6 +375,7 @@ DEFAULTS = {
 _NUM_FIELDS = {
     "seconds", "dice", "sides", "chance", "luck", "every", "max_repeats",
     "capacity_value", "cooldown", "goal", "uses", "min", "max", "max_uses",
+    "charges",
     "pl_bust_start", "pl_bust_step", "pl_max_pumps", "pl_points",
     "sm_symbols", "sm_max_rounds", "sm_reveal",
     "bl_cells", "bl_pops", "bl_points", "rps_wins", "sl_symbols",
