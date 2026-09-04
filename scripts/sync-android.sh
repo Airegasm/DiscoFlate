@@ -8,7 +8,8 @@ PY_DST=android-proof/app/src/main/python
 ASSETS=android-proof/app/src/main/assets
 
 PY_FILES=(app.py config_store.py device_control.py discord_bot.py engine.py
-          kasa_legacy.py minigames.py pumpdirect_import.py version.json)
+          kasa_legacy.py minigames.py pumpdirect_import.py version.json
+          default_preset.json)
 
 check_only=false
 [ "${1:-}" = "--check" ] && check_only=true

@@ -134,6 +134,13 @@
   .ctrlrow .ctrlfield select{width:64px}            /* small dice/sides dropdowns */
   .ctrlrow .ctrlfield input{width:90px}             /* numeric inputs (uniform) */
   @media(max-width:520px){ .ctrlrow{grid-template-columns:140px 1fr} select.ctrlfield{width:100%} }
+  /* one universal manual-save bar, fixed to the bottom of every page (autosave
+     already persists everything — this is a redundant belt-and-suspenders). */
+  #saveBar{position:fixed;left:0;right:0;bottom:0;z-index:9990;display:flex;gap:12px;
+    align-items:center;justify-content:center;padding:8px;background:var(--panel);
+    border-top:1px solid var(--line);box-shadow:0 -2px 8px rgba(0,0,0,.18)}
+  #saveBar button{min-width:180px}
+  body{padding-bottom:58px}
 </style>
 </head>
 <body>
@@ -296,7 +303,6 @@
           <div class="hint" style="margin-top:0">When a trigger is echoed to your other servers, DiscoFlate shows the person's <b>real name</b> in any server they're actually a member of (they'd be visible there anyway), and falls back to this label only in servers they're not in.</div>
 
           <div class="row" style="margin-top:4px">
-            <button onclick="saveDiscord()">Save Discord settings</button>
             <span class="muted" id="listenState"></span>
           </div>
         </div>
@@ -412,7 +418,7 @@
             <input id="pausedNoticeMsg" placeholder="⏸️ [mention], the session is paused…"></label>
         </div>
       </div>
-      <div class="row" style="margin-top:12px"><button onclick="saveAutomation()">Save</button>
+      <div class="row" style="margin-top:12px">
         <span class="muted">Placeholders: <code>[capacity] [capacity_bar] [commands]</code> … see <b>Help</b>. Enter = newline.</span></div>
     </div>
 
@@ -443,9 +449,7 @@
         <button class="ghost" onclick="addRange()">+ Add range</button>
         <button class="ghost" onclick="addEndSequence()" title="A buildup range that ends & resets the session at its End threshold">+ Add End Sequence</button>
         <button class="ghost" onclick="addEnd()" title="Just the terminal threshold — ends & resets when capacity reaches it (no buildup)">+ Add End</button>
-        <button class="warn" onclick="restoreDefaults()">↻ Restore Default Config</button>
         <div style="flex:1"></div>
-        <button onclick="saveRanges()">Save ranges</button>
       </div>
       <div class="hint"><b>Announce</b> shows with roll/capacity while in the range · <b>Milestone</b>/<b>Image</b> post
         once on reaching it. <b>⚙ Per-command settings</b> sets each command's dice (roll), enabled toggle, cooldown &amp; scope,
@@ -498,7 +502,6 @@
           <div class="row" style="margin-top:8px">
             <button class="ghost" onclick="addPrize()">+ Add prize</button>
             <div style="flex:1"></div>
-            <button onclick="savePrizes()">Save prizes</button>
           </div>
         </div>
       </div>
@@ -510,9 +513,7 @@
       <div id="commands"></div>
       <div class="row" style="margin-top:10px">
         <button class="ghost" onclick="addCommand()">+ Add command</button>
-        <button class="warn" onclick="restoreDefaults()">↻ Restore Default Config</button>
         <div style="flex:1"></div>
-        <button onclick="saveCommands()">Save commands</button>
       </div>
       <div class="hint"><b>fire</b> = active device on for fixed seconds (+ optional <b>Add Device Fire</b> rows for extra devices). <b>roll</b> = roll dice (blank dice/sides
         uses the current capacity range) and fire for the total. <b>say</b> = text-only reply, no device.
@@ -529,7 +530,6 @@
       <div class="row" style="margin-top:10px">
         <button class="ghost" onclick="addBroadcast()">+ Add broadcast</button>
         <div style="flex:1"></div>
-        <button onclick="saveBroadcasts()">Save broadcasts</button>
       </div>
       <div class="hint">Preset messages you can fire from the <b>Dashboard → Controls</b> (“Broadcast Custom”). Placeholders work (<code>[capacity]</code>, <code>[operator]</code>, …). Posted to your channel as the owner.</div>
     </div>
@@ -541,7 +541,6 @@
       <div class="row" style="margin-top:10px">
         <button class="ghost" onclick="addMode()">+ Add mode</button>
         <div style="flex:1"></div>
-        <button onclick="saveModes()">Save modes</button>
       </div>
       <div class="hint">A mode's switch enables/disables all its <b>commands and events</b> at once. Fill On/Off messages to
         announce the change in the announce channel, or leave them blank to toggle quietly. Save a mode before
@@ -554,9 +553,7 @@
       <div id="events"></div>
       <div class="row" style="margin-top:10px">
         <button class="ghost" onclick="addEvent()">+ Add event</button>
-        <button class="warn" onclick="restoreDefaults()">↻ Restore Default Config</button>
         <div style="flex:1"></div>
-        <button onclick="saveEvents()">Save events</button>
       </div>
       <div class="row" style="gap:16px;align-items:flex-start;margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
         <label class="field" style="flex:1">“In process” message <span class="muted">(a command tried to start a running event)</span>
@@ -583,7 +580,6 @@
       <div class="row" style="margin-top:10px">
         <button class="ghost" onclick="addCapEvent()">+ Add capacity event</button>
         <div style="flex:1"></div>
-        <button onclick="saveEvents()">Save events</button>
       </div>
       <div class="hint" style="max-width:860px"><b>During the event</b> = while its action block is running (actions execute in order; use <b>wait</b> to shape timing). Effects with the <i>Until Event Completes / For Session Remainder</i> choice either lift when the block finishes or stick until the session resets. <b>Disable</b> effects apply to <b>chat commands only</b> — dashboard controls still work. The <b>Enable</b> list wins over everything, including range membership.</div>
       </details>
@@ -602,7 +598,6 @@
       <div class="row" style="margin-top:10px">
         <button class="ghost" onclick="addPoll()">+ Add poll</button>
         <div style="flex:1"></div>
-        <button onclick="saveEvents()">Save events</button>
       </div>
       </details>
     </div>
@@ -620,7 +615,6 @@
       <div class="row" style="margin-top:10px">
         <button class="ghost" onclick="addCompetition()">+ Add competition</button>
         <div style="flex:1"></div>
-        <button onclick="saveEvents()">Save events</button>
       </div>
       </details>
 
@@ -630,7 +624,6 @@
       <div class="row" style="margin-top:10px">
         <button class="ghost" onclick="addBonusRound()">+ Add bonus round</button>
         <div style="flex:1"></div>
-        <button onclick="saveEvents()">Save events</button>
       </div>
       </details>
     </div>
@@ -668,13 +661,14 @@
       </div>
 
       <details class="help" style="margin-top:16px"><summary><b style="font-size:1.02rem">📦 Gameplay Presets</b></summary>
-        <div class="hint" style="margin-top:8px;max-width:860px">Saved snapshots of your whole <b>Game, Commands, Events &amp; Templates</b> — swap between whole setups instantly. Your ongoing edits autosave to the <b>live</b> config as always; a preset only changes when you <b>Save</b> or <b>Update</b> it. Presets never include your token, devices, or server settings, so preset files are safe to share.</div>
+        <div class="hint" style="margin-top:8px;max-width:860px">Saved snapshots of your whole <b>Game, Commands, Events &amp; Templates</b> — swap between whole setups instantly. Your ongoing edits autosave to the <b>live</b> config as always; a preset only changes when you <b>Save</b> or <b>Update</b> it. Presets never include your token, devices, or server settings, so preset files are safe to share. <b>Defaults (built-in)</b> is the shipped starter setup — load it any time; it can't be edited, renamed, or deleted.</div>
         <div class="row" style="margin-top:10px;gap:8px;align-items:center;flex-wrap:wrap">
           <button onclick="presetSaveCurrent()">💾 Save Current to Preset</button>
           <div style="flex-basis:100%;height:0"></div>
           <select id="presetSel" style="min-width:200px"></select>
           <button class="ghost" onclick="presetLoad()">▶ Load</button>
           <button class="ghost" onclick="presetUpdate()">⟳ Update</button>
+          <button class="ghost" title="Rename this preset" onclick="presetRename()">✏️</button>
           <button class="ghost" onclick="presetExport()">⬇ Export</button>
           <button class="ghost bad" onclick="presetDelete()">✕</button>
         </div>
@@ -1041,6 +1035,11 @@ esphome dashboard config/</code></pre>
 </div>
 
 <div id="appfooter" style="text-align:center;padding:14px 8px 24px;color:var(--dim);font-size:12px;opacity:.75">© 2026 AireGasm</div>
+
+<div id="saveBar">
+  <button onclick="saveAllNow()" title="Everything autosaves as you edit — this is a manual, save-everything safety">💾 Save all</button>
+  <span class="muted" id="saveBarStatus"></span>
+</div>
 
 <script>
 const $ = s => document.querySelector(s);
@@ -1409,12 +1408,13 @@ function delRemoteIp(i){
   remoteIps.splice(i,1); saveRemoteAccess();
 }
 
-// ---- restore defaults + check for updates ----
-async function restoreDefaults(){
-  if(!confirm("Top up with the shipped defaults?\n\nADDS any default commands, games, ranges, events & system-command names you're missing. Your existing commands/ranges/events — including edited defaults and your own — are KEPT, never overwritten.\n\nThe default message templates (capacity/cooldown/roll replies) DO reset. Token, devices, and server settings are untouched. Continue?")) return;
-  try{ applyState(await api('/api/restore-defaults', {}), true); }
-  catch(e){ alert('Restore failed: '+(e.message||e)); }
+// ---- universal manual save (everything autosaves; this is a redundant safety) ----
+async function saveAllNow(){
+  const st=$('#saveBarStatus'); if(st){ st.textContent='saving…'; st.style.color='var(--dim)'; }
+  try{ await doSave(); if(st){ st.textContent='saved ✓'; st.style.color='var(--accent2)'; clearTimeout(st._t); st._t=setTimeout(()=>{if(st)st.textContent='';},2000); } }
+  catch(e){ if(st){ st.textContent='⚠ save failed'; st.style.color='var(--bad)'; } }
 }
+// ---- check for updates ----
 let updApkUrl='';
 async function checkUpdates(){
   const m=$('#updMsg'), act=$('#updAction'), hint=$('#updHint');
@@ -1492,10 +1492,13 @@ function renderPresets(){
                                      : `<option value="">(no presets yet)</option>`;
   if(prev && presetNames.includes(prev)) sel.value=prev;
 }
+const BUILTIN_PRESET='Defaults (built-in)';
+function isBuiltinPreset(n){ return (n||'').trim().toLowerCase()===BUILTIN_PRESET.toLowerCase(); }
 async function presetCall(body){ return api('/api/gameplay/preset', body); }
 async function presetSaveCurrent(){
   const name=(prompt('Name this preset (saves your current Game/Commands/Events/Templates):')||'').trim();
   if(!name) return;
+  if(isBuiltinPreset(name)){ setPresetMsg('that name is reserved for the built-in preset'); return; }
   flushSave();   // make sure pending edits are in the live config before snapshotting
   try{ applyState(await presetCall({action: (presetNames.map(n=>n.toLowerCase()).includes(name.toLowerCase())?'update':'save'), name}), true);
        setPresetMsg('saved preset “'+name+'” ✓'); $('#presetSel').value=name; }
@@ -1509,13 +1512,24 @@ async function presetLoad(){
 }
 async function presetUpdate(){
   const name=$('#presetSel').value; if(!name) return;
+  if(isBuiltinPreset(name)){ setPresetMsg('the built-in Defaults preset is read-only'); return; }
   if(!confirm(`Overwrite preset “${name}” with your current settings?`)) return;
   flushSave();
   try{ applyState(await presetCall({action:'update', name}), true); setPresetMsg('updated “'+name+'” ✓'); }
   catch(e){ setPresetMsg('update failed: '+(e.message||e)); }
 }
+async function presetRename(){
+  const name=$('#presetSel').value; if(!name) return;
+  if(isBuiltinPreset(name)){ setPresetMsg('the built-in Defaults preset is read-only'); return; }
+  const nn=(prompt(`Rename preset “${name}” to:`, name)||'').trim();
+  if(!nn || nn===name) return;
+  if(isBuiltinPreset(nn)){ setPresetMsg('that name is reserved for the built-in preset'); return; }
+  try{ applyState(await presetCall({action:'rename', name, new_name:nn}), true); setPresetMsg('renamed to “'+nn+'” ✓'); $('#presetSel').value=nn; }
+  catch(e){ setPresetMsg('rename failed: '+(e.message||e)); }
+}
 async function presetDelete(){
   const name=$('#presetSel').value; if(!name) return;
+  if(isBuiltinPreset(name)){ setPresetMsg('the built-in Defaults preset is read-only'); return; }
   if(!confirm(`Delete preset “${name}”? This can't be undone (your live setup is unaffected).`)) return;
   try{ applyState(await presetCall({action:'delete', name}), true); setPresetMsg('deleted “'+name+'”'); }
   catch(e){ setPresetMsg('delete failed: '+(e.message||e)); }

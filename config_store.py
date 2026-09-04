@@ -447,6 +447,20 @@ def _deep_merge(base: dict, patch: dict) -> dict:
     return out
 
 
+_FACTORY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "default_config.json")
+
+
+def _factory_seed() -> dict:
+    """The shipped factory config (Basic Session preloaded) — used to pre-fill a
+    brand-new install's fields. Empty dict if it isn't bundled."""
+    try:
+        with open(_FACTORY_PATH, "r", encoding="utf-8") as fh:
+            d = json.load(fh)
+        return d if isinstance(d, dict) else {}
+    except (FileNotFoundError, ValueError, OSError):
+        return {}
+
+
 def load() -> dict:
     global RECOVERED_FROM
     os.makedirs(DATA_DIR, exist_ok=True)
@@ -456,7 +470,7 @@ def load() -> dict:
         if not isinstance(stored, dict):
             raise ValueError(f"config root is a {type(stored).__name__}, expected an object")
     except FileNotFoundError:
-        stored = {}
+        stored = _factory_seed()   # first run → start pre-loaded with the factory config
     except ValueError as e:
         # Corrupt config: NEVER run silently on defaults — the next save would
         # make the wipe permanent. Move the bad file aside for recovery and

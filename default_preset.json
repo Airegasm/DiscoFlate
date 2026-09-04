@@ -1,0 +1,2264 @@
+{
+  "command_prefix": "!",
+  "command_names": {
+    "roll": "agroll",
+    "capacity": "agcap",
+    "help": "aghelp",
+    "leaderboard": "agtop",
+    "leaderboard_life": "agtop-all",
+    "pumptimer": "agtime",
+    "vote": "agvote"
+  },
+  "roll": {
+    "mode": "value",
+    "factor": 1,
+    "min_seconds": 1,
+    "max_seconds": 100,
+    "disable_at_100": false,
+    "reply": "\ud83c\udfb2 [mention] rolled **[dice]** and they landed on **[result]**\n**[secs]** seconds have been added to the pump timer, and will increase  [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+  },
+  "roll_enabled": true,
+  "system_buffer_seconds": 8,
+  "capacity_message": "[announce] - Current Capacity: **[capacity]%**\n[capacity_bar]",
+  "pumptimer_message": "\u23f1\ufe0f [timer] seconds left on the pump timer.",
+  "pump_message": "**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+  "cooldown_message": "\u23f3 [mention], [cmd] is on cooldown \u2014 [cooldown]s left until you can use it again.",
+  "cooldown_reset_message": "",
+  "commands": [
+    {
+      "name": "fill",
+      "type": "fire",
+      "seconds": 35,
+      "dice": null,
+      "sides": null,
+      "reply": "\ud83d\udca8 [mention] used [prefix]fill - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+      "enabled": true,
+      "owner_only": false,
+      "device_id": null,
+      "start_events": [],
+      "range_gate": "0-20",
+      "description": "fill those guts a bit more",
+      "hide_in_list": false,
+      "mention": false,
+      "react_only": false,
+      "react_emoji": "",
+      "poll": null,
+      "fires": [],
+      "fail_fires": [],
+      "chance": null,
+      "luck": null,
+      "success_reply": "",
+      "failure_reply": "",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "sl_symbols": 6,
+      "game_intro": "",
+      "game_tiers": []
+    },
+    {
+      "name": "inflate",
+      "type": "fire",
+      "seconds": 30,
+      "dice": null,
+      "sides": null,
+      "reply": "\ud83d\udca8 [mention] used [prefix]inflate - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+      "enabled": true,
+      "owner_only": false,
+      "device_id": null,
+      "start_events": [],
+      "range_gate": "20-40",
+      "description": "inflate a little further",
+      "hide_in_list": false,
+      "mention": false,
+      "react_only": false,
+      "react_emoji": "",
+      "poll": null,
+      "fires": [],
+      "fail_fires": [],
+      "chance": null,
+      "luck": null,
+      "success_reply": "",
+      "failure_reply": "",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "sl_symbols": 6,
+      "game_intro": "",
+      "game_tiers": []
+    },
+    {
+      "name": "pump",
+      "type": "fire",
+      "seconds": 25,
+      "dice": null,
+      "sides": null,
+      "reply": "\ud83d\udca8 [mention] used [prefix]pump - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+      "enabled": true,
+      "owner_only": false,
+      "device_id": null,
+      "start_events": [],
+      "range_gate": "40-60",
+      "description": "a steady pump of air",
+      "hide_in_list": false,
+      "mention": false,
+      "react_only": false,
+      "react_emoji": "",
+      "poll": null,
+      "fires": [],
+      "fail_fires": [],
+      "chance": null,
+      "luck": null,
+      "success_reply": "",
+      "failure_reply": "",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "sl_symbols": 6,
+      "game_intro": "",
+      "game_tiers": []
+    },
+    {
+      "name": "squeeze",
+      "type": "fire",
+      "seconds": 20,
+      "dice": null,
+      "sides": null,
+      "reply": "\ud83d\udca8 [mention] used [prefix]squeeze - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+      "enabled": true,
+      "owner_only": false,
+      "device_id": null,
+      "start_events": [],
+      "range_gate": "60-80",
+      "description": "a firm squeeze of air",
+      "hide_in_list": false,
+      "mention": false,
+      "react_only": false,
+      "react_emoji": "",
+      "poll": null,
+      "fires": [],
+      "fail_fires": [],
+      "chance": null,
+      "luck": null,
+      "success_reply": "",
+      "failure_reply": "",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "sl_symbols": 6,
+      "game_intro": "",
+      "game_tiers": []
+    },
+    {
+      "name": "tease",
+      "type": "fire",
+      "seconds": 15,
+      "dice": null,
+      "sides": null,
+      "reply": "\ud83d\udca8 [mention] used [prefix]tease - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+      "enabled": true,
+      "owner_only": false,
+      "device_id": null,
+      "start_events": [],
+      "range_gate": "80-90",
+      "description": "a careful teasing puff",
+      "hide_in_list": false,
+      "mention": false,
+      "react_only": false,
+      "react_emoji": "",
+      "poll": null,
+      "fires": [],
+      "fail_fires": [],
+      "chance": null,
+      "luck": null,
+      "success_reply": "",
+      "failure_reply": "",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "sl_symbols": 6,
+      "game_intro": "",
+      "game_tiers": []
+    },
+    {
+      "name": "topup",
+      "type": "fire",
+      "seconds": 5,
+      "dice": null,
+      "sides": null,
+      "reply": "\ud83d\udca8 [mention] used [prefix]topup - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+      "enabled": true,
+      "owner_only": false,
+      "device_id": null,
+      "start_events": [],
+      "range_gate": "90-100",
+      "description": "the tiniest top-up",
+      "hide_in_list": false,
+      "mention": false,
+      "react_only": false,
+      "react_emoji": "",
+      "poll": null,
+      "fires": [],
+      "fail_fires": [],
+      "chance": null,
+      "luck": null,
+      "success_reply": "",
+      "failure_reply": "",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "sl_symbols": 6,
+      "game_intro": "",
+      "game_tiers": []
+    },
+    {
+      "name": "agtoss",
+      "type": "chance",
+      "seconds": null,
+      "dice": null,
+      "sides": null,
+      "reply": "",
+      "enabled": true,
+      "owner_only": false,
+      "device_id": null,
+      "start_events": [],
+      "range_gate": "all",
+      "description": "flip a coin",
+      "hide_in_list": false,
+      "mention": false,
+      "react_only": false,
+      "react_emoji": "",
+      "poll": null,
+      "fires": [],
+      "fail_fires": [],
+      "chance": 50,
+      "luck": null,
+      "success_reply": "[mention] took a chance on a coin flip... - [user] can use this command [cmd_remain] more times.\n**SUCCESS!** [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
+      "failure_reply": "[mention] took a chance on a coin flip - [user] can use this command [cmd_remain] more times.\n**FAILURE!** - Better luck next time...",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "sl_symbols": 6,
+      "game_intro": "",
+      "game_tiers": [],
+      "win_actions": [
+        {
+          "type": "fire",
+          "device_id": null,
+          "seconds": 10
+        }
+      ],
+      "miss_actions": []
+    },
+    {
+      "name": "agroulette",
+      "type": "say",
+      "seconds": null,
+      "dice": null,
+      "sides": null,
+      "reply": "**[user]** spins the roulette wheel\u2026 [user] can use this command [cmd_remain] more times.",
+      "enabled": true,
+      "owner_only": false,
+      "device_id": null,
+      "start_events": [
+        "PumpRoulette"
+      ],
+      "range_gate": "all",
+      "description": "spin the pump roulette \u2014 3 rounds of 50/50 +5s or +20s",
+      "hide_in_list": false,
+      "mention": false,
+      "react_only": false,
+      "react_emoji": "",
+      "poll": null,
+      "fires": [],
+      "fail_fires": [],
+      "chance": null,
+      "luck": null,
+      "success_reply": "",
+      "failure_reply": "",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "sl_symbols": 6,
+      "game_intro": "",
+      "game_tiers": []
+    },
+    {
+      "name": "agpushluck",
+      "type": "game-pushluck",
+      "seconds": null,
+      "dice": null,
+      "sides": null,
+      "reply": "",
+      "enabled": true,
+      "owner_only": false,
+      "device_id": null,
+      "start_events": [],
+      "range_gate": "all",
+      "description": "push-your-luck minigame \u2014 pump for points, bank before you bust",
+      "hide_in_list": false,
+      "mention": false,
+      "react_only": false,
+      "react_emoji": "",
+      "poll": null,
+      "fires": [],
+      "fail_fires": [],
+      "chance": null,
+      "luck": null,
+      "success_reply": "",
+      "failure_reply": "",
+      "pl_bust_start": 12,
+      "pl_bust_step": 13,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "sl_symbols": 6,
+      "game_intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it! [user] can use this command [cmd_remain] more times.",
+      "game_tiers": [
+        {
+          "op": ">=",
+          "min": 0,
+          "message": "\ud83d\udca5 **[user]** busted out with **[score]**. Womp womp.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 5
+            }
+          ]
+        },
+        {
+          "op": ">=",
+          "min": 3,
+          "message": "\ud83d\ude05 **[user]** banked **[score]** \u2014 a little reward!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 15
+            }
+          ]
+        },
+        {
+          "op": ">=",
+          "min": 6,
+          "message": "\ud83d\udd25 **[user]** cashed out a huge **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 28
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "agsimon",
+      "type": "game-simon",
+      "seconds": null,
+      "dice": null,
+      "sides": null,
+      "reply": "",
+      "enabled": true,
+      "owner_only": false,
+      "device_id": null,
+      "start_events": [],
+      "range_gate": "all",
+      "description": "memory minigame \u2014 repeat the growing emoji sequence",
+      "hide_in_list": false,
+      "mention": false,
+      "react_only": false,
+      "react_emoji": "",
+      "poll": null,
+      "fires": [],
+      "fail_fires": [],
+      "chance": null,
+      "luck": null,
+      "success_reply": "",
+      "failure_reply": "",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "sl_symbols": 6,
+      "game_intro": "\ud83e\udde0 **[user]** takes on **Simon** \u2014 memorize the sequence, then repeat it![user] can use this command [cmd_remain] more times. ",
+      "game_tiers": [
+        {
+          "op": ">=",
+          "min": 0,
+          "message": "\u274c **[user]** fumbled at round **[score]**.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 5
+            }
+          ]
+        },
+        {
+          "op": ">=",
+          "min": 1,
+          "message": "\ud83d\udc4f **[user]** reached round **[score]** \u2014 nice!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 15
+            }
+          ]
+        },
+        {
+          "op": ">=",
+          "min": 3,
+          "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 20
+            }
+          ]
+        },
+        {
+          "op": ">=",
+          "min": 6,
+          "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 35
+            }
+          ]
+        },
+        {
+          "op": ">=",
+          "min": 8,
+          "message": "\ud83c\udfc6 **[user]** got a PERFECT SCORE **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 50
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "agpopit",
+      "type": "game-balloon",
+      "seconds": null,
+      "dice": null,
+      "sides": null,
+      "reply": "",
+      "enabled": true,
+      "owner_only": false,
+      "device_id": null,
+      "start_events": [],
+      "range_gate": "all",
+      "description": "don't-pop-it minigame \u2014 reveal safe cells, avoid the balloons",
+      "hide_in_list": false,
+      "mention": false,
+      "react_only": false,
+      "react_emoji": "",
+      "poll": null,
+      "fires": [],
+      "fail_fires": [],
+      "chance": null,
+      "luck": null,
+      "success_reply": "",
+      "failure_reply": "",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "sl_symbols": 6,
+      "game_intro": "\ud83c\udf88 **[user]** plays **Don't Pop It** \u2014 reveal safe cells for points, or cash out before you hit a balloon! [user] can use this command [cmd_remain] more times.",
+      "game_tiers": [
+        {
+          "op": ">=",
+          "min": 0,
+          "message": "\ud83d\udca5 **[user]** popped a balloon and walked away with the bare minimum.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 5
+            }
+          ]
+        },
+        {
+          "op": ">=",
+          "min": 1,
+          "message": "\ud83c\udf88 **[user]** cashed out **[score]** \u2014 nice haul!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 10
+            }
+          ]
+        },
+        {
+          "op": ">=",
+          "min": 3,
+          "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 20
+            }
+          ]
+        },
+        {
+          "op": ">=",
+          "min": 5,
+          "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 35
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "agrps",
+      "type": "game-rps",
+      "seconds": null,
+      "dice": null,
+      "sides": null,
+      "reply": "",
+      "enabled": true,
+      "owner_only": false,
+      "device_id": null,
+      "start_events": [],
+      "range_gate": "all",
+      "description": "rock-paper-scissors vs the bot, best of 5",
+      "hide_in_list": false,
+      "mention": false,
+      "react_only": false,
+      "react_emoji": "",
+      "poll": null,
+      "fires": [],
+      "fail_fires": [],
+      "chance": null,
+      "luck": null,
+      "success_reply": "",
+      "failure_reply": "",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "sl_symbols": 6,
+      "game_intro": "\u270a\u270b\u270c\ufe0f **[user]** challenges the bot to **Rock-Paper-Scissors** \u2014 first to 3! [user] can use this command [cmd_remain] more times.",
+      "game_tiers": [
+        {
+          "op": ">=",
+          "min": 0,
+          "message": "\ud83d\udc80 **[user]** got swept by the bot in rock, paper, scissors. \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 5
+            }
+          ]
+        },
+        {
+          "op": ">=",
+          "min": 1,
+          "message": "\ud83d\ude05 **[user]** fought to **[score]** round(s) but lost the match.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 10
+            }
+          ]
+        },
+        {
+          "op": ">=",
+          "min": 3,
+          "message": "\ud83c\udfc6 **[user]** BEAT the bot! **+[secs]s** added to the pump timer!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 25
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "agpull",
+      "type": "game-slots",
+      "seconds": null,
+      "dice": null,
+      "sides": null,
+      "reply": "",
+      "enabled": true,
+      "owner_only": false,
+      "device_id": null,
+      "start_events": [],
+      "range_gate": "all",
+      "description": "public slot machine \u2014 one pull, tiered payout",
+      "hide_in_list": false,
+      "mention": false,
+      "react_only": false,
+      "react_emoji": "",
+      "poll": null,
+      "fires": [],
+      "fail_fires": [],
+      "chance": null,
+      "luck": null,
+      "success_reply": "",
+      "failure_reply": "",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "sl_symbols": 6,
+      "game_intro": "\ud83c\udfb0 **[user]** pulls the lever\u2026  [user] can use this command [cmd_remain] more times.",
+      "game_tiers": [
+        {
+          "op": ">=",
+          "min": 0,
+          "message": "\ud83c\udfb0 no match \u2014 better luck next pull, **[user]** - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 5
+            }
+          ]
+        },
+        {
+          "op": ">=",
+          "min": 1,
+          "message": "\ud83c\udfb0 **[user]** hit a pair \u2014 small win! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 15
+            }
+          ]
+        },
+        {
+          "op": ">=",
+          "min": 3,
+          "message": "\ud83c\udfb0\ud83c\udf89 **JACKPOT!** **[user]** hit three of a kind! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 35
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "agblackjack",
+      "type": "game-blackjack",
+      "seconds": null,
+      "dice": null,
+      "sides": null,
+      "reply": "",
+      "enabled": true,
+      "owner_only": false,
+      "device_id": null,
+      "start_events": [],
+      "range_gate": "all",
+      "description": "blackjack (21) vs the bot \u2014 hit or stand",
+      "hide_in_list": false,
+      "mention": false,
+      "react_only": false,
+      "react_emoji": "",
+      "poll": null,
+      "fires": [],
+      "fail_fires": [],
+      "chance": null,
+      "luck": null,
+      "success_reply": "",
+      "failure_reply": "",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "sl_symbols": 6,
+      "game_intro": "\ud83c\udccf **[user]** sits down at the blackjack table\u2026  [user] can use this command [cmd_remain] more times.",
+      "game_tiers": [
+        {
+          "op": ">=",
+          "min": 0,
+          "message": "\ud83c\udccf **[user]** lost the hand. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 5
+            }
+          ]
+        },
+        {
+          "op": ">=",
+          "min": 1,
+          "message": "\ud83c\udccf **[user]** pushed \u2014 a wash. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 10
+            }
+          ]
+        },
+        {
+          "op": ">=",
+          "min": 2,
+          "message": "\ud83c\udccf **[user]** beat the dealer! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 20
+            }
+          ]
+        },
+        {
+          "op": ">=",
+          "min": 3,
+          "message": "\ud83c\udccf\ud83c\udca1 **BLACKJACK!** **[user] dominated the dealer!** \u2014 [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
+          "fires": [
+            {
+              "device_id": null,
+              "seconds": 40
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "broadcasts": [
+    {
+      "name": "Plugged",
+      "message": "\u26a0\ufe0f **NOTICE:** \ud83d\udd0c [operator]'s air pump tube is currently fitted with an **inflatable enema retention nozzle** \nThis means that they will **not** be able to release **any pressure** during this session!\n"
+    },
+    {
+      "name": "NoCap",
+      "message": "\u26a0\ufe0f **NOTICE:** \ud83c\udf88\ud83d\udca5 This is an **uncapped inflation session** and over-inflating is **strongly encouraged**\n\n**Pump first, ask permission never.**"
+    }
+  ],
+  "modes": [],
+  "max_roll_prize": {
+    "enabled": false,
+    "goal": 3,
+    "command": "special",
+    "description": "a special reward",
+    "uses": 1,
+    "action": "fire",
+    "seconds": 10,
+    "dice": null,
+    "sides": null,
+    "device_id": null,
+    "reply": "",
+    "progress_message": "[mention] rolled a perfect score [[count]/[goal]] \u2014 [remaining] more will unlock a bonus command!",
+    "unlock_message": "[mention] has unlocked: [prize_cmd] \u2014 [prize_desc]\\nYou can use this command a total of [uses] times."
+  },
+  "prizes": [
+    {
+      "enabled": true,
+      "command": "superpump",
+      "range_gate": "all",
+      "goal": 3,
+      "uses": 1,
+      "action": "fire",
+      "seconds": 40,
+      "dice": null,
+      "sides": null,
+      "device_id": null,
+      "description": "SUPERPUMP - !superpump triggers a 40s burst of air",
+      "reply": "\u2728 [mention] used the prize! [uses_left] uses left\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+      "progress_message": "[mention] rolled a perfect score [[count]/[goal]] \u2014 [remaining] more will unlock a bonus command!",
+      "unlock_message": "[mention] has unlocked: [prize_cmd] \u2014 [prize_desc]\\nYou can use this command a total of [uses] times."
+    }
+  ],
+  "cooldown_seconds": 120,
+  "auto_report": {
+    "enabled": true,
+    "seconds": 300,
+    "message": "[Bot Report] **[operator]'s DiscoFlate Inflation Bot is now LIVE! ([uptime])**\n\n[announce] - Current Capacity: **[capacity]%**\n[capacity_bar]\n\n**[help_cmd]** for a list of commands.\n\n\n"
+  },
+  "listener_message_on": "[Bot Status] **[operator]'s DiscoFlate Inflation Bot is now LIVE!**\n[commands]\n",
+  "listener_message_off": "[Bot Status] **[operator]'s DiscoFlate Inflation Bot is now OFFLINE after running for [uptime]**\n[toppump]\n**Thanks for pumping!**",
+  "pause_message": "\u23f8\ufe0f **Session paused** by [user] \u2014 pumps are off and commands are disabled until the operator resumes.",
+  "resume_message": "\u25b6\ufe0f **Session resumed** by [user] \u2014 pump away!",
+  "paused_notice_message": "\u23f8\ufe0f [mention], the session is paused \u2014 hang tight until the operator resumes.",
+  "output_headers": true,
+  "rich_output": true,
+  "capacity_ranges": [
+    {
+      "min": 0,
+      "max": 20,
+      "dice": 6,
+      "sides": 6,
+      "announce": "\ud83c\udf88 [operator] is barely inflated \u2014 you can do better than that!",
+      "milestone": "",
+      "image": "",
+      "cooldowns": {
+        "fill": {
+          "enabled": true,
+          "max_uses": 3,
+          "seconds": 120,
+          "scope": "user"
+        },
+        "roll": {
+          "seconds": 120,
+          "scope": "user"
+        }
+      },
+      "start_command": "",
+      "start_command_enabled": false,
+      "event_actions": []
+    },
+    {
+      "min": 20,
+      "max": 40,
+      "dice": 4,
+      "sides": 6,
+      "announce": "\ud83d\udca8 [operator] is filling out nicely, the first signs of bloating begin to appear.",
+      "milestone": "**MILESTONE:** \ud83d\udca8 [operator]'s belly starts to round out and press outward slightly. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+      "image": "",
+      "cooldowns": {
+        "inflate": {
+          "enabled": true,
+          "max_uses": 6,
+          "seconds": 195,
+          "scope": "user"
+        },
+        "roll": {
+          "seconds": 195,
+          "scope": "user",
+          "dice": 5
+        }
+      },
+      "start_command": "",
+      "start_command_enabled": false,
+      "event_actions": []
+    },
+    {
+      "min": 40,
+      "max": 60,
+      "dice": 4,
+      "sides": 6,
+      "announce": "\ud83c\udf88 [operator]'s belly is taut and pressurised, curves stretching tighter.",
+      "milestone": "**MILESTONE:** \ud83c\udf88 Halfway there \u2014 [operator]'s middle is firm and noticeably swollen. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+      "image": "",
+      "cooldowns": {
+        "pump": {
+          "enabled": true,
+          "max_uses": 6,
+          "seconds": 220,
+          "scope": "user"
+        },
+        "roll": {
+          "seconds": 220,
+          "scope": "user",
+          "luck": 15
+        }
+      },
+      "start_command": "",
+      "start_command_enabled": false,
+      "event_actions": []
+    },
+    {
+      "min": 60,
+      "max": 80,
+      "dice": 2,
+      "sides": 4,
+      "announce": "\ud83c\udf88 [operator]'s belly is round, tight, and visibly swollen.",
+      "milestone": "**MILESTONE:** \ud83c\udf88 [operator] is seriously swollen now \u2014 the pressure is constant and building. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+      "image": "",
+      "cooldowns": {
+        "squeeze": {
+          "enabled": true,
+          "max_uses": 3,
+          "seconds": 350,
+          "scope": "user"
+        },
+        "roll": {
+          "seconds": 350,
+          "scope": "user",
+          "dice": 3,
+          "sides": 7,
+          "luck": 10
+        }
+      },
+      "start_command": "",
+      "start_command_enabled": false,
+      "event_actions": []
+    },
+    {
+      "min": 80,
+      "max": 90,
+      "dice": 2,
+      "sides": 4,
+      "announce": "\u26a0\ufe0f [operator] 's belly is stretched dangerously tight, groaning under the strain.",
+      "milestone": "**MILESTONE:** \u26a0\ufe0f [operator]'s gut is straining hard \u2014 one bold roll could tip them over! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+      "image": "",
+      "cooldowns": {
+        "tease": {
+          "enabled": true,
+          "max_uses": 5,
+          "seconds": 275,
+          "scope": "user"
+        },
+        "roll": {
+          "seconds": 275,
+          "scope": "user",
+          "luck": 20,
+          "sides": 8
+        }
+      },
+      "start_command": "",
+      "start_command_enabled": false,
+      "event_actions": []
+    },
+    {
+      "min": 90,
+      "max": 100,
+      "dice": 2,
+      "sides": 4,
+      "announce": "\ud83d\udea8 [operator]'s belly is at the absolute brink, creaking and ready to pop''.",
+      "milestone": "**MILESTONE:** \ud83d\udea8 The edge! [operator] has reached maximum capacity and can't take much more! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]\n",
+      "image": "",
+      "cooldowns": {
+        "topup": {
+          "enabled": true,
+          "max_uses": null,
+          "seconds": 300,
+          "scope": "user"
+        },
+        "roll": {
+          "seconds": 300,
+          "scope": "user",
+          "luck": 20,
+          "dice": 3
+        }
+      },
+      "start_command": "",
+      "start_command_enabled": false,
+      "event_actions": []
+    },
+    {
+      "min": 105,
+      "max": 110,
+      "dice": 2,
+      "sides": 4,
+      "announce": "\ud83d\udea8 [operator] is at the absolute brink, creaking and ready to pop. Any minute now! ",
+      "milestone": "**MILESTONE:** \ud83d\udea8 [operator] is going to pop at any second! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+      "image": "",
+      "cooldowns": {
+        "topup": {
+          "enabled": true,
+          "max_uses": null,
+          "seconds": 20,
+          "scope": "user"
+        },
+        "roll": {
+          "seconds": 20,
+          "scope": "user",
+          "luck": 10
+        }
+      },
+      "start_command": "",
+      "start_command_enabled": false,
+      "event_actions": [],
+      "is_end": true,
+      "enabled": true,
+      "end_only": false,
+      "final_message": "\ud83d\udca5 **BOOOOM!!** \nCongradulations! [operator] has popped!\n\n[off_message]"
+    }
+  ],
+  "always_on_enabled": true,
+  "always_on_commands": [
+    {
+      "name": "agpushluck",
+      "cooldown": 300,
+      "max_uses": 3,
+      "luck": null
+    },
+    {
+      "name": "agsimon",
+      "cooldown": 150,
+      "max_uses": 3,
+      "luck": null
+    },
+    {
+      "name": "agpopit",
+      "cooldown": 150,
+      "max_uses": 4,
+      "luck": null
+    },
+    {
+      "name": "agrps",
+      "cooldown": 150,
+      "max_uses": 4,
+      "luck": null
+    },
+    {
+      "name": "agroulette",
+      "cooldown": 300,
+      "max_uses": 1,
+      "luck": null
+    },
+    {
+      "name": "agtoss",
+      "cooldown": 150,
+      "max_uses": 4,
+      "luck": null
+    },
+    {
+      "name": "agpull",
+      "cooldown": 150,
+      "max_uses": 4,
+      "luck": null
+    },
+    {
+      "name": "agblackjack",
+      "cooldown": 300,
+      "max_uses": 3,
+      "luck": null
+    }
+  ],
+  "events": [
+    {
+      "name": "PumpRoulette",
+      "enabled": false,
+      "mode": "loop",
+      "every": 30,
+      "max_repeats": 3,
+      "fire_immediately": true,
+      "clean_previous": false,
+      "action": "chance",
+      "message": "",
+      "seconds": null,
+      "dice": null,
+      "sides": null,
+      "capacity_op": "add",
+      "capacity_value": 0,
+      "device_id": null,
+      "poll": null,
+      "broadcast": null,
+      "cooldown": 30,
+      "activation_message": "",
+      "end_message": "\ud83c\udfb0 **PumpRoulette** complete!",
+      "chance": 50,
+      "luck": null,
+      "fires": [
+        {
+          "device_id": null,
+          "seconds": 20
+        }
+      ],
+      "fail_fires": [
+        {
+          "device_id": null,
+          "seconds": 5
+        }
+      ],
+      "success_message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udd34 **BIG HIT!** +20s pump! (Capacity now [capacity]%)\n[next_round]",
+      "failure_message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udfe2 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]",
+      "post_actions": []
+    },
+    {
+      "name": "Uncapped",
+      "enabled": true,
+      "mode": "loop",
+      "every": 600,
+      "max_repeats": null,
+      "fire_immediately": true,
+      "clean_previous": false,
+      "action": "broadcast",
+      "message": "",
+      "seconds": 5,
+      "dice": null,
+      "sides": null,
+      "capacity_op": "add",
+      "capacity_value": 0,
+      "device_id": null,
+      "poll": null,
+      "broadcast": "NoCap",
+      "cooldown": null,
+      "activation_message": "",
+      "end_message": "",
+      "chance": 50,
+      "luck": null,
+      "fires": [],
+      "fail_fires": [],
+      "success_message": "",
+      "failure_message": "",
+      "post_actions": []
+    },
+    {
+      "name": "Nozzle",
+      "enabled": true,
+      "mode": "loop",
+      "every": 660,
+      "max_repeats": null,
+      "fire_immediately": true,
+      "clean_previous": false,
+      "action": "broadcast",
+      "message": "",
+      "seconds": 5,
+      "dice": null,
+      "sides": null,
+      "capacity_op": "add",
+      "capacity_value": 0,
+      "device_id": null,
+      "poll": null,
+      "broadcast": "Plugged",
+      "cooldown": null,
+      "activation_message": "",
+      "end_message": "",
+      "chance": 50,
+      "luck": null,
+      "fires": [],
+      "fail_fires": [],
+      "success_message": "",
+      "failure_message": "",
+      "post_actions": []
+    }
+  ],
+  "capacity_events": [
+    {
+      "name": "Popornot",
+      "enabled": true,
+      "at": 99,
+      "stop_devices": true,
+      "disable_range_cmds": true,
+      "disable_range_cmds_scope": "event",
+      "disable_always_on": true,
+      "disable_always_on_scope": "event",
+      "pause_events": true,
+      "pause_events_scope": "event",
+      "enable_commands_on": false,
+      "enable_commands": [],
+      "actions": [
+        {
+          "type": "message",
+          "message": "** \ud83d\udea8 WARNING\u203c\ufe0f: [operator]'s belly has officially reached critical capacity! It's now time to decide the next step of this inflation procedure...**",
+          "seconds": null,
+          "device_id": null,
+          "dice": null,
+          "sides": null,
+          "capacity_op": "add",
+          "capacity_value": 0,
+          "poll": null,
+          "broadcast": null,
+          "if_option": null
+        },
+        {
+          "type": "poll",
+          "message": "",
+          "seconds": null,
+          "device_id": null,
+          "dice": null,
+          "sides": null,
+          "capacity_op": "add",
+          "capacity_value": 0,
+          "poll": "Popordonot",
+          "broadcast": null,
+          "if_option": null
+        }
+      ],
+      "post_actions": []
+    },
+    {
+      "name": "Gutrep1",
+      "enabled": true,
+      "at": 33,
+      "stop_devices": false,
+      "disable_range_cmds": false,
+      "disable_range_cmds_scope": "event",
+      "disable_always_on": false,
+      "disable_always_on_scope": "event",
+      "pause_events": false,
+      "pause_events_scope": "event",
+      "enable_commands_on": false,
+      "enable_commands": [],
+      "actions": [
+        {
+          "type": "message",
+          "message": "** \ud83e\udd75 GUT REPORT \ud83d\udcc8: ** [operator] is experiencing significant noticeable pressure bordering on mildly uncomfortable.\n[capacity_bar]",
+          "seconds": null,
+          "device_id": null,
+          "dice": null,
+          "sides": null,
+          "capacity_op": "add",
+          "capacity_value": 0,
+          "poll": null,
+          "broadcast": null,
+          "if_option": null
+        }
+      ],
+      "post_actions": []
+    },
+    {
+      "name": "Gutrep2",
+      "enabled": true,
+      "at": 66,
+      "stop_devices": false,
+      "disable_range_cmds": false,
+      "disable_range_cmds_scope": "event",
+      "disable_always_on": false,
+      "disable_always_on_scope": "event",
+      "pause_events": false,
+      "pause_events_scope": "event",
+      "enable_commands_on": false,
+      "enable_commands": [],
+      "actions": [
+        {
+          "type": "message",
+          "message": "** \ud83e\udd75 GUT REPORT \ud83d\udcc8: ** [operator] is experiencing fairly regular mild to moderate intestinal cramping.\n[capacity_bar]",
+          "seconds": null,
+          "device_id": null,
+          "dice": null,
+          "sides": null,
+          "capacity_op": "add",
+          "capacity_value": 0,
+          "poll": null,
+          "broadcast": null,
+          "if_option": null
+        }
+      ],
+      "post_actions": []
+    },
+    {
+      "name": "Gutrep3",
+      "enabled": true,
+      "at": 81,
+      "stop_devices": false,
+      "disable_range_cmds": false,
+      "disable_range_cmds_scope": "event",
+      "disable_always_on": false,
+      "disable_always_on_scope": "event",
+      "pause_events": false,
+      "pause_events_scope": "event",
+      "enable_commands_on": false,
+      "enable_commands": [],
+      "actions": [
+        {
+          "type": "message",
+          "message": "** \ud83e\udd75 GUT REPORT \ud83d\udcc8: ** [operator] is experiencing intense cramping and the sensation that their belly might pop from the pressure.\n[capacity_bar]",
+          "seconds": null,
+          "device_id": null,
+          "dice": null,
+          "sides": null,
+          "capacity_op": "add",
+          "capacity_value": 0,
+          "poll": null,
+          "broadcast": null,
+          "if_option": null
+        }
+      ],
+      "post_actions": []
+    }
+  ],
+  "polls": [
+    {
+      "name": "Belly-shock",
+      "title": "Create an electrifying experience?",
+      "body": "**[operator] currently has TENS unit electrodes attached to the sides of their belly!** It is up to you whether or not the e-stim machine gets activated to shock their belly and and cause involuntary abdominal muscle contractions. A successful vote to activate the device will keep it running for 5 minutes. Choose wisely!",
+      "duration": 60,
+      "repeat_every": 15,
+      "options": [
+        {
+          "label": "ACTIVATE!",
+          "fallback": true,
+          "actions": [
+            {
+              "type": "message",
+              "message": "**The decision has been made to activate the electro stimulation machine and begins sending shocking pulses into [operator]'s belly, forcing contractions during the inflation process. This will continue for 5 minutes.**",
+              "seconds": null,
+              "device_id": null,
+              "dice": null,
+              "sides": null,
+              "capacity_op": "add",
+              "capacity_value": 0,
+              "poll": null,
+              "broadcast": null,
+              "if_option": null
+            }
+          ]
+        },
+        {
+          "label": "Mercy!",
+          "fallback": false,
+          "actions": [
+            {
+              "type": "message",
+              "message": "**The inflators have chosen to show [operator] mercy, sparing them from the shocking jolts that would have been applied to their swelling gut.**",
+              "seconds": null,
+              "device_id": null,
+              "dice": null,
+              "sides": null,
+              "capacity_op": "add",
+              "capacity_value": 0,
+              "poll": null,
+              "broadcast": null,
+              "if_option": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Popordonot",
+      "title": "[operator]'s belly has reached critical capacity!",
+      "body": "It is now up to the pump operators to decide how this inflation procedure session ends! You can choose to end the session now, allowing [operator] to deflate and release the air safely, or you could decide that you want to see just how much pressure their belly can actually take before it pops!",
+      "duration": 60,
+      "repeat_every": 15,
+      "options": [
+        {
+          "label": "Deflate",
+          "fallback": false,
+          "actions": [
+            {
+              "type": "message",
+              "message": "** The operators have decided to allow [operator] to deflate safely! **",
+              "seconds": null,
+              "device_id": null,
+              "dice": null,
+              "sides": null,
+              "capacity_op": "add",
+              "capacity_value": 0,
+              "poll": null,
+              "broadcast": null,
+              "if_option": null
+            },
+            {
+              "type": "end_session",
+              "message": "",
+              "seconds": null,
+              "device_id": null,
+              "dice": null,
+              "sides": null,
+              "capacity_op": "add",
+              "capacity_value": 0,
+              "poll": null,
+              "broadcast": null,
+              "if_option": null
+            }
+          ]
+        },
+        {
+          "label": "Burst",
+          "fallback": true,
+          "actions": [
+            {
+              "type": "message",
+              "message": "** The operators have decided to over inflate [operator]'s belly until it bursts! **",
+              "seconds": null,
+              "device_id": null,
+              "dice": null,
+              "sides": null,
+              "capacity_op": "add",
+              "capacity_value": 0,
+              "poll": null,
+              "broadcast": null,
+              "if_option": null
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "event_in_process_message": "\u23f3 [event] is already running.",
+  "event_cooldown_message": "\u23f3 [event] is on cooldown \u2014 [cooldown]s left.",
+  "templates": {
+    "commands": [
+      {
+        "name": "inflate",
+        "type": "fire",
+        "seconds": 30,
+        "dice": null,
+        "sides": null,
+        "reply": "\ud83d\udca8 [mention] used [prefix]inflate - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+        "enabled": true,
+        "owner_only": false,
+        "device_id": null,
+        "start_events": [],
+        "range_gate": "20-40",
+        "description": "inflate a little further",
+        "hide_in_list": false,
+        "mention": false,
+        "react_only": false,
+        "react_emoji": "",
+        "fires": [],
+        "fail_fires": [],
+        "chance": null,
+        "luck": null,
+        "success_reply": "",
+        "failure_reply": "",
+        "pl_bust_start": 15,
+        "pl_bust_step": 12,
+        "pl_max_pumps": 8,
+        "pl_points": 1,
+        "sm_symbols": 4,
+        "sm_max_rounds": 8,
+        "sm_reveal": 3,
+        "bl_cells": 9,
+        "bl_pops": 3,
+        "bl_points": 1,
+        "rps_wins": 3,
+        "sl_symbols": 6,
+        "game_intro": "",
+        "game_tiers": []
+      },
+      {
+        "name": "agtoss",
+        "type": "chance",
+        "seconds": null,
+        "dice": null,
+        "sides": null,
+        "reply": "",
+        "enabled": true,
+        "owner_only": false,
+        "device_id": null,
+        "start_events": [],
+        "range_gate": "all",
+        "description": "flip a coin",
+        "hide_in_list": false,
+        "mention": false,
+        "react_only": false,
+        "react_emoji": "",
+        "fires": [
+          {
+            "device_id": null,
+            "seconds": 10
+          }
+        ],
+        "fail_fires": [],
+        "chance": 50,
+        "luck": null,
+        "success_reply": "[mention] took a chance on a coin flip... - [user] can use this command [cmd_remain] more times.\n**SUCCESS!** [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
+        "failure_reply": "[mention] took a chance on a coin flip - [user] can use this command [cmd_remain] more times.\n**FAILURE!** - Better luck next time...",
+        "pl_bust_start": 15,
+        "pl_bust_step": 12,
+        "pl_max_pumps": 8,
+        "pl_points": 1,
+        "sm_symbols": 4,
+        "sm_max_rounds": 8,
+        "sm_reveal": 3,
+        "bl_cells": 9,
+        "bl_pops": 3,
+        "bl_points": 1,
+        "rps_wins": 3,
+        "sl_symbols": 6,
+        "game_intro": "",
+        "game_tiers": []
+      },
+      {
+        "name": "agroulette",
+        "type": "say",
+        "seconds": null,
+        "dice": null,
+        "sides": null,
+        "reply": "**[user]** spins the roulette wheel\u2026 [user] can use this command [cmd_remain] more times.",
+        "enabled": true,
+        "owner_only": false,
+        "device_id": null,
+        "start_events": [
+          "PumpRoulette"
+        ],
+        "range_gate": "all",
+        "description": "spin the pump roulette \u2014 3 rounds of 50/50 +5s or +20s",
+        "hide_in_list": false,
+        "mention": false,
+        "react_only": false,
+        "react_emoji": "",
+        "fires": [],
+        "fail_fires": [],
+        "chance": null,
+        "luck": null,
+        "success_reply": "",
+        "failure_reply": "",
+        "pl_bust_start": 15,
+        "pl_bust_step": 12,
+        "pl_max_pumps": 8,
+        "pl_points": 1,
+        "sm_symbols": 4,
+        "sm_max_rounds": 8,
+        "sm_reveal": 3,
+        "bl_cells": 9,
+        "bl_pops": 3,
+        "bl_points": 1,
+        "rps_wins": 3,
+        "sl_symbols": 6,
+        "game_intro": "",
+        "game_tiers": []
+      },
+      {
+        "name": "agpushluck",
+        "type": "game-pushluck",
+        "seconds": null,
+        "dice": null,
+        "sides": null,
+        "reply": "",
+        "enabled": true,
+        "owner_only": false,
+        "device_id": null,
+        "start_events": [],
+        "range_gate": "all",
+        "description": "push-your-luck minigame \u2014 pump for points, bank before you bust",
+        "hide_in_list": false,
+        "mention": false,
+        "react_only": false,
+        "react_emoji": "",
+        "fires": [],
+        "fail_fires": [],
+        "chance": null,
+        "luck": null,
+        "success_reply": "",
+        "failure_reply": "",
+        "pl_bust_start": 12,
+        "pl_bust_step": 13,
+        "pl_max_pumps": 8,
+        "pl_points": 1,
+        "sm_symbols": 4,
+        "sm_max_rounds": 8,
+        "sm_reveal": 3,
+        "bl_cells": 9,
+        "bl_pops": 3,
+        "bl_points": 1,
+        "rps_wins": 3,
+        "sl_symbols": 6,
+        "game_intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it! [user] can use this command [cmd_remain] more times.",
+        "game_tiers": [
+          {
+            "op": ">=",
+            "min": 0,
+            "message": "\ud83d\udca5 **[user]** busted out with **[score]**. Womp womp.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+            "fires": [
+              {
+                "device_id": null,
+                "seconds": 5
+              }
+            ]
+          },
+          {
+            "op": ">=",
+            "min": 3,
+            "message": "\ud83d\ude05 **[user]** banked **[score]** \u2014 a little reward!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+            "fires": [
+              {
+                "device_id": null,
+                "seconds": 15
+              }
+            ]
+          },
+          {
+            "op": ">=",
+            "min": 6,
+            "message": "\ud83d\udd25 **[user]** cashed out a huge **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+            "fires": [
+              {
+                "device_id": null,
+                "seconds": 28
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "agsimon",
+        "type": "game-simon",
+        "seconds": null,
+        "dice": null,
+        "sides": null,
+        "reply": "",
+        "enabled": true,
+        "owner_only": false,
+        "device_id": null,
+        "start_events": [],
+        "range_gate": "all",
+        "description": "memory minigame \u2014 repeat the growing emoji sequence",
+        "hide_in_list": false,
+        "mention": false,
+        "react_only": false,
+        "react_emoji": "",
+        "fires": [],
+        "fail_fires": [],
+        "chance": null,
+        "luck": null,
+        "success_reply": "",
+        "failure_reply": "",
+        "pl_bust_start": 15,
+        "pl_bust_step": 12,
+        "pl_max_pumps": 8,
+        "pl_points": 1,
+        "sm_symbols": 4,
+        "sm_max_rounds": 8,
+        "sm_reveal": 3,
+        "bl_cells": 9,
+        "bl_pops": 3,
+        "bl_points": 1,
+        "rps_wins": 3,
+        "sl_symbols": 6,
+        "game_intro": "\ud83e\udde0 **[user]** takes on **Simon** \u2014 memorize the sequence, then repeat it![user] can use this command [cmd_remain] more times. ",
+        "game_tiers": [
+          {
+            "op": ">=",
+            "min": 0,
+            "message": "\u274c **[user]** fumbled at round **[score]**.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+            "fires": [
+              {
+                "device_id": null,
+                "seconds": 5
+              }
+            ]
+          },
+          {
+            "op": ">=",
+            "min": 1,
+            "message": "\ud83d\udc4f **[user]** reached round **[score]** \u2014 nice!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+            "fires": [
+              {
+                "device_id": null,
+                "seconds": 15
+              }
+            ]
+          },
+          {
+            "op": ">=",
+            "min": 3,
+            "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+            "fires": [
+              {
+                "device_id": null,
+                "seconds": 20
+              }
+            ]
+          },
+          {
+            "op": ">=",
+            "min": 6,
+            "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+            "fires": [
+              {
+                "device_id": null,
+                "seconds": 35
+              }
+            ]
+          },
+          {
+            "op": ">=",
+            "min": 8,
+            "message": "\ud83c\udfc6 **[user]** got a PERFECT SCORE **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+            "fires": [
+              {
+                "device_id": null,
+                "seconds": 50
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "agpopit",
+        "type": "game-balloon",
+        "seconds": null,
+        "dice": null,
+        "sides": null,
+        "reply": "",
+        "enabled": true,
+        "owner_only": false,
+        "device_id": null,
+        "start_events": [],
+        "range_gate": "all",
+        "description": "don't-pop-it minigame \u2014 reveal safe cells, avoid the balloons",
+        "hide_in_list": false,
+        "mention": false,
+        "react_only": false,
+        "react_emoji": "",
+        "fires": [],
+        "fail_fires": [],
+        "chance": null,
+        "luck": null,
+        "success_reply": "",
+        "failure_reply": "",
+        "pl_bust_start": 15,
+        "pl_bust_step": 12,
+        "pl_max_pumps": 8,
+        "pl_points": 1,
+        "sm_symbols": 4,
+        "sm_max_rounds": 8,
+        "sm_reveal": 3,
+        "bl_cells": 9,
+        "bl_pops": 3,
+        "bl_points": 1,
+        "rps_wins": 3,
+        "sl_symbols": 6,
+        "game_intro": "\ud83c\udf88 **[user]** plays **Don't Pop It** \u2014 reveal safe cells for points, or cash out before you hit a balloon! [user] can use this command [cmd_remain] more times.",
+        "game_tiers": [
+          {
+            "op": ">=",
+            "min": 0,
+            "message": "\ud83d\udca5 **[user]** popped a balloon and walked away with the bare minimum.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+            "fires": [
+              {
+                "device_id": null,
+                "seconds": 5
+              }
+            ]
+          },
+          {
+            "op": ">=",
+            "min": 1,
+            "message": "\ud83c\udf88 **[user]** cashed out **[score]** \u2014 nice haul!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+            "fires": [
+              {
+                "device_id": null,
+                "seconds": 10
+              }
+            ]
+          },
+          {
+            "op": ">=",
+            "min": 3,
+            "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+            "fires": [
+              {
+                "device_id": null,
+                "seconds": 20
+              }
+            ]
+          },
+          {
+            "op": ">=",
+            "min": 5,
+            "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+            "fires": [
+              {
+                "device_id": null,
+                "seconds": 35
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "agrps",
+        "type": "game-rps",
+        "seconds": null,
+        "dice": null,
+        "sides": null,
+        "reply": "",
+        "enabled": true,
+        "owner_only": false,
+        "device_id": null,
+        "start_events": [],
+        "range_gate": "all",
+        "description": "rock-paper-scissors vs the bot, best of 5",
+        "hide_in_list": false,
+        "mention": false,
+        "react_only": false,
+        "react_emoji": "",
+        "fires": [],
+        "fail_fires": [],
+        "chance": null,
+        "luck": null,
+        "success_reply": "",
+        "failure_reply": "",
+        "pl_bust_start": 15,
+        "pl_bust_step": 12,
+        "pl_max_pumps": 8,
+        "pl_points": 1,
+        "sm_symbols": 4,
+        "sm_max_rounds": 8,
+        "sm_reveal": 3,
+        "bl_cells": 9,
+        "bl_pops": 3,
+        "bl_points": 1,
+        "rps_wins": 3,
+        "sl_symbols": 6,
+        "game_intro": "\u270a\u270b\u270c\ufe0f **[user]** challenges the bot to **Rock-Paper-Scissors** \u2014 first to 3! [user] can use this command [cmd_remain] more times.",
+        "game_tiers": [
+          {
+            "op": ">=",
+            "min": 0,
+            "message": "\ud83d\udc80 **[user]** got swept by the bot in rock, paper, scissors. \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+            "fires": [
+              {
+                "device_id": null,
+                "seconds": 5
+              }
+            ]
+          },
+          {
+            "op": ">=",
+            "min": 1,
+            "message": "\ud83d\ude05 **[user]** fought to **[score]** round(s) but lost the match.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+            "fires": [
+              {
+                "device_id": null,
+                "seconds": 10
+              }
+            ]
+          },
+          {
+            "op": ">=",
+            "min": 3,
+            "message": "\ud83c\udfc6 **[user]** BEAT the bot! **+[secs]s** added to the pump timer!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
+            "fires": [
+              {
+                "device_id": null,
+                "seconds": 25
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "agpull",
+        "type": "game-slots",
+        "seconds": null,
+        "dice": null,
+        "sides": null,
+        "reply": "",
+        "enabled": true,
+        "owner_only": false,
+        "device_id": null,
+        "start_events": [],
+        "range_gate": "all",
+        "description": "public slot machine \u2014 one pull, tiered payout",
+        "hide_in_list": false,
+        "mention": false,
+        "react_only": false,
+        "react_emoji": "",
+        "fires": [],
+        "fail_fires": [],
+        "chance": null,
+        "luck": null,
+        "success_reply": "",
+        "failure_reply": "",
+        "pl_bust_start": 15,
+        "pl_bust_step": 12,
+        "pl_max_pumps": 8,
+        "pl_points": 1,
+        "sm_symbols": 4,
+        "sm_max_rounds": 8,
+        "sm_reveal": 3,
+        "bl_cells": 9,
+        "bl_pops": 3,
+        "bl_points": 1,
+        "rps_wins": 3,
+        "sl_symbols": 6,
+        "game_intro": "\ud83c\udfb0 **[user]** pulls the lever\u2026  [user] can use this command [cmd_remain] more times.",
+        "game_tiers": [
+          {
+            "op": ">=",
+            "min": 0,
+            "message": "\ud83c\udfb0 no match \u2014 better luck next pull, **[user]** - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
+            "fires": [
+              {
+                "device_id": null,
+                "seconds": 5
+              }
+            ]
+          },
+          {
+            "op": ">=",
+            "min": 1,
+            "message": "\ud83c\udfb0 **[user]** hit a pair \u2014 small win! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
+            "fires": [
+              {
+                "device_id": null,
+                "seconds": 15
+              }
+            ]
+          },
+          {
+            "op": ">=",
+            "min": 3,
+            "message": "\ud83c\udfb0\ud83c\udf89 **JACKPOT!** **[user]** hit three of a kind! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
+            "fires": [
+              {
+                "device_id": null,
+                "seconds": 35
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "agblackjack",
+        "type": "game-blackjack",
+        "seconds": null,
+        "dice": null,
+        "sides": null,
+        "reply": "",
+        "enabled": true,
+        "owner_only": false,
+        "device_id": null,
+        "start_events": [],
+        "range_gate": "all",
+        "description": "blackjack (21) vs the bot \u2014 hit or stand",
+        "hide_in_list": false,
+        "mention": false,
+        "react_only": false,
+        "react_emoji": "",
+        "fires": [],
+        "fail_fires": [],
+        "chance": null,
+        "luck": null,
+        "success_reply": "",
+        "failure_reply": "",
+        "pl_bust_start": 15,
+        "pl_bust_step": 12,
+        "pl_max_pumps": 8,
+        "pl_points": 1,
+        "sm_symbols": 4,
+        "sm_max_rounds": 8,
+        "sm_reveal": 3,
+        "bl_cells": 9,
+        "bl_pops": 3,
+        "bl_points": 1,
+        "rps_wins": 3,
+        "sl_symbols": 6,
+        "game_intro": "\ud83c\udccf **[user]** sits down at the blackjack table\u2026  [user] can use this command [cmd_remain] more times.",
+        "game_tiers": [
+          {
+            "op": ">=",
+            "min": 0,
+            "message": "\ud83c\udccf **[user]** lost the hand. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
+            "fires": [
+              {
+                "device_id": null,
+                "seconds": 5
+              }
+            ]
+          },
+          {
+            "op": ">=",
+            "min": 1,
+            "message": "\ud83c\udccf **[user]** pushed \u2014 a wash. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
+            "fires": [
+              {
+                "device_id": null,
+                "seconds": 10
+              }
+            ]
+          },
+          {
+            "op": ">=",
+            "min": 2,
+            "message": "\ud83c\udccf **[user]** beat the dealer! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
+            "fires": [
+              {
+                "device_id": null,
+                "seconds": 20
+              }
+            ]
+          },
+          {
+            "op": ">=",
+            "min": 3,
+            "message": "\ud83c\udccf\ud83c\udca1 **BLACKJACK!** **[user] dominated the dealer!** \u2014 [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
+            "fires": [
+              {
+                "device_id": null,
+                "seconds": 40
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "events": [
+      {
+        "name": "PumpRoulette",
+        "enabled": false,
+        "mode": "loop",
+        "every": 30,
+        "max_repeats": 3,
+        "fire_immediately": true,
+        "clean_previous": false,
+        "action": "chance",
+        "message": "",
+        "seconds": null,
+        "dice": null,
+        "sides": null,
+        "capacity_op": "add",
+        "capacity_value": 0,
+        "device_id": null,
+        "cooldown": 30,
+        "activation_message": "",
+        "end_message": "\ud83c\udfb0 **PumpRoulette** complete!",
+        "chance": 50,
+        "luck": null,
+        "fires": [
+          {
+            "device_id": null,
+            "seconds": 20
+          }
+        ],
+        "fail_fires": [
+          {
+            "device_id": null,
+            "seconds": 5
+          }
+        ],
+        "success_message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udd34 **BIG HIT!** +20s pump! (Capacity now [capacity]%)\n[next_round]",
+        "failure_message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udfe2 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]"
+      }
+    ],
+    "ranges": [
+      {
+        "min": 0,
+        "max": 20,
+        "dice": 6,
+        "sides": 6,
+        "announce": "\ud83e\udec1 [operator] is barely inflated \u2014 you can do better than that!",
+        "milestone": "",
+        "image": "",
+        "cooldowns": {
+          "fill": {
+            "enabled": true,
+            "max_uses": 3,
+            "seconds": 120,
+            "scope": "user"
+          },
+          "roll": {
+            "seconds": 120,
+            "scope": "user"
+          }
+        },
+        "start_command": "",
+        "start_command_enabled": false,
+        "event_actions": []
+      },
+      {
+        "min": 20,
+        "max": 40,
+        "dice": 4,
+        "sides": 6,
+        "announce": "\ud83d\udca8 [operator] is filling out nicely, the first signs of bloating begin to appear.",
+        "milestone": "**MILESTONE:** \ud83d\udca8 [operator]'s belly starts to round out and press outward slightly. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+        "image": "",
+        "cooldowns": {
+          "inflate": {
+            "enabled": true,
+            "max_uses": 6,
+            "seconds": 195,
+            "scope": "user"
+          },
+          "roll": {
+            "seconds": 195,
+            "scope": "user",
+            "dice": 5
+          }
+        },
+        "start_command": "",
+        "start_command_enabled": false,
+        "event_actions": []
+      },
+      {
+        "min": 40,
+        "max": 60,
+        "dice": 4,
+        "sides": 6,
+        "announce": "\ud83c\udf88 [operator]'s belly is taut and pressurised, curves stretching tighter.",
+        "milestone": "**MILESTONE:** \ud83c\udf88 Halfway there \u2014 [operator]'s middle is firm and noticeably swollen. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+        "image": "",
+        "cooldowns": {
+          "pump": {
+            "enabled": true,
+            "max_uses": 6,
+            "seconds": 220,
+            "scope": "user"
+          },
+          "roll": {
+            "seconds": 220,
+            "scope": "user",
+            "luck": 15
+          }
+        },
+        "start_command": "",
+        "start_command_enabled": false,
+        "event_actions": []
+      },
+      {
+        "min": 60,
+        "max": 80,
+        "dice": 2,
+        "sides": 4,
+        "announce": "\ud83c\udf88 [operator]'s belly is round, tight, and visibly swollen.",
+        "milestone": "**MILESTONE:** \ud83c\udf88 [operator] is seriously swollen now \u2014 the pressure is constant and building. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+        "image": "",
+        "cooldowns": {
+          "squeeze": {
+            "enabled": true,
+            "max_uses": 3,
+            "seconds": 350,
+            "scope": "user"
+          },
+          "roll": {
+            "seconds": 350,
+            "scope": "user",
+            "dice": 3,
+            "sides": 7,
+            "luck": 10
+          }
+        },
+        "start_command": "",
+        "start_command_enabled": false,
+        "event_actions": []
+      },
+      {
+        "min": 80,
+        "max": 90,
+        "dice": 2,
+        "sides": 4,
+        "announce": "\u26a0\ufe0f [operator] 's belly is stretched dangerously tight, groaning under the strain.",
+        "milestone": "**MILESTONE:** \u26a0\ufe0f [operator]'s gut is straining hard \u2014 one bold roll could tip them over! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+        "image": "",
+        "cooldowns": {
+          "tease": {
+            "enabled": true,
+            "max_uses": 5,
+            "seconds": 275,
+            "scope": "user"
+          },
+          "roll": {
+            "seconds": 275,
+            "scope": "user",
+            "luck": 20,
+            "sides": 8
+          }
+        },
+        "start_command": "",
+        "start_command_enabled": false,
+        "event_actions": []
+      },
+      {
+        "min": 90,
+        "max": 100,
+        "dice": 2,
+        "sides": 4,
+        "announce": "\ud83d\udea8 [operator]'s belly is at the absolute brink, creaking and ready to pop''.",
+        "milestone": "**MILESTONE:** \ud83d\udea8 The edge! [operator] has reached maximum capacity and can't take much more! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]\n",
+        "image": "",
+        "cooldowns": {
+          "topup": {
+            "enabled": true,
+            "max_uses": null,
+            "seconds": 300,
+            "scope": "user"
+          },
+          "roll": {
+            "seconds": 300,
+            "scope": "user",
+            "luck": 20,
+            "dice": 3
+          }
+        },
+        "start_command": "",
+        "start_command_enabled": false,
+        "event_actions": []
+      }
+    ]
+  }
+}

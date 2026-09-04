@@ -34,10 +34,24 @@ from discord_bot import BotManager
 HERE = os.path.dirname(os.path.abspath(__file__))
 WEB_DIR = os.environ.get("DISCOFLATE_WEB_DIR") or os.path.join(HERE, "web")
 IMAGES_DIR = os.path.join(config_store.DATA_DIR, "images")
-# Shipped default game config (for "Restore Default Config"). On Android the host
-# copies the bundled seed to a pristine path and points this env at it.
+# Shipped default game config (fresh-install seed). On Android the host copies
+# the bundled seed to a pristine path and points this env at it.
 DEFAULT_CONFIG_PATH = os.environ.get("DISCOFLATE_DEFAULT_CONFIG") or os.path.join(HERE, "default_config.json")
+# The immutable built-in Gameplay Preset (shipped starter setup — "Basic
+# Session"). Appears in the preset list; can be loaded but never overwritten.
+DEFAULT_PRESET_PATH = os.path.join(HERE, "default_preset.json")
+BUILTIN_PRESET_NAME = "Defaults (built-in)"
 PORT = int(os.getenv("DISCOFLATE_PORT", "8765"))
+
+
+def _builtin_preset_data() -> dict:
+    """The shipped default preset's gameplay data (empty dict if unavailable)."""
+    try:
+        with open(DEFAULT_PRESET_PATH, "r", encoding="utf-8") as fh:
+            d = json.load(fh)
+        return {k: v for k, v in d.items() if k in _GAMEPLAY_KEYS}
+    except (FileNotFoundError, ValueError, OSError):
+        return {}
 HOST = "127.0.0.1"
 
 # App version — single-sourced from version.json (android build.gradle.kts and
@@ -274,8 +288,10 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "config_rev": cfg.get("config_rev", 0),
         "recovered_config": config_store.RECOVERED_FROM,
         "version": VERSION,
-        # preset NAMES only (the full data would bloat the 1s state poll)
-        "gameplay_presets": [{"name": p.get("name", "")} for p in (cfg.get("gameplay_presets") or [])],
+        # preset NAMES only (the full data would bloat the 1s state poll). The
+        # immutable built-in "Defaults" preset is always listed first.
+        "gameplay_presets": ([{"name": BUILTIN_PRESET_NAME, "builtin": True}]
+                             + [{"name": p.get("name", "")} for p in (cfg.get("gameplay_presets") or [])]),
         "remote_access": cfg.get("remote_access", {"enabled": False, "allowed_ips": []}),
         "lan_ips": _lan_ips(),
         "port": PORT,
@@ -876,17 +892,6 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         b = await _json(request)
         return web.json_response(await botmgr.operator_cleanup(_num(b.get("count")) or 1))
 
-    async def restore_defaults(request):
-        await guard(request)
-        try:
-            with open(DEFAULT_CONFIG_PATH, "r", encoding="utf-8") as fh:
-                dflt = json.load(fh)
-        except (FileNotFoundError, ValueError) as e:
-            raise web.HTTPBadRequest(text=f"default config not available: {e}")
-        cfg = config_store.save(_merge_defaults(config_store.load(), dflt))
-        engine.set_config(cfg)
-        return web.json_response(_public_state(engine, botmgr))
-
     async def export_config(request):
         # Full config (incl. token) for backup, plus the all-time leaderboard —
         # so a reinstall/restore brings the stats back too.
@@ -927,6 +932,11 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         def _find(n):
             return next((p for p in presets if (p.get("name") or "").strip().lower() == n.lower()), None)
 
+        _bi = BUILTIN_PRESET_NAME.lower()
+        new_name = (b.get("new_name") or "").strip()
+        if action in ("save", "update", "delete", "import", "rename") and (
+                name.strip().lower() == _bi or new_name.lower() == _bi):
+            raise web.HTTPBadRequest(text="the built-in Defaults preset is read-only")
         if action in ("save", "update", "import"):
             if not name:
                 raise web.HTTPBadRequest(text="a preset name is required")
@@ -946,10 +956,16 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             cfg = config_store.save(cfg)
             engine.set_config(cfg)
         elif action == "load":
-            p = _find(name)
-            if p is None:
-                raise web.HTTPBadRequest(text="no such preset")
-            merged = _gameplay_merge(cfg, p.get("data") or {}, "replace")
+            if name.strip().lower() == BUILTIN_PRESET_NAME.lower():
+                data = _builtin_preset_data()
+                if not data:
+                    raise web.HTTPBadRequest(text="the built-in Defaults preset isn't available")
+            else:
+                p = _find(name)
+                if p is None:
+                    raise web.HTTPBadRequest(text="no such preset")
+                data = p.get("data") or {}
+            merged = _gameplay_merge(cfg, data, "replace")
             cfg = config_store.save(config_store._coerce_numbers(merged))
             engine.set_config(cfg)
         elif action == "delete":
@@ -957,7 +973,21 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                                        if (p.get("name") or "").strip().lower() != name.lower()]
             cfg = config_store.save(cfg)
             engine.set_config(cfg)
+        elif action == "rename":
+            if not new_name:
+                raise web.HTTPBadRequest(text="a new name is required")
+            p = _find(name)
+            if p is None:
+                raise web.HTTPBadRequest(text="no such preset")
+            if _find(new_name):
+                raise web.HTTPBadRequest(text="a preset with that name already exists")
+            p["name"] = new_name
+            cfg["gameplay_presets"] = presets
+            cfg = config_store.save(cfg)
+            engine.set_config(cfg)
         elif action == "export":
+            if name.strip().lower() == BUILTIN_PRESET_NAME.lower():
+                return web.json_response({"name": BUILTIN_PRESET_NAME, "data": _builtin_preset_data()})
             p = _find(name)
             if p is None:
                 raise web.HTTPBadRequest(text="no such preset")
@@ -1185,7 +1215,6 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/control/leaderboard", control_leaderboard),
         web.post("/api/control/broadcast", control_broadcast),
         web.post("/api/control/cleanup", control_cleanup),
-        web.post("/api/restore-defaults", restore_defaults),
         web.post("/api/config/export", export_config),
         web.post("/api/config/import", import_config),
         web.post("/api/gameplay/export", export_gameplay),

@@ -1,6 +1,6 @@
 {
-  "version": "3.37.0",
-  "versionCode": 107,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.37.0/discoflate.apk",
-  "notes": "DiscoFlate v3.37.0 — 'Tracked users' is now 'Leaderboards': a 'Broadcast Top Pumpers:' line with Current + Lifetime buttons, each with a 🗑 that confirms before resetting that board (Current = this session's pumpers & tracked list; Lifetime = the all-time board). New conditional message lines: start a line with [if name] and it shows only when that placeholder has a value (e.g. [if runnerup]🥈 Runner-up: [runnerup]); [if not name] for the inverse; works with any placeholder. Awards to a placeholder with no value (e.g. [runnerup] when there wasn't one) quietly skip."
+  "version": "3.38.0",
+  "versionCode": 108,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.38.0/discoflate.apk",
+  "notes": "DiscoFlate v3.38.0 — no more save buttons: everything autosaves as you edit, and there's now ONE universal '💾 Save all' bar pinned to the bottom of every page as a manual safety. All the per-section Save buttons and the 'Restore Default Config' buttons are gone. The shipped defaults are now an IMMUTABLE built-in Gameplay Preset ('Defaults (built-in)' = Basic Session, minus the electrode event, with [operator] in place of any hard-coded name) — load it any time; it can't be edited/renamed/deleted/overwritten. A brand-new install now starts pre-loaded with it in every field. Presets also gained a ✏️ rename."
 }
