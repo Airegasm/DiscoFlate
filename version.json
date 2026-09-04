@@ -1,6 +1,6 @@
 {
-  "version": "3.20.1",
-  "versionCode": 89,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.20.1/discoflate.apk",
-  "notes": "DiscoFlate v3.20.1 \u2014 competition winner idle deadline: give the winner a stated time limit to use their granted command; if they don't, it auto-fires so the game can't stall."
+  "version": "3.21.0",
+  "versionCode": 90,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.21.0/discoflate.apk",
+  "notes": "DiscoFlate v3.21.0 \u2014 new command type 'actions': a full action sequence like events (message/broadcast/fire/roll/capacity/wait/poll/competition/end_session), so one command can do a whole series of things and even trigger competitions/polls. Existing command types unchanged. 'Owner-only' relabeled 'Owner/Bot Internal Only'."
 }

@@ -699,6 +699,7 @@
         <li><b>roll</b> — rolls dice and fires for the total. Leave <b>Dice/Sides</b> on <code>rng</code> to use the <i>current range's</i> dice, or pin specific dice (e.g. 2 d 6).</li>
         <li><b>say</b> — text-only reply, no device. Good for lore, hints, or status.</li>
         <li><b>chance</b> — a gamble. Rolls 1–100 against your <b>Chance %</b>; <b>Luck %</b> is a ± chance to force the outcome (positive = force a win, negative = force a miss). A <b>win</b> posts the <b>Success message</b> and fires the <b>🟢 win</b> device rows; a <b>miss</b> posts the <b>Failure message</b> and fires the separate <b>🔴 failure</b> device rows (leave them empty to fire nothing on a miss). Placeholders <code>[roll]</code>, <code>[chance]</code>, <code>[luck]</code>, <code>[secs]</code> work in both. Like every command it's range-gated, cooldownable, and <b>exhaustable</b> (Max/person, set per range).</li>
+        <li><b>actions</b> — a full <b>action sequence</b>, exactly like an event's: add any number of steps by type (<b>message</b> · <b>broadcast</b> a saved preset · <b>fire</b> · <b>roll</b> · <b>capacity</b> add/set · <b>wait</b> · start a <b>poll</b> · start a <b>competition</b> · <b>end_session</b>), executed in order. Fires credit the person who ran it. Use this when one command should do several things — e.g. <i>message → wait 3s → fire → start a competition</i>.</li>
         <li><b>game-pushluck</b> — a private button minigame: the player presses <b>💨 Pump</b> for points at a rising bust chance (starts at <b>Bust start %</b>, <b>+% / pump</b>) or <b>🏦 Bank</b> to lock in. Bust = 0. You set max pumps + points/pump and the <b>outcome tiers</b> (score → broadcast message + optional pump fire credited to the player).</li>
         <li><b>game-simon</b> — a private memory minigame: the bot shows a growing emoji sequence for <b>Reveal (s)</b>, hides it, and the player repeats it with buttons. Score = rounds survived. Set # symbols + max rounds and the same <b>outcome tiers</b>.</li>
         <li><b>game-balloon</b> (Don't Pop It) — a button grid; reveal safe cells for points, or 🏦 Cash Out before you hit a hidden balloon (pop = 0). Set # cells, # balloons, points/cell. Score = points cashed out.</li>
@@ -2076,7 +2077,7 @@ function renderCommands(){
       `<div class="row" style="gap:10px">`+
         `<label class="field">Name <input value="${esc(c.name||'')}" placeholder="spin" style="width:140px" onchange="renameCommand(${i}, this.value)"></label>`+
         `<label class="field">Type <select onchange="commandRows[${i}].type=this.value;renderCommands()">`+
-          ['fire','roll','say','chance','poll','game-pushluck','game-simon','game-balloon','game-rps','game-slots','game-blackjack'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`+
+          ['fire','roll','say','chance','actions','poll','game-pushluck','game-simon','game-balloon','game-rps','game-slots','game-blackjack'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`+
         (typ==='poll'?`<label class="field">Poll <select onchange="commandRows[${i}].poll=this.value;scheduleSave()">${pollNameOpts(c.poll)}</select></label>`:'')+
         (typ==='fire'?`<label class="field">Seconds <input type="number" value="${c.seconds??''}" min="0" step="0.5" style="width:80px" onchange="commandRows[${i}].seconds=+this.value"></label>`+
           `<label class="field">Fire until % <span class="muted">(optional — runs until capacity hits this; great for a winner's progression command)</span> <input type="number" value="${c.fire_until??''}" min="1" max="999" step="1" placeholder="off" style="width:90px" onchange="commandRows[${i}].fire_until=(this.value===''?null:+this.value)"></label>`:'')+
@@ -2101,7 +2102,7 @@ function renderCommands(){
       `<div class="muted" style="font-size:12px">${cmdRangeSummary(c.name)}</div>`+
       `<div class="row" style="gap:16px">`+
         `<label class="field" title="EXTRA restriction on top of range membership: even where the command is a member, it only responds while capacity is inside this band. 'All ranges' (default) = no extra gate.">Range gate <select onchange="commandRows[${i}].range_gate=this.value;scheduleSave()">${rangeGateOptions(c.range_gate)}</select></label>`+
-        `<label class="row" style="gap:6px"><input type="checkbox" ${c.owner_only?'checked':''} onchange="commandRows[${i}].owner_only=this.checked"> owner-only</label>`+
+        `<label class="row" style="gap:6px" title="only the Owner can type it — and it's callable by the bot internally (range-start, [!command], action blocks)"><input type="checkbox" ${c.owner_only?'checked':''} onchange="commandRows[${i}].owner_only=this.checked"> Owner/Bot Internal Only</label>`+
         `<label class="row" style="gap:6px"><input type="checkbox" ${c.mention?'checked':''} onchange="commandRows[${i}].mention=this.checked"> reply pings user</label>`+
         `<label class="row" style="gap:6px"><input type="checkbox" ${c.hide_in_list?'checked':''} onchange="commandRows[${i}].hide_in_list=this.checked"> hide from command list</label>`+
         (!isGame
@@ -2118,7 +2119,12 @@ function renderCommands(){
               `<label class="field">Failure message <span class="muted">(on a miss)</span><textarea rows="3" onchange="commandRows[${i}].failure_reply=this.value">${esc(c.failure_reply||'')}</textarea></label>`
             : `<label class="field">Reply <textarea rows="4" onchange="commandRows[${i}].reply=this.value">${esc(c.reply||'')}</textarea></label>`)+
           (typ==='fire' ? firesEditor(i, c, 'fires', 'Device fires') : '')+
-          (typ==='chance' ? firesEditor(i, c, 'fires', '🟢 Fires on WIN') + firesEditor(i, c, 'fail_fires', '🔴 Fires on FAILURE') : ''))+
+          (typ==='chance' ? firesEditor(i, c, 'fires', '🟢 Fires on WIN') + firesEditor(i, c, 'fail_fires', '🔴 Fires on FAILURE') : '')+
+          (typ==='actions'
+            ? `<div style="border-top:1px solid var(--line);padding-top:8px;margin-top:4px"><div class="muted" style="margin-bottom:6px"><b>Actions</b> — run in order when the command is used (fires credit the runner):</div>`+
+              ((c.actions||[]).map((a,j)=>actionRow(`commandRows[${i}].actions`,'renderCommands',j,a)).join('')||'<div class="muted">no actions yet</div>')+
+              `<button class="ghost" style="margin-top:6px" onclick="commandRows[${i}].actions=commandRows[${i}].actions||[];commandRows[${i}].actions.push({type:'fire',seconds:3});renderCommands();scheduleSave()">+ Add action</button></div>`
+            : ''))+
       `<label class="field">Starts events <input value="${esc((c.start_events||[]).join(', '))}" placeholder="event names, comma-separated" onchange="commandRows[${i}].start_events=idList(this.value)"></label>`;
     }
     el.innerHTML = html;
@@ -2143,6 +2149,7 @@ function cleanCommands(){
     react_only: !!c.react_only, react_emoji: (c.react_emoji||'').trim(),
     poll: (c.poll||'').trim()||null,
     fire_until: (c.fire_until>0)?+c.fire_until:null,
+    actions: cleanActionRows(c.actions),
     // chance + multi-device fire
     fires: cleanFires(c.fires),
     fail_fires: cleanFires(c.fail_fires),

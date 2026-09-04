@@ -961,12 +961,14 @@ class Engine:
                 await self.abort(reason=f"capacity event {name}")
             self._capev_tasks[key] = asyncio.create_task(self._run_capev(ev, key, name))
 
-    async def _run_action_block(self, actions, name: str, hdr: str | None = None) -> None:
-        """Execute an ordered action block: message | fire | roll | capacity |
-        wait | poll. Shared by capacity events and poll winner outcomes. A poll
-        action BLOCKS the caller until the poll (and its winner's actions)
-        finish — that's what keeps a surrounding event 'running' throughout.
-        `name` labels logs; `hdr` (default = name) is the output-header tag."""
+    async def _run_action_block(self, actions, name: str, hdr: str | None = None,
+                                uid=None, who: str | None = None) -> None:
+        """Execute an ordered action block: message | broadcast | fire | roll |
+        capacity | wait | poll | competition | end_session. Shared by capacity
+        events, poll outcomes, and 'actions'-type custom commands. A poll action
+        BLOCKS the caller until it finishes. `name` labels logs; `hdr` (default =
+        name) is the output-header tag; `uid`/`who` (a command's runner) credit
+        that person's leaderboard for the block's fires."""
         if hdr is None:
             hdr = name
         for a in (actions or []):
@@ -1043,7 +1045,9 @@ class Engine:
                         dur = self._duration_from_total(total)
                     else:
                         dur = round(max(0.1, min(self._hard_cap(), float(a.get("seconds") or 3))), 1)
-                    self._begin_or_extend(target, dur, name)
+                    fr = self._begin_or_extend(target, dur, name)
+                    if uid is not None and fr.get("status") in ("started", "extended"):
+                        self.credit_pump(uid, who, fr.get("added", dur), target)
                     msg = (a.get("message") or "").strip()
                     if msg:
                         await self._announce(self._evt_hdr(hdr) + self.render(
@@ -2092,6 +2096,32 @@ class Engine:
             return {"ok": True, "device": False, "started": False, "events_posted": ev_posts,
                     "reply": self.render(cmd.get("reply") or "", {"user": who, "mention": self._mention(uid, who), "cmd_remain": _remain()}) or f"{name}!",
                     "reply_anon": self.render(cmd.get("reply") or "", {"user": anon, "mention": anon, "cmd_remain": _remain()}) or f"{name}!"}
+
+        if typ == "actions":
+            # A full action SEQUENCE (like an event): message / broadcast /
+            # fire / roll / capacity / wait / poll / competition / end_session,
+            # in order. Same gating as any command; the block's fires credit
+            # the runner. start_events still supported alongside.
+            cmdkey = name.lower()
+            cd, scope = self._range_cd_scope(self.range_for(self.capacity), cmdkey)
+            key_uid = str(uid) if scope == "user" else "*"
+            exempt = uid is not None and self._is_exempt(uid, who)
+            if uid is not None and not exempt:
+                remaining = self.cooldown_remaining(key_uid, cmdkey)
+                if remaining > 0:
+                    return {"ok": False, "cooldown": True, "error": self._cooldown_reply(who, remaining, uid, cmdkey)}
+            if uid is not None:
+                self._track_user(uid, who)
+                if scope == "command" or not exempt:
+                    self._touch_cooldown(key_uid, cmdkey, cd)
+            _spend_use()
+            ev_posts, _ = await self.start_events(cmd.get("start_events"), uid, who)
+            await self._run_action_block(cmd.get("actions"), f"{name} by {who}", hdr=name, uid=uid, who=who)
+            anon = self._anon_label()
+            tmpl = cmd.get("reply") or ""
+            return {"ok": True, "device": True, "started": True, "events_posted": ev_posts,
+                    "reply": self.render(tmpl, {"user": who, "mention": self._mention(uid, who), "cmd_remain": _remain()}),
+                    "reply_anon": self.render(tmpl, {"user": anon, "mention": anon, "cmd_remain": _remain()})}
 
         if typ == "poll":
             # Starts a named poll (same gating as other commands; the poll
