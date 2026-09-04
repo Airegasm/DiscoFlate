@@ -977,7 +977,10 @@ class Engine:
         return fx in self._capev_session_fx or any(fx in s for s in self._capev_fx.values())
 
     def _capev_enabled_cmds(self) -> set:
-        out = set()
+        # command_gate 'allow' rows bypass EVERY gate (block_all, disable-range,
+        # disable-always-on, range membership) — same power the old capacity-event
+        # enable-list had.
+        out = set(self._cmd_gate_allow)
         for s in self._capev_enable.values():
             out |= s
         return out
@@ -1375,6 +1378,8 @@ class Engine:
                             self._capev_session_fx.discard("pause_events")
                         elif op == "allow" and ck:
                             self._cmd_gate_allow.add(ck)
+                        elif op == "unallow" and ck:
+                            self._cmd_gate_allow.discard(ck)
                         elif op == "block" and ck:
                             self._cmd_gate_blocked_cmds.add(ck)
                         elif op == "unblock" and ck:

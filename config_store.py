@@ -34,7 +34,7 @@ DEFAULT_PUMPDIRECT_PATH = os.path.normpath(
 
 # Schema version of the stored config. Bump it + add a _migrate step whenever a
 # key is renamed/moved, so old configs upgrade instead of silently stranding data.
-CONFIG_VERSION = 8
+CONFIG_VERSION = 9
 
 # The dead "dice recharged" default that a remediation migration accidentally
 # promoted to the live cooldown-ready message. Migration v3 undoes that.
@@ -263,10 +263,9 @@ DEFAULTS = {
     # End / End Sequence overrules them). Each:
     #   {name, enabled, at (1-999),
     #    stop_devices,                                   # abort all fires once, at trigger
-    #    disable_range_cmds, disable_range_cmds_scope,   # chat-only; scope: "event"|"session"
-    #    disable_always_on, disable_always_on_scope,
-    #    pause_events, pause_events_scope,
-    #    enable_commands_on, enable_commands: [names],   # usable during the event regardless
+    #    # command gating (disable range/always-on cmds, pause events, allow
+    #    # specific ones) is done with a command_gate action IN the block below —
+    #    # the old disable_*/pause_events/enable_commands tickboxes migrated there.
     #    actions: [{type: message|broadcast|command|fire|roll|capacity|wait|poll|
     #               competition|bonus_round|award|command_gate|end_session,
     #               # message: style (plain|embed) + title + message; an OPTIONAL
@@ -620,6 +619,37 @@ def _migrate(cfg: dict) -> dict:
         # v8: award_prize + award_amount → one `award` (award_type command/pct/
         # secs); the `embed` action folds into `message` (style plain/embed).
         _walk_migrate_actions_v8(cfg)
+    if v < 9:
+        # v9: capacity-event gating TICKBOXES become command_gate rows inside the
+        # event's action block. Event-scoped effects disable at the start of the
+        # block and resume at the end (auto-lift); session-scoped ones just
+        # disable (a later command/event can resume them). enable_commands →
+        # allow rows (a universal bypass), unallowed at block end (event-scoped).
+        for e in (cfg.get("capacity_events") or []):
+            if not isinstance(e, dict):
+                continue
+            disables = []
+            resumes = []
+            for tick, dis_op, res_op in (
+                    ("disable_range_cmds", "disable_range_cmds", "resume_range_cmds"),
+                    ("disable_always_on", "disable_always_on", "resume_always_on"),
+                    ("pause_events", "pause_events", "resume_events")):
+                if e.get(tick):
+                    disables.append({"op": dis_op})
+                    if (e.get(tick + "_scope") or "event") != "session":
+                        resumes.append({"op": res_op})
+            allows = list(e.get("enable_commands") or []) if e.get("enable_commands_on") else []
+            pre = [{"op": "allow", "command": c} for c in allows] + disables
+            resumes += [{"op": "unallow", "command": c} for c in allows]   # enable is during-event
+            if pre:
+                acts = list(e.get("actions") or [])
+                e["actions"] = ([{"type": "command_gate", "modifiers": pre}] + acts
+                                + ([{"type": "command_gate", "modifiers": resumes}] if resumes else []))
+            for dead in ("disable_range_cmds", "disable_range_cmds_scope",
+                         "disable_always_on", "disable_always_on_scope",
+                         "pause_events", "pause_events_scope",
+                         "enable_commands_on", "enable_commands"):
+                e.pop(dead, None)
     cfg["config_version"] = CONFIG_VERSION
     return cfg
 

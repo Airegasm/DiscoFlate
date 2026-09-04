@@ -1,6 +1,6 @@
 {
   "discord_token": "",
-  "config_version": 8,
+  "config_version": 9,
   "config_rev": 0,
   "command_prefix": "!",
   "listener_enabled": false,
@@ -2003,15 +2003,21 @@
       "enabled": true,
       "at": 99,
       "stop_devices": true,
-      "disable_range_cmds": true,
-      "disable_range_cmds_scope": "event",
-      "disable_always_on": true,
-      "disable_always_on_scope": "event",
-      "pause_events": true,
-      "pause_events_scope": "event",
-      "enable_commands_on": false,
-      "enable_commands": [],
       "actions": [
+        {
+          "type": "command_gate",
+          "modifiers": [
+            {
+              "op": "disable_range_cmds"
+            },
+            {
+              "op": "disable_always_on"
+            },
+            {
+              "op": "pause_events"
+            }
+          ]
+        },
         {
           "type": "message",
           "message": "** \ud83d\udea8 WARNING\u203c\ufe0f: [operator]'s belly has officially reached critical capacity! It's now time to decide the next step of this inflation procedure...**",
@@ -2037,6 +2043,20 @@
           "poll": "Popordonot",
           "broadcast": null,
           "if_option": null
+        },
+        {
+          "type": "command_gate",
+          "modifiers": [
+            {
+              "op": "resume_range_cmds"
+            },
+            {
+              "op": "resume_always_on"
+            },
+            {
+              "op": "resume_events"
+            }
+          ]
         }
       ],
       "post_actions": []
@@ -2046,14 +2066,6 @@
       "enabled": true,
       "at": 33,
       "stop_devices": false,
-      "disable_range_cmds": false,
-      "disable_range_cmds_scope": "event",
-      "disable_always_on": false,
-      "disable_always_on_scope": "event",
-      "pause_events": false,
-      "pause_events_scope": "event",
-      "enable_commands_on": false,
-      "enable_commands": [],
       "actions": [
         {
           "type": "message",
@@ -2076,14 +2088,6 @@
       "enabled": true,
       "at": 66,
       "stop_devices": false,
-      "disable_range_cmds": false,
-      "disable_range_cmds_scope": "event",
-      "disable_always_on": false,
-      "disable_always_on_scope": "event",
-      "pause_events": false,
-      "pause_events_scope": "event",
-      "enable_commands_on": false,
-      "enable_commands": [],
       "actions": [
         {
           "type": "message",
@@ -2106,14 +2110,6 @@
       "enabled": true,
       "at": 81,
       "stop_devices": false,
-      "disable_range_cmds": false,
-      "disable_range_cmds_scope": "event",
-      "disable_always_on": false,
-      "disable_always_on_scope": "event",
-      "pause_events": false,
-      "pause_events_scope": "event",
-      "enable_commands_on": false,
-      "enable_commands": [],
       "actions": [
         {
           "type": "message",

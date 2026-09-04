@@ -2695,8 +2695,8 @@ function actionRow(base, rr, j, a, condLabels){
   }
   if(typ==='command_gate'){
     const nb=`${base}[${j}].modifiers`;
-    const OPS=[['block_all','block ALL custom + roll'],['allow','allow a command through'],['block','block a command'],['unblock','unblock a command'],['disable_range_cmds','disable this range’s commands'],['resume_range_cmds','resume range commands'],['disable_always_on','disable always-on commands'],['resume_always_on','resume always-on'],['pause_events','pause timed events'],['resume_events','resume timed events'],['remove_block','remove ALL gates']];
-    const needsCmd=o=>['allow','block','unblock'].includes(o);
+    const OPS=[['block_all','block ALL custom + roll'],['allow','allow a command through'],['unallow','undo allow'],['block','block a command'],['unblock','unblock a command'],['disable_range_cmds','disable this range’s commands'],['resume_range_cmds','resume range commands'],['disable_always_on','disable always-on commands'],['resume_always_on','resume always-on'],['pause_events','pause timed events'],['resume_events','resume timed events'],['remove_block','remove ALL gates']];
+    const needsCmd=o=>['allow','unallow','block','unblock'].includes(o);
     const rows=(a.modifiers||[]).map((m,k)=>
       `<div class="row" style="gap:6px;align-items:center">`+
         `<select onchange="${nb}[${k}].op=this.value;${rr}();scheduleSave()">`+OPS.map(([v,l])=>`<option value="${v}" ${(m.op||'block_all')===v?'selected':''}>${l}</option>`).join('')+`</select>`+
@@ -2762,8 +2762,7 @@ function renderCapEvents(){
   capEvRows.forEach((e,i)=>{
     const open=capEvOpen.has(i);
     const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap='10px';
-    const fx=[e.stop_devices?'stop devices':'', e.disable_range_cmds?'disable range cmds':'', e.disable_always_on?'disable always-on':'',
-              e.pause_events?'pause events':'', (e.enable_commands_on&&(e.enable_commands||[]).length)?`enable ${(e.enable_commands||[]).length}`:'',
+    const fx=[e.stop_devices?'stop devices':'',
               `${(e.actions||[]).length} action${(e.actions||[]).length===1?'':'s'}`].filter(Boolean).join(' · ');
     let html =
       // whole header toggles this event open/closed (checkbox + delete are guarded)
@@ -2784,22 +2783,8 @@ function renderCapEvents(){
       `</div>`+
       `<div class="colsec" style="gap:8px">`+
         `<label class="row" style="gap:6px"><input type="checkbox" ${e.stop_devices?'checked':''} onchange="capEvRows[${i}].stop_devices=this.checked;scheduleSave()"> <b>Stop All Devices</b> <span class="muted">(once, at trigger)</span></label>`+
-        `<div class="row" style="gap:6px;flex-wrap:wrap"><label class="row" style="gap:6px"><input type="checkbox" ${e.disable_range_cmds?'checked':''} onchange="capEvRows[${i}].disable_range_cmds=this.checked;renderCapEvents();scheduleSave()"> <b>Disable Custom Range Commands</b> <span class="muted">(chat only)</span></label>${capScopeRadio(i,'disable_range_cmds')}</div>`+
-        `<div class="row" style="gap:6px;flex-wrap:wrap"><label class="row" style="gap:6px"><input type="checkbox" ${e.disable_always_on?'checked':''} onchange="capEvRows[${i}].disable_always_on=this.checked;renderCapEvents();scheduleSave()"> <b>Disable Always-On Custom Commands</b> <span class="muted">(chat only)</span></label>${capScopeRadio(i,'disable_always_on')}</div>`+
-        `<div class="row" style="gap:6px;flex-wrap:wrap"><label class="row" style="gap:6px"><input type="checkbox" ${e.pause_events?'checked':''} onchange="capEvRows[${i}].pause_events=this.checked;renderCapEvents();scheduleSave()"> <b>Pause All Timed Events</b></label>${capScopeRadio(i,'pause_events')}</div>`+
-        `<label class="row" style="gap:6px"><input type="checkbox" ${e.enable_commands_on?'checked':''} onchange="capEvRows[${i}].enable_commands_on=this.checked;renderCapEvents();scheduleSave()"> <b>Enable the Following Commands</b> <span class="muted">(during the event — wins over the disables and range membership)</span></label>`;
-      if(e.enable_commands_on){
-        const names=(e.enable_commands||[]).map((n,k)=>
-          `<span class="pill" style="gap:6px">!${esc(n)} <a style="cursor:pointer" onclick="capEvRows[${i}].enable_commands.splice(${k},1);renderCapEvents();scheduleSave()">✕</a></span>`).join(' ');
-        const have=new Set((e.enable_commands||[]).map(n=>n.toLowerCase()));
-        const avail=commandRows.map(c=>(c.name||'').trim()).filter(Boolean).filter(n=>!have.has(n.toLowerCase()));
-        const addSel = avail.length
-          ? `<select onchange="if(this.value){capEvRows[${i}].enable_commands=capEvRows[${i}].enable_commands||[];capEvRows[${i}].enable_commands.push(this.value);renderCapEvents();scheduleSave();}"><option value="">+ Add command…</option>`+
-            avail.map(n=>`<option value="${esc(n)}">!${esc(n)}</option>`).join('')+`</select>`
-          : `<span class="muted">no more custom commands to add</span>`;
-        html += `<div class="row" style="gap:8px;margin-left:26px;flex-wrap:wrap">${names||'<span class="muted">none yet</span>'} ${addSel}</div>`;
-      }
-      html += `</div>`+
+        `<div class="hint" style="margin:0">Gate commands during this event — disable range/always-on commands, pause timed events, allow specific ones — by adding a <b>command_gate</b> action to the block below (it stacks all those modifiers). A <b>remove</b>/<b>resume</b> modifier at the end lifts it; leave it off to persist for the session.</div>`+
+      `</div>`+
       `<div style="border-top:1px solid var(--line);padding-top:8px">`+
         `<div class="muted" style="margin-bottom:6px"><b>During the Event</b> — the action block runs in order; the event's restrictions hold until it finishes.</div>`+
         ((e.actions||[]).map((a,j)=>capEvActionRow(i,j,a)).join('')||'<div class="muted" style="margin-bottom:6px">no actions yet</div>')+
@@ -2811,11 +2796,7 @@ function renderCapEvents(){
   });
 }
 function addCapEvent(){
-  capEvRows.push({name:'',enabled:true,at:50,stop_devices:false,
-    disable_range_cmds:false,disable_range_cmds_scope:'event',
-    disable_always_on:false,disable_always_on_scope:'event',
-    pause_events:false,pause_events_scope:'event',
-    enable_commands_on:false,enable_commands:[],actions:[]});
+  capEvRows.push({name:'',enabled:true,at:50,stop_devices:false,actions:[],post_actions:[]});
   capEvOpen.add(capEvRows.length-1); renderCapEvents(); scheduleSave();
 }
 function delCapEvent(i){
@@ -3082,10 +3063,10 @@ function cleanActionRows(arr){
       else { o.amount=(typeof a.amount==='string'&&a.amount.includes('['))?a.amount:(+a.amount||0); } }
     if(t==='bonus_round'){ o.bonus_round=(a.bonus_round||'').trim()||null; }
     if(t==='command_gate'){
-      const OK=['block_all','remove_block','allow','block','unblock','disable_range_cmds','resume_range_cmds','disable_always_on','resume_always_on','pause_events','resume_events'];
+      const OK=['block_all','remove_block','allow','unallow','block','unblock','disable_range_cmds','resume_range_cmds','disable_always_on','resume_always_on','pause_events','resume_events'];
       o.modifiers=(a.modifiers|| (a.gate_mode?[{op:a.gate_mode}]:[]) ).map(m=>{
         const op=OK.includes(m.op)?m.op:'block_all';
-        const r={op}; if(['allow','block','unblock'].includes(op)) r.command=(m.command||'').trim(); return r;
+        const r={op}; if(['allow','unallow','block','unblock'].includes(op)) r.command=(m.command||'').trim(); return r;
       }); }
     if(t==='message'){ o.style=a.style==='embed'?'embed':'plain'; o.title=a.title||''; o.target=(a.target||'').trim();
       if(o.target){ o.label=a.label||''; o.freeze=!!a.freeze; o.deadline=Math.max(0,+a.deadline||0);
@@ -3111,11 +3092,6 @@ function cleanCapEvents(){
     name:(e.name||'').trim(), enabled:e.enabled!==false,
     at:Math.max(1,Math.min(999,+e.at||1)),
     stop_devices:!!e.stop_devices,
-    disable_range_cmds:!!e.disable_range_cmds, disable_range_cmds_scope:e.disable_range_cmds_scope==='session'?'session':'event',
-    disable_always_on:!!e.disable_always_on, disable_always_on_scope:e.disable_always_on_scope==='session'?'session':'event',
-    pause_events:!!e.pause_events, pause_events_scope:e.pause_events_scope==='session'?'session':'event',
-    enable_commands_on:!!e.enable_commands_on,
-    enable_commands:(e.enable_commands||[]).map(x=>String(x).trim()).filter(Boolean),
     actions:cleanActionRows(e.actions),
     post_actions:cleanActionRows(e.post_actions),
   }));

@@ -1,6 +1,6 @@
 {
-  "version": "3.41.0",
-  "versionCode": 111,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.41.0/discoflate.apk",
-  "notes": "DiscoFlate v3.41.0 — every action row now has a 📋 Duplicate button and a ⋮⋮ drag handle to reorder actions within a block (works at any nesting — command/event/competition/bonus-round blocks, poll options, button/post-pump sub-blocks)."
+  "version": "3.42.0",
+  "versionCode": 112,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.42.0/discoflate.apk",
+  "notes": "DiscoFlate v3.42.0 — the capacity-event gating tickboxes (disable range/always-on commands, pause events, enable-commands) are gone: they now migrate into command_gate rows inside the event's action block (event-scope disables at the start + resumes at the end; session-scope persists and can be resumed elsewhere; enable→allow). command_gate's 'allow' is a universal bypass; added an 'unallow'. Everything auto-migrates and the built-in default was rebuilt to match."
 }
