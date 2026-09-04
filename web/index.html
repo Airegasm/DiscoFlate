@@ -123,13 +123,17 @@
     .toggles{flex-basis:100%;margin-left:0;justify-content:flex-end}
   }
   /* operator Controls: one feature per row — BUTTON then its field(s) */
-  .ctrlgrid{display:flex;flex-direction:column;gap:8px}
-  .ctrlrow{display:flex;gap:10px;align-items:center;flex-wrap:nowrap}
-  .ctrlrow>button{min-width:200px;text-align:left;flex:none}
-  .ctrlrow .ctrlfield{display:flex;gap:6px;align-items:center;flex:1;min-width:0}
-  .ctrlrow .ctrlfield select,.ctrlrow .ctrlfield input{min-width:0}
-  .ctrlrow .ctrlfield select{flex:1}
-  @media(max-width:560px){ .ctrlrow>button{min-width:150px} }
+  /* operator Controls: every row a fixed 2-column grid (same template → columns
+     line up). Every button the same width; fields sized to their content, NOT
+     flex-stretched. */
+  .ctrlgrid{display:flex;flex-direction:column;gap:8px;align-items:start}
+  .ctrlrow{display:grid;grid-template-columns:210px 210px;gap:12px;align-items:center}
+  .ctrlrow>button{text-align:left}                 /* fills its 210px column */
+  .ctrlrow .ctrlfield{display:flex;gap:6px;align-items:center}
+  select.ctrlfield{width:210px}                     /* broadcast/poll name dropdowns */
+  .ctrlrow .ctrlfield select{width:64px}            /* small dice/sides dropdowns */
+  .ctrlrow .ctrlfield input{width:90px}             /* numeric inputs (uniform) */
+  @media(max-width:520px){ .ctrlrow{grid-template-columns:140px 1fr} select.ctrlfield{width:100%} }
 </style>
 </head>
 <body>
@@ -185,6 +189,7 @@
       <div class="row" style="align-items:center">
         <div style="flex:1"><span class="muted">⏱ Session uptime:</span> <b id="uptimeVal">0s</b></div>
         <button class="warn" onclick="if(confirm('Reset the session? Capacity → 0%, all cooldowns cleared, timed events re-armed, command-started events reverted.')) act('/api/session-reset')">↺ Session reset</button>
+        <button class="bad" id="ctrlStopBtn" onclick="controlStop()" title="Pause the whole session: pumps off, events + games cancelled, commands latched until Resume">🛑 Stop</button>
       </div>
 
       <!-- operator controls: fire real in-channel actions as the owner -->
@@ -197,7 +202,7 @@
           </div>
           <div class="ctrlrow">
             <button onclick="controlPump()">💨 Pump</button>
-            <span class="ctrlfield"><input type="number" id="ctrlPump" value="5" min="1" step="0.5" style="width:90px"><span class="muted">secs</span></span>
+            <span class="ctrlfield"><input type="number" id="ctrlPump" value="5" min="1" step="0.5"><span class="muted">secs</span></span>
           </div>
           <div class="ctrlrow">
             <button class="ghost" onclick="controlCapacity()">📊 Broadcast Capacity</button>
@@ -212,10 +217,7 @@
           </div>
           <div class="ctrlrow">
             <button class="ghost" onclick="controlCleanup()">🧹 Cleanup</button>
-            <span class="ctrlfield"><input type="number" id="ctrlCleanup" value="1" min="1" max="100" step="1" style="width:80px"><span class="muted">of the bot's last messages</span></span>
-          </div>
-          <div class="ctrlrow">
-            <button class="bad" id="ctrlStopBtn" onclick="controlStop()" title="Pause the whole session: pumps off, events + games cancelled, commands latched until Resume">🛑 Stop</button>
+            <span class="ctrlfield"><input type="number" id="ctrlCleanup" value="1" min="1" max="100" step="1"><span class="muted">bot msgs</span></span>
           </div>
         </div>
         <div class="row" style="margin-top:8px"><span class="muted" id="ctrlMsg"></span></div>
@@ -612,7 +614,7 @@
           <input id="cmdEnter" value="enter" style="width:130px"></label>
         <span class="muted">Players type <code>!enter</code> to join, then compete.</span>
       </div>
-      <div class="hint" style="max-width:880px">A competition is an <b>action</b> (start it from a timed event or capacity-event block). Players <b>!enter</b> during the window, then compete via an entry command; enter AND meet the required entries or you're eliminated. Prizes are a <b>Winner reward action block</b> — fire <code>[winner_score]</code> to the pump, post an <b>embed with a gated button</b> (winner/runner-up/leader/allowlist), <b>award_prize</b> a command, or <b>command_gate</b> everyone else. Currently a <b>Roll-off</b> (highest score wins — by total, highest single, or most uses via the <b>metric</b>). <i>Race &amp; raffle are being redesigned and will return.</i> Placeholders: <code>[winner]</code> <code>[winner_score]</code> <code>[runnerup]</code> <code>[total_score]</code> (all finishers combined) <code>[results]</code> (full scoreboard).</div>
+      <div class="hint" style="max-width:880px">A competition is an <b>action</b> (start it from a timed event or capacity-event block). Players <b>!enter</b> during the window, then compete via an entry command; enter AND meet the required entries or you're eliminated. Prizes are a <b>Winner reward action block</b> — fire <code>[winner_score]</code> to the pump, post a <b>message/embed with a gated button</b> (winner/runner-up/leader/allowlist), <b>award</b> a bonus command or amount, or <b>command_gate</b> everyone else. Currently a <b>Roll-off</b> (highest score wins — by total, highest single, or most uses via the <b>metric</b>). <i>Race &amp; raffle are being redesigned and will return.</i> Placeholders: <code>[winner]</code> <code>[winner_score]</code> <code>[runnerup]</code> <code>[total_score]</code> (all finishers combined) <code>[results]</code> (full scoreboard).</div>
       <div id="competitions" style="margin-top:10px"></div>
       <div class="row" style="margin-top:10px">
         <button class="ghost" onclick="addCompetition()">+ Add competition</button>
@@ -622,7 +624,7 @@
       </details>
 
       <details class="help"><summary><h2>🤝 Bonus Rounds</h2></summary>
-      <div class="hint" style="max-width:880px">A Bonus Round is a <b>teamwork cash-in</b>, started by a <b>bonus_round</b> action. First bank amounts with the <b>award_amount</b> action (pump <b>seconds</b> or <b>capacity %</b>, on <code>[winner]</code>/<code>[range_leader]</code>/<code>[session_leader]</code>/…). The round posts an embed with a <b>Confirm</b> button for bonus holders; once the needed holders confirm (<b>all</b>, or just the <b>top holder</b>) before the timer, your action block runs with the pooled <code>[total_bonus_secs]</code> / <code>[total_bonus_pct]</code> — then the banks are spent. Use <code>fire [total_bonus_secs]</code> or <code>add % [total_bonus_pct]</code> to apply them.</div>
+      <div class="hint" style="max-width:880px">A Bonus Round is a <b>teamwork cash-in</b>, started by a <b>bonus_round</b> action. First bank amounts with an <b>award</b> action (volume secs/%) (pump <b>seconds</b> or <b>capacity %</b>, on <code>[winner]</code>/<code>[range_leader]</code>/<code>[session_leader]</code>/…). The round posts an embed with a <b>Confirm</b> button for bonus holders; once the needed holders confirm (<b>all</b>, or just the <b>top holder</b>) before the timer, your action block runs with the pooled <code>[total_bonus_secs]</code> / <code>[total_bonus_pct]</code> — then the banks are spent. Use <code>fire [total_bonus_secs]</code> or <code>add % [total_bonus_pct]</code> to apply them.</div>
       <div id="bonusRounds" style="margin-top:10px"></div>
       <div class="row" style="margin-top:10px">
         <button class="ghost" onclick="addBonusRound()">+ Add bonus round</button>
@@ -743,7 +745,7 @@
         <li><b>roll</b> — rolls dice and fires for the total. Leave <b>Dice/Sides</b> on <code>rng</code> to use the <i>current range's</i> dice, or pin specific dice (e.g. 2 d 6).</li>
         <li><b>say</b> — text-only reply, no device. Good for lore, hints, or status.</li>
         <li><b>chance</b> — a gamble. Rolls 1–100 against your <b>Chance %</b>; <b>Luck %</b> is a ± chance to force the outcome (positive = force a win, negative = force a miss). A <b>win</b> posts the <b>Success message</b> then runs the <b>🟢 On WIN</b> action block; a <b>miss</b> posts the <b>Failure message</b> then runs the <b>🔴 On MISS</b> block (each can fire, add capacity, award a prize, start a competition — anything). Placeholders <code>[roll]</code>, <code>[chance]</code>, <code>[luck]</code>, <code>[secs]</code> work in the messages. Range-gated, cooldownable, and <b>exhaustable</b> (Max/person, set per range).</li>
-        <li><b>actions</b> — a full <b>action sequence</b>, exactly like an event's: add any number of steps by type (<b>message</b> · <b>broadcast</b> a saved preset · <b>fire</b> · <b>roll</b> · <b>command</b> (run another command) · <b>capacity</b> add/set · <b>wait</b> · <b>embed</b> (title + body, with an optional button gated to winner/runner-up/leader/everyone/allowlist that runs a nested block with freeze + timer/fallback) · start a <b>poll</b> / <b>competition</b> / <b>bonus_round</b> · <b>award_prize</b> (grant a target — e.g. <code>[range_leader]</code> — N charges of a command, cooldown bypassed) · <b>award_amount</b> (bank bonus seconds/% for a Bonus Round) · <b>command_gate</b> (block_all / remove_block) · <b>end_session</b>), executed in order. <b>fire</b> can pump a fixed time OR until a % is added/reached, block others while pumping, and run Post-Pump Actions. Fires credit the person who ran it. Use this when one command should do several things — e.g. <i>message → wait 3s → fire → start a competition</i>.</li>
+        <li><b>actions</b> — a full <b>action sequence</b>, exactly like an event's: add any number of steps by type (<b>message</b> · <b>broadcast</b> a saved preset · <b>fire</b> · <b>roll</b> · <b>command</b> (run another command) · <b>capacity</b> add/set · <b>wait</b> · start a <b>poll</b> / <b>competition</b> / <b>bonus_round</b> · <b>award</b> (a target gets a bonus command with N charges, or a banked volume in seconds/% for a Bonus Round) · <b>command_gate</b> (block_all / remove_block) · <b>end_session</b>), executed in order. A <b>message</b> can post <b>plain or as an embed</b>, and carry an optional <b>button</b> gated to winner/runner-up/leader/everyone/an allowlist that runs a nested block (freeze + timer/fallback). <b>fire</b> can pump a fixed time OR until a % is added/reached, block others while pumping, and run Post-Pump Actions. Fires credit the person who ran it. Use this when one command should do several things — e.g. <i>message → wait 3s → fire → start a competition</i>.</li>
         <li><b>game-pushluck</b> — a private button minigame: the player presses <b>💨 Pump</b> for points at a rising bust chance (starts at <b>Bust start %</b>, <b>+% / pump</b>) or <b>🏦 Bank</b> to lock in. Bust = 0. You set max pumps + points/pump and the <b>outcome tiers</b> (score → broadcast message + optional pump fire credited to the player).</li>
         <li><b>game-simon</b> — a private memory minigame: the bot shows a growing emoji sequence for <b>Reveal (s)</b>, hides it, and the player repeats it with buttons. Score = rounds survived. Set # symbols + max rounds and the same <b>outcome tiers</b>.</li>
         <li><b>game-balloon</b> (Don't Pop It) — a button grid; reveal safe cells for points, or 🏦 Cash Out before you hit a hidden balloon (pop = 0). Set # cells, # balloons, points/cell. Score = points cashed out.</li>
@@ -944,7 +946,7 @@ esphome dashboard config/</code></pre>
             <tr><td><code>[results]</code></td><td>competition scoreboard — everyone who entered and their final scores (live during a run, final afterward); best in a win-message embed</td></tr>
             <tr><td><code>[bonus_holders]</code></td><td>roster of who currently holds which bonus/prize command(s), what each does, and how many charges remain (best in an embed)</td></tr>
             <tr><td><code>[total_bonus_secs]</code> / <code>[total_bonus_pct]</code></td><td>pooled bonus AMOUNTS banked by everyone (pump seconds / capacity %) — what a Bonus Round cashes in</td></tr>
-            <tr><td><code>[user_bonus_secs]</code> / <code>[user_bonus_pct]</code></td><td>the current person's own banked bonus (in a per-user context — action blocks, award_amount announces)</td></tr>
+            <tr><td><code>[user_bonus_secs]</code> / <code>[user_bonus_pct]</code></td><td>the current person's own banked bonus (in a per-user context — action blocks, award announces)</td></tr>
             <tr><td><code>[pump_msg]</code></td><td>the operator Pump message (rendered), for reuse in other messages</td></tr>
             <tr><td><code>[capacity]</code></td><td>current capacity %, e.g. 47.5</td></tr>
             <tr><td><code>[capacity_bar]</code></td><td>emoji bar 🟩🟩🟩⬛⬛</td></tr>
@@ -955,7 +957,7 @@ esphome dashboard config/</code></pre>
             <tr><td><code>[custom_commands]</code></td><td>just the <b>Capacity Range Commands (start%–stop%)</b> header + this range's custom commands (no system commands)</td></tr>
             <tr><td><code>[toppump]</code> / <code>[toppump-all]</code></td><td>the leaderboard blocks — same output as the session / all-time top-pumpers commands, so you can embed a board inside any message</td></tr>
             <tr><td><code>[leaderboard_range]</code></td><td>the top-pumper board for the <b>current capacity range</b> only (a per-range leaderboard block)</td></tr>
-            <tr><td><code>[range_leader]</code> / <code>[range_leader_score]</code></td><td>the top pumper in the current range and their capacity % pumped this range — use <code>[range_leader]</code> as an <b>award_prize</b> / <b>embed</b>-button target</td></tr>
+            <tr><td><code>[range_leader]</code> / <code>[range_leader_score]</code></td><td>the top pumper in the current range and their capacity % pumped this range — use <code>[range_leader]</code> as an <b>award</b> / <b>message</b>-button target</td></tr>
             <tr><td><code>[session_leader]</code> / <code>[session_leader_score]</code></td><td>the top pumper this whole session and their capacity % — use <code>[session_leader]</code> as a target for an end-of-session special prize</td></tr>
             <tr><td><code>[on_message]</code> / <code>[off_message]</code></td><td>the configured Activation ON / OFF message text (rendered), for reuse in other messages</td></tr>
             <tr><td><code>[prefix]</code> <code>[roll_cmd]</code> <code>[capacity_cmd]</code> <code>[leaderboard_cmd]</code> <code>[pumptimer_cmd]</code></td><td>the command names (e.g. <code>!agroll</code>)</td></tr>
@@ -2185,7 +2187,7 @@ function gameTiersEditor(i, c){
       `</div>`+
       `<textarea rows="2" placeholder="broadcast on this tier · [user] [score] [secs] [secs2capacity] …" onchange="setTier(${i},${j},'message',this.value)">${esc(t.message||'')}</textarea>`+
       tierFiresEditor(i,j,t)+
-      `<div style="border-top:1px solid var(--line);padding-top:4px"><div class="muted" style="margin-bottom:4px">Actions on this tier <span class="muted">(runs after the result — award_prize, capacity, competition, embed, …)</span></div>`+
+      `<div style="border-top:1px solid var(--line);padding-top:4px"><div class="muted" style="margin-bottom:4px">Actions on this tier <span class="muted">(runs after the result — award, capacity, competition, message, …)</span></div>`+
         ((t.actions||[]).map((a,k)=>actionRow(`commandRows[${i}].game_tiers[${j}].actions`,'renderCommands',k,a)).join(''))+
         `<button class="ghost" style="margin-top:4px" onclick="commandRows[${i}].game_tiers[${j}].actions=commandRows[${i}].game_tiers[${j}].actions||[];commandRows[${i}].game_tiers[${j}].actions.push({type:'message',message:''});renderCommands();scheduleSave()">+ Add tier action</button></div>`+
     `</div>`).join('');
@@ -2280,7 +2282,7 @@ function renderCommands(){
             : `<label class="field">Reply <textarea rows="4" onchange="commandRows[${i}].reply=this.value">${esc(c.reply||'')}</textarea></label>`)+
           (typ==='fire' ? firesEditor(i, c, 'fires', 'Device fires') : '')+
           (typ==='chance'
-            ? `<div style="border-top:1px solid var(--line);padding-top:8px;margin-top:4px"><div class="muted" style="margin-bottom:6px"><b>🟢 On WIN</b> — actions run after the success message (award_prize, fire, capacity, competition, embed, …):</div>`+
+            ? `<div style="border-top:1px solid var(--line);padding-top:8px;margin-top:4px"><div class="muted" style="margin-bottom:6px"><b>🟢 On WIN</b> — actions run after the success message (award, fire, capacity, competition, message, …):</div>`+
                 ((c.win_actions||[]).map((a,j)=>actionRow(`commandRows[${i}].win_actions`,'renderCommands',j,a)).join(''))+
                 `<button class="ghost" style="margin-top:4px" onclick="commandRows[${i}].win_actions=commandRows[${i}].win_actions||[];commandRows[${i}].win_actions.push({type:'fire',seconds:5});renderCommands();scheduleSave()">+ Add win action</button>`+
               `<div class="muted" style="margin:10px 0 6px"><b>🔴 On MISS</b> — actions run after the failure message:</div>`+
@@ -2537,7 +2539,7 @@ function broadcastNameOpts(sel){
     names.map(n=>`<option value="${esc(n)}" ${sel===n?'selected':''}>${esc(n)}</option>`).join('')+
     ((sel&&!names.includes(sel))?`<option value="${esc(sel)}" selected>${esc(sel)} (missing)</option>`:'');
 }
-// Custom-command dropdown for "award_prize" actions (the command being granted).
+// Custom-command dropdown for award / command actions (the command being granted/run).
 function cmdNameOpts(sel){
   const names = commandRows.map(c=>(c.name||'').trim()).filter(Boolean);
   return `<option value="">— pick a command —</option>`+
@@ -2568,7 +2570,7 @@ function actionRow(base, rr, j, a, condLabels){
     cond=`<label class="field">Run <select onchange="${T('if_option')}=+this.value;scheduleSave()">${opts}</select></label>`;
   }
   const typeSel = cond + `<label class="field">Action <select onchange="${T('type')}=this.value;${rr}();scheduleSave()">`+
-    ['message','embed','broadcast','command','fire','roll','capacity','wait','poll','competition','bonus_round','award_prize','award_amount','command_gate','end_session'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`;
+    ['message','broadcast','command','fire','roll','capacity','wait','poll','competition','bonus_round','award','command_gate','end_session'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`;
   let fields='';
   if(typ==='wait')
     fields += `<label class="field">Seconds <span class="muted">(number or [placeholder])</span> <input value="${esc(String(a.seconds??10))}" placeholder="10 or [winner_score]" style="width:150px" onchange="${T('seconds')}=this.value;scheduleSave()"></label>`;
@@ -2587,12 +2589,13 @@ function actionRow(base, rr, j, a, condLabels){
       `<label class="field">Sides <input type="number" min="1" value="${a.sides??''}" placeholder="rng" style="width:70px" onchange="${T('sides')}=(this.value===''?null:+this.value);scheduleSave()"></label>`;
   if(typ==='fire'||typ==='roll')
     fields += `<label class="field">Device <select onchange="${T('device_id')}=this.value||null">${cmdDeviceOpts(a.device_id)}</select></label>`;
-  if(typ==='embed'){
-    const btnOn = !!(a.target||'').trim();
-    fields += `<label class="field">Titlebar <input value="${esc(a.title||'')}" placeholder="📢 Notice" style="width:180px" onchange="${T('title')}=this.value;scheduleSave()"></label>`+
-      `<label class="field">Button <select onchange="${T('target')}=this.value;${rr}();scheduleSave()">`+
-        [['','— none (plain embed) —'],['winner','winner presses'],['runnerup','runner-up presses'],['range_leader','range leader presses'],['session_leader','session leader presses'],['top_bonus_holder','top bonus holder presses'],['everyone','anyone presses'],['allowlist','allowlist presses…']].map(([v,l])=>`<option value="${v}" ${(a.target||'')===v?'selected':''}>${l}</option>`).join('')+`</select></label>`;
-    if(btnOn){
+  if(typ==='message'){
+    const st=(a.style||'plain');
+    fields += `<label class="field">Style <select onchange="${T('style')}=this.value;${rr}();scheduleSave()"><option value="plain" ${st!=='embed'?'selected':''}>plain</option><option value="embed" ${st==='embed'?'selected':''}>embed</option></select></label>`;
+    if(st==='embed') fields += `<label class="field">Titlebar <input value="${esc(a.title||'')}" placeholder="📢 Notice" style="width:170px" onchange="${T('title')}=this.value;scheduleSave()"></label>`;
+    fields += `<label class="field">Button <select onchange="${T('target')}=this.value;${rr}();scheduleSave()">`+
+        [['','— none —'],['winner','winner presses'],['runnerup','runner-up presses'],['range_leader','range leader presses'],['session_leader','session leader presses'],['top_bonus_holder','top bonus holder presses'],['everyone','anyone presses'],['allowlist','allowlist presses…']].map(([v,l])=>`<option value="${v}" ${(a.target||'')===v?'selected':''}>${l}</option>`).join('')+`</select></label>`;
+    if((a.target||'').trim()){
       fields += `<label class="field">Button label <input value="${esc(a.label||'')}" placeholder="🎁 Claim" style="width:150px" onchange="${T('label')}=this.value;scheduleSave()"></label>`+
         `<label class="row" style="gap:6px"><input type="checkbox" ${a.freeze?'checked':''} onchange="${T('freeze')}=this.checked;scheduleSave()"> Freeze others until pressed</label>`+
         `<label class="field">Deadline (s) <span class="muted">(0=none)</span> <input type="number" min="0" step="1" value="${a.deadline??0}" style="width:80px" onchange="${T('deadline')}=+this.value;scheduleSave()"></label>`;
@@ -2611,36 +2614,37 @@ function actionRow(base, rr, j, a, condLabels){
     fields += `<label class="field">Broadcast <select onchange="${T('broadcast')}=this.value;scheduleSave()">${broadcastNameOpts(a.broadcast)}</select></label>`;
   if(typ==='command')
     fields += `<label class="field">Command <select onchange="${T('command')}=this.value;scheduleSave()">${cmdNameOpts(a.command)}</select></label>`;
-  if(typ==='award_amount')
-    fields += `<label class="field">Target <input value="${esc(a.target||'[winner]')}" placeholder="[winner]" style="width:150px" onchange="${T('target')}=this.value;scheduleSave()"></label>`+
-      `<label class="field">Unit <select onchange="${T('unit')}=this.value;scheduleSave()">`+
-        [['secs','pump seconds'],['pct','capacity %']].map(([v,l])=>`<option value="${v}" ${(a.unit||'secs')===v?'selected':''}>${l}</option>`).join('')+`</select></label>`+
-      `<label class="field">Amount <span class="muted">(number or [placeholder])</span> <input value="${esc(String(a.amount??10))}" placeholder="10 or [winner_score]" style="width:150px" onchange="${T('amount')}=this.value;scheduleSave()"></label>`;
-  if(typ==='award_prize')
-    fields += `<label class="field">Target <input value="${esc(a.target||'[range_leader]')}" placeholder="[range_leader]" style="width:150px" onchange="${T('target')}=this.value;scheduleSave()"></label>`+
-      `<label class="field">Command <select onchange="${T('command')}=this.value;scheduleSave()">${cmdNameOpts(a.command)}</select></label>`+
-      `<label class="field">Charges <input type="number" min="0" step="1" value="${a.charges??1}" placeholder="∞" style="width:70px" onchange="${T('charges')}=+this.value;scheduleSave()"></label>`+
-      `<label class="row" style="gap:6px"><input type="checkbox" ${a.stash!==false?'checked':''} onchange="${T('stash')}=this.checked;scheduleSave()"> Stashable <span class="muted">(survives range changes)</span></label>`+
-      `<label class="row" style="gap:6px"><input type="checkbox" ${a.lock?'checked':''} onchange="${T('lock')}=this.checked;scheduleSave()"> Lock others until used</label>`+
-      `<label class="field">Deadline (s) <span class="muted">(0=none · auto-fires if idle)</span> <input type="number" min="0" step="1" value="${a.deadline??0}" style="width:80px" onchange="${T('deadline')}=+this.value;scheduleSave()"></label>`;
+  if(typ==='award'){
+    const at=(a.award_type||'command');
+    fields += `<label class="field">Award <select onchange="${T('award_type')}=this.value;${rr}();scheduleSave()">`+
+        [['command','bonus command'],['secs','volume (seconds)'],['pct','volume (%)']].map(([v,l])=>`<option value="${v}" ${at===v?'selected':''}>${l}</option>`).join('')+`</select></label>`+
+      `<label class="field">Target <input value="${esc(a.target||'[winner]')}" placeholder="[winner]" style="width:150px" onchange="${T('target')}=this.value;scheduleSave()"></label>`;
+    if(at==='command'){
+      fields += `<label class="field">Command <select onchange="${T('command')}=this.value;scheduleSave()">${cmdNameOpts(a.command)}</select></label>`+
+        `<label class="field">Charges <input type="number" min="0" step="1" value="${a.charges??1}" placeholder="∞" style="width:70px" onchange="${T('charges')}=+this.value;scheduleSave()"></label>`+
+        `<label class="row" style="gap:6px"><input type="checkbox" ${a.stash!==false?'checked':''} onchange="${T('stash')}=this.checked;scheduleSave()"> Stashable</label>`+
+        `<label class="row" style="gap:6px"><input type="checkbox" ${a.lock?'checked':''} onchange="${T('lock')}=this.checked;scheduleSave()"> Lock others until used</label>`+
+        `<label class="field">Deadline (s) <span class="muted">(0=none)</span> <input type="number" min="0" step="1" value="${a.deadline??0}" style="width:80px" onchange="${T('deadline')}=+this.value;scheduleSave()"></label>`;
+    } else {
+      fields += `<label class="field">Amount <span class="muted">(${at==='pct'?'capacity %':'pump seconds'} · number or [placeholder])</span> <input value="${esc(String(a.amount??10))}" placeholder="10 or [winner_score]" style="width:150px" onchange="${T('amount')}=this.value;scheduleSave()"></label>`;
+    }
+  }
   if(typ==='command_gate')
     fields += `<label class="field">Mode <select onchange="${T('gate_mode')}=this.value;scheduleSave()">`+
       [['block_all','block all custom + roll'],['remove_block','remove block']].map(([v,l])=>`<option value="${v}" ${(a.gate_mode||'block_all')===v?'selected':''}>${l}</option>`).join('')+`</select></label>`;
   if(typ==='end_session')
     fields += `<span class="muted">ends the session · posts your OFF message ${'⚠ nothing after this runs'}</span>`;
-  const msgTypes = {message:'message to post · placeholders work',
-    embed:'embed body · [target] [mention] [winner] work',
+  const msgTypes = {message:'message / embed body · placeholders work',
     fire:'optional message · [secs] works', roll:'optional message · [secs] works',
-    award_prize:'optional announce · [target] [mention] [bonus_cmd] [charges] work',
-    award_amount:'optional announce · [target] [mention] [amount] [user_bonus_secs] [user_bonus_pct] work',
+    award:'optional announce · [target] [mention] [bonus_cmd] [charges] [amount] work',
     command_gate:'optional announce · placeholders work',
     end_session:'optional extra line, posted before your OFF message'};
   const msg = msgTypes[typ]
     ? `<textarea rows="2" placeholder="${msgTypes[typ]}" onchange="${T('message')}=this.value">${esc(a.message||'')}</textarea>` : '';
-  // some actions carry their OWN nested block: embed (button allowlist + what
+  // some actions carry their OWN nested block: message (button allowlist + what
   // pressing it runs) and fire (Post-Pump Actions, run once the pump expires).
   let nested='';
-  if(typ==='embed' && (a.target||'').trim()){
+  if(typ==='message' && (a.target||'').trim()){
     let al='';
     if((a.target||'')==='allowlist'){
       const rows=(a.allow||[]);
@@ -2869,7 +2873,7 @@ function renderCompetitions(){
       // rewards = a full action block run when there's a winner
       `<div style="border-top:1px solid var(--line);padding-top:8px">`+
         (typ==='rolloff'?`<label class="row" style="gap:6px;margin-bottom:6px"><input type="checkbox" ${cd.add_all_totals?'checked':''} onchange="compRows[${i}].add_all_totals=this.checked;scheduleSave()"> Add <b>ALL</b> player totals to the timer <span class="muted">(each credited separately — otherwise add a <code>fire [winner_score]</code> action below for just the winner's)</span></label>`:'')+
-        `<div class="muted" style="margin-bottom:6px"><b>Winner reward actions</b> — run in order when there's a winner. Placeholders: <code>[winner]</code> <code>[winner_score]</code> <code>[runnerup]</code> <code>[results]</code> <code>[mention]</code>. Fires credit the winner (use <code>fire [winner_score]</code> to add their total). Post an <b>embed</b> with a gated button, <b>award_prize</b> a command, or <b>command_gate</b> everyone else.</div>`+
+        `<div class="muted" style="margin-bottom:6px"><b>Winner reward actions</b> — run in order when there's a winner. Placeholders: <code>[winner]</code> <code>[winner_score]</code> <code>[runnerup]</code> <code>[results]</code> <code>[mention]</code>. Fires credit the winner (use <code>fire [winner_score]</code> to add their total). Post a <b>message/embed</b> with a gated button, <b>award</b> a command/amount, or <b>command_gate</b> everyone else.</div>`+
         ((cd.win_actions||[]).map((a,j)=>actionRow(`compRows[${i}].win_actions`,'renderCompetitions',j,a)).join('')||'<div class="muted" style="margin-bottom:6px">no reward actions yet</div>')+
         `<button class="ghost" style="margin-top:6px" onclick="compRows[${i}].win_actions=compRows[${i}].win_actions||[];compRows[${i}].win_actions.push({type:'message',message:''});renderCompetitions();scheduleSave()">+ Add reward action</button>`+
         `<div class="muted" style="margin:10px 0 6px"><b>No-winner actions</b> <span class="muted">(optional · run when nobody qualified)</span></div>`+
@@ -3005,18 +3009,20 @@ function cleanActionRows(arr){
       poll:(a.poll||'').trim()||null, broadcast:(a.broadcast||'').trim()||null,
       competition:(a.competition||'').trim()||null,
       target:(a.target||'').trim()||null, command:(a.command||'').trim()||null,
-      charges:(t==='award_prize'&&a.charges==null)?1:(a.charges>0?+a.charges:0),
       if_option:(a.if_option>0)?+a.if_option:null};
     if(t==='fire'){ o.fire_mode=['add','to'].includes(a.fire_mode)?a.fire_mode:'seconds';
       o.fill_pct=(typeof a.fill_pct==='string'&&a.fill_pct.includes('['))?a.fill_pct:(+a.fill_pct||0);
       o.block_during=!!a.block_during; o.post_actions=cleanActionRows(a.post_actions); }
-    if(t==='award_prize'){ o.stash=a.stash!==false; o.lock=!!a.lock; o.deadline=Math.max(0,+a.deadline||0);
-      o.deadline_message=a.deadline_message||''; o.timeout_message=a.timeout_message||''; }
-    if(t==='award_amount'){ o.unit=a.unit==='pct'?'pct':'secs';
-      o.amount=(typeof a.amount==='string'&&a.amount.includes('['))?a.amount:(+a.amount||0); }
+    if(t==='award'){ o.award_type=['command','pct','secs'].includes(a.award_type)?a.award_type:'command';
+      o.target=(a.target||'').trim()||null;
+      if(o.award_type==='command'){ o.command=(a.command||'').trim()||null;
+        o.charges=(a.charges==null)?1:(a.charges>0?+a.charges:0);
+        o.stash=a.stash!==false; o.lock=!!a.lock; o.deadline=Math.max(0,+a.deadline||0);
+        o.deadline_message=a.deadline_message||''; o.timeout_message=a.timeout_message||''; }
+      else { o.amount=(typeof a.amount==='string'&&a.amount.includes('['))?a.amount:(+a.amount||0); } }
     if(t==='bonus_round'){ o.bonus_round=(a.bonus_round||'').trim()||null; }
     if(t==='command_gate'){ o.gate_mode=a.gate_mode==='remove_block'?'remove_block':'block_all'; }
-    if(t==='embed'){ o.title=a.title||''; o.target=(a.target||'').trim();
+    if(t==='message'){ o.style=a.style==='embed'?'embed':'plain'; o.title=a.title||''; o.target=(a.target||'').trim();
       if(o.target){ o.label=a.label||''; o.freeze=!!a.freeze; o.deadline=Math.max(0,+a.deadline||0);
         o.deadline_message=a.deadline_message||''; o.timeout_message=a.timeout_message||'';
         o.actions=cleanActionRows(a.actions);

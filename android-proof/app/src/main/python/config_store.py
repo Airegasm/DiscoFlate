@@ -34,7 +34,7 @@ DEFAULT_PUMPDIRECT_PATH = os.path.normpath(
 
 # Schema version of the stored config. Bump it + add a _migrate step whenever a
 # key is renamed/moved, so old configs upgrade instead of silently stranding data.
-CONFIG_VERSION = 7
+CONFIG_VERSION = 8
 
 # The dead "dice recharged" default that a remediation migration accidentally
 # promoted to the live cooldown-ready message. Migration v3 undoes that.
@@ -265,27 +265,26 @@ DEFAULTS = {
     #    disable_always_on, disable_always_on_scope,
     #    pause_events, pause_events_scope,
     #    enable_commands_on, enable_commands: [names],   # usable during the event regardless
-    #    actions: [{type: message|embed|broadcast|command|fire|roll|capacity|wait|
-    #               poll|competition|bonus_round|award_prize|award_amount|
-    #               command_gate|end_session,
+    #    actions: [{type: message|broadcast|command|fire|roll|capacity|wait|poll|
+    #               competition|bonus_round|award|command_gate|end_session,
+    #               # message: style (plain|embed) + title + message; an OPTIONAL
+    #               #   button via target (""=none / winner / runnerup / range_leader
+    #               #   / session_leader / top_bonus_holder / everyone / allowlist)
+    #               #   + allow:[…] + label + freeze + deadline + deadline_message +
+    #               #   timeout_message + actions:[…] (run on press/deadline). Folds
+    #               #   in the old message/embed/winner_button/session_leader_event.
+    #               # award: award_type (command|secs|pct) + target; command form
+    #               #   adds command + charges + stash + lock + deadline +
+    #               #   deadline_message + timeout_message; secs/pct form adds amount
+    #               #   (banked for a Bonus Round). Folds in award_prize/award_amount.
     #               command (run a named custom command),
-    #               title + message,   # embed: titlebar + body
-    #               target (embed button gate: ""=no button / winner / runnerup /
-    #                 range_leader / session_leader / top_bonus_holder / everyone /
-    #                 allowlist) + allow:[…] + label + freeze + deadline +
-    #                 deadline_message + timeout_message + actions:[…] (run on press
-    #                 or deadline). Folds in the old embed_message/winner_button/
-    #                 session_leader_event.
     #               bonus_round (name),   # start a named Bonus Round
-    #               unit (secs|pct) + amount,   # award_amount: bank a bonus amount
     #               seconds (number OR [placeholder]),
     #               device_id, dice, sides, capacity_op, capacity_value,
     #               poll, broadcast, competition,
     #               fire_mode (seconds|add|to) + fill_pct (fire: pump until N%
     #                 added / reached; [secs] = the computed time) + block_during +
     #                 post_actions:[…],
-    #               charges, stash, lock, deadline,
-    #                 deadline_message, timeout_message,   # award_prize
     #               gate_mode (block_all|remove_block)}]}  # command_gate
     # The action block runs sequentially; the event is "running" (its effects
     # active) until the block finishes. One-shot per session (re-armed by
@@ -480,6 +479,26 @@ _KNOWN_BUTTON_TARGETS = {"winner", "runnerup", "range_leader", "session_leader",
                          "top_bonus_holder", "everyone", "all", "anyone"}
 
 
+def _walk_migrate_actions_v8(node) -> None:
+    """Recursively fold award_prize/award_amount → `award` (award_type) and
+    `embed` → `message` (style=embed), anywhere in the config."""
+    if isinstance(node, dict):
+        t = (node.get("type") or "").lower()
+        if t == "award_prize":
+            node["type"] = "award"; node["award_type"] = "command"
+        elif t == "award_amount":
+            unit = (node.get("unit") or "secs").lower()
+            node["type"] = "award"
+            node["award_type"] = "pct" if unit in ("pct", "%", "cap", "capacity") else "secs"
+        elif t == "embed":
+            node["type"] = "message"; node["style"] = "embed"
+        for v in node.values():
+            _walk_migrate_actions_v8(v)
+    elif isinstance(node, list):
+        for item in node:
+            _walk_migrate_actions_v8(item)
+
+
 def _walk_migrate_embeds(node) -> None:
     """Recursively fold legacy embed_message/winner_button/session_leader_event
     action rows (anywhere — nested blocks, templates) into the unified `embed`."""
@@ -579,6 +598,10 @@ def _migrate(cfg: dict) -> dict:
                 c["win_actions"] = _fires_to_actions(c.get("fires")) + list(c.get("win_actions") or [])
                 c["miss_actions"] = _fires_to_actions(c.get("fail_fires")) + list(c.get("miss_actions") or [])
                 c["fires"] = []; c["fail_fires"] = []
+    if v < 8:
+        # v8: award_prize + award_amount → one `award` (award_type command/pct/
+        # secs); the `embed` action folds into `message` (style plain/embed).
+        _walk_migrate_actions_v8(cfg)
     cfg["config_version"] = CONFIG_VERSION
     return cfg
 

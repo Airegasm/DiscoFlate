@@ -1085,26 +1085,25 @@ class Engine:
                 if typ == "wait":
                     await asyncio.sleep(max(0.0, self._num_expr(a.get("seconds"), xc)))
                     continue
-                if typ == "message":
-                    msg = (a.get("message") or "").strip()
-                    if msg:
-                        await self._announce(self._evt_hdr(hdr) + R(msg), None)
-                    continue
-                if typ in ("embed", "embed_message", "winner_button", "session_leader_event"):
-                    # Unified embed action: a titlebar + body embed, OPTIONALLY
-                    # with a button gated to a target (winner/runnerup/range_leader/
-                    # session_leader/top_bonus_holder/everyone/allowlist) that runs
-                    # a nested action block. Legacy embed_message/winner_button/
-                    # session_leader_event map onto it (also handled by migration).
-                    if typ == "embed_message":
-                        tgt, acts = "", []
+                if typ in ("message", "embed", "embed_message", "winner_button", "session_leader_event"):
+                    # Unified post action: a `message` posted plain OR as an embed
+                    # (style), OPTIONALLY with a button gated to a target (winner/
+                    # runnerup/range_leader/session_leader/top_bonus_holder/everyone/
+                    # allowlist) that runs a nested action block. Legacy embed /
+                    # embed_message / winner_button / session_leader_event map on.
+                    if typ == "message":
+                        style = (a.get("style") or "plain").lower()
+                        tgt = (a.get("target") or "").strip().strip("[]").lower()
+                        acts = a.get("actions") or []
+                    elif typ == "embed_message":
+                        style, tgt, acts = "embed", "", []
                     elif typ == "session_leader_event":
-                        tgt, acts = "session_leader", (a.get("actions") or [])
+                        style, tgt, acts = "embed", "session_leader", (a.get("actions") or [])
                     elif typ == "winner_button":
-                        tgt = (a.get("target") or "[winner]").strip().strip("[]").lower()
+                        style = "embed"; tgt = (a.get("target") or "[winner]").strip().strip("[]").lower()
                         acts = a.get("actions") or []
                     else:  # embed
-                        tgt = (a.get("target") or "").strip().strip("[]").lower()
+                        style = "embed"; tgt = (a.get("target") or "").strip().strip("[]").lower()
                         acts = a.get("actions") or []
                     has_button = bool(tgt) and bool(acts)
                     allowed = None; primary_uid = None; primary_who = ""
@@ -1134,14 +1133,18 @@ class Engine:
                     title = R((a.get("title") or "").strip(), bctx)
                     body = R((a.get("message") or "").strip(), bctx)
                     if not has_button:
-                        if self.embed_cb:
-                            try:
-                                await self.embed_cb(title or "​", body)
-                            except Exception as e:  # noqa: BLE001
-                                self._log("error", f"embed failed: {e}")
+                        if style == "embed":
+                            if self.embed_cb:
+                                try:
+                                    await self.embed_cb(title or "​", body)
+                                except Exception as e:  # noqa: BLE001
+                                    self._log("error", f"embed failed: {e}")
+                                    await self._announce((f"**{title}**\n" if title else "") + body, None)
+                            else:
                                 await self._announce((f"**{title}**\n" if title else "") + body, None)
-                        else:
-                            await self._announce((f"**{title}**\n" if title else "") + body, None)
+                        else:   # plain message
+                            if body:
+                                await self._announce(self._evt_hdr(hdr) + body, None)
                         continue
                     label = (a.get("label") or "").strip() or "🎁 Claim"
                     freeze = bool(a.get("freeze"))
@@ -1234,12 +1237,39 @@ class Engine:
                         await self._announce(self._evt_hdr(hdr) + R(extra), None)
                     await self.end_session(source=name)
                     break
-                if typ == "award_prize":
-                    # Grant a target user a bonus command they can run N times
-                    # (bypassing cooldown/lock/range), e.g. the range leader gets
-                    # to fire a progression command 3× back-to-back. Optional
-                    # lock (freeze everyone else until they use it) + idle deadline
-                    # (auto-fire if they don't) + stash (survive range changes).
+                if typ in ("award", "award_prize", "award_amount"):
+                    # Unified award: award_type=command grants a bonus command;
+                    # award_type=pct/secs banks a bonus amount for a Bonus Round.
+                    # Legacy award_prize/award_amount map onto it.
+                    if typ == "award_prize":
+                        award_type = "command"
+                    elif typ == "award_amount":
+                        award_type = "pct" if (a.get("unit") or "secs").lower() in ("pct", "%", "cap", "capacity") else "secs"
+                    else:
+                        award_type = (a.get("award_type") or "command").lower()
+                    if award_type != "command":
+                        # bank a bonus AMOUNT (pump seconds or capacity %)
+                        uid_t, who_t = self._resolve_award_target(a.get("target") or "[winner]")
+                        if uid_t is None:
+                            self._log("bot", f"{name}: award — no target for '{a.get('target')}', skipped")
+                            continue
+                        amt = round(self._num_expr(a.get("amount"), xc), 1)
+                        rec = self._bonus_bank.setdefault(str(uid_t), {"name": who_t, "secs": 0.0, "pct": 0.0})
+                        rec["name"] = who_t
+                        if award_type == "pct":
+                            rec["pct"] += amt
+                        else:
+                            rec["secs"] += amt
+                        self._log("bot", f"{name}: banked {amt:g}{'%' if award_type=='pct' else 's'} bonus for {who_t}")
+                        msg = (a.get("message") or "").strip()
+                        if msg:
+                            await self._announce(self._evt_hdr(hdr) + R(msg, {
+                                "target": who_t, "winner": who_t,
+                                "mention": self._mention(uid_t, who_t), "amount": f"{amt:g}",
+                                "user_bonus_secs": f"{rec['secs']:g}", "user_bonus_pct": f"{rec['pct']:g}"}), None)
+                        continue
+                    # award_type == "command": grant a bonus command (charges/lock/
+                    # deadline/stash) — bypasses cooldown/lock/range for the target.
                     bkey = (a.get("command") or "").strip().lower()
                     cmd = self.find_command(bkey) if bkey else None
                     if cmd is None:
@@ -1285,31 +1315,6 @@ class Engine:
                         self._deadline_task = asyncio.create_task(
                             self._winner_deadline(deadline, bkey,
                                                   {"timeout_message": a.get("timeout_message")}))
-                    continue
-                if typ == "award_amount":
-                    # Bank a bonus AMOUNT (pump seconds or capacity %) on a target;
-                    # a Bonus Round later pools & spends everyone's banks.
-                    uid_t, who_t = self._resolve_award_target(a.get("target") or "[winner]")
-                    if uid_t is None:
-                        self._log("bot", f"{name}: award_amount — no target for '{a.get('target')}', skipped")
-                        continue
-                    unit = (a.get("unit") or "secs").lower()
-                    amt = round(self._num_expr(a.get("amount"), xc), 1)
-                    rec = self._bonus_bank.setdefault(str(uid_t),
-                                                      {"name": who_t, "secs": 0.0, "pct": 0.0})
-                    rec["name"] = who_t
-                    if unit in ("pct", "%", "cap", "capacity"):
-                        rec["pct"] += amt
-                    else:
-                        rec["secs"] += amt
-                    self._log("bot", f"{name}: banked {amt:g}{'%' if unit.startswith(('p','%','c')) else 's'} bonus for {who_t}")
-                    msg = (a.get("message") or "").strip()
-                    if msg:
-                        await self._announce(self._evt_hdr(hdr) + R(msg, {
-                            "target": who_t, "winner": who_t,
-                            "mention": self._mention(uid_t, who_t),
-                            "amount": f"{amt:g}",
-                            "user_bonus_secs": f"{rec['secs']:g}", "user_bonus_pct": f"{rec['pct']:g}"}), None)
                     continue
                 if typ == "command_gate":
                     # block_all: freeze every custom command AND the builtin roll

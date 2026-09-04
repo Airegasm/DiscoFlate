@@ -1,6 +1,6 @@
 {
-  "version": "3.35.0",
-  "versionCode": 105,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.35.0/discoflate.apk",
-  "notes": "DiscoFlate v3.35.0 (consolidation, part 3) — outcomes are now full action blocks. Minigame outcome tiers gain an Actions block (award_prize, capacity, competition, embed, …) on top of message+fires. chance/cointoss commands replace their device-only win/miss fires with 🟢 On WIN / 🔴 On MISS action blocks (old fires auto-migrate). This is the groundwork for bonus commands earnable from any game (e.g. perfect blackjack)."
+  "version": "3.36.0",
+  "versionCode": 106,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.36.0/discoflate.apk",
+  "notes": "DiscoFlate v3.36.0 (consolidation, part 4) — two action types collapse further. 'message' now has a Style dropdown (plain / embed) AND can carry the optional gated button, absorbing the old 'embed' action. 'award_prize' + 'award_amount' become one 'award' action with a dropdown: bonus command / volume seconds / volume %. Everything auto-migrates. Also: Dashboard Controls are now a true fixed-width grid (uniform buttons + right-sized fields — no more stretched dropdowns), and Stop moved up next to Session reset."
 }
