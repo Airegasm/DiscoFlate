@@ -1,7 +1,6 @@
 {
   "command_prefix": "!",
   "command_names": {
-    "roll": "agroll",
     "capacity": "agcap",
     "help": "aghelp",
     "leaderboard": "agtop",
@@ -14,275 +13,25 @@
     "factor": 1,
     "min_seconds": 1,
     "max_seconds": 100,
-    "disable_at_100": false,
-    "reply": "\ud83c\udfb2 [mention] rolled **[dice]** and they landed on **[result]**\n**[secs]** seconds have been added to the pump timer, and will increase  [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+    "disable_at_100": false
   },
-  "roll_enabled": true,
   "system_buffer_seconds": 8,
   "capacity_message": "[announce] - Current Capacity: **[capacity]%**\n[capacity_bar]",
   "pumptimer_message": "\u23f1\ufe0f [timer] seconds left on the pump timer.",
   "pump_message": "**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
   "cooldown_message": "\u23f3 [mention], [cmd] is on cooldown \u2014 [cooldown]s left until you can use it again.",
-  "cooldown_reset_message": "",
   "commands": [
     {
       "name": "fill",
-      "type": "fire",
-      "seconds": 35,
-      "dice": null,
-      "sides": null,
-      "reply": "\ud83d\udca8 [mention] used [prefix]fill - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+      "type": "actions",
       "enabled": true,
       "owner_only": false,
-      "device_id": null,
       "start_events": [],
       "range_gate": "0-20",
       "description": "fill those guts a bit more",
       "hide_in_list": false,
-      "mention": false,
       "react_only": false,
       "react_emoji": "",
-      "poll": null,
-      "fires": [],
-      "fail_fires": [],
-      "chance": null,
-      "luck": null,
-      "success_reply": "",
-      "failure_reply": "",
-      "pl_bust_start": 15,
-      "pl_bust_step": 12,
-      "pl_max_pumps": 8,
-      "pl_points": 1,
-      "sm_symbols": 4,
-      "sm_max_rounds": 8,
-      "sm_reveal": 3,
-      "bl_cells": 9,
-      "bl_pops": 3,
-      "bl_points": 1,
-      "rps_wins": 3,
-      "sl_symbols": 6,
-      "game_intro": "",
-      "game_tiers": []
-    },
-    {
-      "name": "inflate",
-      "type": "fire",
-      "seconds": 30,
-      "dice": null,
-      "sides": null,
-      "reply": "\ud83d\udca8 [mention] used [prefix]inflate - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
-      "enabled": true,
-      "owner_only": false,
-      "device_id": null,
-      "start_events": [],
-      "range_gate": "20-40",
-      "description": "inflate a little further",
-      "hide_in_list": false,
-      "mention": false,
-      "react_only": false,
-      "react_emoji": "",
-      "poll": null,
-      "fires": [],
-      "fail_fires": [],
-      "chance": null,
-      "luck": null,
-      "success_reply": "",
-      "failure_reply": "",
-      "pl_bust_start": 15,
-      "pl_bust_step": 12,
-      "pl_max_pumps": 8,
-      "pl_points": 1,
-      "sm_symbols": 4,
-      "sm_max_rounds": 8,
-      "sm_reveal": 3,
-      "bl_cells": 9,
-      "bl_pops": 3,
-      "bl_points": 1,
-      "rps_wins": 3,
-      "sl_symbols": 6,
-      "game_intro": "",
-      "game_tiers": []
-    },
-    {
-      "name": "pump",
-      "type": "fire",
-      "seconds": 25,
-      "dice": null,
-      "sides": null,
-      "reply": "\ud83d\udca8 [mention] used [prefix]pump - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
-      "enabled": true,
-      "owner_only": false,
-      "device_id": null,
-      "start_events": [],
-      "range_gate": "40-60",
-      "description": "a steady pump of air",
-      "hide_in_list": false,
-      "mention": false,
-      "react_only": false,
-      "react_emoji": "",
-      "poll": null,
-      "fires": [],
-      "fail_fires": [],
-      "chance": null,
-      "luck": null,
-      "success_reply": "",
-      "failure_reply": "",
-      "pl_bust_start": 15,
-      "pl_bust_step": 12,
-      "pl_max_pumps": 8,
-      "pl_points": 1,
-      "sm_symbols": 4,
-      "sm_max_rounds": 8,
-      "sm_reveal": 3,
-      "bl_cells": 9,
-      "bl_pops": 3,
-      "bl_points": 1,
-      "rps_wins": 3,
-      "sl_symbols": 6,
-      "game_intro": "",
-      "game_tiers": []
-    },
-    {
-      "name": "squeeze",
-      "type": "fire",
-      "seconds": 20,
-      "dice": null,
-      "sides": null,
-      "reply": "\ud83d\udca8 [mention] used [prefix]squeeze - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
-      "enabled": true,
-      "owner_only": false,
-      "device_id": null,
-      "start_events": [],
-      "range_gate": "60-80",
-      "description": "a firm squeeze of air",
-      "hide_in_list": false,
-      "mention": false,
-      "react_only": false,
-      "react_emoji": "",
-      "poll": null,
-      "fires": [],
-      "fail_fires": [],
-      "chance": null,
-      "luck": null,
-      "success_reply": "",
-      "failure_reply": "",
-      "pl_bust_start": 15,
-      "pl_bust_step": 12,
-      "pl_max_pumps": 8,
-      "pl_points": 1,
-      "sm_symbols": 4,
-      "sm_max_rounds": 8,
-      "sm_reveal": 3,
-      "bl_cells": 9,
-      "bl_pops": 3,
-      "bl_points": 1,
-      "rps_wins": 3,
-      "sl_symbols": 6,
-      "game_intro": "",
-      "game_tiers": []
-    },
-    {
-      "name": "tease",
-      "type": "fire",
-      "seconds": 15,
-      "dice": null,
-      "sides": null,
-      "reply": "\ud83d\udca8 [mention] used [prefix]tease - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
-      "enabled": true,
-      "owner_only": false,
-      "device_id": null,
-      "start_events": [],
-      "range_gate": "80-90",
-      "description": "a careful teasing puff",
-      "hide_in_list": false,
-      "mention": false,
-      "react_only": false,
-      "react_emoji": "",
-      "poll": null,
-      "fires": [],
-      "fail_fires": [],
-      "chance": null,
-      "luck": null,
-      "success_reply": "",
-      "failure_reply": "",
-      "pl_bust_start": 15,
-      "pl_bust_step": 12,
-      "pl_max_pumps": 8,
-      "pl_points": 1,
-      "sm_symbols": 4,
-      "sm_max_rounds": 8,
-      "sm_reveal": 3,
-      "bl_cells": 9,
-      "bl_pops": 3,
-      "bl_points": 1,
-      "rps_wins": 3,
-      "sl_symbols": 6,
-      "game_intro": "",
-      "game_tiers": []
-    },
-    {
-      "name": "topup",
-      "type": "fire",
-      "seconds": 5,
-      "dice": null,
-      "sides": null,
-      "reply": "\ud83d\udca8 [mention] used [prefix]topup - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
-      "enabled": true,
-      "owner_only": false,
-      "device_id": null,
-      "start_events": [],
-      "range_gate": "90-100",
-      "description": "the tiniest top-up",
-      "hide_in_list": false,
-      "mention": false,
-      "react_only": false,
-      "react_emoji": "",
-      "poll": null,
-      "fires": [],
-      "fail_fires": [],
-      "chance": null,
-      "luck": null,
-      "success_reply": "",
-      "failure_reply": "",
-      "pl_bust_start": 15,
-      "pl_bust_step": 12,
-      "pl_max_pumps": 8,
-      "pl_points": 1,
-      "sm_symbols": 4,
-      "sm_max_rounds": 8,
-      "sm_reveal": 3,
-      "bl_cells": 9,
-      "bl_pops": 3,
-      "bl_points": 1,
-      "rps_wins": 3,
-      "sl_symbols": 6,
-      "game_intro": "",
-      "game_tiers": []
-    },
-    {
-      "name": "agtoss",
-      "type": "chance",
-      "seconds": null,
-      "dice": null,
-      "sides": null,
-      "reply": "",
-      "enabled": true,
-      "owner_only": false,
-      "device_id": null,
-      "start_events": [],
-      "range_gate": "all",
-      "description": "flip a coin",
-      "hide_in_list": false,
-      "mention": false,
-      "react_only": false,
-      "react_emoji": "",
-      "poll": null,
-      "fires": [],
-      "fail_fires": [],
-      "chance": 50,
-      "luck": null,
-      "success_reply": "[mention] took a chance on a coin flip... - [user] can use this command [cmd_remain] more times.\n**SUCCESS!** [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
-      "failure_reply": "[mention] took a chance on a coin flip - [user] can use this command [cmd_remain] more times.\n**FAILURE!** - Better luck next time...",
       "pl_bust_start": 15,
       "pl_bust_step": 12,
       "pl_max_pumps": 8,
@@ -297,41 +46,30 @@
       "sl_symbols": 6,
       "game_intro": "",
       "game_tiers": [],
-      "win_actions": [
+      "actions": [
         {
           "type": "fire",
-          "device_id": null,
-          "seconds": 10
+          "fire_mode": "seconds",
+          "seconds": 35,
+          "device_id": null
+        },
+        {
+          "type": "message",
+          "message": "\ud83d\udca8 [mention] used [prefix]fill - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
         }
-      ],
-      "miss_actions": []
+      ]
     },
     {
-      "name": "agroulette",
-      "type": "say",
-      "seconds": null,
-      "dice": null,
-      "sides": null,
-      "reply": "**[user]** spins the roulette wheel\u2026 [user] can use this command [cmd_remain] more times.",
+      "name": "inflate",
+      "type": "actions",
       "enabled": true,
       "owner_only": false,
-      "device_id": null,
-      "start_events": [
-        "PumpRoulette"
-      ],
-      "range_gate": "all",
-      "description": "spin the pump roulette \u2014 3 rounds of 50/50 +5s or +20s",
+      "start_events": [],
+      "range_gate": "20-40",
+      "description": "inflate a little further",
       "hide_in_list": false,
-      "mention": false,
       "react_only": false,
       "react_emoji": "",
-      "poll": null,
-      "fires": [],
-      "fail_fires": [],
-      "chance": null,
-      "luck": null,
-      "success_reply": "",
-      "failure_reply": "",
       "pl_bust_start": 15,
       "pl_bust_step": 12,
       "pl_max_pumps": 8,
@@ -345,7 +83,255 @@
       "rps_wins": 3,
       "sl_symbols": 6,
       "game_intro": "",
-      "game_tiers": []
+      "game_tiers": [],
+      "actions": [
+        {
+          "type": "fire",
+          "fire_mode": "seconds",
+          "seconds": 30,
+          "device_id": null
+        },
+        {
+          "type": "message",
+          "message": "\ud83d\udca8 [mention] used [prefix]inflate - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+        }
+      ]
+    },
+    {
+      "name": "pump",
+      "type": "actions",
+      "enabled": true,
+      "owner_only": false,
+      "start_events": [],
+      "range_gate": "40-60",
+      "description": "a steady pump of air",
+      "hide_in_list": false,
+      "react_only": false,
+      "react_emoji": "",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "sl_symbols": 6,
+      "game_intro": "",
+      "game_tiers": [],
+      "actions": [
+        {
+          "type": "fire",
+          "fire_mode": "seconds",
+          "seconds": 25,
+          "device_id": null
+        },
+        {
+          "type": "message",
+          "message": "\ud83d\udca8 [mention] used [prefix]pump - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+        }
+      ]
+    },
+    {
+      "name": "squeeze",
+      "type": "actions",
+      "enabled": true,
+      "owner_only": false,
+      "start_events": [],
+      "range_gate": "60-80",
+      "description": "a firm squeeze of air",
+      "hide_in_list": false,
+      "react_only": false,
+      "react_emoji": "",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "sl_symbols": 6,
+      "game_intro": "",
+      "game_tiers": [],
+      "actions": [
+        {
+          "type": "fire",
+          "fire_mode": "seconds",
+          "seconds": 20,
+          "device_id": null
+        },
+        {
+          "type": "message",
+          "message": "\ud83d\udca8 [mention] used [prefix]squeeze - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+        }
+      ]
+    },
+    {
+      "name": "tease",
+      "type": "actions",
+      "enabled": true,
+      "owner_only": false,
+      "start_events": [],
+      "range_gate": "80-90",
+      "description": "a careful teasing puff",
+      "hide_in_list": false,
+      "react_only": false,
+      "react_emoji": "",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "sl_symbols": 6,
+      "game_intro": "",
+      "game_tiers": [],
+      "actions": [
+        {
+          "type": "fire",
+          "fire_mode": "seconds",
+          "seconds": 15,
+          "device_id": null
+        },
+        {
+          "type": "message",
+          "message": "\ud83d\udca8 [mention] used [prefix]tease - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+        }
+      ]
+    },
+    {
+      "name": "topup",
+      "type": "actions",
+      "enabled": true,
+      "owner_only": false,
+      "start_events": [],
+      "range_gate": "90-100",
+      "description": "the tiniest top-up",
+      "hide_in_list": false,
+      "react_only": false,
+      "react_emoji": "",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "sl_symbols": 6,
+      "game_intro": "",
+      "game_tiers": [],
+      "actions": [
+        {
+          "type": "fire",
+          "fire_mode": "seconds",
+          "seconds": 5,
+          "device_id": null
+        },
+        {
+          "type": "message",
+          "message": "\ud83d\udca8 [mention] used [prefix]topup - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+        }
+      ]
+    },
+    {
+      "name": "agtoss",
+      "type": "actions",
+      "enabled": true,
+      "owner_only": false,
+      "start_events": [],
+      "range_gate": "all",
+      "description": "flip a coin",
+      "hide_in_list": false,
+      "react_only": false,
+      "react_emoji": "",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "sl_symbols": 6,
+      "game_intro": "",
+      "game_tiers": [],
+      "actions": [
+        {
+          "type": "chance",
+          "chance": 50,
+          "luck": null,
+          "win_actions": [
+            {
+              "type": "fire",
+              "device_id": null,
+              "seconds": 10
+            },
+            {
+              "type": "message",
+              "message": "[mention] took a chance on a coin flip... - [user] can use this command [cmd_remain] more times.\n**SUCCESS!** [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+            }
+          ],
+          "miss_actions": [
+            {
+              "type": "message",
+              "message": "[mention] took a chance on a coin flip - [user] can use this command [cmd_remain] more times.\n**FAILURE!** - Better luck next time..."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "agroulette",
+      "type": "actions",
+      "enabled": true,
+      "owner_only": false,
+      "start_events": [
+        "PumpRoulette"
+      ],
+      "range_gate": "all",
+      "description": "spin the pump roulette \u2014 3 rounds of 50/50 +5s or +20s",
+      "hide_in_list": false,
+      "react_only": false,
+      "react_emoji": "",
+      "pl_bust_start": 15,
+      "pl_bust_step": 12,
+      "pl_max_pumps": 8,
+      "pl_points": 1,
+      "sm_symbols": 4,
+      "sm_max_rounds": 8,
+      "sm_reveal": 3,
+      "bl_cells": 9,
+      "bl_pops": 3,
+      "bl_points": 1,
+      "rps_wins": 3,
+      "sl_symbols": 6,
+      "game_intro": "",
+      "game_tiers": [],
+      "actions": [
+        {
+          "type": "message",
+          "message": "**[user]** spins the roulette wheel\u2026 [user] can use this command [cmd_remain] more times."
+        }
+      ]
     },
     {
       "name": "agpushluck",
@@ -353,7 +339,6 @@
       "seconds": null,
       "dice": null,
       "sides": null,
-      "reply": "",
       "enabled": true,
       "owner_only": false,
       "device_id": null,
@@ -426,7 +411,6 @@
       "seconds": null,
       "dice": null,
       "sides": null,
-      "reply": "",
       "enabled": true,
       "owner_only": false,
       "device_id": null,
@@ -521,7 +505,6 @@
       "seconds": null,
       "dice": null,
       "sides": null,
-      "reply": "",
       "enabled": true,
       "owner_only": false,
       "device_id": null,
@@ -605,7 +588,6 @@
       "seconds": null,
       "dice": null,
       "sides": null,
-      "reply": "",
       "enabled": true,
       "owner_only": false,
       "device_id": null,
@@ -678,7 +660,6 @@
       "seconds": null,
       "dice": null,
       "sides": null,
-      "reply": "",
       "enabled": true,
       "owner_only": false,
       "device_id": null,
@@ -751,7 +732,6 @@
       "seconds": null,
       "dice": null,
       "sides": null,
-      "reply": "",
       "enabled": true,
       "owner_only": false,
       "device_id": null,
@@ -828,6 +808,41 @@
           ]
         }
       ]
+    },
+    {
+      "name": "agroll",
+      "type": "actions",
+      "enabled": true,
+      "description": "Roll the dice \u2014 the result becomes pump seconds",
+      "actions": [
+        {
+          "type": "roll"
+        },
+        {
+          "type": "message",
+          "message": "\ud83c\udfb2 [mention] rolled **[dice]** and they landed on **[result]**\n**[secs]** seconds have been added to the pump timer, and will increase  [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+        }
+      ]
+    },
+    {
+      "name": "superpump",
+      "type": "actions",
+      "enabled": true,
+      "hide_in_list": true,
+      "range_gate": "all",
+      "description": "SUPERPUMP - !superpump triggers a 40s burst of air",
+      "actions": [
+        {
+          "type": "fire",
+          "fire_mode": "seconds",
+          "seconds": 40,
+          "device_id": null
+        },
+        {
+          "type": "message",
+          "message": "\u2728 [mention] used the prize!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+        }
+      ]
     }
   ],
   "broadcasts": [
@@ -841,37 +856,28 @@
     }
   ],
   "modes": [],
-  "max_roll_prize": {
-    "enabled": false,
-    "goal": 3,
-    "command": "special",
-    "description": "a special reward",
-    "uses": 1,
-    "action": "fire",
-    "seconds": 10,
-    "dice": null,
-    "sides": null,
-    "device_id": null,
-    "reply": "",
-    "progress_message": "[mention] rolled a perfect score [[count]/[goal]] \u2014 [remaining] more will unlock a bonus command!",
-    "unlock_message": "[mention] has unlocked: [prize_cmd] \u2014 [prize_desc]\\nYou can use this command a total of [uses] times."
-  },
   "prizes": [
     {
+      "name": "SUPERPUMP - !superpump triggers a 40s burst of air",
       "enabled": true,
-      "command": "superpump",
-      "range_gate": "all",
+      "counter": "roll",
       "goal": 3,
-      "uses": 1,
-      "action": "fire",
-      "seconds": 40,
-      "dice": null,
-      "sides": null,
-      "device_id": null,
-      "description": "SUPERPUMP - !superpump triggers a 40s burst of air",
-      "reply": "\u2728 [mention] used the prize! [uses_left] uses left\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+      "range_gate": "all",
       "progress_message": "[mention] rolled a perfect score [[count]/[goal]] \u2014 [remaining] more will unlock a bonus command!",
-      "unlock_message": "[mention] has unlocked: [prize_cmd] \u2014 [prize_desc]\\nYou can use this command a total of [uses] times."
+      "actions": [
+        {
+          "type": "award",
+          "award_type": "command",
+          "target": "[user]",
+          "command": "superpump",
+          "charges": 1,
+          "stash": true
+        },
+        {
+          "type": "message",
+          "message": "[mention] has unlocked: [bonus_cmd] \u2014 SUPERPUMP - !superpump triggers a 40s burst of air\\nYou can use this command a total of [charges] times."
+        }
+      ]
     }
   ],
   "cooldown_seconds": 120,
@@ -906,6 +912,10 @@
         "roll": {
           "seconds": 120,
           "scope": "user"
+        },
+        "agroll": {
+          "seconds": 120,
+          "scope": "user"
         }
       },
       "start_command": "",
@@ -931,6 +941,10 @@
           "seconds": 195,
           "scope": "user",
           "dice": 5
+        },
+        "agroll": {
+          "seconds": 195,
+          "scope": "user"
         }
       },
       "start_command": "",
@@ -956,6 +970,10 @@
           "seconds": 220,
           "scope": "user",
           "luck": 15
+        },
+        "agroll": {
+          "seconds": 220,
+          "scope": "user"
         }
       },
       "start_command": "",
@@ -983,6 +1001,10 @@
           "dice": 3,
           "sides": 7,
           "luck": 10
+        },
+        "agroll": {
+          "seconds": 350,
+          "scope": "user"
         }
       },
       "start_command": "",
@@ -1009,6 +1031,10 @@
           "scope": "user",
           "luck": 20,
           "sides": 8
+        },
+        "agroll": {
+          "seconds": 275,
+          "scope": "user"
         }
       },
       "start_command": "",
@@ -1035,6 +1061,10 @@
           "scope": "user",
           "luck": 20,
           "dice": 3
+        },
+        "agroll": {
+          "seconds": 300,
+          "scope": "user"
         }
       },
       "start_command": "",
@@ -1060,6 +1090,10 @@
           "seconds": 20,
           "scope": "user",
           "luck": 10
+        },
+        "agroll": {
+          "seconds": 20,
+          "scope": "user"
         }
       },
       "start_command": "",
@@ -1131,36 +1165,44 @@
       "max_repeats": 3,
       "fire_immediately": true,
       "clean_previous": false,
-      "action": "chance",
-      "message": "",
-      "seconds": null,
-      "dice": null,
-      "sides": null,
-      "capacity_op": "add",
-      "capacity_value": 0,
-      "device_id": null,
-      "poll": null,
-      "broadcast": null,
       "cooldown": 30,
-      "activation_message": "",
-      "end_message": "\ud83c\udfb0 **PumpRoulette** complete!",
-      "chance": 50,
-      "luck": null,
-      "fires": [
+      "post_actions": [
         {
-          "device_id": null,
-          "seconds": 20
+          "type": "message",
+          "message": "\ud83c\udfb0 **PumpRoulette** complete!"
         }
       ],
-      "fail_fires": [
+      "actions": [
         {
-          "device_id": null,
-          "seconds": 5
+          "type": "chance",
+          "chance": 50,
+          "luck": null,
+          "win_actions": [
+            {
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 20,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udd34 **BIG HIT!** +20s pump! (Capacity now [capacity]%)\n[next_round]"
+            }
+          ],
+          "miss_actions": [
+            {
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 5,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udfe2 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]"
+            }
+          ]
         }
-      ],
-      "success_message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udd34 **BIG HIT!** +20s pump! (Capacity now [capacity]%)\n[next_round]",
-      "failure_message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udfe2 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]",
-      "post_actions": []
+      ]
     },
     {
       "name": "Uncapped",
@@ -1170,26 +1212,14 @@
       "max_repeats": null,
       "fire_immediately": true,
       "clean_previous": false,
-      "action": "broadcast",
-      "message": "",
-      "seconds": 5,
-      "dice": null,
-      "sides": null,
-      "capacity_op": "add",
-      "capacity_value": 0,
-      "device_id": null,
-      "poll": null,
-      "broadcast": "NoCap",
       "cooldown": null,
-      "activation_message": "",
-      "end_message": "",
-      "chance": 50,
-      "luck": null,
-      "fires": [],
-      "fail_fires": [],
-      "success_message": "",
-      "failure_message": "",
-      "post_actions": []
+      "post_actions": [],
+      "actions": [
+        {
+          "type": "broadcast",
+          "broadcast": "NoCap"
+        }
+      ]
     },
     {
       "name": "Nozzle",
@@ -1199,26 +1229,14 @@
       "max_repeats": null,
       "fire_immediately": true,
       "clean_previous": false,
-      "action": "broadcast",
-      "message": "",
-      "seconds": 5,
-      "dice": null,
-      "sides": null,
-      "capacity_op": "add",
-      "capacity_value": 0,
-      "device_id": null,
-      "poll": null,
-      "broadcast": "Plugged",
       "cooldown": null,
-      "activation_message": "",
-      "end_message": "",
-      "chance": 50,
-      "luck": null,
-      "fires": [],
-      "fail_fires": [],
-      "success_message": "",
-      "failure_message": "",
-      "post_actions": []
+      "post_actions": [],
+      "actions": [
+        {
+          "type": "broadcast",
+          "broadcast": "Plugged"
+        }
+      ]
     }
   ],
   "capacity_events": [
@@ -1226,8 +1244,10 @@
       "name": "Popornot",
       "enabled": true,
       "at": 99,
-      "stop_devices": true,
       "actions": [
+        {
+          "type": "stop_devices"
+        },
         {
           "type": "command_gate",
           "modifiers": [
@@ -1289,7 +1309,6 @@
       "name": "Gutrep1",
       "enabled": true,
       "at": 33,
-      "stop_devices": false,
       "actions": [
         {
           "type": "message",
@@ -1311,7 +1330,6 @@
       "name": "Gutrep2",
       "enabled": true,
       "at": 66,
-      "stop_devices": false,
       "actions": [
         {
           "type": "message",
@@ -1333,7 +1351,6 @@
       "name": "Gutrep3",
       "enabled": true,
       "at": 81,
-      "stop_devices": false,
       "actions": [
         {
           "type": "message",
@@ -1426,7 +1443,6 @@
             },
             {
               "type": "end_session",
-              "message": "",
               "seconds": null,
               "device_id": null,
               "dice": null,
@@ -1467,27 +1483,15 @@
     "commands": [
       {
         "name": "inflate",
-        "type": "fire",
-        "seconds": 30,
-        "dice": null,
-        "sides": null,
-        "reply": "\ud83d\udca8 [mention] used [prefix]inflate - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
+        "type": "actions",
         "enabled": true,
         "owner_only": false,
-        "device_id": null,
         "start_events": [],
         "range_gate": "20-40",
         "description": "inflate a little further",
         "hide_in_list": false,
-        "mention": false,
         "react_only": false,
         "react_emoji": "",
-        "fires": [],
-        "fail_fires": [],
-        "chance": null,
-        "luck": null,
-        "success_reply": "",
-        "failure_reply": "",
         "pl_bust_start": 15,
         "pl_bust_step": 12,
         "pl_max_pumps": 8,
@@ -1501,36 +1505,31 @@
         "rps_wins": 3,
         "sl_symbols": 6,
         "game_intro": "",
-        "game_tiers": []
+        "game_tiers": [],
+        "actions": [
+          {
+            "type": "fire",
+            "fire_mode": "seconds",
+            "seconds": 30,
+            "device_id": null
+          },
+          {
+            "type": "message",
+            "message": "\ud83d\udca8 [mention] used [prefix]inflate - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+          }
+        ]
       },
       {
         "name": "agtoss",
-        "type": "chance",
-        "seconds": null,
-        "dice": null,
-        "sides": null,
-        "reply": "",
+        "type": "actions",
         "enabled": true,
         "owner_only": false,
-        "device_id": null,
         "start_events": [],
         "range_gate": "all",
         "description": "flip a coin",
         "hide_in_list": false,
-        "mention": false,
         "react_only": false,
         "react_emoji": "",
-        "fires": [
-          {
-            "device_id": null,
-            "seconds": 10
-          }
-        ],
-        "fail_fires": [],
-        "chance": 50,
-        "luck": null,
-        "success_reply": "[mention] took a chance on a coin flip... - [user] can use this command [cmd_remain] more times.\n**SUCCESS!** [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
-        "failure_reply": "[mention] took a chance on a coin flip - [user] can use this command [cmd_remain] more times.\n**FAILURE!** - Better luck next time...",
         "pl_bust_start": 15,
         "pl_bust_step": 12,
         "pl_max_pumps": 8,
@@ -1544,33 +1543,46 @@
         "rps_wins": 3,
         "sl_symbols": 6,
         "game_intro": "",
-        "game_tiers": []
+        "game_tiers": [],
+        "actions": [
+          {
+            "type": "chance",
+            "chance": 50,
+            "luck": null,
+            "win_actions": [
+              {
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 10,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "[mention] took a chance on a coin flip... - [user] can use this command [cmd_remain] more times.\n**SUCCESS!** [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+              }
+            ],
+            "miss_actions": [
+              {
+                "type": "message",
+                "message": "[mention] took a chance on a coin flip - [user] can use this command [cmd_remain] more times.\n**FAILURE!** - Better luck next time..."
+              }
+            ]
+          }
+        ]
       },
       {
         "name": "agroulette",
-        "type": "say",
-        "seconds": null,
-        "dice": null,
-        "sides": null,
-        "reply": "**[user]** spins the roulette wheel\u2026 [user] can use this command [cmd_remain] more times.",
+        "type": "actions",
         "enabled": true,
         "owner_only": false,
-        "device_id": null,
         "start_events": [
           "PumpRoulette"
         ],
         "range_gate": "all",
         "description": "spin the pump roulette \u2014 3 rounds of 50/50 +5s or +20s",
         "hide_in_list": false,
-        "mention": false,
         "react_only": false,
         "react_emoji": "",
-        "fires": [],
-        "fail_fires": [],
-        "chance": null,
-        "luck": null,
-        "success_reply": "",
-        "failure_reply": "",
         "pl_bust_start": 15,
         "pl_bust_step": 12,
         "pl_max_pumps": 8,
@@ -1584,7 +1596,13 @@
         "rps_wins": 3,
         "sl_symbols": 6,
         "game_intro": "",
-        "game_tiers": []
+        "game_tiers": [],
+        "actions": [
+          {
+            "type": "message",
+            "message": "**[user]** spins the roulette wheel\u2026 [user] can use this command [cmd_remain] more times."
+          }
+        ]
       },
       {
         "name": "agpushluck",
@@ -1592,7 +1610,6 @@
         "seconds": null,
         "dice": null,
         "sides": null,
-        "reply": "",
         "enabled": true,
         "owner_only": false,
         "device_id": null,
@@ -1664,7 +1681,6 @@
         "seconds": null,
         "dice": null,
         "sides": null,
-        "reply": "",
         "enabled": true,
         "owner_only": false,
         "device_id": null,
@@ -1758,7 +1774,6 @@
         "seconds": null,
         "dice": null,
         "sides": null,
-        "reply": "",
         "enabled": true,
         "owner_only": false,
         "device_id": null,
@@ -1841,7 +1856,6 @@
         "seconds": null,
         "dice": null,
         "sides": null,
-        "reply": "",
         "enabled": true,
         "owner_only": false,
         "device_id": null,
@@ -1913,7 +1927,6 @@
         "seconds": null,
         "dice": null,
         "sides": null,
-        "reply": "",
         "enabled": true,
         "owner_only": false,
         "device_id": null,
@@ -1985,7 +1998,6 @@
         "seconds": null,
         "dice": null,
         "sides": null,
-        "reply": "",
         "enabled": true,
         "owner_only": false,
         "device_id": null,
@@ -2072,33 +2084,44 @@
         "max_repeats": 3,
         "fire_immediately": true,
         "clean_previous": false,
-        "action": "chance",
-        "message": "",
-        "seconds": null,
-        "dice": null,
-        "sides": null,
-        "capacity_op": "add",
-        "capacity_value": 0,
-        "device_id": null,
         "cooldown": 30,
-        "activation_message": "",
-        "end_message": "\ud83c\udfb0 **PumpRoulette** complete!",
-        "chance": 50,
-        "luck": null,
-        "fires": [
+        "actions": [
           {
-            "device_id": null,
-            "seconds": 20
+            "type": "chance",
+            "chance": 50,
+            "luck": null,
+            "win_actions": [
+              {
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 20,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udd34 **BIG HIT!** +20s pump! (Capacity now [capacity]%)\n[next_round]"
+              }
+            ],
+            "miss_actions": [
+              {
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 5,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udfe2 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]"
+              }
+            ]
           }
         ],
-        "fail_fires": [
+        "post_actions": [
           {
-            "device_id": null,
-            "seconds": 5
+            "type": "message",
+            "message": "\ud83c\udfb0 **PumpRoulette** complete!"
           }
-        ],
-        "success_message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udd34 **BIG HIT!** +20s pump! (Capacity now [capacity]%)\n[next_round]",
-        "failure_message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udfe2 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]"
+        ]
       }
     ],
     "ranges": [

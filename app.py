@@ -69,16 +69,16 @@ VERSION_URL = "https://raw.githubusercontent.com/Airegasm/DiscoFlate/main/versio
 # (Commands and system-command NAMES are handled additively below so your edits
 # and customs are never clobbered.) Connection/personal keys are never touched.
 _DEFAULT_SCALAR_KEYS = ["roll", "capacity_message", "pumptimer_message",
-                        "pump_message", "cooldown_message", "cooldown_reset_message",
-                        "system_buffer_seconds", "cooldown_seconds", "roll_enabled",
-                        "max_roll_prize", "auto_report", "listener_message_on", "listener_message_off",
+                        "pump_message", "cooldown_message",
+                        "system_buffer_seconds", "cooldown_seconds",
+                        "auto_report", "listener_message_on", "listener_message_off",
                         "pause_message", "resume_message", "paused_notice_message",
                         "always_on_enabled"]
 # list key -> identity function. Restore KEEPS everything you already have (edited
 # defaults + customs) and only ADDS shipped items whose key is missing.
 _DEFAULT_LIST_KEYS = {
     "commands": lambda c: (c.get("name") or "").strip().lower(),
-    "prizes": lambda p: (p.get("command") or "").strip().lower(),
+    "prizes": lambda p: ((p.get("name") if isinstance(p, dict) else "") or "").strip().lower(),
     "modes": lambda m: (m.get("name") or "").strip().lower(),
     "events": lambda e: (e.get("name") or "").strip().lower(),
     "capacity_events": lambda e: ((e.get("name") or "").strip() or str(e.get("at") or "")).lower(),
@@ -97,10 +97,10 @@ _DEFAULT_LIST_KEYS = {
 # names/IDs, operator name, mock/pumpdirect/runtime state.
 _GAMEPLAY_KEYS = [
     # Commands tab
-    "command_prefix", "command_names", "roll", "roll_enabled", "system_buffer_seconds",
+    "command_prefix", "command_names", "roll", "system_buffer_seconds",
     "capacity_message", "pumptimer_message", "pump_message",
-    "cooldown_message", "cooldown_reset_message",
-    "commands", "broadcasts", "modes", "max_roll_prize", "prizes",
+    "cooldown_message",
+    "commands", "broadcasts", "modes", "prizes",
     # Game tab
     "cooldown_seconds", "auto_report",
     "listener_message_on", "listener_message_off",
@@ -118,7 +118,7 @@ _GAMEPLAY_LIST_KEYS = {
     "commands": lambda c: (c.get("name") or "").strip().lower(),
     "broadcasts": lambda b: (b.get("name") or "").strip().lower(),
     "modes": lambda m: (m.get("name") or "").strip().lower(),
-    "prizes": lambda p: (p.get("command") or "").strip().lower(),
+    "prizes": lambda p: ((p.get("name") if isinstance(p, dict) else "") or "").strip().lower(),
     "events": lambda e: (e.get("name") or "").strip().lower(),
     "capacity_events": lambda e: ((e.get("name") or "").strip() or str(e.get("at") or "")).lower(),
     "polls": lambda p: (p.get("name") or "").strip().lower(),
@@ -237,12 +237,9 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "capacity_message": cfg.get("capacity_message", ""),
         "pumptimer_message": cfg.get("pumptimer_message", ""),
         "pump_message": cfg.get("pump_message", ""),
-        "roll_enabled": cfg.get("roll_enabled", True),
         "system_buffer_seconds": cfg.get("system_buffer_seconds", 8),
         "cooldown_message": cfg.get("cooldown_message", ""),
-        "cooldown_reset_message": cfg.get("cooldown_reset_message", ""),
         "roll": cfg.get("roll", {}),
-        "max_roll_prize": cfg.get("max_roll_prize", {}),
         "prizes": cfg.get("prizes", []),
         "capacity_ranges": cfg.get("capacity_ranges", []),
         "commands": cfg.get("commands", []),
@@ -499,7 +496,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                    "capacity_ranges": list, "listen_targets": list, "broadcasts": list,
                    "always_on_commands": list, "cooldown_exempt_user_ids": list,
                    "cooldown_exempt_names": list, "command_names": dict, "roll": dict,
-                   "max_roll_prize": dict, "auto_report": dict, "templates": dict,
+                   "auto_report": dict, "templates": dict,
                    "vendors": dict, "allow": dict, "server_channels": dict}
 
     async def set_config(request):
@@ -517,8 +514,8 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                 raise web.HTTPConflict(text="config changed elsewhere — reload and retry")
         patch = {}
         for key in ("command_prefix", "command_names", "capacity_message",
-                    "roll_enabled", "system_buffer_seconds", "cooldown_message", "cooldown_reset_message", "pumptimer_message", "pump_message",
-                    "roll", "max_roll_prize", "prizes", "capacity_ranges", "commands", "modes", "events",
+                    "system_buffer_seconds", "cooldown_message", "pumptimer_message", "pump_message",
+                    "roll", "prizes", "capacity_ranges", "commands", "modes", "events",
                     "capacity_events", "polls", "competitions",
                     "allow", "pumpdirect_path", "cooldown_seconds",
                     "cooldown_exempt_user_ids", "cooldown_exempt_names", "operator_name", "auto_report",
@@ -910,6 +907,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         board = body.pop("_lifetime_leaderboard", None)
         if isinstance(board, dict):
             engine.set_lifetime(board)
+        body = config_store._migrate(body)   # backups can be from any older version
         cfg = config_store.save(config_store._coerce_numbers(
             config_store._deep_merge(config_store.DEFAULTS, body)))
         engine.set_config(cfg)
@@ -944,6 +942,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                 data = b.get("data")
                 if not isinstance(data, dict) or len(set(_GAMEPLAY_KEYS) & set(data)) < 2:
                     raise web.HTTPBadRequest(text="that doesn't look like a DiscoFlate gameplay/preset file")
+                data = config_store._migrate(dict(data))   # files can be any older version
                 snap = {k: v for k, v in data.items() if k in _GAMEPLAY_KEYS}
             else:
                 snap = _gameplay_export(cfg)   # snapshot the current live gameplay
@@ -965,6 +964,9 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                 if p is None:
                     raise web.HTTPBadRequest(text="no such preset")
                 data = p.get("data") or {}
+            # stored presets were migrated with the config, but belt & braces:
+            # the collapse is idempotent and cheap
+            data = config_store._collapse_v10(dict(data))
             merged = _gameplay_merge(cfg, data, "replace")
             cfg = config_store.save(config_store._coerce_numbers(merged))
             engine.set_config(cfg)
@@ -1012,6 +1014,9 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         # must look like a gameplay file (share at least a couple safe keys)
         if len(set(_GAMEPLAY_KEYS) & set(data)) < 2:
             raise web.HTTPBadRequest(text="that doesn't look like a DiscoFlate gameplay file")
+        # a gameplay file can be from ANY older version — run the (idempotent,
+        # shape-guarded) migrations over it before merging
+        data = config_store._migrate(dict(data))
         merged = _gameplay_merge(config_store.load(), data, mode)
         cfg = config_store.save(config_store._coerce_numbers(merged))
         engine.set_config(cfg)

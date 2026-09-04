@@ -872,16 +872,12 @@ class BotManager:
         if not content.startswith(prefix):
             return
         cmd = content[len(prefix):].split(" ", 1)[0].lower()
-        bn = self.engine.builtin_names()               # {roll,capacity,help,…} → names
+        bn = self.engine.builtin_names()               # {capacity,help,…} → names
         action = next((k for k, v in bn.items() if v == cmd), None)
-        if action == "roll" and not cfg.get("roll_enabled", True):
-            action = None  # dice disabled → ignore quietly
         custom = self.engine.find_command(cmd)
         if custom is not None and not custom.get("enabled", True):
             custom = None  # disabled command → ignore quietly
-        prize = self.engine.find_prize_by_command(cmd)
-        is_prize = prize is not None
-        if action is None and custom is None and not is_prize:
+        if action is None and custom is None:
             return
         if not self._allowed(cfg, message):
             return
@@ -894,23 +890,9 @@ class BotManager:
         # Anti-spam buffer: quietly ignore one PERSON spamming the SAME command
         # back-to-back. Keyed per-user, so different people are never buffered
         # against each other.
-        bufkey = (prize.get("command", "").lower() if is_prize
-                  else custom.get("name", "").lower() if custom is not None else action)
+        bufkey = custom.get("name", "").lower() if custom is not None else action
         if not self.engine.buffer_ok(f"buf:{bufkey}:{message.author.id}"):
             return
-
-        if is_prize:
-            res = await self.engine.use_prize_command(who, str(message.author.id), prize)
-            if res.get("silent"):
-                return  # not unlocked / used up → ignore quietly
-            if not res.get("ok"):
-                await _reply(message, res["error"] if res.get("paused")
-                             else f"⚠️ {res.get('error', 'could not run')}")
-                return
-            await _reply(message, res["reply"])
-            await self._echo(message, res.get("reply_anon"), "", res.get("reply"))
-            return
-
 
         if action == "vote":
             # only live during a poll — cast_vote returns None otherwise (silent)
@@ -1018,21 +1000,7 @@ class BotManager:
                 else:
                     await self.broadcast(post, None)
             return
-
-        # action == "roll"
-        res = await self.engine.roll_and_fire(who, uid=str(message.author.id))
-        if res.get("silent"):
-            return  # dice disabled in this range → ignore quietly
-        if not res.get("ok"):
-            await _reply(message, res["error"] if (res.get("cooldown") or res.get("paused"))
-                         else f"⚠️ {res.get('error', 'could not roll')}")
-            return
-        line = res["reply"]
-        # No extend notice: the reply's [timer] already shows the new remaining
-        # time, so a separate "added to the running fire" line would be redundant.
-        roll_label = self.engine.builtin_names().get("roll") or "roll"
-        await _reply(message, self._hdr(cfg, roll_label, who) + line)
-        await self._echo(message, res.get("reply_anon"), "", res.get("reply"), label=roll_label)
+        # (no trailing builtin here: the old chat dice-roll is a custom command now)
 
     async def _is_member(self, guild, uid: int) -> bool:
         """True if user `uid` is a member of `guild`. Checks the member cache, then

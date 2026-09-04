@@ -1,6 +1,6 @@
 {
-  "version": "3.42.0",
-  "versionCode": 112,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.42.0/discoflate.apk",
-  "notes": "DiscoFlate v3.42.0 — the capacity-event gating tickboxes (disable range/always-on commands, pause events, enable-commands) are gone: they now migrate into command_gate rows inside the event's action block (event-scope disables at the start + resumes at the end; session-scope persists and can be resumed elsewhere; enable→allow). command_gate's 'allow' is a universal bypass; added an 'unallow'. Everything auto-migrates and the built-in default was rebuilt to match."
+  "version": "3.43.0",
+  "versionCode": 113,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.43.0/discoflate.apk",
+  "notes": "DiscoFlate v3.43.0 — the consolidation finale (config v10). EVERYTHING is an action block now: commands and timed events lose their legacy type dropdowns (a command is its gates + an action block; minigames keep their tiers), replies and per-action announce boxes are gone — the bot speaks only through message rows, with roll/fire/award results flowing into later rows as placeholders. New chance action (odds + nested win/miss blocks) and stop_devices action. command_gate gets Block/Allow/Resume pills over commands AND events (block one event, pause all timed or all capacity events). The builtin !agroll chat command is now a plain custom command (range dice + luck still rule). Competitions are fully button-driven (entry command removed). Timed-event rounds run detached so a wait/poll never stalls the session. Templates moved to System. Everything auto-migrates, presets and templates included."
 }

@@ -80,6 +80,10 @@ class Engine:
         # ranges yield to these; End / End Sequence overrules them.
         self._capev_done: set = set()                    # keys fired this session
         self._capev_tasks: dict[str, asyncio.Task] = {}  # running action blocks
+        # Timed events run their per-round action block DETACHED (a wait/poll
+        # inside must not stall the capacity loop); one task per event key, and
+        # a new round never starts while the previous round's block still runs.
+        self._event_tasks: dict[str, asyncio.Task] = {}
         self._capev_fx: dict[str, set] = {}              # key -> effects while it runs
         self._capev_session_fx: set = set()              # effects locked for the session
         self._capev_enable: dict[str, set] = {}          # key -> commands enabled during it
@@ -124,11 +128,14 @@ class Engine:
         # command_gate action or a Winner Button's freeze; cleared by remove_block,
         # a Winner Button press/deadline, or session reset.
         self._cmd_gate_block: bool = False
-        # command_gate refinements: commands whitelisted THROUGH a block_all, and
-        # specific commands blocked. (disable_range / disable_always_on /
-        # pause_events modifiers reuse the capacity-event session-effect set.)
+        # command_gate refinements: commands whitelisted THROUGH a block_all,
+        # specific commands blocked, and specific timed/capacity EVENTS blocked
+        # from firing (by lowercased name). (disable_range / disable_always_on /
+        # pause_events / pause_capacity modifiers reuse the capacity-event
+        # session-effect set.)
         self._cmd_gate_allow: set = set()
         self._cmd_gate_blocked_cmds: set = set()
+        self._cmd_gate_blocked_events: set = set()
         # Winner Button: a one-press button handed to a competition winner (or any
         # target). Pressing it runs a mini action block; if the target never
         # presses it, a deadline auto-runs the block so the game can't stall.
@@ -148,8 +155,13 @@ class Engine:
         # NOT part of it. Session-scoped: cancelled on pause / reset / off.
         self._post_tasks: set = set()
         # Max Roll Prize tracking (in-memory; resets on session reset / restart).
-        self._perfect: dict[str, int] = {}       # uid -> perfect-roll count
-        self._prize_uses: dict[str, int] = {}    # uid -> remaining uses (present = unlocked)
+        # Perfect Prizes: per-(uid, prize-index) progress toward each prize's
+        # goal. Progress resets on unlock (prizes are re-earnable) and on
+        # session reset. Perfect ROLLS bump the "roll" counter automatically;
+        # an `achievement` action row bumps any named counter (e.g. a blackjack
+        # tier bumping "blackjack").
+        self._prize_prog: dict = {}
+        self._in_prize: bool = False   # re-entrancy guard: no bumps inside a prize block
         self._pump_time: dict[str, dict] = {}    # uid -> {name, seconds, capacity} (session leaderboard)
         # Per-range leaderboards: (min,max) -> {uid: {name, seconds, capacity}}.
         # Same shape as _pump_time but scoped to the range the pump landed in, for
@@ -396,7 +408,6 @@ class Engine:
                 await self._check_milestones()
                 await self._check_range_entry()
                 await self._check_end_sequence()
-                await self._check_cooldown_resets()
                 await self._check_events()
                 await self._check_capacity_events()
             except asyncio.CancelledError:
@@ -458,7 +469,6 @@ class Engine:
             "uptime_seconds": int(self.session_uptime()),
             "capacity_bar": self._capacity_bar(),
             "prefix": prefix,
-            "roll_cmd": f"{prefix}{bn['roll']}",
             "capacity_cmd": f"{prefix}{bn['capacity']}",
             "help_cmd": f"{prefix}{bn['help']}",
             "leaderboard_cmd": f"{prefix}{bn['leaderboard']}",
@@ -498,10 +508,6 @@ class Engine:
         ctx["total_bonus_pct"] = f"{tb_pct:g}"
         ctx.setdefault("user_bonus_secs", "")
         ctx.setdefault("user_bonus_pct", "")
-        pz = self.active_prize() or {}
-        ctx["max_roll_goal"] = pz.get("goal") if pz.get("goal") not in (None, "") else ""
-        ctx["max_roll_command"] = f"{prefix}{(pz.get('command') or '').strip()}" if pz.get("command") else ""
-        ctx["max_roll_desc"] = pz.get("description") or ""
         if extra:
             ctx.update(extra)
         # Embeddable blocks: [toppump] / [toppump-all] = the leaderboard command
@@ -928,34 +934,11 @@ class Engine:
 
     def _touch_cooldown(self, key_uid: str, cmdkey: str, cd: float) -> None:
         self._cooldowns.setdefault(str(key_uid), {})[cmdkey] = {
-            "last": time.monotonic(), "cd": cd, "notified": cd <= 0}
+            "last": time.monotonic(), "cd": cd}
 
     def _cmd_display(self, cmdkey: str) -> str:
         """A command's user-facing name with prefix, e.g. '!agroll'."""
-        prefix = self.cfg.get("command_prefix", "!")
-        if cmdkey == "roll":
-            cmdkey = self.builtin_names()["roll"]
-        return f"{prefix}{cmdkey}"
-
-    async def _check_cooldown_resets(self) -> None:
-        """When a cooldown expires, post the one generic reset message (if set)."""
-        tmpl = (self.cfg.get("cooldown_reset_message") or "").strip()
-        if not tmpl:
-            return
-        now = time.monotonic()
-        # iterate over copies — the awaits below yield, and a command landing
-        # mid-broadcast mutates these dicts (RuntimeError otherwise)
-        for key_uid, cmds in list(self._cooldowns.items()):
-            for cmdkey, rec in list(cmds.items()):
-                if rec.get("notified"):
-                    continue
-                if rec["cd"] and now >= rec["last"] + rec["cd"]:
-                    rec["notified"] = True
-                    uid = None if key_uid == "*" else key_uid
-                    name = "" if key_uid == "*" else self._users.get(key_uid, {}).get("name", "")
-                    await self._announce(self.render(tmpl, {
-                        "user": name, "mention": self._mention(uid, name), "cmd": self._cmd_display(cmdkey),
-                    }), None)
+        return f"{self.cfg.get('command_prefix', '!')}{cmdkey}"
 
     def reset_users(self) -> None:
         self._users.clear()
@@ -973,7 +956,8 @@ class Engine:
     # -- capacity events ------------------------------------------------------ #
     def _capev_effect(self, fx: str) -> bool:
         """True if any running capacity event (or a session-remainder lock)
-        currently imposes this effect: disable_range | disable_ao | pause_events."""
+        currently imposes this effect:
+        disable_range | disable_ao | pause_events | pause_capacity."""
         return fx in self._capev_session_fx or any(fx in s for s in self._capev_fx.values())
 
     def _capev_enabled_cmds(self) -> set:
@@ -995,16 +979,20 @@ class Engine:
             return self._capev_effect("disable_ao")
         return self._capev_effect("disable_range")
 
-    def _spawn_post_actions(self, actions, label: str, hdr: str | None = None) -> None:
+    def _spawn_post_actions(self, actions, label: str, hdr: str | None = None,
+                            replace_key: str | None = None) -> None:
         """Queue a post-event action block as a DETACHED task — the event is
         already complete and its effects lifted, so this runs independently
-        (e.g. 'wait 5 min, then do X'). Cancelled on pause / reset / off."""
+        (e.g. 'wait 5 min, then do X'). Cancelled on pause / reset / off.
+        `replace_key` (clean-previous loops): the block's first message row
+        replaces the final round's, like the old end message did."""
         if not actions:
             return
 
         async def _run():
             try:
-                await self._run_action_block(actions, label, hdr=hdr)
+                await self._run_action_block(actions, label, hdr=hdr,
+                                             replace_key=replace_key)
                 self._log("bot", f"{label} complete")
             except asyncio.CancelledError:
                 pass
@@ -1016,6 +1004,9 @@ class Engine:
         for t in self._capev_tasks.values():
             t.cancel()
         self._capev_tasks.clear()
+        for t in self._event_tasks.values():   # running timed-event rounds die too
+            t.cancel()
+        self._event_tasks.clear()
         self._capev_fx.clear()
         self._capev_enable.clear()
         for t in list(self._post_tasks):
@@ -1032,6 +1023,8 @@ class Engine:
         has triggered, and the session end cancels them)."""
         if not self.cfg.get("listener_enabled") or self._end_triggered:
             return
+        if self._capev_effect("pause_capacity"):
+            return   # a command_gate has paused all capacity events
         for ev in self.cfg.get("capacity_events", []):
             if not ev.get("enabled"):
                 continue
@@ -1043,6 +1036,8 @@ class Engine:
                 continue
             name = (ev.get("name") or "").strip() or f"capacity-{at:g}"
             key = name.lower()
+            if key in self._cmd_gate_blocked_events:
+                continue   # a command_gate blocks this specific event (fires on unblock if still ≥ at)
             if key in self._capev_done or self.capacity < at:
                 continue
             self._capev_done.add(key)
@@ -1064,7 +1059,7 @@ class Engine:
                 en = {str(n).strip().lower() for n in (ev.get("enable_commands") or []) if str(n).strip()}
                 if en:
                     self._capev_enable[key] = en
-            if ev.get("stop_devices"):
+            if ev.get("stop_devices"):   # legacy pre-v10 flag (now a stop_devices action)
                 await self.abort(reason=f"capacity event {name}")
             self._capev_tasks[key] = asyncio.create_task(self._run_capev(ev, key, name))
 
@@ -1086,23 +1081,37 @@ class Engine:
 
     async def _run_action_block(self, actions, name: str, hdr: str | None = None,
                                 uid=None, who: str | None = None,
-                                extra_ctx: dict | None = None) -> None:
-        """Execute an ordered action block: message | broadcast | fire | roll |
-        capacity | wait | poll | competition | award_prize | command_gate |
-        winner_button | end_session. Shared by capacity events, poll outcomes,
-        'actions'-type custom commands, and competition win blocks. A poll action
-        BLOCKS the caller until it finishes. `name` labels logs; `hdr` (default =
-        name) is the output-header tag; `uid`/`who` (a command's runner, or a
-        competition winner) credit that person's leaderboard for the block's
-        fires; `extra_ctx` (e.g. {'mention': ..}) is merged into every render so
-        winner/mention placeholders resolve inside the block."""
+                                extra_ctx: dict | None = None,
+                                replace_key: str | None = None,
+                                cmdkey: str | None = None) -> dict:
+        """Execute an ordered action block: message | broadcast | command | fire |
+        roll | capacity | wait | poll | competition | bonus_round | award | chance |
+        command_gate | stop_devices | end_session. Shared by timed & capacity
+        events, poll outcomes, custom commands, and competition win blocks. A poll
+        action BLOCKS the caller until it finishes. `name` labels logs; `hdr`
+        (default = name) is the output-header tag; `uid`/`who` (a command's
+        runner, or a competition winner) credit that person's leaderboard for the
+        block's fires; `extra_ctx` (e.g. {'mention': ..}) is merged into every
+        render. Fire/roll/award actions PUBLISH their results into the running
+        context ([secs], [result], [bonus_cmd], …) so later message rows can use
+        them; the final context is returned. `replace_key` (clean-previous event
+        loops): each plain message row's post replaces its counterpart from the
+        previous round. `cmdkey` (a custom command's block): the CURRENT range's
+        row for that command overrides its fire rows' seconds/device — range
+        values beat the row's own, resolved live per fire."""
         if hdr is None:
             hdr = name
         xc = dict(extra_ctx or {})
-        if uid is not None and "user_bonus_secs" not in xc:
-            ubs, ubp = self.user_bonus(uid)   # [user_bonus_*] for the block's runner
-            xc["user_bonus_secs"] = f"{ubs:g}"
-            xc["user_bonus_pct"] = f"{ubp:g}"
+        if who and "user" not in xc:
+            xc["user"] = who              # [user]/[mention] = the block's runner
+        if uid is not None:
+            if "mention" not in xc:
+                xc["mention"] = self._mention(uid, who or "")
+            if "user_bonus_secs" not in xc:
+                ubs, ubp = self.user_bonus(uid)   # [user_bonus_*] for the block's runner
+                xc["user_bonus_secs"] = f"{ubs:g}"
+                xc["user_bonus_pct"] = f"{ubp:g}"
+        nmsg = 0   # per-round message counter → stable per-row replace keys
 
         def R(template, more=None):
             return self.render(template, {**xc, **(more or {})})
@@ -1167,10 +1176,13 @@ class Engine:
                                 allowed = {str(u)}; primary_uid, primary_who = u, w
                             else:
                                 has_button = False
-                    # [target]/[mention] = the button's target; [winner] is left to
-                    # the global last-winner so a plain embed's [winner] still works.
-                    bctx = {"target": primary_who,
-                            "mention": self._mention(primary_uid, primary_who) if primary_uid else ""}
+                    # [target]/[mention] = the button's target — but ONLY when the
+                    # row actually targets someone; a plain message leaves them to
+                    # the block context (the runner / prize earner / winner).
+                    bctx = {}
+                    if tgt:
+                        bctx = {"target": primary_who,
+                                "mention": self._mention(primary_uid, primary_who) if primary_uid else ""}
                     title = R((a.get("title") or "").strip(), bctx)
                     body = R((a.get("message") or "").strip(), bctx)
                     if not has_button:
@@ -1185,7 +1197,9 @@ class Engine:
                                 await self._announce((f"**{title}**\n" if title else "") + body, None)
                         else:   # plain message
                             if body:
-                                await self._announce(self._evt_hdr(hdr) + body, None)
+                                nmsg += 1
+                                await self._announce(self._evt_hdr(hdr) + body, None,
+                                                     replace_key=(f"{replace_key}:m{nmsg}" if replace_key else None))
                         continue
                     label = (a.get("label") or "").strip() or "🎁 Claim"
                     freeze = bool(a.get("freeze"))
@@ -1288,9 +1302,16 @@ class Engine:
                         award_type = "pct" if (a.get("unit") or "secs").lower() in ("pct", "%", "cap", "capacity") else "secs"
                     else:
                         award_type = (a.get("award_type") or "command").lower()
+                    # "[user]"/"[target]" = the block's runner (a command's caller,
+                    # a prize earner) — resolved directly, no board lookup needed.
+                    tspec = (a.get("target") or "").strip().lower()
+                    runner_t = tspec in ("[user]", "user", "[target]", "target", "[runner]")
                     if award_type != "command":
                         # bank a bonus AMOUNT (pump seconds or capacity %)
-                        uid_t, who_t = self._resolve_award_target(a.get("target") or "[winner]")
+                        if runner_t and uid is not None:
+                            uid_t, who_t = str(uid), who or ""
+                        else:
+                            uid_t, who_t = self._resolve_award_target(a.get("target") or "[winner]")
                         if uid_t is None:
                             self._log("bot", f"{name}: award — no target for '{a.get('target')}', skipped")
                             continue
@@ -1302,12 +1323,15 @@ class Engine:
                         else:
                             rec["secs"] += amt
                         self._log("bot", f"{name}: banked {amt:g}{'%' if award_type=='pct' else 's'} bonus for {who_t}")
-                        msg = (a.get("message") or "").strip()
+                        # publish for later rows ([target]/[amount]/[user_bonus_*])
+                        xc.update({"target": who_t, "target_mention": self._mention(uid_t, who_t),
+                                   "amount": f"{amt:g}",
+                                   "user_bonus_secs": f"{rec['secs']:g}",
+                                   "user_bonus_pct": f"{rec['pct']:g}"})
+                        msg = (a.get("message") or "").strip()   # legacy pre-v10 rows
                         if msg:
                             await self._announce(self._evt_hdr(hdr) + R(msg, {
-                                "target": who_t, "winner": who_t,
-                                "mention": self._mention(uid_t, who_t), "amount": f"{amt:g}",
-                                "user_bonus_secs": f"{rec['secs']:g}", "user_bonus_pct": f"{rec['pct']:g}"}), None)
+                                "winner": who_t, "mention": self._mention(uid_t, who_t)}), None)
                         continue
                     # award_type == "command": grant a bonus command (charges/lock/
                     # deadline/stash) — bypasses cooldown/lock/range for the target.
@@ -1316,7 +1340,10 @@ class Engine:
                     if cmd is None:
                         self._log("error", f"{name}: award_prize — no command '{a.get('command')}'")
                         continue
-                    uid_t, who_t = self._resolve_award_target(a.get("target"))
+                    if runner_t and uid is not None:
+                        uid_t, who_t = str(uid), who or ""
+                    else:
+                        uid_t, who_t = self._resolve_award_target(a.get("target"))
                     if uid_t is None:
                         self._log("bot", f"{name}: award_prize — no target for '{a.get('target')}', skipped")
                         continue
@@ -1339,6 +1366,9 @@ class Engine:
                             "mention": self._mention(uid_t, who_t),
                             "bonus_cmd": f"{prefix}{bkey}",
                             "charges": ("∞" if charges <= 0 else str(charges))}
+                    # publish for later rows ([target]/[target_mention]/[bonus_cmd]/[charges])
+                    xc.update({"target": who_t, "target_mention": actx["mention"],
+                               "bonus_cmd": actx["bonus_cmd"], "charges": actx["charges"]})
                     if a.get("lock"):
                         self._progression_lock = {"uid": str(uid_t), "cmd": bkey}
                         self._log("bot", f"progression LOCKED until {who_t} uses !{bkey}")
@@ -1367,15 +1397,20 @@ class Engine:
                     for m in mods:
                         op = (m.get("op") or "").lower()
                         ck = (m.get("command") or "").strip().lower()
+                        ek = (m.get("event") or "").strip().lower()
                         if op == "block_all":
                             self._cmd_gate_block = True
+                        elif op == "unblock_all":
+                            self._cmd_gate_block = False
                         elif op in ("remove_block", "remove", "off", "none"):
                             self._cmd_gate_block = False
                             self._cmd_gate_allow.clear()
                             self._cmd_gate_blocked_cmds.clear()
+                            self._cmd_gate_blocked_events.clear()
                             self._capev_session_fx.discard("disable_range")
                             self._capev_session_fx.discard("disable_ao")
                             self._capev_session_fx.discard("pause_events")
+                            self._capev_session_fx.discard("pause_capacity")
                         elif op == "allow" and ck:
                             self._cmd_gate_allow.add(ck)
                         elif op == "unallow" and ck:
@@ -1384,6 +1419,14 @@ class Engine:
                             self._cmd_gate_blocked_cmds.add(ck)
                         elif op == "unblock" and ck:
                             self._cmd_gate_blocked_cmds.discard(ck)
+                        elif op == "block_event" and ek:
+                            self._cmd_gate_blocked_events.add(ek)
+                        elif op == "unblock_event" and ek:
+                            self._cmd_gate_blocked_events.discard(ek)
+                        elif op == "pause_capacity":
+                            self._capev_session_fx.add("pause_capacity")
+                        elif op == "resume_capacity":
+                            self._capev_session_fx.discard("pause_capacity")
                         elif op == "disable_range_cmds":
                             self._capev_session_fx.add("disable_range")
                         elif op == "resume_range_cmds":
@@ -1401,18 +1444,90 @@ class Engine:
                     if msg:
                         await self._announce(self._evt_hdr(hdr) + R(msg), None)
                     continue
+                if typ == "achievement":
+                    # Bump a named prize counter for the block's runner — e.g. a
+                    # blackjack 21-tier bumping "blackjack" toward a Perfect Prize.
+                    await self._bump_achievement(
+                        ((a.get("counter") or "").strip().lower()) or "roll", uid, who or "")
+                    continue
+                if typ == "stop_devices":
+                    # One-shot: kill any running fire on every device right now.
+                    await self.abort(reason=f"{name}: stop devices")
+                    msg = (a.get("message") or "").strip()
+                    if msg:
+                        await self._announce(self._evt_hdr(hdr) + R(msg), None)
+                    continue
+                if typ == "chance":
+                    # A gamble row: roll 1-100 vs chance% (luck: ±% to force the
+                    # outcome), then run the nested win/miss block. [roll]/[chance]/
+                    # [luck]/[won] publish to the rest of the block.
+                    try:
+                        chance = max(0.0, min(100.0, float(a.get("chance") if a.get("chance") is not None else 50)))
+                    except (TypeError, ValueError):
+                        chance = 50.0
+                    try:
+                        luck = float(a.get("luck") or 0)
+                    except (TypeError, ValueError):
+                        luck = 0.0
+                    roll = random.randint(1, 100)
+                    win = roll <= chance
+                    if luck > 0 and random.random() * 100 < min(100.0, luck):
+                        win = True
+                    elif luck < 0 and random.random() * 100 < min(100.0, -luck):
+                        win = False
+                    xc.update({"roll": roll, "chance": f"{chance:.0f}",
+                               "luck": f"{luck:+.0f}" if luck else "0", "won": win})
+                    self._log("roll", f"{name}: chance rolled {roll} vs {chance:.0f}%"
+                              + (f" (luck {luck:+.0f})" if luck else "")
+                              + f" → {'WIN' if win else 'miss'}")
+                    outcome = a.get("win_actions") if win else a.get("miss_actions")
+                    if outcome:
+                        sub = await self._run_action_block(
+                            outcome, f"{name} ({'win' if win else 'miss'})", hdr, uid, who,
+                            extra_ctx=dict(xc), cmdkey=cmdkey)
+                        # a fire/roll inside the outcome publishes [secs] etc. onward
+                        for k in ("secs", "seconds", "secs2capacity", "result", "total",
+                                  "dice", "sides", "timer", "total_secs", "total_seconds"):
+                            if k in (sub or {}):
+                                xc[k] = sub[k]
+                    continue
                 if typ in ("fire", "roll"):
-                    target = a.get("device_id") or self._active_id()
+                    # Range override for THIS command's fires: the current
+                    # range's row may set fire_seconds / fire_device — range
+                    # values beat the row's own (checked live, so a block that
+                    # crosses ranges alternates pumps/durations with them).
+                    ov = self._range_entry(self.range_for(self.capacity), cmdkey) if cmdkey else {}
+                    target = ov.get("fire_device") or a.get("device_id") or self._active_id()
                     if self._device(target) is None:
                         self._log("error", f"{name}: no target device")
                         continue
                     until = None
+                    total = None
                     if typ == "roll":
-                        rd, rs = self.range_dice(self.range_for(self.capacity))
-                        dice = int(a.get("dice") or rd)
-                        sides = int(a.get("sides") or rs)
+                        # RANGE values win; the row's own NdN/luck are the FALLBACK
+                        # (what an always-on roll uses in ranges that don't set
+                        # dice). The range-dict dice come last: that's the legacy
+                        # spot and the built-in default range's 1d6.
+                        r = self.range_for(self.capacity)
+                        e = self._range_entry(r, "roll")
+                        dice = max(1, int(e.get("dice") or a.get("dice") or r.get("dice") or 1))
+                        sides = max(1, int(e.get("sides") or a.get("sides") or r.get("sides") or 6))
                         total, _ = self._roll_total(dice, sides)
+                        luck_v = e.get("luck")
+                        if luck_v in (None, "", 0):
+                            luck_v = a.get("luck")
+                        try:
+                            luck = float(luck_v or 0)
+                        except (TypeError, ValueError):
+                            luck = 0.0
+                        if luck > 0 and random.random() * 100 < luck:
+                            total = dice * sides
+                        elif luck < 0 and random.random() * 100 < min(100.0, -luck):
+                            total = dice
                         dur = self._duration_from_total(total)
+                        if total == dice * sides:
+                            # a PERFECT roll advances the "roll" prize counter
+                            await self._bump_achievement("roll", uid, who or "")
                     else:
                         # fire amount: fixed seconds, or pump until N% is ADDED
                         # ('add') / until capacity REACHES N% ('to'). The %-modes
@@ -1422,8 +1537,11 @@ class Engine:
                             until = self.capacity + self._num_expr(a.get("fill_pct"), xc)
                         elif mode in ("to", "to_pct", "until"):
                             until = self._num_expr(a.get("fill_pct"), xc)
+                        secs_v = a.get("seconds")
+                        if until is None and ov.get("fire_seconds") not in (None, ""):
+                            secs_v = ov["fire_seconds"]   # the range's per-command override
                         dur = round(max(0.1, min(self._hard_cap(),
-                                                 self._num_expr(a.get("seconds"), xc, 3.0))), 1)
+                                                 self._num_expr(secs_v, xc, 3.0))), 1)
                     if until is not None:
                         fr = self._begin_or_extend(target, 0.0, name, until_capacity=until)
                     else:
@@ -1432,10 +1550,18 @@ class Engine:
                     wait_secs = round(fr.get("remaining", dur), 1)   # time until the pump ends
                     if uid is not None and fr.get("status") in ("started", "extended"):
                         self.credit_pump(uid, who, dur, target)
-                    msg = (a.get("message") or "").strip()
+                    # publish the results so later rows can use them ([secs],
+                    # [timer]; a roll adds [result]/[total]/[dice]/[sides])
+                    xc.update({"secs": f"{dur:.1f}", "seconds": f"{dur:.1f}",
+                               "secs2capacity": self._secs_to_capacity(dur, target),
+                               "timer": f"{wait_secs:.1f}", "total_secs": f"{wait_secs:.1f}",
+                               "total_seconds": f"{wait_secs:.1f}"})
+                    if typ == "roll":
+                        xc.update({"result": total, "total": total,
+                                   "dice": f"{dice}d{sides}", "sides": sides})
+                    msg = (a.get("message") or "").strip()   # legacy pre-v10 rows
                     if msg:
-                        await self._announce(self._evt_hdr(hdr) + R(
-                            msg, {"secs": f"{dur:.1f}", "seconds": f"{dur:.1f}"}), None)
+                        await self._announce(self._evt_hdr(hdr) + R(msg), None)
                     # "block others while pumping" + Post-Pump Actions: when either
                     # is set the fire WAITS OUT its run (freezing all other custom
                     # commands + roll if asked), then runs the post block.
@@ -1453,11 +1579,12 @@ class Engine:
                         if post and not self._paused and not self._end_triggered:
                             await self._run_action_block(
                                 post, f"{name} (post-pump)", hdr, uid, who,
-                                extra_ctx={**xc, "secs": f"{dur:.1f}", "seconds": f"{dur:.1f}"})
+                                extra_ctx=dict(xc), cmdkey=cmdkey)
             except asyncio.CancelledError:
                 raise
             except Exception as e:  # noqa: BLE001 — one bad action shouldn't kill the block
                 self._log("error", f"{name} action failed: {e}")
+        return xc
 
     async def _run_capev(self, ev: dict, key: str, name: str) -> None:
         """Execute the event's action block sequentially. The event counts as
@@ -1731,15 +1858,15 @@ class Engine:
     def competition_roll_value(self, slot=None) -> float:
         """Produce one roll value for the given 0-based slot. With per-roll specs
         (roll-off rows) each slot uses its own NdN + luck; otherwise falls back
-        to the entry command's dice."""
+        to the current range's dice."""
         if self._comp is None:
             return 0.0
         specs = self._comp["def"].get("roll_specs") or []
         if specs:
             i = 0 if slot is None else max(0, min(len(specs) - 1, int(slot)))
             return self._roll_spec(specs[i])
-        entry = self.find_command(self._comp["cmd"])
-        return self._comp_value(entry) if entry else float(self._roll_total(1, 6)[0])
+        rd, rs = self.range_dice(self.range_for(self.capacity))
+        return float(self._roll_total(rd, rs)[0])
 
     def competition_submit(self, uid, who: str, rolls: list) -> dict:
         """Record a player's finished rolls, score them by the metric, mark them
@@ -1950,13 +2077,8 @@ class Engine:
         await self._finish_competition(cd, name, entry, winner_uid, winner, results_text)
 
     def _comp_intro(self, cd: dict, entry_key: str, duration: float) -> str:
-        prefix = self.cfg.get("command_prefix", "!")
-        en = f"{prefix}{self.builtin_names()['enter']}"
-        need = int(cd.get("required_entries") or 0)
-        parts = [f"Type `{en}` to join"]
-        if entry_key:
-            parts.append(f"then use `{prefix}{entry_key}`" + (f" ×{need}" if need else ""))
-        return "**HIGHEST SCORE WINS** — " + ", ".join(parts) + f". {duration:g}s!"
+        # button flow: players press Enter Challenge on the embed and roll there
+        return f"**HIGHEST SCORE WINS** — press **Enter Challenge** to join & roll. {duration:g}s!"
 
     def _comp_standings(self) -> str:
         rows = sorted(self._comp["players"].values(), key=lambda p: p["score"], reverse=True)
@@ -2014,8 +2136,9 @@ class Engine:
             await self._announce(text, None)
         if winner is None:
             self._last_winner, self._last_winner_score = "", 0.0
-            msg = (cd.get("no_winner_message") or "").strip() or f"**{name}**: no qualifying winner."
-            await _result_embed(name, self.render(msg, {"results": results}))
+            msg = (cd.get("no_winner_message") or "").strip()   # legacy pre-v10 field
+            if msg:
+                await _result_embed(name, self.render(msg, {"results": results}))
             await self._run_action_block(cd.get("no_winner_actions"),
                                          f"competition {name} no-winner", hdr="COMPETITION")
             self._log("bot", f"COMPETITION '{name}' — no winner")
@@ -2023,9 +2146,9 @@ class Engine:
         self._last_winner = winner["name"]
         self._last_winner_score = winner["score"]
         mention = self._mention(winner_uid, winner["name"])
-        # announce the win as a results embed
-        msg = (cd.get("win_message") or "").strip() or "🏆 **[winner]** wins with **[winner_score]**!\n\n[results]"
-        await _result_embed(name, self.render(msg, {"mention": mention}))
+        msg = (cd.get("win_message") or "").strip()   # legacy pre-v10 field (now a win_actions row)
+        if msg:
+            await _result_embed(name, self.render(msg, {"mention": mention}))
         self._log("bot", f"COMPETITION '{name}' — winner {winner['name']} ({winner['score']:g})")
         # Prizes are an ACTION BLOCK now: fire [winner_score] to the pump, hand
         # the winner a Winner Button, award_prize a bonus command, gate everyone
@@ -2296,6 +2419,8 @@ class Engine:
         for ev in self.cfg.get("events", []):
             name = (ev.get("name") or "").strip()
             key = name.lower()
+            if key in self._cmd_gate_blocked_events:
+                continue   # a command_gate blocks this specific event
             # Effective on = saved tick OR temporarily started by a command.
             if not (ev.get("enabled") or key in self._runtime_events_on):
                 continue
@@ -2307,6 +2432,8 @@ class Engine:
                 continue
             if key in self._events_done:
                 continue  # a "once" event / repeat-capped loop that already finished
+            if key in self._event_tasks:
+                continue  # previous round's block still running — rounds never overlap
             last = self._event_last.get(key)
             if last is not None and now < last + every:
                 continue
@@ -2328,8 +2455,11 @@ class Engine:
         """Run one iteration of an event: bump the loop count, fire it, and on the
         final round drop the activator, start its cooldown and post the end message.
         With `sink` set, messages go into that list (used for the immediate first
-        round so it follows the command reply) instead of broadcasting now."""
-        if self._capev_effect("pause_events"):
+        round so it follows the command reply) instead of broadcasting now — that
+        path runs inline. Otherwise the round runs DETACHED (one task per event)
+        so a wait/poll inside its block never stalls the capacity loop; a new
+        round won't start while the previous round's block is still running."""
+        if self._capev_effect("pause_events") or key in self._cmd_gate_blocked_events:
             return   # covers the fire_immediately path too
         name = (ev.get("name") or "").strip()
         one_shot = (ev.get("mode") or "loop").lower() == "once"
@@ -2357,8 +2487,23 @@ class Engine:
         next_round = "" if ending else f"Next Round in {every:g} seconds"
         loop_ctx = {"current_loop": count, "total_loops": ("∞" if cap <= 0 else str(cap)),
                     "loop_timer": f"{every:g}", "event": name, "next_round": next_round}
+        if sink is not None:
+            await self._run_event_round(ev, key, name, ending, loop_ctx, sink, replace_key)
+            return
+        t = asyncio.create_task(
+            self._run_event_round(ev, key, name, ending, loop_ctx, None, replace_key))
+        self._event_tasks[key] = t
+        t.add_done_callback(lambda _t, k=key: self._event_tasks.pop(k, None))
+
+    async def _run_event_round(self, ev: dict, key: str, name: str, ending: bool,
+                               loop_ctx: dict, sink, replace_key) -> None:
+        """One round's body: the event's block, then — on the final round — the
+        wrap-up (drop the activator, start the cooldown, post the end message,
+        queue Post Event Commands)."""
         try:
             await self._run_event(ev, loop_ctx, sink=sink, replace_key=replace_key)
+        except asyncio.CancelledError:
+            return
         except Exception as e:  # noqa: BLE001
             self._log("error", f"event {name} failed: {e}")
         if ending:
@@ -2372,34 +2517,38 @@ class Engine:
                 cdn = 0.0
             if cdn > 0:
                 self._event_cooldown_until[key] = time.monotonic() + cdn
-            em = (ev.get("end_message") or "").strip()
+            em = (ev.get("end_message") or "").strip()   # legacy pre-v10 (now a post_actions row)
             if em:
                 try:
-                    # Same replace_key: the end message deletes the final round and
-                    # stays put (the next run uses a new run id, so it's never wiped).
-                    await self._emit(self.render(em, loop_ctx), sink, replace_key=replace_key)
+                    await self._emit(self.render(em, loop_ctx), sink,
+                                     replace_key=(f"{replace_key}:m1" if replace_key else None))
                 except Exception as e:  # noqa: BLE001
                     self._log("error", f"event {name} end msg failed: {e}")
-            # The event has ended and cleared — queue its post-event commands
-            # detached (they run on their own timeline, not part of the event).
+            # The event has ended and cleared — run its END block, detached
+            # (it runs on its own timeline, not part of the event). With
+            # clean_previous, its first message row replaces the final round.
             if not self._paused and not self._end_triggered:
-                self._spawn_post_actions(ev.get("post_actions"), f"event {name} (post)", hdr="")
+                self._spawn_post_actions(ev.get("post_actions"), f"event {name} (post)", hdr="",
+                                         replace_key=replace_key)
 
     async def _run_event(self, ev: dict, extra: dict | None = None, sink: list | None = None,
                          replace_key: str | None = None) -> None:
         name = ev.get("name", "event")
-        action = (ev.get("action") or "message").lower()
+        # post-v10 events have no `action` key at all — they ARE action blocks;
+        # a present-but-empty key is the legacy default (message).
+        action = (ev.get("action") or ("message" if "action" in ev else "actions")).lower()
         msg = (ev.get("message") or "").strip()
         # If a command started this event, credit that person's leaderboard for its pumps.
         act_uid, act_who = self._event_activator.get(name.strip().lower(), (None, ""))
 
         if action == "actions":
-            # Full action block per round (message/embed/fire/award/competition/…),
-            # exactly like a command's 'actions' type. Loop context ([current_loop],
-            # [event], [next_round]) is available inside it. (clean_previous message
-            # replacement stays a feature of the simple single-action types.)
+            # Full action block per round (message/fire/chance/award/competition/…).
+            # Loop context ([current_loop], [event], [next_round]) is available
+            # inside it; clean_previous flows through replace_key so each round's
+            # message rows replace the previous round's.
             await self._run_action_block(ev.get("actions"), f"event {name}", hdr="",
-                                         uid=act_uid, who=act_who, extra_ctx=extra)
+                                         uid=act_uid, who=act_who, extra_ctx=extra,
+                                         replace_key=replace_key)
             return
 
         if action == "chance":
@@ -2510,8 +2659,7 @@ class Engine:
     # -- custom commands ----------------------------------------------------- #
     def builtin_names(self) -> dict:
         n = self.cfg.get("command_names", {})
-        return {"roll": (n.get("roll") or "agroll").strip().lower(),
-                "capacity": (n.get("capacity") or "capacity").strip().lower(),
+        return {"capacity": (n.get("capacity") or "capacity").strip().lower(),
                 "help": (n.get("help") or "aghelp").strip().lower(),
                 "leaderboard": (n.get("leaderboard") or "leaderboard").strip().lower(),
                 "leaderboard_life": (n.get("leaderboard_life") or "toppumpers-life").strip().lower(),
@@ -2886,14 +3034,6 @@ class Engine:
         anon = self._anon_label()
         reply = self.render(tmpl, {"user": who, "mention": self._mention(uid, who), **base})
         reply_anon = self.render(tmpl, {"user": anon, "mention": anon, **base})
-
-        # Max Roll Prize: a "perfect" roll is the maximum possible total.
-        if uid is not None and p["total"] == p["dice"] * p["sides"]:
-            pt, pa = self._prize_progress({"uid": uid}, who, self._mention(uid, who))
-            if pt:
-                reply += "\n" + pt
-                reply_anon += "\n" + pa
-
         return {"ok": True, "started": fr["status"] in ("started", "extended"),
                 "extended": extended, "added": fr.get("added"), "remaining": fr.get("remaining"),
                 **p, "reply": reply, "reply_anon": reply_anon,
@@ -3016,10 +3156,11 @@ class Engine:
                     "reply_anon": self.render(cmd.get("reply") or "", {"user": anon, "mention": anon, "cmd_remain": _remain()}) or f"{name}!"}
 
         if typ == "actions":
-            # A full action SEQUENCE (like an event): message / broadcast /
-            # fire / roll / capacity / wait / poll / competition / end_session,
-            # in order. Same gating as any command; the block's fires credit
-            # the runner. start_events still supported alongside.
+            # THE command type: an action SEQUENCE (message / fire / roll / chance /
+            # capacity / wait / poll / competition / award / command_gate / …), in
+            # order. Same gating as any command; the block's fires credit the
+            # runner; the bot speaks through the block's message rows.
+            # start_events still supported alongside.
             cmdkey = name.lower()
             cd, scope = self._range_cd_scope(self.range_for(self.capacity), cmdkey)
             key_uid = str(uid) if scope == "user" else "*"
@@ -3028,18 +3169,26 @@ class Engine:
                 remaining = self.cooldown_remaining(key_uid, cmdkey)
                 if remaining > 0:
                     return {"ok": False, "cooldown": True, "error": self._cooldown_reply(who, remaining, uid, cmdkey)}
-            if uid is not None:
+            ev_posts, activated = await self.start_events(cmd.get("start_events"), uid, who)
+            # A PURE event-trigger command (start_events, no action rows) only
+            # costs a use / touches its cooldown when it actually starts one —
+            # if everything it targets was blocked, don't drain the budget.
+            if not (cmd.get("start_events") and not (cmd.get("actions") or []) and activated == 0):
+                _spend_use()
+                if uid is not None:
+                    self._track_user(uid, who)
+                    if scope == "command" or not exempt:
+                        self._touch_cooldown(key_uid, cmdkey, cd)
+            elif uid is not None:
                 self._track_user(uid, who)
-                if scope == "command" or not exempt:
-                    self._touch_cooldown(key_uid, cmdkey, cd)
-            _spend_use()
-            ev_posts, _ = await self.start_events(cmd.get("start_events"), uid, who)
-            await self._run_action_block(cmd.get("actions"), f"{name} by {who}", hdr=name, uid=uid, who=who)
+            bctx = await self._run_action_block(cmd.get("actions"), f"{name} by {who}",
+                                                hdr=name, uid=uid, who=who, cmdkey=cmdkey)
             anon = self._anon_label()
-            tmpl = cmd.get("reply") or ""
+            tmpl = cmd.get("reply") or ""   # legacy pre-v10 replies — [secs]/[result] flow in
+            base = {**(bctx or {}), "cmd_remain": _remain()}
             return {"ok": True, "device": True, "started": True, "events_posted": ev_posts,
-                    "reply": self.render(tmpl, {"user": who, "mention": self._mention(uid, who), "cmd_remain": _remain()}),
-                    "reply_anon": self.render(tmpl, {"user": anon, "mention": anon, "cmd_remain": _remain()})}
+                    "reply": self.render(tmpl, {**base, "user": who, "mention": self._mention(uid, who)}),
+                    "reply_anon": self.render(tmpl, {**base, "user": anon, "mention": anon})}
 
         if typ == "poll":
             # Starts a named poll (same gating as other commands; the poll
@@ -3547,6 +3696,7 @@ class Engine:
         self._cancel_bonus_round()     # a live Bonus Round dies too (banks survive the pause)
         self._cmd_gate_block = False    # STOP lifts any command gate; resume starts clean
         self._cmd_gate_allow.clear(); self._cmd_gate_blocked_cmds.clear()
+        self._cmd_gate_blocked_events.clear()
         self._cancel_deadline()   # keep the grant, but don't auto-fire into a paused session
         self._event_last.clear()
         self._event_fires.clear()
@@ -3707,9 +3857,15 @@ class Engine:
             activated += 1
             if uid is not None:
                 self._event_activator[key] = (uid, who)   # credit this person for the event's pumps
-            am = (ev.get("activation_message") or "").strip()
+            am = (ev.get("activation_message") or "").strip()   # legacy pre-v10 (now a block)
             if am:
                 posts.append(hdr + self.render(am, self._event_ctx(ev)))
+            if ev.get("activation_actions"):
+                # Activation block: runs once, in order, BEFORE round 1.
+                await self._run_action_block(ev["activation_actions"],
+                                             f"event {ev.get('name', '')} (activation)",
+                                             hdr=ev.get("name", ""), uid=uid, who=who,
+                                             extra_ctx=self._event_ctx(ev))
             if ev.get("fire_immediately"):
                 # Fire round 1 right now, in order (after the activation line),
                 # instead of racing the async tick loop. The tick then waits `every`.
@@ -3754,8 +3910,7 @@ class Engine:
         self._event_cooldown_until.clear()
         self._event_activator.clear()
         self._event_run_id.clear()
-        self._perfect.clear()
-        self._prize_uses.clear()
+        self._prize_prog.clear()
         self._pump_time.clear()
         self._pump_range.clear()
         self._cmd_uses.clear()
@@ -3767,6 +3922,7 @@ class Engine:
         self._bonus_bank.clear()
         self._cmd_gate_block = False
         self._cmd_gate_allow.clear(); self._cmd_gate_blocked_cmds.clear()
+        self._cmd_gate_blocked_events.clear()
         self._clear_winner_grants(all_incl_stash=True)
         self._last_winner = ""; self._last_winner_score = 0.0
         self._last_runnerup = ""; self._last_runnerup_score = 0.0
@@ -3781,121 +3937,45 @@ class Engine:
         self._log("bot", "SESSION RESET — capacity 0%, cooldowns cleared, events re-armed, prizes reset")
 
     # -- max roll prizes (multiple) ----------------------------------------- #
-    def _prizes(self) -> list:
-        """The prize list. Falls back to the legacy single max_roll_prize."""
-        lst = self.cfg.get("prizes")
-        if lst:
-            return [p for p in lst if p.get("enabled")]
-        mp = self.cfg.get("max_roll_prize") or {}
-        return [mp] if mp.get("enabled") else []
-
-    def _prize_key(self, p: dict) -> str:
-        return (p.get("command") or "").strip().lower()
-
-    def active_prize(self) -> dict | None:
-        """The prize being tracked right now. An 'All'-gated prize overrides and
-        disables any range-gated prizes; otherwise the prize whose range matches
-        the current capacity (first match) is active."""
-        prizes = self._prizes()
-        for p in prizes:  # All-gated overrides everything
-            if (p.get("range_gate") or "all") == "all":
-                return p
-        for p in prizes:
-            if self._range_gate_ok(p.get("range_gate")):
-                return p
-        return None
-
-    def prize_command_names(self) -> set:
-        return {self._prize_key(p) for p in self._prizes() if self._prize_key(p)}
-
-    def find_prize_by_command(self, name: str) -> dict | None:
-        name = (name or "").strip().lower()
-        for p in self._prizes():
-            if self._prize_key(p) == name:
-                return p
-        return None
-
-    def _uses_left(self, uid, pkey: str) -> int:
-        return self._prize_uses.get(str(uid), {}).get(pkey, 0)
-
-    def _prize_progress(self, ev: dict, who: str, mention: str) -> tuple[str, str]:
-        """On a perfect roll, advance the person's CUMULATIVE count (carries
-        across ranges) and unlock the currently-active prize when reached."""
-        uid = ev.get("uid")
-        if uid is None:
-            return "", ""
-        p = self.active_prize()
-        if not p:
-            return "", ""
-        pkey = self._prize_key(p)
-        if self._uses_left(uid, pkey) > 0:
-            return "", ""  # this prize already unlocked for them
-        cnt = self._perfect.get(str(uid), 0) + 1
-        self._perfect[str(uid)] = cnt          # cumulative — never per-prize
-        goal = max(1, int(p.get("goal") or 1))
-        anon = self._anon_label()
-        if cnt >= goal:
-            uses = max(1, int(p.get("uses") or 1))
-            self._prize_uses.setdefault(str(uid), {})[pkey] = uses
-            self._log("bot", f"{who} unlocked prize '{pkey}' ({goal} perfects)")
-            prefix = self.cfg.get("command_prefix", "!")
-            pc = {"prize_cmd": f"{prefix}{pkey}", "prize_desc": p.get("description") or "", "uses": uses}
-            tmpl = p.get("unlock_message") or "[mention] has unlocked: [prize_cmd] — [prize_desc]\\nYou can use this command a total of [uses] times."
-            return (self.render(tmpl, {"user": who, "mention": mention, **pc}),
-                    self.render(tmpl, {"user": anon, "mention": anon, **pc}))
-        rem = goal - cnt
-        tmpl = p.get("progress_message") or "[mention] rolled a perfect score [[count]/[goal]] — [remaining] more will unlock a bonus command!"
-        c = {"count": cnt, "goal": goal, "remaining": rem}
-        return (self.render(tmpl, {"user": who, "mention": mention, **c}),
-                self.render(tmpl, {"user": anon, "mention": anon, **c}))
-
-    async def use_prize_command(self, who: str, uid: str | None, prize: dict) -> dict:
-        """Run an unlocked prize command (the person keeps uses across ranges;
-        the prize's own range gate controls where it may be USED)."""
-        if self._paused:
-            return self._paused_result(who, uid)
-        pkey = self._prize_key(prize)
-        left = self._uses_left(uid, pkey)
-        if left <= 0:
-            return {"ok": False, "silent": True}  # not unlocked / exhausted
-        if not self._range_gate_ok(prize.get("range_gate")):
-            return {"ok": False, "silent": True}  # can't be used in this range
-
-        typ = (prize.get("action") or "fire").lower()
-        extra_ctx = {"user": who, "mention": self._mention(uid, who), "uses_left": left - 1}
-        anon_ctx = {"user": self._anon_label(), "mention": self._anon_label(), "uses_left": left - 1}
-
-        def _spend():
-            self._prize_uses.setdefault(str(uid), {})[pkey] = left - 1
-
-        if typ == "say":
-            _spend()
-            tmpl = prize.get("reply") or "[mention] used the prize! ([uses_left] left)"
-            return {"ok": True, "device": False, "started": False,
-                    "reply": self.render(tmpl, extra_ctx), "reply_anon": self.render(tmpl, anon_ctx)}
-
-        target = prize.get("device_id") or self._active_id()
-        if self._device(target) is None:
-            return {"ok": False, "error": "prize target device not found"}
-        if typ == "roll":
-            rd, rs = self.range_dice(self.range_for(self.capacity))
-            dice = int(prize.get("dice") or rd); sides = int(prize.get("sides") or rs)
-            total, _ = self._roll_total(dice, sides)
-            duration = self._duration_from_total(total)
-            extra_ctx.update({"dice": f"{dice}d{sides}", "result": total, "total": total})
-            anon_ctx.update({"dice": f"{dice}d{sides}", "result": total, "total": total})
-        else:
-            duration = round(max(0.1, min(self._hard_cap(), float(prize.get("seconds") or 5))), 1)
-        s2c = self._secs_to_capacity(duration, target)
-        extra_ctx.update({"secs": f"{duration:.1f}", "seconds": f"{duration:.1f}", "secs2capacity": s2c})
-        anon_ctx.update({"secs": f"{duration:.1f}", "seconds": f"{duration:.1f}", "secs2capacity": s2c})
-
-        _spend()
-        self._begin_or_extend(target, duration, f"prize by {who}")
-        self._log("roll", f"{who} used prize '{pkey}' → {duration:.1f}s ({left-1} left)")
-        tmpl = prize.get("reply") or "✨ [mention] used the prize command! ([uses_left] uses left)"
-        return {"ok": True, "device": True, "started": True,
-                "reply": self.render(tmpl, extra_ctx), "reply_anon": self.render(tmpl, anon_ctx)}
+    async def _bump_achievement(self, counter: str, uid, who: str) -> None:
+        """A PERFECT happened: a roll action hit its maximum total (counter
+        "roll", automatic), or an `achievement` action row fired (any named
+        counter — e.g. a blackjack 21-tier bumping "blackjack"). Advance this
+        person's progress on every enabled prize watching that counter (range
+        gate permitting); at the goal, run the prize's unlock ACTION BLOCK
+        (award rows grant the reward) and reset that progress — re-earnable."""
+        if uid is None or not counter or self._in_prize:
+            return
+        for i, p in enumerate(self.cfg.get("prizes") or []):
+            if not isinstance(p, dict) or p.get("enabled") is False:
+                continue
+            if ((p.get("counter") or "roll").strip().lower()) != counter:
+                continue
+            if not self._range_gate_ok(p.get("range_gate")):
+                continue
+            k = (str(uid), i)
+            prog = self._prize_prog.get(k, 0) + 1
+            goal = max(1, int(p.get("goal") or 1))
+            label = (p.get("name") or "").strip() or counter
+            ctx = {"count": prog, "goal": goal, "remaining": max(0, goal - prog),
+                   "counter": counter, "prize": label,
+                   "target": who, "mention": self._mention(uid, who)}
+            if prog >= goal:
+                self._prize_prog[k] = 0
+                self._log("bot", f"{who} hit {goal}× perfect '{counter}' → prize '{label}'")
+                self._in_prize = True
+                try:
+                    await self._run_action_block(p.get("actions"), f"prize {label}",
+                                                 hdr="🏆", uid=str(uid), who=who,
+                                                 extra_ctx=ctx)
+                finally:
+                    self._in_prize = False
+            else:
+                self._prize_prog[k] = prog
+                pm = (p.get("progress_message") or "").strip()
+                if pm:
+                    await self._announce(self._evt_hdr("🏆") +
+                                         self.render(pm, {"user": who, **ctx}), None)
 
     def set_capacity(self, value) -> None:
         try:
@@ -3935,8 +4015,6 @@ class Engine:
         """The built-in system commands (always excluded from [custom_commands])."""
         bn = self.builtin_names()
         lines = []
-        if self.cfg.get("roll_enabled", True) and self.cmd_enabled_in_range("roll"):
-            lines.append(f"**{prefix}{bn['roll']}** - roll the dice")
         lines.append(f"**{prefix}{bn['capacity']}** - check capacity")
         lines.append(f"**{prefix}{bn['leaderboard']}** - show the leaderboard (this session)")
         lines.append(f"**{prefix}{bn['leaderboard_life']}** - all-time top pumpers")

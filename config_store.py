@@ -34,7 +34,7 @@ DEFAULT_PUMPDIRECT_PATH = os.path.normpath(
 
 # Schema version of the stored config. Bump it + add a _migrate step whenever a
 # key is renamed/moved, so old configs upgrade instead of silently stranding data.
-CONFIG_VERSION = 9
+CONFIG_VERSION = 10
 
 # The dead "dice recharged" default that a remediation migration accidentally
 # promoted to the live cooldown-ready message. Migration v3 undoes that.
@@ -48,8 +48,6 @@ DEFAULTS = {
     "config_rev": 0,
     "command_prefix": "!",
     "listener_enabled": False,
-    # Master toggle for the built-in roll (dice) command. Off = dice disabled.
-    "roll_enabled": True,
     # Short anti-spam buffer (seconds) between back-to-back uses of the SAME
     # command, across everyone. Subsequent calls inside the window are ignored
     # quietly (no reply). Separate from cooldowns; prevents channel flooding.
@@ -67,7 +65,7 @@ DEFAULTS = {
 
     # Names of the three built-in commands (rename to avoid clashing with other
     # bots — e.g. another dice bot already using !roll).
-    "command_names": {"roll": "agroll", "capacity": "capacity",
+    "command_names": {"capacity": "capacity",
                       "help": "aghelp", "leaderboard": "toppumpers",
                       "leaderboard_life": "toppumpers-life", "pumptimer": "pumptimer",
                       "vote": "agvote", "enter": "enter"},
@@ -156,9 +154,6 @@ DEFAULTS = {
     # ONE generic cooldown message for all commands. Placeholders:
     # [mention] [user] [cooldown] [cmd] (the command they tried).
     "cooldown_message": "⏳ [mention], [cmd] is on cooldown — [cooldown]s left",
-    # ONE generic "cooldown ready again" message (blank = say nothing).
-    # Placeholders: [mention] [user] [cmd] (the command that reset).
-    "cooldown_reset_message": "",
 
     # Bot auto-posts every N seconds to announce_channel. `message` is a custom
     # template ([capacity], [commands]); blank uses the built-in capacity+commands text.
@@ -167,7 +162,8 @@ DEFAULTS = {
     # Channel the bot posts auto-reports and milestone messages into.
     "announce_channel_id": "",
 
-    # Roll total -> on-time (seconds).
+    # Roll total -> on-time (seconds). (Chat rolls are custom commands with a
+    # `roll` action now; this block is the shared dice mechanics they all use.)
     "roll": {
         "mode": "value",        # "value": seconds = roll total
                                 # "factor": seconds = roll total * factor
@@ -175,9 +171,6 @@ DEFAULTS = {
         "min_seconds": 1,
         "max_seconds": 20,      # HARD CAP on any single fire
         "disable_at_100": False,
-        # Message the roll command posts. Placeholders: [user] [dice] [result]
-        # [secs] [sides] [capacity]. Blank falls back to the built-in default.
-        "reply": "🎲 **[user]** rolled **[dice]** = **[result]** → **[secs]s** · capacity [capacity]%",
     },
 
     # Which N-dice-of-S-sides to roll, by current capacity range.
@@ -188,34 +181,29 @@ DEFAULTS = {
         {"min": 66,  "max": 100, "dice": 2, "sides": 6},
     ],
 
-    # User-defined commands, created in the web UI on the fly. Each:
-    #   {name, type, seconds, dice, sides, device_id, reply, enabled, owner_only,
-    #    mention, hide_in_list, description, start_events, range_gate,
-    #    react_only, react_emoji}
+    # User-defined commands, created in the web UI on the fly. A command is its
+    # GATES plus an ACTION BLOCK (v10: the old fire/roll/say/poll/chance types
+    # collapsed into action rows; replies are message rows). Each:
+    #   {name, type ("actions" | "game-*"), enabled, owner_only, hide_in_list,
+    #    description, start_events, range_gate, react_only, react_emoji,
+    #    actions: [action rows — see capacity_events below for the full row set]}
     # react_only → acknowledge the command with a reaction (react_emoji, default 💨)
-    #   on the caller's message instead of posting a text reply (cuts chat spam for
-    #   rapid-fire commands). The fire/roll/credit still happen; only the reply text
-    #   is suppressed. Cross-server echo is skipped (a reaction is local to the
-    #   origin channel). Falls back to a normal reply if the emoji can't be added.
-    # type "fire"   → fire device_id for `seconds` (+ optional extra `fires` rows)
-    # type "roll"   → roll dice/sides (or the range's) and fire for the total
-    # type "say"    → text-only reply, no device
-    # type "chance" → gamble: roll 1–100 vs `chance`% (± `luck`); win posts
-    #                 `success_reply` + fires the `fires` rows, miss posts `failure_reply`
-    #   fires: [{device_id, seconds}] — independent, concurrent device fires
+    #   on the caller's message (cuts chat spam for rapid-fire commands). The
+    #   block still runs; cross-server echo is skipped.
+    # A `roll` action's dice: the RANGE's dice/luck (its range-dice row) win;
+    #   the row's own dice/sides/luck are the fallback (for always-on rolls).
     # type "game-*" (pushluck/simon/balloon/rps/slots/blackjack) → button/
     #   ephemeral minigames (minigames.py). Params: pl_* (pushluck), sm_* (simon),
     #   bl_cells/bl_pops/bl_points (balloon), rps_wins (rps), sl_symbols (slots).
     #   game_intro = message with the Play button. game_tiers = [{op, min, message,
     #   fires, actions}] score→outcome; the highest matching value (per `op`: >= >
     #   = != < <=) the final score reaches broadcasts + fires + runs its action
-    #   block (credited to the player). chance commands use win_actions/miss_actions
-    #   action blocks for their win/miss outcomes. A luck
-    #   modifier (a flat ± added to the final score before tier lookup) may be set
-    #   per range (the range's cooldowns[cmd].luck) or on the Always-On entry; a
-    #   range the game is a member of takes precedence over Always-On. [score] and
-    #   [luck] are available in tier messages. Every result is labelled with the
-    #   game and respects cross-server anonymity (real name only where a member).
+    #   block (credited to the player). A luck modifier (a flat ± added to the
+    #   final score before tier lookup) may be set per range (the range's
+    #   cooldowns[cmd].luck) or on the Always-On entry; a range the game is a
+    #   member of takes precedence over Always-On. [score] and [luck] are
+    #   available in tier messages. Every result is labelled with the game and
+    #   respects cross-server anonymity (real name only where a member).
     "commands": [],
 
     # Custom commands that work in EVERY capacity range (bypass per-range
@@ -230,30 +218,25 @@ DEFAULTS = {
     # Each: {name, commands: [names], enabled, message_on, message_off}
     "modes": [],
 
-    # Timed events — like commands, but fired automatically on a timer.
-    # Each: {name, enabled, mode ("loop"|"once"), every (secs), action, message,
-    #        seconds, device_id, dice, sides, capacity_op ("add"|"set"), capacity_value,
-    #        max_repeats, cooldown, fire_immediately, clean_previous,
-    #        activation_message, end_message,
-    #        chance, luck, fires, fail_fires, success_message, failure_message,
-    #        actions (action="actions": a full action block run each round)}
-    #   mode "loop"       → fires every `every` seconds, repeatedly (up to
-    #                       `max_repeats` times if set; 0/blank = unlimited).
-    #                       clean_previous → each round deletes the previous round's
-    #                       message (anti-spam); the end_message replaces the last.
-    #   mode "once"       → fires a single time, `every` seconds after arming
-    #   action "message"  → post `message` to all listen channels
-    #   action "actions"  → run the `actions` block each round (full action system)
-    #   action "fire"     → fire device for `seconds` (+ optional message)
-    #   action "roll"     → roll dice on device, scaled on-time (+ message)
-    #   action "capacity" → add/set capacity by capacity_value (+ message)
-    #   action "chance"   → roll vs `chance`% (± `luck`); win fires `fires` +
-    #                       posts `success_message`, miss fires `fail_fires` +
-    #                       posts `failure_message`
+    # Timed events — THREE ACTION BLOCKS on a timer (v10: the old per-type
+    # fields and activation/end messages collapsed into blocks):
+    #   activation_actions (once, when a command starts it, before round 1) →
+    #   actions (each round) → post_actions (when the loop ends, detached).
+    # Each: {name, enabled, mode ("loop"|"once"), every (secs), max_repeats,
+    #        cooldown, fire_immediately, clean_previous,
+    #        activation_actions: [...], actions: [...], post_actions: [...]}
+    #   mode "loop" → runs the round block every `every` seconds, repeatedly (up
+    #                 to `max_repeats` times if set; 0/blank = unlimited).
+    #                 clean_previous → each round's message rows replace the
+    #                 previous round's; the end block's first message replaces
+    #                 the last round.
+    #   mode "once" → one round, `every` seconds after arming.
+    # Rounds run DETACHED (a wait/poll inside never stalls the session loop) and
+    # never overlap: a new round waits for the previous round's block to finish.
     # Activation via a command's start_events is intelligent: a running event
-    # posts `event_in_process_message`, one on cooldown posts `event_cooldown_message`;
-    # otherwise it activates (posting the event's `activation_message`) and, when it
-    # finishes, posts `end_message` and starts its per-event `cooldown` timer.
+    # posts `event_in_process_message`, one on cooldown posts
+    # `event_cooldown_message`; otherwise it activates, runs activation_actions,
+    # and when it finishes starts its per-event `cooldown` timer.
     "events": [],
     "event_in_process_message": "⏳ [event] is already running.",
     "event_cooldown_message": "⏳ [event] is on cooldown — [cooldown]s left.",
@@ -262,12 +245,12 @@ DEFAULTS = {
     # independent of ranges (their effects beat normal range behaviour; the
     # End / End Sequence overrules them). Each:
     #   {name, enabled, at (1-999),
-    #    stop_devices,                                   # abort all fires once, at trigger
     #    # command gating (disable range/always-on cmds, pause events, allow
     #    # specific ones) is done with a command_gate action IN the block below —
-    #    # the old disable_*/pause_events/enable_commands tickboxes migrated there.
+    #    # the old disable_*/pause_events/enable_commands tickboxes migrated there
+    #    # (v9), and the stop_devices tickbox became a stop_devices ACTION (v10).
     #    actions: [{type: message|broadcast|command|fire|roll|capacity|wait|poll|
-    #               competition|bonus_round|award|command_gate|end_session,
+    #               competition|bonus_round|award|command_gate|stop_devices|end_session,
     #               # message: style (plain|embed) + title + message; an OPTIONAL
     #               #   button via target (""=none / winner / runnerup / range_leader
     #               #   / session_leader / top_bonus_holder / everyone / allowlist)
@@ -286,9 +269,13 @@ DEFAULTS = {
     #               fire_mode (seconds|add|to) + fill_pct (fire: pump until N%
     #                 added / reached; [secs] = the computed time) + block_during +
     #                 post_actions:[…],
-    #               modifiers:[{op,command}] (command_gate: block_all|remove_block|allow|
-    #                 block|unblock|disable_range_cmds|resume_range_cmds|
-    #                 disable_always_on|resume_always_on|pause_events|resume_events)}]}
+    #               stop_devices: no fields — aborts ALL fires now (+ optional message),
+    #               modifiers:[{op,command?,event?}] (command_gate: block_all|unblock_all|
+    #                 remove_block|allow|unallow|block|unblock|block_event|unblock_event|
+    #                 disable_range_cmds|resume_range_cmds|disable_always_on|
+    #                 resume_always_on|pause_events|resume_events|pause_capacity|
+    #                 resume_capacity; command for the cmd ops, event (timed/capacity
+    #                 event name) for the event ops)}]}
     # The action block runs sequentially; the event is "running" (its effects
     # active) until the block finishes. One-shot per session (re-armed by
     # session reset / activation).
@@ -344,23 +331,15 @@ DEFAULTS = {
     # per-user unlock/uses are tracked in memory and reset on session reset /
     # app restart. Placeholders: [user] [mention] [count] [goal] [remaining]
     # (progress) and [prize_cmd] [prize_desc] [uses] [uses_left] (unlock/use).
-    "max_roll_prize": {
-        "enabled": False,
-        "goal": 3,                 # perfect rolls needed to unlock
-        "command": "special",      # the unlocked command's name
-        "description": "a special reward",
-        "uses": 1,                 # uses granted on unlock
-        "action": "fire",          # fire | roll | say
-        "seconds": 10,
-        "dice": None, "sides": None,
-        "device_id": None,
-        "reply": "",               # message when the prize command is used
-        "progress_message": "[mention] rolled a perfect score [[count]/[goal]] — [remaining] more will unlock a bonus command!",
-        "unlock_message": "[mention] has unlocked: [prize_cmd] — [prize_desc]\\nYou can use this command a total of [uses] times.",
-    },
-    # Multiple prizes (new). Each has the same shape as max_roll_prize plus a
-    # per-prize range_gate. An "all"-gated prize overrides range-gated ones.
-    # If this list is empty, the single max_roll_prize above is used.
+    # Perfect Prizes (v10) — achievement-triggered awards. Each:
+    #   {name, enabled, counter, goal, range_gate, progress_message,
+    #    actions: [unlock block — e.g. award (target "[user]") + message rows]}
+    # A PERFECT roll (a roll action hitting its maximum total) bumps that
+    # person's "roll" counter automatically; an `achievement` action row (e.g.
+    # on a blackjack 21 tier) bumps any named counter. When a watched counter
+    # reaches `goal` (inside the prize's range gate), the unlock block runs for
+    # the earner and their progress resets — prizes are re-earnable. Progress
+    # placeholders: [count] [goal] [remaining] [counter] [prize].
     "prizes": [],
 
     # Registered devices (imported from PumpDirect or discovered on the LAN).
@@ -540,6 +519,387 @@ def _walk_migrate_embeds(node) -> None:
             _walk_migrate_embeds(item)
 
 
+def _v10_msg_row(text, if_option=None):
+    row = {"type": "message", "message": text}
+    if if_option:
+        row["if_option"] = if_option
+    return row
+
+
+def _v10_fire_rows(fires):
+    """Legacy device-fire rows ({device_id, seconds}) → fire actions."""
+    return [{"type": "fire", "fire_mode": "seconds",
+             "seconds": (r.get("seconds") if r.get("seconds") is not None else 3),
+             "device_id": r.get("device_id") or None}
+            for r in (fires or []) if isinstance(r, dict)]
+
+
+def _v10_actions(rows):
+    """The bot speaks ONLY through message rows now: pull each legacy per-action
+    announce text (fire/roll/award/command_gate/stop_devices after the row,
+    end_session before it) out into a real message row. Recursive over nested
+    blocks; idempotent (the extracted keys are removed)."""
+    out = []
+    for a in (rows or []):
+        if not isinstance(a, dict):
+            continue
+        t = (a.get("type") or "message").lower()
+        for sub in ("actions", "post_actions", "win_actions", "miss_actions"):
+            if a.get(sub):
+                a[sub] = _v10_actions(a[sub])
+        if t in ("fire", "roll", "award", "command_gate", "stop_devices", "end_session"):
+            msg = (a.pop("message", "") or "").strip()
+            if msg:
+                if t == "award":   # award messages addressed the TARGET
+                    msg = msg.replace("[mention]", "[target_mention]")
+                mrow = _v10_msg_row(msg, a.get("if_option"))
+                if t == "end_session":   # nothing runs after end_session
+                    out.append(mrow)
+                    out.append(a)
+                else:
+                    out.append(a)
+                    out.append(mrow)
+                continue
+        out.append(a)
+    return out
+
+
+def _v10_command(c: dict) -> None:
+    """Collapse a legacy-typed command (fire/roll/say/poll/chance) into a pure
+    'actions' command; its reply becomes a trailing message row ([secs]/[result]
+    flow through the block context). Minigame types keep their mechanics."""
+    t = (c.get("type") or "fire").lower()
+    if t.startswith("game-"):
+        for tier in (c.get("game_tiers") or []):
+            if isinstance(tier, dict) and tier.get("actions"):
+                tier["actions"] = _v10_actions(tier["actions"])
+        c.pop("reply", None)
+        return
+    name = (c.get("name") or "").strip()
+    reply = (c.get("reply") or "").strip()
+    rows: list = []
+    if t == "actions":
+        rows = list(c.get("actions") or [])
+        if not reply and not c.get("mention"):
+            # nothing to fold in — just normalize the rows
+            c["actions"] = _v10_actions(rows)
+            for dead in ("reply", "mention", "seconds", "dice", "sides", "device_id",
+                         "fire_until", "fires", "fail_fires", "chance", "luck",
+                         "success_reply", "failure_reply", "win_actions", "miss_actions", "poll"):
+                c.pop(dead, None)
+            return
+    elif t == "say":
+        reply = reply or (f"{name}!" if name else "")
+    elif t == "poll":
+        rows = [{"type": "poll", "poll": c.get("poll") or None}]
+    elif t == "roll":
+        rows = [{"type": "roll", "dice": c.get("dice") or None,
+                 "sides": c.get("sides") or None, "device_id": c.get("device_id") or None}]
+        reply = reply or "🎲 **[user]** rolled [dice] = **[result]** → **[secs]s**"
+    elif t == "chance":
+        win = _v10_fire_rows(c.get("fires")) + list(c.get("win_actions") or [])
+        miss = _v10_fire_rows(c.get("fail_fires")) + list(c.get("miss_actions") or [])
+        if not c.get("react_only"):
+            sr = (c.get("success_reply") or "").strip() or \
+                "🎲 **[user]** rolled [roll] vs [chance]% — **win!**"
+            fr = (c.get("failure_reply") or "").strip() or \
+                "🎲 **[user]** rolled [roll] vs [chance]% — no luck."
+            if c.get("mention"):
+                sr = sr if "[mention]" in sr else "[mention] " + sr
+                fr = fr if "[mention]" in fr else "[mention] " + fr
+            win.append(_v10_msg_row(sr))
+            miss.append(_v10_msg_row(fr))
+        rows = [{"type": "chance",
+                 "chance": (c.get("chance") if c.get("chance") is not None else 50),
+                 "luck": c.get("luck"), "win_actions": win, "miss_actions": miss}]
+        reply = ""   # the outcome blocks carry the talk
+    else:   # fire (the old default)
+        fu = c.get("fire_until")
+        if fu not in (None, "", 0):
+            main = {"type": "fire", "fire_mode": "to", "fill_pct": fu,
+                    "device_id": c.get("device_id") or None}
+        else:
+            main = {"type": "fire", "fire_mode": "seconds",
+                    "seconds": (c.get("seconds") if c.get("seconds") not in (None, "", 0) else 3),
+                    "device_id": c.get("device_id") or None}
+        rows = [main] + _v10_fire_rows(c.get("fires"))
+        reply = reply or ("🔥 **[user]** ran **" + (name or "it") + "** → **[secs]s**")
+    if reply and not c.get("react_only"):
+        if c.get("mention") and "[mention]" not in reply:
+            reply = "[mention] " + reply
+        rows = rows + [_v10_msg_row(reply)]
+    c["type"] = "actions"
+    c["actions"] = _v10_actions(rows)
+    for dead in ("reply", "mention", "seconds", "dice", "sides", "device_id", "fire_until",
+                 "fires", "fail_fires", "chance", "luck", "success_reply", "failure_reply",
+                 "win_actions", "miss_actions", "poll"):
+        c.pop(dead, None)
+
+
+def _v10_event(e: dict) -> None:
+    """Collapse a legacy-typed timed event (message/broadcast/poll/competition/
+    capacity/fire/roll/chance) into its pure action blocks. An event is now
+    THREE blocks: activation_actions (once, when a command starts it) →
+    actions (each round) → post_actions (when the loop ends)."""
+    if "activation_message" in e:
+        am = (e.pop("activation_message") or "").strip()
+        if am:
+            e["activation_actions"] = [_v10_msg_row(am)] + list(e.get("activation_actions") or [])
+    if "end_message" in e:
+        em = (e.pop("end_message") or "").strip()
+        if em:
+            e["post_actions"] = [_v10_msg_row(em)] + list(e.get("post_actions") or [])
+    if e.get("activation_actions"):
+        e["activation_actions"] = _v10_actions(e["activation_actions"])
+    if "action" not in e and "message" not in e:
+        if e.get("post_actions"):
+            e["post_actions"] = _v10_actions(e["post_actions"])
+        return   # already collapsed
+    act = (e.pop("action", "") or "message").lower()
+    msg = (e.pop("message", "") or "").strip()
+    rows: list = []
+    if act == "actions":
+        rows = list(e.get("actions") or [])
+    elif act == "broadcast":
+        rows = [{"type": "broadcast", "broadcast": e.get("broadcast") or None}]
+        if msg:
+            rows.append(_v10_msg_row(msg))
+    elif act == "poll":
+        # message FIRST: the poll row holds the block until the poll finishes
+        if msg:
+            rows.append(_v10_msg_row(msg))
+        rows.append({"type": "poll", "poll": e.get("poll") or None})
+    elif act == "competition":
+        rows = [{"type": "competition", "competition": e.get("competition") or None}]
+        if msg:
+            rows.append(_v10_msg_row(msg))
+    elif act == "capacity":
+        rows = [{"type": "capacity", "capacity_op": e.get("capacity_op") or "add",
+                 "capacity_value": e.get("capacity_value") or 0}]
+        if msg:
+            rows.append(_v10_msg_row(msg))
+    elif act in ("fire", "roll"):
+        if act == "fire":
+            rows = [{"type": "fire", "fire_mode": "seconds",
+                     "seconds": (e.get("seconds") if e.get("seconds") not in (None, "", 0) else 3),
+                     "device_id": e.get("device_id") or None}]
+        else:
+            rows = [{"type": "roll", "dice": e.get("dice") or None,
+                     "sides": e.get("sides") or None, "device_id": e.get("device_id") or None}]
+        if msg:
+            rows.append(_v10_msg_row(msg))
+    elif act == "chance":
+        win = _v10_fire_rows(e.get("fires"))
+        miss = _v10_fire_rows(e.get("fail_fires"))
+        sm = (e.get("success_message") or "").strip() or msg
+        fm = (e.get("failure_message") or "").strip() or msg
+        if sm:
+            win.append(_v10_msg_row(sm))
+        if fm:
+            miss.append(_v10_msg_row(fm))
+        rows = [{"type": "chance",
+                 "chance": (e.get("chance") if e.get("chance") is not None else 50),
+                 "luck": e.get("luck"), "win_actions": win, "miss_actions": miss}]
+    else:   # plain message event
+        if msg:
+            rows = [_v10_msg_row(msg)]
+    e["actions"] = _v10_actions(rows)
+    if e.get("post_actions"):
+        e["post_actions"] = _v10_actions(e["post_actions"])
+    for dead in ("seconds", "dice", "sides", "capacity_op", "capacity_value", "device_id",
+                 "poll", "broadcast", "competition", "chance", "luck", "fires",
+                 "fail_fires", "success_message", "failure_message"):
+        e.pop(dead, None)
+
+
+def _v10_competition(c: dict) -> None:
+    """Competitions are fully button-driven: drop the entry command + chat-entry
+    fields; win/no-winner messages become embed message rows in their blocks."""
+    name = (c.get("name") or "").strip()
+    if "win_message" in c:
+        wm = (c.pop("win_message") or "").strip() or \
+            "🏆 **[winner]** wins with **[winner_score]**!\n\n[results]"
+        c["win_actions"] = [{"type": "message", "style": "embed",
+                             "title": f"🏁 {name}".strip(), "message": wm}] + \
+            list(c.get("win_actions") or [])
+    if "no_winner_message" in c:
+        nm = (c.pop("no_winner_message") or "").strip() or \
+            (f"**{name}**: no qualifying winner." if name else "No qualifying winner.")
+        c["no_winner_actions"] = [{"type": "message", "style": "embed",
+                                   "title": f"🏁 {name}".strip(), "message": nm}] + \
+            list(c.get("no_winner_actions") or [])
+    if not (c.get("body") or "").strip() and (c.get("intro") or "").strip():
+        c["body"] = c["intro"]
+    for dead in ("command", "entry_message", "require_enter", "intro"):
+        c.pop(dead, None)
+    c["type"] = "rolloff"
+    c["win_actions"] = _v10_actions(c.get("win_actions"))
+    c["no_winner_actions"] = _v10_actions(c.get("no_winner_actions"))
+
+
+def _v10_builtin_roll(c: dict) -> None:
+    """The builtin chat dice-roll becomes a plain custom command: a `roll`
+    action + a message row (the old reply). It joins every range the builtin
+    was enabled in, inheriting that range's roll cooldown/scope; the range's
+    dice/sides/luck stay on the range-dice row (range values override)."""
+    names = c.get("command_names")
+    rname = ""
+    if isinstance(names, dict):
+        rname = (names.pop("roll", "") or "").strip().lower()
+    enabled = c.pop("roll_enabled", None)
+    reply = ""
+    if isinstance(c.get("roll"), dict):
+        reply = (c["roll"].pop("reply", "") or "").strip()
+    if enabled is None and not rname:
+        return   # nothing to convert (already done, or a subset without it)
+    rname = rname or "agroll"
+    cmds = c.get("commands")
+    if enabled is False or not isinstance(cmds, list):
+        return   # the builtin was off (or no commands list to add to)
+    if any((x.get("name") or "").strip().lower() == rname
+           for x in cmds if isinstance(x, dict)):
+        return   # a command already owns that name
+    cmds.append({
+        "name": rname, "type": "actions", "enabled": True,
+        "description": "Roll the dice — the result becomes pump seconds",
+        "actions": [
+            {"type": "roll"},
+            {"type": "message", "message": reply or
+             "🎲 **[user]** rolled **[dice]** = **[result]** → **[secs]s** · capacity [capacity]%"}]})
+    for r in (c.get("capacity_ranges") or []):
+        cds = r.get("cooldowns") if isinstance(r, dict) else None
+        if not isinstance(cds, dict):
+            continue
+        e = cds.get("roll")
+        if not isinstance(e, dict) or e.get("enabled") is False:
+            continue   # roll was disabled in this range → not a member there
+        row = {}
+        if e.get("seconds") not in (None, ""):
+            row["seconds"] = e["seconds"]
+        if e.get("scope"):
+            row["scope"] = e["scope"]
+        cds[rname] = row
+
+
+def _v10_prizes(c: dict) -> None:
+    """Max-Roll Prizes → Perfect Prizes: the old dice-only prize rows (and the
+    single legacy max_roll_prize) become counter/goal rows whose unlock is an
+    ACTION BLOCK — an award row grants the prize command (now a real, hidden
+    custom command) to the earner. Perfect rolls bump the "roll" counter."""
+    mrp = c.pop("max_roll_prize", None)
+    prizes = c.get("prizes")
+    legacy = []
+    if isinstance(prizes, list):
+        for p in list(prizes):
+            if isinstance(p, dict) and "actions" not in p:   # legacy shape
+                legacy.append(p)
+                prizes.remove(p)
+    if not legacy and isinstance(mrp, dict) and mrp.get("enabled") \
+            and isinstance(prizes, list) and not prizes:
+        legacy.append({**mrp, "range_gate": "all"})
+    if not legacy:
+        return
+    cmds = c.get("commands") if isinstance(c.get("commands"), list) else None
+    for p in legacy:
+        pcmd = (p.get("command") or "").strip()
+        # the prize command becomes a REAL custom command (hidden, range-free —
+        # only the award grant makes it usable, and its range_gate limits where)
+        if pcmd and cmds is not None and not any(
+                (x.get("name") or "").strip().lower() == pcmd.lower()
+                for x in cmds if isinstance(x, dict)):
+            rows = []
+            act = (p.get("action") or "fire").lower()
+            if act == "roll":
+                rows.append({"type": "roll", "dice": p.get("dice") or None,
+                             "sides": p.get("sides") or None,
+                             "device_id": p.get("device_id") or None})
+            elif act != "say":
+                rows.append({"type": "fire", "fire_mode": "seconds",
+                             "seconds": (p.get("seconds") if p.get("seconds") not in (None, "", 0) else 5),
+                             "device_id": p.get("device_id") or None})
+            rep = (p.get("reply") or "").strip()
+            if rep:
+                rows.append(_v10_msg_row(rep))
+            cmds.append({"name": pcmd, "type": "actions", "enabled": True,
+                         "hide_in_list": True, "range_gate": p.get("range_gate") or "all",
+                         "description": p.get("description") or "", "actions": rows})
+        try:
+            uses = max(1, int(p.get("uses") or 1))
+        except (TypeError, ValueError):
+            uses = 1
+        acts = []
+        if pcmd:
+            acts.append({"type": "award", "award_type": "command", "target": "[user]",
+                         "command": pcmd, "charges": uses, "stash": True})
+        um = (p.get("unlock_message") or "").strip()
+        if um:
+            um = (um.replace("[prize_cmd]", "[bonus_cmd]").replace("[uses]", "[charges]")
+                    .replace("[prize_desc]", p.get("description") or ""))
+            acts.append(_v10_msg_row(um))
+        prizes.append({"name": (p.get("description") or pcmd or "prize").strip(),
+                       "enabled": bool(p.get("enabled", True)),
+                       "counter": "roll", "goal": p.get("goal") or 3,
+                       "range_gate": p.get("range_gate") or "all",
+                       "progress_message": p.get("progress_message") or "",
+                       "actions": acts})
+
+
+def _collapse_v10(c: dict) -> dict:
+    """v10 consolidation (shape-keyed & IDEMPOTENT — safe to run on presets,
+    templates and gameplay imports of any age): commands & timed events become
+    pure action blocks; per-action announce texts become message rows;
+    competitions lose the entry-command/chat fields; the capacity-event
+    stop_devices tickbox becomes a stop_devices action; the builtin chat
+    dice-roll becomes a custom command; the cooldown-ready notice is gone."""
+    _v10_builtin_roll(c)
+    _v10_prizes(c)
+    c.pop("cooldown_reset_message", None)
+    # Always-On and range membership are mutually exclusive: a command living
+    # in any range is stripped from Always-On (range values rule).
+    members = set()
+    for r in (c.get("capacity_ranges") or []):
+        if isinstance(r, dict):
+            members |= {str(k).lower() for k in (r.get("cooldowns") or {})
+                        if str(k).lower() != "roll"}
+    if members and isinstance(c.get("always_on_commands"), list):
+        c["always_on_commands"] = [
+            a for a in c["always_on_commands"]
+            if (((a.get("name") if isinstance(a, dict) else str(a)) or "").strip().lower())
+            not in members]
+    for cmd in (c.get("commands") or []):
+        if isinstance(cmd, dict):
+            _v10_command(cmd)
+    for e in (c.get("events") or []):
+        if isinstance(e, dict):
+            _v10_event(e)
+    for e in (c.get("capacity_events") or []):
+        if isinstance(e, dict):
+            if e.pop("stop_devices", False):
+                e["actions"] = [{"type": "stop_devices"}] + list(e.get("actions") or [])
+            e["actions"] = _v10_actions(e.get("actions"))
+            if e.get("post_actions"):
+                e["post_actions"] = _v10_actions(e["post_actions"])
+    for comp in (c.get("competitions") or []):
+        if isinstance(comp, dict):
+            _v10_competition(comp)
+    for p in (c.get("polls") or []):
+        for o in (p.get("options") or []) if isinstance(p, dict) else []:
+            if isinstance(o, dict) and o.get("actions"):
+                o["actions"] = _v10_actions(o["actions"])
+    for b in (c.get("bonus_rounds") or []):
+        if isinstance(b, dict) and b.get("actions"):
+            b["actions"] = _v10_actions(b["actions"])
+    for p in (c.get("prizes") or []):
+        if isinstance(p, dict) and p.get("actions"):
+            p["actions"] = _v10_actions(p["actions"])
+    t = c.get("templates") or {}
+    if t:
+        _collapse_v10({"commands": t.get("commands"), "events": t.get("events"),
+                       "capacity_events": t.get("capevents"),
+                       "competitions": t.get("competitions"), "polls": t.get("polls")})
+    return c
+
+
 def _migrate(cfg: dict) -> dict:
     """Ordered upgrades for configs written by older versions. Each step bumps
     config_version; unknown future keys always pass through untouched."""
@@ -650,6 +1010,13 @@ def _migrate(cfg: dict) -> dict:
                          "pause_events", "pause_events_scope",
                          "enable_commands_on", "enable_commands"):
                 e.pop(dead, None)
+    if v < 10:
+        # v10: THE consolidation finale — see _collapse_v10. Saved gameplay
+        # presets carry the same structures, so convert theirs too.
+        _collapse_v10(cfg)
+        for p in (cfg.get("gameplay_presets") or []):
+            if isinstance(p, dict):
+                _collapse_v10(p.get("data") or {})
     cfg["config_version"] = CONFIG_VERSION
     return cfg
 

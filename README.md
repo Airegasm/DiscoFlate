@@ -15,35 +15,62 @@ backend embedded via Chaquopy — no Termux, no separate process).
 
 ## What it does
 
-Players type a command (default `!agroll`) in Discord. The bot rolls that
-capacity range's dice, fires the active smart plug for the rolled number of
-seconds, and a **capacity meter (0–100%+)** climbs based on the device's
-calibration. As capacity rises it moves through **ranges**, each with its own
-dice, cooldowns, announcements, custom commands, images, and one-time milestones.
+Players type commands (e.g. `!agroll`) in Discord. The bot rolls that capacity
+range's dice, fires the active smart plug for the rolled number of seconds, and
+a **capacity meter (0–100%+)** climbs based on the device's calibration. As
+capacity rises it moves through **ranges**, each with its own dice, cooldowns,
+announcements, commands, images, and one-time milestones.
+
+**Everything is an action block.** A custom command, a timed-event round, a
+capacity event, a poll option, a competition outcome, a bonus round, a prize
+unlock — they're all the same ordered list of **action rows**:
+
+`message` (plain/embed, optional gated button) · `fire` (fixed seconds or until
+a %) · `roll` · `chance` (a gamble with nested win/miss blocks) · `capacity` ·
+`wait` · `poll` · `competition` · `bonus_round` · `award` (grant a bonus command
+or bank volume) · `command_gate` (Block/Allow/Resume play) · `achievement` ·
+`stop_devices` · `end_session` — plus `broadcast` and `command`. The bot speaks
+only through **message** rows; results (`[secs]`, `[result]`, `[bonus_cmd]`, …)
+flow into the rows after them.
 
 - **Capacity engine** — capacity accumulates while the active pump runs, at a
   rate set by that device's `seconds-to-100%` calibration.
-- **Per-range everything** — dice (`N`d`sides`), a luck modifier, per-command
-  cooldowns (per-user or shared), custom commands with per-person use budgets,
-  ongoing announce text, one-time milestone messages + images.
-- **Custom commands** — build `fire` / `roll` / `say` commands in the UI; add
-  them to whichever ranges they should be active in.
-- **Max-roll prizes** — hitting a perfect roll N times unlocks limited-use bonus
-  commands, range-gated or global, with a cumulative counter.
+- **Per-range everything** — dice (`N`d`sides`) + luck, per-command cooldowns
+  (per-user or shared), per-person use budgets, **fire overrides** (one `!pump`
+  can drive different pumps for different lengths per band), announce text,
+  one-time milestone messages + images. **Range values always beat a command's
+  own**; **Always-On** hosts range-free utility commands (a command lives in
+  ranges *or* Always-On, never both).
+- **Custom commands = gates + an action block.** Six interactive **minigames**
+  (push-luck, simon, balloon, RPS, slots, blackjack) are the only special types —
+  private button play, score→tier outcomes that can run any action block.
+- **Timed events = three blocks** — 🚀 on activation → 🔁 each round → 🏁 when it
+  ends. Rounds never overlap and never stall the game; `clean_previous` keeps
+  loops to a single live message.
+- **Capacity events** — one-shot blocks at a threshold (1–999%), whose
+  `command_gate` rows can lock down play for the event or the session.
+- **Polls, roll-off competitions** (fully button-driven — Enter Challenge →
+  private rolls → results all at once), **team Bonus Rounds** (banked volume,
+  Confirm to cash in), and **Perfect Prizes** (N perfect rolls — or any named
+  achievement, like a blackjack 21 — runs an unlock block for the earner;
+  re-earnable).
 - **End sequences** — let capacity run past 100% to a final burst threshold with
   its own entry milestone and final message/image.
-- **Timed events, modes, leaderboard, per-user cooldowns, anti-spam buffer,**
-  multi-server support with anonymized cross-server echoes.
+- **Modes, leaderboards (session / lifetime / per-range), per-user cooldowns,
+  anti-spam buffer,** multi-server support with anonymized cross-server echoes.
 - **Snapshot** — capture a webcam frame and post it to the channel.
-- **Operator Controls** — dashboard buttons (Roll, Stop, Pump, Broadcast
-  Capacity/Users) that fire real in-channel actions *as the owner*, exactly as if
-  they'd typed the command. The **owner name** is set right at the top of the Dashboard.
+- **Operator Controls** — dashboard buttons (Roll, Stop, Pump, Broadcasts,
+  Leaderboards, Cleanup) that fire real in-channel actions *as the owner*.
+- **Gameplay Presets & Templates** — save/load whole game setups (the shipped
+  **Defaults (built-in)** preset included) or single commands/events/ranges;
+  everything auto-migrates across versions, presets and templates included.
 - **Mock mode** — run the entire game (capacity, timers, messages, leaderboard)
   with **no hardware at all**; set the virtual pump's calibration on the Devices tab.
 
 Fully templated messages via `[placeholders]` — `[capacity]`, `[capacity_bar]`,
-`[dice]`, `[result]`, `[secs2capacity]`, `[timer]`, `[commands]`,
-`[custom_commands]`, `[cmd_remain]`, `[operator]`, and more.
+`[dice]`, `[result]`, `[secs2capacity]`, `[timer]`, `[commands]`, `[winner]`,
+`[cmd_remain]`, `[operator]`, per-line `[if name]` conditionals, `[!command]`
+inline fires, and more (full table in Help → Placeholders).
 
 ---
 
@@ -160,7 +187,7 @@ export your config first via **Help → Export config**.) APKs are published on
 | Path | Role |
 |---|---|
 | `app.py` | entry: capacity engine + aiohttp web UI/API + Discord bot in one asyncio loop |
-| `engine.py` | capacity, dice-by-range, firing, milestones, cooldowns, prizes, tracking |
+| `engine.py` | capacity, the action-block system, dice-by-range, firing, events, competitions, prizes, tracking |
 | `discord_bot.py` | the bot: command dispatch, broadcasts, operator controls |
 | `device_control.py` | vendor-agnostic on/off/discovery router |
 | `vendors/` | per-brand drivers (kasa is `kasa_legacy.py`) |
