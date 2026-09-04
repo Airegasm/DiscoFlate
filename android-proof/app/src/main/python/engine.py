@@ -101,6 +101,7 @@ class Engine:
         self._last_winner_score: float = 0.0
         self._last_runnerup: str = ""           # [runnerup] placeholder (2nd place, last competition)
         self._last_runnerup_score: float = 0.0
+        self._last_total_score: float = 0.0     # [total_score] (sum of all finishers' scores)
         self._last_results: str = ""            # [results] placeholder (last competition's scoreboard)
         # Winner-only command grants: cmdkey -> uid. Only that user may run the
         # command, and only within the current range (cleared on range change /
@@ -445,6 +446,8 @@ class Engine:
         ctx["winner_score"] = f"{self._last_winner_score:g}" if self._last_winner else ""
         ctx["runnerup"] = self._last_runnerup       # 2nd place, most recent competition
         ctx["runnerup_score"] = f"{self._last_runnerup_score:g}" if self._last_runnerup else ""
+        # summed score of every finisher (live during a competition, else last)
+        ctx["total_score"] = f"{(self._comp_total_score() if self._comp is not None else self._last_total_score):g}"
         # live scoreboard during a competition, else the last competition's final results
         ctx["results"] = self._comp_results() if self._comp is not None else self._last_results
         # per-range top-pumper board for the current capacity band
@@ -1819,9 +1822,11 @@ class Engine:
             self._log("bot", f"COMPETITION '{name}' — all player totals added to timer")
         results_text = self._comp_results()   # capture the scoreboard before clearing
         ru_name, ru_score = self._comp_runnerup(winner_uid)   # 2nd place, before clearing
+        total_score = self._comp_total_score()   # combined total, before clearing
         self._comp = None
         self._last_results = results_text
         self._last_runnerup, self._last_runnerup_score = ru_name, ru_score
+        self._last_total_score = total_score
         await self._finish_competition(cd, name, entry, winner_uid, winner, results_text)
 
     def _comp_intro(self, cd: dict, entry_key: str, duration: float) -> str:
@@ -1842,6 +1847,14 @@ class Engine:
             return "No entrants yet — press Enter Challenge to join!"
         lines = [f"**{p['name']}** — {p['score']:g} ({p['entries']} in)" for p in rows[:10]]
         return "\n".join(lines)
+
+    def _comp_total_score(self) -> float:
+        """Sum of every finisher's score in the current competition ([total_score]
+        — the combined dice total across all players)."""
+        if self._comp is None:
+            return 0.0
+        return sum(float(p.get("score") or 0) for p in self._comp["players"].values()
+                   if p.get("done_at") is not None)
 
     def _comp_runnerup(self, winner_uid):
         """(name, score) of the 2nd-place finisher for [runnerup], or ("", 0.0).
@@ -3579,6 +3592,7 @@ class Engine:
         self._clear_winner_grants(all_incl_stash=True)
         self._last_winner = ""; self._last_winner_score = 0.0
         self._last_runnerup = ""; self._last_runnerup_score = 0.0
+        self._last_total_score = 0.0
         self._last_results = ""
         self._current_range_key = None
         self._end_triggered = False

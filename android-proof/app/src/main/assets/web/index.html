@@ -584,7 +584,7 @@
           <input id="cmdEnter" value="enter" style="width:130px"></label>
         <span class="muted">Players type <code>!enter</code> to join, then compete.</span>
       </div>
-      <div class="hint" style="max-width:880px">A competition is an <b>action</b> (start it from a timed event or capacity-event block). Players <b>!enter</b> during the window, then compete via an entry command; enter AND meet the required entries or you're eliminated. Prizes are a <b>Winner reward action block</b> — fire <code>[winner_score]</code> to the pump, hand the winner a one-press <b>winner_button</b>, <b>award_prize</b> a command, or <b>command_gate</b> everyone else. Types: <b>Roll-off</b> (highest score by total / highest single / most uses), <b>Race</b> (first to finish the required entries), <b>Raffle</b> (random winner among qualifiers). Placeholders: <code>[winner]</code> <code>[winner_score]</code> <code>[runnerup]</code> <code>[results]</code> (full scoreboard).</div>
+      <div class="hint" style="max-width:880px">A competition is an <b>action</b> (start it from a timed event or capacity-event block). Players <b>!enter</b> during the window, then compete via an entry command; enter AND meet the required entries or you're eliminated. Prizes are a <b>Winner reward action block</b> — fire <code>[winner_score]</code> to the pump, hand the winner a one-press <b>winner_button</b>, <b>award_prize</b> a command, or <b>command_gate</b> everyone else. Types: <b>Roll-off</b> (highest score by total / highest single / most uses), <b>Race</b> (first to finish the required entries), <b>Raffle</b> (random winner among qualifiers). Placeholders: <code>[winner]</code> <code>[winner_score]</code> <code>[runnerup]</code> <code>[total_score]</code> (all finishers combined) <code>[results]</code> (full scoreboard).</div>
       <div id="competitions" style="margin-top:10px"></div>
       <div class="row" style="margin-top:10px">
         <button class="ghost" onclick="addCompetition()">+ Add competition</button>
@@ -906,6 +906,7 @@ esphome dashboard config/</code></pre>
             <tr><td><code>[operator]</code></td><td>the bot operator's name</td></tr>
             <tr><td><code>[winner]</code> / <code>[winner_score]</code></td><td>the most recent competition's winner and their winning score</td></tr>
             <tr><td><code>[runnerup]</code> / <code>[runnerup_score]</code></td><td>the most recent competition's 2nd place and their score</td></tr>
+            <tr><td><code>[total_score]</code></td><td>combined dice total of ALL finishers in the competition (live during a run, final afterward) — pairs with a roll-off's "Add ALL totals"</td></tr>
             <tr><td><code>[results]</code></td><td>competition scoreboard — everyone who entered and their final scores (live during a run, final afterward); best in a win-message embed</td></tr>
             <tr><td><code>[bonus_holders]</code></td><td>roster of who currently holds which bonus/prize command(s), what each does, and how many charges remain (best in an embed)</td></tr>
             <tr><td><code>[total_bonus_secs]</code> / <code>[total_bonus_pct]</code></td><td>pooled bonus AMOUNTS banked by everyone (pump seconds / capacity %) — what a Bonus Round cashes in</td></tr>
