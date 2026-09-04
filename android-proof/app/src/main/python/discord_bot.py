@@ -827,6 +827,10 @@ class BotManager:
             res = await self.engine.game_result(cmd, score, who, uid)
             label = self.engine.game_display_name(cmd)
             await self._broadcast_named(res.get("real"), res.get("anon"), uid, label=label, who=who)
+            # the winning tier's optional action block runs AFTER its result posts
+            if res.get("tier_actions"):
+                await self.engine.run_actions(res["tier_actions"], f"{label} tier",
+                                              uid=uid, who=who, score=res.get("score"))
             # events the game's start_events activated (activation lines + any
             # fire_immediately first rounds) follow the result
             for post in (res.get("events_posted") or []):

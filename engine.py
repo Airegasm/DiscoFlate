@@ -3034,6 +3034,16 @@ class Engine:
             # Win fires the `fires` rows; a miss fires the `fail_fires` rows (if any).
             fired = await self._run_fires(cmd.get("fires") if win else cmd.get("fail_fires"), who, uid)
             ev_posts = (await self.start_events(cmd.get("start_events"), uid, who))[0] if win else []
+            # win_actions / miss_actions — the full action block for this outcome
+            # (fires, capacity, award_prize, embed, competition, …), credited to
+            # the player. Runs after any legacy fire rows above.
+            outcome_actions = cmd.get("win_actions") if win else cmd.get("miss_actions")
+            if outcome_actions:
+                await self._run_action_block(
+                    outcome_actions, f"chance {name} ({'win' if win else 'miss'})", hdr="🎲",
+                    uid=uid, who=who,
+                    extra_ctx={"mention": self._mention(uid, who),
+                               "roll": roll, "chance": f"{chance:.0f}"})
             total_secs = round(sum(f["duration"] for f in fired), 1)
             self._log("roll", f"{who} gambled {name}: rolled {roll} vs {chance:.0f}%"
                       + (f" (luck {luck:+.0f})" if luck else "")
@@ -3226,7 +3236,26 @@ class Engine:
         anon_msg = header + (self.render(tmpl, {"user": anon, "mention": anon, **base})
                              or f"**{anon}** scored **{score}**.")
         self._log("roll", f"{who} finished {name} — score {score}" + (f", fired {total}s" if fired else ""))
-        return {"real": real, "anon": anon_msg, "events_posted": ev_posts}
+        # The tier's optional ACTION BLOCK runs after the result is posted (the
+        # bot calls run_actions), so a tier can do anything an event can.
+        return {"real": real, "anon": anon_msg, "events_posted": ev_posts,
+                "tier_actions": tier.get("actions") or [], "score": score}
+
+    async def run_actions(self, actions, name: str, uid=None, who: str | None = None,
+                          score=None) -> None:
+        """Public entry to run an action block from the bot layer (e.g. a minigame
+        tier's block, after its result is posted), crediting the player."""
+        if not actions:
+            return
+        xc = {}
+        if uid is not None or who:
+            xc["mention"] = self._mention(uid, who or "")
+            xc["target"] = who or ""
+        if score is not None:
+            xc["score"] = score
+        await self._run_action_block(actions, name, hdr="🎮",
+                                     uid=(str(uid) if uid is not None else None),
+                                     who=who, extra_ctx=xc)
 
     async def _run_fires(self, fires, who: str, uid: str | None) -> list:
         """Fire each {device_id, seconds} row independently and concurrently.

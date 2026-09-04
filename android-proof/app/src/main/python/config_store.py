@@ -34,7 +34,7 @@ DEFAULT_PUMPDIRECT_PATH = os.path.normpath(
 
 # Schema version of the stored config. Bump it + add a _migrate step whenever a
 # key is renamed/moved, so old configs upgrade instead of silently stranding data.
-CONFIG_VERSION = 6
+CONFIG_VERSION = 7
 
 # The dead "dice recharged" default that a remediation migration accidentally
 # promoted to the live cooldown-ready message. Migration v3 undoes that.
@@ -207,8 +207,10 @@ DEFAULTS = {
     #   ephemeral minigames (minigames.py). Params: pl_* (pushluck), sm_* (simon),
     #   bl_cells/bl_pops/bl_points (balloon), rps_wins (rps), sl_symbols (slots).
     #   game_intro = message with the Play button. game_tiers = [{op, min, message,
-    #   fires}] score→outcome; the highest matching value (per `op`: >= > = != < <=)
-    #   the final score reaches broadcasts + fires (credited to the player). A luck
+    #   fires, actions}] score→outcome; the highest matching value (per `op`: >= >
+    #   = != < <=) the final score reaches broadcasts + fires + runs its action
+    #   block (credited to the player). chance commands use win_actions/miss_actions
+    #   action blocks for their win/miss outcomes. A luck
     #   modifier (a flat ± added to the final score before tier lookup) may be set
     #   per range (the range's cooldowns[cmd].luck) or on the Always-On entry; a
     #   range the game is a member of takes precedence over Always-On. [score] and
@@ -565,6 +567,18 @@ def _migrate(cfg: dict) -> dict:
         # v6: embed_message + winner_button + session_leader_event collapsed into
         # one unified `embed` action (title/body + optional gated button + block).
         _walk_migrate_embeds(cfg)
+    if v < 7:
+        # v7: chance commands' device-only win/miss fire rows become win_actions /
+        # miss_actions action blocks (so a gamble can do anything an event can).
+        def _fires_to_actions(rows):
+            return [{"type": "fire", "device_id": (r.get("device_id") or None),
+                     "seconds": (r.get("seconds") if r.get("seconds") is not None else 3)}
+                    for r in (rows or []) if isinstance(r, dict)]
+        for c in (cfg.get("commands") or []):
+            if isinstance(c, dict) and (c.get("type") or "").lower() == "chance":
+                c["win_actions"] = _fires_to_actions(c.get("fires")) + list(c.get("win_actions") or [])
+                c["miss_actions"] = _fires_to_actions(c.get("fail_fires")) + list(c.get("miss_actions") or [])
+                c["fires"] = []; c["fail_fires"] = []
     cfg["config_version"] = CONFIG_VERSION
     return cfg
 

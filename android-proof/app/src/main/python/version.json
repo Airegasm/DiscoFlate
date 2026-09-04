@@ -1,6 +1,6 @@
 {
-  "version": "3.34.0",
-  "versionCode": 104,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.34.0/discoflate.apk",
-  "notes": "DiscoFlate v3.34.0 (consolidation, part 2) — embed_message, winner_button and session_leader_event collapse into ONE 'embed' action: a titlebar + body, with an OPTIONAL button gated to a target (winner / runner-up / range-leader / session-leader / top-bonus-holder / everyone / a custom allowlist) that runs a nested action block, with freeze + timer/fallback. Existing setups auto-migrate. Also new [runnerup]/[top_bonus_holder] button targets."
+  "version": "3.35.0",
+  "versionCode": 105,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.35.0/discoflate.apk",
+  "notes": "DiscoFlate v3.35.0 (consolidation, part 3) — outcomes are now full action blocks. Minigame outcome tiers gain an Actions block (award_prize, capacity, competition, embed, …) on top of message+fires. chance/cointoss commands replace their device-only win/miss fires with 🟢 On WIN / 🔴 On MISS action blocks (old fires auto-migrate). This is the groundwork for bonus commands earnable from any game (e.g. perfect blackjack)."
 }

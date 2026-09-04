@@ -742,7 +742,7 @@
         <li><b>fire</b> — turns the device on for a fixed number of <b>Seconds</b>. (Drives capacity if the device is a pump.) Add <b>+ Add Device Fire</b> rows to also fire other devices, each for its own seconds, independently.</li>
         <li><b>roll</b> — rolls dice and fires for the total. Leave <b>Dice/Sides</b> on <code>rng</code> to use the <i>current range's</i> dice, or pin specific dice (e.g. 2 d 6).</li>
         <li><b>say</b> — text-only reply, no device. Good for lore, hints, or status.</li>
-        <li><b>chance</b> — a gamble. Rolls 1–100 against your <b>Chance %</b>; <b>Luck %</b> is a ± chance to force the outcome (positive = force a win, negative = force a miss). A <b>win</b> posts the <b>Success message</b> and fires the <b>🟢 win</b> device rows; a <b>miss</b> posts the <b>Failure message</b> and fires the separate <b>🔴 failure</b> device rows (leave them empty to fire nothing on a miss). Placeholders <code>[roll]</code>, <code>[chance]</code>, <code>[luck]</code>, <code>[secs]</code> work in both. Like every command it's range-gated, cooldownable, and <b>exhaustable</b> (Max/person, set per range).</li>
+        <li><b>chance</b> — a gamble. Rolls 1–100 against your <b>Chance %</b>; <b>Luck %</b> is a ± chance to force the outcome (positive = force a win, negative = force a miss). A <b>win</b> posts the <b>Success message</b> then runs the <b>🟢 On WIN</b> action block; a <b>miss</b> posts the <b>Failure message</b> then runs the <b>🔴 On MISS</b> block (each can fire, add capacity, award a prize, start a competition — anything). Placeholders <code>[roll]</code>, <code>[chance]</code>, <code>[luck]</code>, <code>[secs]</code> work in the messages. Range-gated, cooldownable, and <b>exhaustable</b> (Max/person, set per range).</li>
         <li><b>actions</b> — a full <b>action sequence</b>, exactly like an event's: add any number of steps by type (<b>message</b> · <b>broadcast</b> a saved preset · <b>fire</b> · <b>roll</b> · <b>command</b> (run another command) · <b>capacity</b> add/set · <b>wait</b> · <b>embed</b> (title + body, with an optional button gated to winner/runner-up/leader/everyone/allowlist that runs a nested block with freeze + timer/fallback) · start a <b>poll</b> / <b>competition</b> / <b>bonus_round</b> · <b>award_prize</b> (grant a target — e.g. <code>[range_leader]</code> — N charges of a command, cooldown bypassed) · <b>award_amount</b> (bank bonus seconds/% for a Bonus Round) · <b>command_gate</b> (block_all / remove_block) · <b>end_session</b>), executed in order. <b>fire</b> can pump a fixed time OR until a % is added/reached, block others while pumping, and run Post-Pump Actions. Fires credit the person who ran it. Use this when one command should do several things — e.g. <i>message → wait 3s → fire → start a competition</i>.</li>
         <li><b>game-pushluck</b> — a private button minigame: the player presses <b>💨 Pump</b> for points at a rising bust chance (starts at <b>Bust start %</b>, <b>+% / pump</b>) or <b>🏦 Bank</b> to lock in. Bust = 0. You set max pumps + points/pump and the <b>outcome tiers</b> (score → broadcast message + optional pump fire credited to the player).</li>
         <li><b>game-simon</b> — a private memory minigame: the bot shows a growing emoji sequence for <b>Reveal (s)</b>, hides it, and the player repeats it with buttons. Score = rounds survived. Set # symbols + max rounds and the same <b>outcome tiers</b>.</li>
@@ -2185,6 +2185,9 @@ function gameTiersEditor(i, c){
       `</div>`+
       `<textarea rows="2" placeholder="broadcast on this tier · [user] [score] [secs] [secs2capacity] …" onchange="setTier(${i},${j},'message',this.value)">${esc(t.message||'')}</textarea>`+
       tierFiresEditor(i,j,t)+
+      `<div style="border-top:1px solid var(--line);padding-top:4px"><div class="muted" style="margin-bottom:4px">Actions on this tier <span class="muted">(runs after the result — award_prize, capacity, competition, embed, …)</span></div>`+
+        ((t.actions||[]).map((a,k)=>actionRow(`commandRows[${i}].game_tiers[${j}].actions`,'renderCommands',k,a)).join(''))+
+        `<button class="ghost" style="margin-top:4px" onclick="commandRows[${i}].game_tiers[${j}].actions=commandRows[${i}].game_tiers[${j}].actions||[];commandRows[${i}].game_tiers[${j}].actions.push({type:'message',message:''});renderCommands();scheduleSave()">+ Add tier action</button></div>`+
     `</div>`).join('');
   return `<div class="muted" style="margin:8px 0 4px">Outcome tiers <span class="muted">— pick an operator (≥, &gt;, =, ≠, &lt;, ≤) &amp; value; among all tiers that match the final score, the <b>highest value</b> wins (add a <b>≥ 0</b> tier as the floor/loss).</span></div>`+
     (rows||'<div class="muted" style="margin-bottom:4px">no tiers yet</div>')+
@@ -2202,7 +2205,7 @@ function tierFiresEditor(i,j,t){
     `<button class="ghost" style="margin-top:4px" onclick="addTierFire(${i},${j})">+ Add Device Fire</button></div>`;
 }
 function setTier(i,j,field,val){ const t=(commandRows[i].game_tiers||[])[j]; if(!t) return; t[field]=(field==='min')?(val===''?0:+val):val; scheduleSave(); }
-function addTier(i){ commandRows[i].game_tiers=commandRows[i].game_tiers||[]; commandRows[i].game_tiers.push({op:'>=',min:0,message:'',fires:[]}); renderCommands(); scheduleSave(); }
+function addTier(i){ commandRows[i].game_tiers=commandRows[i].game_tiers||[]; commandRows[i].game_tiers.push({op:'>=',min:0,message:'',fires:[],actions:[]}); renderCommands(); scheduleSave(); }
 function removeTier(i,j){ (commandRows[i].game_tiers||[]).splice(j,1); renderCommands(); scheduleSave(); }
 function setTierFire(i,j,k,field,val){ const f=(((commandRows[i].game_tiers||[])[j]||{}).fires||[])[k]; if(!f) return; f[field]=(field==='seconds')?(val===''?null:+val):(val||null); scheduleSave(); }
 function addTierFire(i,j){ const t=(commandRows[i].game_tiers||[])[j]; if(!t) return; t.fires=t.fires||[]; t.fires.push({device_id:null,seconds:5}); renderCommands(); scheduleSave(); }
@@ -2276,7 +2279,14 @@ function renderCommands(){
               `<label class="field">Failure message <span class="muted">(on a miss)</span><textarea rows="3" onchange="commandRows[${i}].failure_reply=this.value">${esc(c.failure_reply||'')}</textarea></label>`
             : `<label class="field">Reply <textarea rows="4" onchange="commandRows[${i}].reply=this.value">${esc(c.reply||'')}</textarea></label>`)+
           (typ==='fire' ? firesEditor(i, c, 'fires', 'Device fires') : '')+
-          (typ==='chance' ? firesEditor(i, c, 'fires', '🟢 Fires on WIN') + firesEditor(i, c, 'fail_fires', '🔴 Fires on FAILURE') : '')+
+          (typ==='chance'
+            ? `<div style="border-top:1px solid var(--line);padding-top:8px;margin-top:4px"><div class="muted" style="margin-bottom:6px"><b>🟢 On WIN</b> — actions run after the success message (award_prize, fire, capacity, competition, embed, …):</div>`+
+                ((c.win_actions||[]).map((a,j)=>actionRow(`commandRows[${i}].win_actions`,'renderCommands',j,a)).join(''))+
+                `<button class="ghost" style="margin-top:4px" onclick="commandRows[${i}].win_actions=commandRows[${i}].win_actions||[];commandRows[${i}].win_actions.push({type:'fire',seconds:5});renderCommands();scheduleSave()">+ Add win action</button>`+
+              `<div class="muted" style="margin:10px 0 6px"><b>🔴 On MISS</b> — actions run after the failure message:</div>`+
+                ((c.miss_actions||[]).map((a,j)=>actionRow(`commandRows[${i}].miss_actions`,'renderCommands',j,a)).join(''))+
+                `<button class="ghost" style="margin-top:4px" onclick="commandRows[${i}].miss_actions=commandRows[${i}].miss_actions||[];commandRows[${i}].miss_actions.push({type:'message',message:''});renderCommands();scheduleSave()">+ Add miss action</button></div>`
+            : '')+
           (typ==='actions'
             ? `<div style="border-top:1px solid var(--line);padding-top:8px;margin-top:4px"><div class="muted" style="margin-bottom:6px"><b>Actions</b> — run in order when the command is used (fires credit the runner):</div>`+
               ((c.actions||[]).map((a,j)=>actionRow(`commandRows[${i}].actions`,'renderCommands',j,a)).join('')||'<div class="muted">no actions yet</div>')+
@@ -2288,7 +2298,7 @@ function renderCommands(){
     box.appendChild(el);
   });
 }
-function addCommand(){ commandRows.push({name:'',type:'fire',seconds:5,dice:'',sides:'',reply:'',enabled:true,owner_only:false,device_id:null,start_events:[],range_gate:'all',description:'',hide_in_list:false,mention:false,react_only:false,react_emoji:'',fires:[],fail_fires:[],chance:50,luck:null,success_reply:'',failure_reply:'',pl_bust_start:15,pl_bust_step:12,pl_max_pumps:8,pl_points:1,sm_symbols:4,sm_max_rounds:8,sm_reveal:3,bl_cells:9,bl_pops:3,bl_points:1,rps_wins:3,sl_symbols:6,game_intro:'',game_tiers:[]}); renderCommands(); renderRanges(); }
+function addCommand(){ commandRows.push({name:'',type:'fire',seconds:5,dice:'',sides:'',reply:'',enabled:true,owner_only:false,device_id:null,start_events:[],range_gate:'all',description:'',hide_in_list:false,mention:false,react_only:false,react_emoji:'',fires:[],fail_fires:[],chance:50,luck:null,success_reply:'',failure_reply:'',win_actions:[],miss_actions:[],pl_bust_start:15,pl_bust_step:12,pl_max_pumps:8,pl_points:1,sm_symbols:4,sm_max_rounds:8,sm_reveal:3,bl_cells:9,bl_pops:3,bl_points:1,rps_wins:3,sl_symbols:6,game_intro:'',game_tiers:[]}); renderCommands(); renderRanges(); }
 function cleanFires(arr){
   return (arr||[]).filter(f=>f && (f.seconds!=null && f.seconds!=='' || f.device_id!=null))
     .map(f=>({device_id: f.device_id||null, seconds: (f.seconds===''||f.seconds==null)?null:+f.seconds}));
@@ -2313,12 +2323,13 @@ function cleanCommands(){
     chance: (c.chance==null||c.chance==='')?null:+c.chance,
     luck: (c.luck==null||c.luck==='')?null:+c.luck,
     success_reply: c.success_reply||'', failure_reply: c.failure_reply||'',
+    win_actions:cleanActionRows(c.win_actions), miss_actions:cleanActionRows(c.miss_actions),
     // minigames
     pl_bust_start:c.pl_bust_start??15, pl_bust_step:c.pl_bust_step??12, pl_max_pumps:c.pl_max_pumps??8, pl_points:c.pl_points??1,
     sm_symbols:c.sm_symbols??4, sm_max_rounds:c.sm_max_rounds??8, sm_reveal:c.sm_reveal??3,
     bl_cells:c.bl_cells??9, bl_pops:c.bl_pops??3, bl_points:c.bl_points??1, rps_wins:c.rps_wins??3, sl_symbols:c.sl_symbols??6,
     game_intro:c.game_intro||'',
-    game_tiers:(c.game_tiers||[]).map(t=>({op:t.op||'>=', min:+t.min||0, message:t.message||'', fires:cleanFires(t.fires)})),
+    game_tiers:(c.game_tiers||[]).map(t=>({op:t.op||'>=', min:+t.min||0, message:t.message||'', fires:cleanFires(t.fires), actions:cleanActionRows(t.actions)})),
   }));
 }
 async function saveCommands(){ await saveCfg({commands: cleanCommands()}); }
