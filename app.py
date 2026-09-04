@@ -265,6 +265,8 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "config_rev": cfg.get("config_rev", 0),
         "recovered_config": config_store.RECOVERED_FROM,
         "version": VERSION,
+        # preset NAMES only (the full data would bloat the 1s state poll)
+        "gameplay_presets": [{"name": p.get("name", "")} for p in (cfg.get("gameplay_presets") or [])],
         "remote_access": cfg.get("remote_access", {"enabled": False, "allowed_ips": []}),
         "lan_ips": _lan_ips(),
         "port": PORT,
@@ -879,6 +881,61 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         await botmgr.ensure(cfg.get("discord_token"), force=True)
         return web.json_response({"ok": True})
 
+    async def gameplay_preset(request):
+        """Named gameplay presets (System tab). Presets are managed ONLY here —
+        never through the generic config save — so ongoing autosaved edits can't
+        overwrite them. action: save|update (upsert current live gameplay under
+        name) | load (swap the four tabs to a preset) | delete | export (return
+        one preset's data) | import (store a gameplay file as a named preset)."""
+        await guard(request)
+        b = await _json(request)
+        action = (b.get("action") or "").strip().lower()
+        name = (b.get("name") or "").strip()
+        cfg = config_store.load()
+        presets = list(cfg.get("gameplay_presets") or [])
+
+        def _find(n):
+            return next((p for p in presets if (p.get("name") or "").strip().lower() == n.lower()), None)
+
+        if action in ("save", "update", "import"):
+            if not name:
+                raise web.HTTPBadRequest(text="a preset name is required")
+            if action == "import":
+                data = b.get("data")
+                if not isinstance(data, dict) or len(set(_GAMEPLAY_KEYS) & set(data)) < 2:
+                    raise web.HTTPBadRequest(text="that doesn't look like a DiscoFlate gameplay/preset file")
+                snap = {k: v for k, v in data.items() if k in _GAMEPLAY_KEYS}
+            else:
+                snap = _gameplay_export(cfg)   # snapshot the current live gameplay
+            existing = _find(name)
+            if existing:
+                existing["data"] = snap
+            else:
+                presets.append({"name": name, "data": snap})
+            cfg["gameplay_presets"] = presets
+            cfg = config_store.save(cfg)
+            engine.set_config(cfg)
+        elif action == "load":
+            p = _find(name)
+            if p is None:
+                raise web.HTTPBadRequest(text="no such preset")
+            merged = _gameplay_merge(cfg, p.get("data") or {}, "replace")
+            cfg = config_store.save(config_store._coerce_numbers(merged))
+            engine.set_config(cfg)
+        elif action == "delete":
+            cfg["gameplay_presets"] = [p for p in presets
+                                       if (p.get("name") or "").strip().lower() != name.lower()]
+            cfg = config_store.save(cfg)
+            engine.set_config(cfg)
+        elif action == "export":
+            p = _find(name)
+            if p is None:
+                raise web.HTTPBadRequest(text="no such preset")
+            return web.json_response({"name": p.get("name"), "data": p.get("data") or {}})
+        else:
+            raise web.HTTPBadRequest(text="unknown preset action")
+        return web.json_response(_public_state(engine, botmgr))
+
     async def export_gameplay(request):
         # Shareable: the whole Game/Commands/Events/Templates set, no secrets.
         await guard(request)
@@ -1071,6 +1128,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/config/import", import_config),
         web.post("/api/gameplay/export", export_gameplay),
         web.post("/api/gameplay/import", import_gameplay),
+        web.post("/api/gameplay/preset", gameplay_preset),
         web.post("/api/check-updates", check_updates),
         web.post("/api/pull-updates", pull_updates),
     ])

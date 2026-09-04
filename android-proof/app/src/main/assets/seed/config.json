@@ -931,5 +931,6 @@
     "allowed_ips": []
   },
   "capacity_events": [],
-  "polls": []
+  "polls": [],
+  "gameplay_presets": []
 }

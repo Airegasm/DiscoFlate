@@ -332,6 +332,12 @@ DEFAULTS = {
     # (guild/channel scoping is listen_targets' job — see migration v2.)
     "allow": {"user_ids": []},
 
+    # Named gameplay presets (System tab) — saved snapshots of the Game/Commands/
+    # Events/Templates tabs you can switch between. Separate from the live config:
+    # your ongoing edits autosave to the live config, NOT to a preset. Each:
+    # {name, data: {<safe gameplay keys>}}. Managed only via /api/gameplay/preset.
+    "gameplay_presets": [],
+
     # Remote access (System tab): OFF = the server binds loopback only (the
     # default, nothing else on the network can even connect). ON = binds
     # 0.0.0.0, and ONLY clients whose IP is in allowed_ips may talk to it

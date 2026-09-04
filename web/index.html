@@ -592,7 +592,36 @@
     <!-- system -->
     <div class="card span" data-tab="system">
       <h2>System</h2>
-      <details class="help"><summary><b style="font-size:1.02rem">📡 Remote Access (LAN)</b> <span class="pill" id="raPill" style="display:none;padding:2px 10px;font-size:11px"></span></summary>
+
+      <!-- full-config backup (token included) -->
+      <div class="hint" style="margin-top:0"><b>Full backup</b> — saves <b>everything</b> incl. your token, devices &amp; server settings to <code>discoflate-backup.json</code>. <b>Uninstalling the app erases everything</b>, so keep a backup. ⚠️ Includes your bot token — keep it private.</div>
+      <div class="row" style="margin-top:8px">
+        <button class="ghost" onclick="exportConfig()">⬇ Export config</button>
+        <button onclick="$('#importFile').click()">⬆ Restore from file</button>
+        <input type="file" id="importFile" accept="application/json,.json" style="display:none" onchange="importConfigFile(this)">
+        <span class="muted" id="backupMsg"></span>
+      </div>
+
+      <details class="help" style="margin-top:16px"><summary><b style="font-size:1.02rem">📦 Gameplay Presets</b></summary>
+        <div class="hint" style="margin-top:8px;max-width:860px">Saved snapshots of your whole <b>Game, Commands, Events &amp; Templates</b> — swap between whole setups instantly. Your ongoing edits autosave to the <b>live</b> config as always; a preset only changes when you <b>Save</b> or <b>Update</b> it. Presets never include your token, devices, or server settings, so preset files are safe to share.</div>
+        <div class="row" style="margin-top:10px;gap:8px;align-items:center;flex-wrap:wrap">
+          <button onclick="presetSaveCurrent()">💾 Save Current to Preset</button>
+          <div style="flex-basis:100%;height:0"></div>
+          <select id="presetSel" style="min-width:200px"></select>
+          <button class="ghost" onclick="presetLoad()">▶ Load</button>
+          <button class="ghost" onclick="presetUpdate()">⟳ Update</button>
+          <button class="ghost" onclick="presetExport()">⬇ Export</button>
+          <button class="ghost bad" onclick="presetDelete()">✕</button>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button onclick="$('#importPresetFile').click()">⬆ Import Preset File</button>
+          <input type="file" id="importPresetFile" accept="application/json,.json" style="display:none" onchange="importPresetFile(this)">
+          <span class="muted" id="presetMsg"></span>
+        </div>
+        <div class="hint" style="margin-top:8px"><b>Load</b> swaps all four tabs to the selected preset (your live edits are replaced). <b>Update</b> overwrites the selected preset with your current settings. <b>Export</b> saves it as a shareable file; <b>Import Preset File</b> brings one in under a name you choose.</div>
+      </details>
+
+      <details class="help" style="margin-top:16px"><summary><b style="font-size:1.02rem">📡 Remote Access (LAN)</b> <span class="pill" id="raPill" style="display:none;padding:2px 10px;font-size:11px"></span></summary>
         <div class="hint" style="margin-top:8px;max-width:820px">Control DiscoFlate from another device on your network — e.g. use an <b>iPhone as the remote</b> while the app runs here. OFF (default) = the server listens on this machine only; nothing else on the network can even connect. ON = it listens on the LAN, and <b>only the devices whose IPs you whitelist below</b> may talk to it (everyone else is refused at the door). An empty whitelist means <b>no</b> remote device gets in.</div>
         <label class="row" style="gap:8px;margin:12px 0"><input type="checkbox" id="raEnabled" onchange="saveRemoteAccess()" style="width:auto"> <b>Enable remote access</b></label>
         <div id="raUrl" class="hint" style="margin:0 0 10px;display:none"></div>
@@ -619,26 +648,7 @@
       <div class="hint" id="updHint" style="display:none;white-space:pre-wrap;margin-top:8px"></div>
       <div class="hint">On the phone app this downloads &amp; installs the new APK; on desktop it pulls the latest code from GitHub (then restart DiscoFlate).
         <b>Phone update stuck?</b> Delete old <code>discoflate*.apk</code> files from Downloads first, then update — the phone can re-install a cached old copy otherwise.</div>
-      <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">
-        <h3 style="margin:0 0 6px">Backup / Restore config</h3>
-        <div class="hint" style="margin-top:0"><b>Uninstalling the app erases everything</b> (token, devices, games). <b>Export config</b> saves a <code>discoflate-backup.json</code> file (to your <b>Downloads</b> on the phone) — including the <b>all-time leaderboard</b> — and <b>Restore from file</b> loads it all back, so you can recover in seconds after a reinstall or on a new device. ⚠️ The file <b>includes your bot token</b>, so keep it private.</div>
-        <div class="row" style="margin-top:8px">
-          <button class="ghost" onclick="exportConfig()">⬇ Export config (file)</button>
-          <button onclick="$('#importFile').click()">⬆ Restore from file</button>
-          <input type="file" id="importFile" accept="application/json,.json" style="display:none" onchange="importConfigFile(this)">
-          <span class="muted" id="backupMsg"></span>
-        </div>
-        <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px">
-          <h3 style="margin:0 0 6px">Share gameplay settings</h3>
-          <div class="hint" style="margin-top:0">Export just your <b>Game, Commands, Events &amp; Templates</b> — the safe, shareable stuff — to swap setups with other people. <b>No token, devices, servers, or credentials are included</b>, so it's safe to post publicly. Importing lets you <b>replace</b> your setup with the file's, or only <b>add what you're missing</b> (keeping everything you already have).</div>
-          <div class="row" style="margin-top:8px">
-            <button class="ghost" onclick="exportGameplay()">⬇ Export Gameplay Settings</button>
-            <button onclick="$('#importGameplayFile').click()">⬆ Import Gameplay Settings</button>
-            <input type="file" id="importGameplayFile" accept="application/json,.json" style="display:none" onchange="importGameplayFile(this)">
-            <span class="muted" id="gameplayMsg"></span>
-          </div>
-        </div>
-      </div>
+      <div class="hint" style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px"><b>Backups &amp; presets moved to the <a style="cursor:pointer" onclick="showTab('system')">System tab</a>:</b> full config backup (token included) at the top, and shareable <b>Gameplay Presets</b> below it.</div>
     </div>
 
     <div class="card span" data-tab="help">
@@ -1319,6 +1329,68 @@ async function importConfigFile(input){
   }catch(e){ setBackupMsg('restore failed: '+(e.message||e)); }
   input.value='';
 }
+// ---- gameplay presets (named snapshots, System tab) ----
+let presetNames = [];
+function setPresetMsg(t){ const m=$('#presetMsg'); if(m){ m.textContent=t; clearTimeout(m._t); m._t=setTimeout(()=>{ if(m) m.textContent=''; }, 4000); } }
+function renderPresets(){
+  const sel=$('#presetSel'); if(!sel) return;
+  const prev=sel.value;
+  sel.innerHTML = presetNames.length ? presetNames.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')
+                                     : `<option value="">(no presets yet)</option>`;
+  if(prev && presetNames.includes(prev)) sel.value=prev;
+}
+async function presetCall(body){ return api('/api/gameplay/preset', body); }
+async function presetSaveCurrent(){
+  const name=(prompt('Name this preset (saves your current Game/Commands/Events/Templates):')||'').trim();
+  if(!name) return;
+  flushSave();   // make sure pending edits are in the live config before snapshotting
+  try{ applyState(await presetCall({action: (presetNames.map(n=>n.toLowerCase()).includes(name.toLowerCase())?'update':'save'), name}), true);
+       setPresetMsg('saved preset “'+name+'” ✓'); $('#presetSel').value=name; }
+  catch(e){ setPresetMsg('save failed: '+(e.message||e)); }
+}
+async function presetLoad(){
+  const name=$('#presetSel').value; if(!name) return;
+  if(!confirm(`Load preset “${name}”?\n\nThis REPLACES your current Game, Commands, Events & Templates with the preset's. (Your token, devices, and server settings are untouched.)`)) return;
+  try{ applyState(await presetCall({action:'load', name}), true); setPresetMsg('loaded “'+name+'” ✓'); }
+  catch(e){ setPresetMsg('load failed: '+(e.message||e)); }
+}
+async function presetUpdate(){
+  const name=$('#presetSel').value; if(!name) return;
+  if(!confirm(`Overwrite preset “${name}” with your current settings?`)) return;
+  flushSave();
+  try{ applyState(await presetCall({action:'update', name}), true); setPresetMsg('updated “'+name+'” ✓'); }
+  catch(e){ setPresetMsg('update failed: '+(e.message||e)); }
+}
+async function presetDelete(){
+  const name=$('#presetSel').value; if(!name) return;
+  if(!confirm(`Delete preset “${name}”? This can't be undone (your live setup is unaffected).`)) return;
+  try{ applyState(await presetCall({action:'delete', name}), true); setPresetMsg('deleted “'+name+'”'); }
+  catch(e){ setPresetMsg('delete failed: '+(e.message||e)); }
+}
+async function presetExport(){
+  const name=$('#presetSel').value; if(!name){ setPresetMsg('pick a preset first'); return; }
+  try{
+    const r=await presetCall({action:'export', name});
+    const text=JSON.stringify(r.data||{}, null, 2);
+    const fn='discoflate-preset-'+name.replace(/[^\w.-]+/g,'_')+'.json';
+    if(saveToDownloads(fn, text)){ setPresetMsg('saving to Downloads…'); return; }
+    const blob=new Blob([text],{type:'application/json'}); const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob); a.download=fn; document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    setPresetMsg('exported '+fn+' ✓');
+  }catch(e){ setPresetMsg('export failed: '+(e.message||e)); }
+}
+async function importPresetFile(input){
+  const f=input.files&&input.files[0]; if(!f) return;
+  let obj; try{ obj=JSON.parse(await f.text()); }catch(e){ setPresetMsg("that file isn't valid JSON"); input.value=''; return; }
+  input.value='';
+  const suggested=(f.name||'').replace(/^discoflate-(preset-|gameplay)?/,'').replace(/\.json$/,'').replace(/_/g,' ').trim();
+  const name=(prompt('Name this imported preset:', suggested||'imported')||'').trim();
+  if(!name) return;
+  try{ applyState(await presetCall({action:'import', name, data:obj}), true); setPresetMsg('imported as “'+name+'” ✓'); $('#presetSel').value=name; }
+  catch(e){ setPresetMsg('import failed: '+(e.message||e)); }
+}
+
 // ---- share gameplay settings (safe subset: Game/Commands/Events/Templates) ----
 function setGameplayMsg(t){ const m=$('#gameplayMsg'); if(m){ m.textContent=t; clearTimeout(m._t); m._t=setTimeout(()=>{ if(m) m.textContent=''; }, 4000); } }
 async function exportGameplay(){
@@ -2986,6 +3058,8 @@ function applyState(st, full){
     remoteEnabled = !!ra.enabled;
     remoteIps = (ra.allowed_ips||[]).slice();
     renderRemoteAccess(st);
+    presetNames = (st.gameplay_presets||[]).map(p=>p.name).filter(Boolean);
+    renderPresets();
     configRev = st.config_rev ?? configRev;
     editingForms = true;
   }
