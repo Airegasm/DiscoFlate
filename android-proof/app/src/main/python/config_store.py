@@ -235,13 +235,15 @@ DEFAULTS = {
     #        seconds, device_id, dice, sides, capacity_op ("add"|"set"), capacity_value,
     #        max_repeats, cooldown, fire_immediately, clean_previous,
     #        activation_message, end_message,
-    #        chance, luck, fires, fail_fires, success_message, failure_message}
+    #        chance, luck, fires, fail_fires, success_message, failure_message,
+    #        actions (action="actions": a full action block run each round)}
     #   mode "loop"       → fires every `every` seconds, repeatedly (up to
     #                       `max_repeats` times if set; 0/blank = unlimited).
     #                       clean_previous → each round deletes the previous round's
     #                       message (anti-spam); the end_message replaces the last.
     #   mode "once"       → fires a single time, `every` seconds after arming
     #   action "message"  → post `message` to all listen channels
+    #   action "actions"  → run the `actions` block each round (full action system)
     #   action "fire"     → fire device for `seconds` (+ optional message)
     #   action "roll"     → roll dice on device, scaled on-time (+ message)
     #   action "capacity" → add/set capacity by capacity_value (+ message)

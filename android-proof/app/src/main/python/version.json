@@ -1,6 +1,6 @@
 {
-  "version": "3.38.0",
-  "versionCode": 108,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.38.0/discoflate.apk",
-  "notes": "DiscoFlate v3.38.0 — no more save buttons: everything autosaves as you edit, and there's now ONE universal '💾 Save all' bar pinned to the bottom of every page as a manual safety. All the per-section Save buttons and the 'Restore Default Config' buttons are gone. The shipped defaults are now an IMMUTABLE built-in Gameplay Preset ('Defaults (built-in)' = Basic Session, minus the electrode event, with [operator] in place of any hard-coded name) — load it any time; it can't be edited/renamed/deleted/overwritten. A brand-new install now starts pre-loaded with it in every field. Presets also gained a ✏️ rename."
+  "version": "3.39.0",
+  "versionCode": 109,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.39.0/discoflate.apk",
+  "notes": "DiscoFlate v3.39.0 (consolidation, part 5) — Timed Events gain an 'actions' action type: a full action block run each round (message/embed/fire/award/competition/command_gate/…), with loop placeholders ([current_loop]/[event]/[next_round]) — just like a command's actions. The simple single-action types stay for the common case + clean-previous loops. Also: Competitions and Bonus Rounds are now clearly separated collapsible sections."
 }

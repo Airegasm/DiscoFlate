@@ -2356,6 +2356,15 @@ class Engine:
         # If a command started this event, credit that person's leaderboard for its pumps.
         act_uid, act_who = self._event_activator.get(name.strip().lower(), (None, ""))
 
+        if action == "actions":
+            # Full action block per round (message/embed/fire/award/competition/…),
+            # exactly like a command's 'actions' type. Loop context ([current_loop],
+            # [event], [next_round]) is available inside it. (clean_previous message
+            # replacement stays a feature of the simple single-action types.)
+            await self._run_action_block(ev.get("actions"), f"event {name}", hdr="",
+                                         uid=act_uid, who=act_who, extra_ctx=extra)
+            return
+
         if action == "chance":
             # Per-loop gamble: win fires `fires` + posts success_message; miss fires
             # `fail_fires` + posts failure_message (each falls back to `message`).

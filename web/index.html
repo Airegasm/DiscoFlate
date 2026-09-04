@@ -604,7 +604,7 @@
 
     <!-- competitions -->
     <div class="card span" data-tab="events">
-      <details class="help"><summary><h2>🏁 Competitions</h2></summary>
+      <details class="help" style="margin-top:14px"><summary><h2>🏁 Competitions</h2></summary>
       <div class="row" style="gap:10px;align-items:flex-end;margin-top:8px">
         <label class="field">Join command <span class="muted">(only active during a competition)</span>
           <input id="cmdEnter" value="enter" style="width:130px"></label>
@@ -618,7 +618,7 @@
       </div>
       </details>
 
-      <details class="help"><summary><h2>🤝 Bonus Rounds</h2></summary>
+      <details class="help" style="margin-top:14px"><summary><h2>🤝 Bonus Rounds</h2></summary>
       <div class="hint" style="max-width:880px">A Bonus Round is a <b>teamwork cash-in</b>, started by a <b>bonus_round</b> action. First bank amounts with an <b>award</b> action (volume secs/%) (pump <b>seconds</b> or <b>capacity %</b>, on <code>[winner]</code>/<code>[range_leader]</code>/<code>[session_leader]</code>/…). The round posts an embed with a <b>Confirm</b> button for bonus holders; once the needed holders confirm (<b>all</b>, or just the <b>top holder</b>) before the timer, your action block runs with the pooled <code>[total_bonus_secs]</code> / <code>[total_bonus_pct]</code> — then the banks are spent. Use <code>fire [total_bonus_secs]</code> or <code>add % [total_bonus_pct]</code> to apply them.</div>
       <div id="bonusRounds" style="margin-top:10px"></div>
       <div class="row" style="margin-top:10px">
@@ -797,6 +797,7 @@
         <li><b>roll</b> — auto-roll a device (its own dice/sides, or the current range's).</li>
         <li><b>capacity</b> — <b>add</b> or <b>set</b> the meter by a value.</li>
         <li><b>chance</b> — each fire is a gamble (like the chance command): rolls vs <b>chance %</b> (± <b>luck</b>); a win fires the <b>🟢 win</b> rows + posts the success message, a miss fires the <b>🔴 failure</b> rows + posts the failure message.</li>
+        <li><b>actions</b> — a full <b>action block</b> run each round (message/embed/fire/award/competition/command_gate/…), exactly like a command's actions. Loop placeholders (<code>[current_loop]</code>, <code>[event]</code>, <code>[next_round]</code>) work inside it. Use this when a round should do more than one thing.</li>
       </ul>
       <div class="hint" style="max-width:820px">Every action can <i>also</i> post a message, and placeholders work everywhere. <b>Events are OFF by default</b> — turn one on three ways: tick it here, list its name in a command's <b>Starts events</b>, or have a range <b>Enable</b> it on entry.</div>
       <h3 style="margin:14px 0 6px">Activation, cooldown &amp; messages</h3>
@@ -2465,7 +2466,7 @@ function renderEvents(){
       // --- action ---
       `<div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end;border-top:1px solid var(--line);padding-top:10px">`+
         `<label class="field">Action <select onchange="eventRows[${i}].action=this.value;renderEvents()">`+
-          ['message','broadcast','fire','roll','capacity','chance','poll','competition'].map(a=>`<option value="${a}" ${act===a?'selected':''}>${a}</option>`).join('')+`</select></label>`+
+          ['message','actions','broadcast','fire','roll','capacity','chance','poll','competition'].map(a=>`<option value="${a}" ${act===a?'selected':''}>${a}</option>`).join('')+`</select></label>`+
         (act==='broadcast'?`<label class="field">Broadcast <select onchange="eventRows[${i}].broadcast=this.value;scheduleSave()">${broadcastNameOpts(e.broadcast)}</select></label>`:'')+
         (act==='poll'?`<label class="field">Poll <span class="muted">(runs in the background)</span> <select onchange="eventRows[${i}].poll=this.value;scheduleSave()">${pollNameOpts(e.poll)}</select></label>`:'')+
         (act==='competition'?`<label class="field">Competition <select onchange="eventRows[${i}].competition=this.value;scheduleSave()">${compNameOpts(e.competition)}</select></label>`:'')+
@@ -2477,12 +2478,16 @@ function renderEvents(){
         (act==='chance'?`<label class="field">Chance % <input type="number" min="0" max="100" step="1" value="${e.chance??50}" style="width:80px" onchange="eventRows[${i}].chance=Math.max(0,Math.min(100,+this.value||0))"></label>`+
             `<label class="field">Luck % <span class="muted">(±force)</span> <input type="number" min="-100" max="100" step="1" value="${e.luck??''}" placeholder="0" style="width:80px" onchange="eventRows[${i}].luck=(this.value===''?null:+this.value)"></label>`:'')+
       `</div>`+
-      // --- message(s) ---
+      // --- message(s) / action block ---
       (act==='chance'
         ? `<label class="field">🟢 Success message <span class="muted">([roll] [chance] [luck] [secs] [current_loop] …)</span><textarea rows="2" onchange="eventRows[${i}].success_message=this.value">${esc(e.success_message||'')}</textarea></label>`+
           evtFiresEditor(i, e, 'fires', '🟢 Fires on WIN')+
           `<label class="field">🔴 Failure message<textarea rows="2" onchange="eventRows[${i}].failure_message=this.value">${esc(e.failure_message||'')}</textarea></label>`+
           evtFiresEditor(i, e, 'fail_fires', '🔴 Fires on FAILURE')
+        : act==='actions'
+        ? `<div style="border-top:1px solid var(--line);padding-top:8px"><div class="muted" style="margin-bottom:6px"><b>Actions</b> — run in order each round (<code>[current_loop]</code> <code>[event]</code> <code>[next_round]</code> work):</div>`+
+          ((e.actions||[]).map((a,j)=>actionRow(`eventRows[${i}].actions`,'renderEvents',j,a)).join(''))+
+          `<button class="ghost" style="margin-top:4px" onclick="eventRows[${i}].actions=eventRows[${i}].actions||[];eventRows[${i}].actions.push({type:'message',message:''});renderEvents();scheduleSave()">+ Add action</button></div>`
         : `<label class="field">Message <span class="muted">(optional · [capacity] [announce] [current_loop] [total_loops] [loop_timer] [next_round] …)</span><textarea rows="3" onchange="eventRows[${i}].message=this.value">${esc(e.message||'')}</textarea></label>`);
       html += postActionsSection(`eventRows[${i}].post_actions`, 'renderEvents', e.post_actions, timedEvPollLabels(e));
     }
@@ -2499,7 +2504,7 @@ function renameEvent(i, val){
   }
   eventRows[i].name=val; renderModes();
 }
-function addEvent(){ eventRows.push({name:'',enabled:false,mode:'loop',every:60,max_repeats:null,fire_immediately:false,clean_previous:false,action:'message',message:'',seconds:5,dice:'',sides:'',capacity_op:'add',capacity_value:0,device_id:null,cooldown:null,activation_message:'',end_message:'',chance:50,luck:null,fires:[],fail_fires:[],success_message:'',failure_message:''}); renderEvents(); scheduleSave(); }
+function addEvent(){ eventRows.push({name:'',enabled:false,mode:'loop',every:60,max_repeats:null,fire_immediately:false,clean_previous:false,action:'message',message:'',seconds:5,dice:'',sides:'',capacity_op:'add',capacity_value:0,device_id:null,cooldown:null,activation_message:'',end_message:'',chance:50,luck:null,fires:[],fail_fires:[],success_message:'',failure_message:'',actions:[]}); renderEvents(); scheduleSave(); }
 function cleanEvents(){
   return eventRows.filter(e=>(e.name||'').trim()).map(e=>({
     name:(e.name||'').trim(), enabled:e.enabled!==false, mode:e.mode||'loop', every:(e.every>0)?+e.every:null,
@@ -2512,6 +2517,7 @@ function cleanEvents(){
     chance:(e.chance==null||e.chance==='')?null:+e.chance, luck:(e.luck==null||e.luck==='')?null:+e.luck,
     fires:cleanFires(e.fires), fail_fires:cleanFires(e.fail_fires),
     success_message:e.success_message||'', failure_message:e.failure_message||'',
+    actions:cleanActionRows(e.actions),
     post_actions:cleanActionRows(e.post_actions),
   }));
 }
