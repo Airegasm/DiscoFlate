@@ -324,14 +324,14 @@
         <button class="ghost" onclick="startCamera()">▶ Start / allow camera</button>
         <button class="ghost" onclick="stopCamera()">■ Stop</button>
         <label class="row" style="gap:6px"><input type="checkbox" id="camMirror" onchange="applyPreviewTransform()"> mirror</label>
-        <label class="row" style="gap:6px">zoom <input type="range" id="camZoomSlider" min="1" max="5" step="0.1" value="1" style="width:120px" oninput="camZoom=+this.value;applyPreviewTransform()"></label>
+        <label class="row" style="gap:6px">zoom <input type="range" id="camZoomSlider" min="1" max="5" step="0.1" value="1" style="width:120px" oninput="setZoom(+this.value)"><span id="camZoomLabel" class="muted" style="min-width:34px">1.0×</span></label>
         <span class="muted" id="camMsg"></span>
       </div>
       <div id="camWrap" style="margin-top:12px;position:relative;background:#000;border:1px solid var(--line);border-radius:10px;overflow:hidden;width:100%;max-width:300px;aspect-ratio:9/16;touch-action:none">
         <video id="camPreview" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;display:block;transform-origin:center center"></video>
         <button id="snapBtn" onclick="snapPhoto()" title="Snap photo" style="position:absolute;bottom:14px;left:50%;transform:translateX(-50%);width:60px;height:60px;border-radius:50%;background:#fff;border:4px solid rgba(0,0,0,.4);cursor:pointer;padding:0;box-shadow:0 2px 10px rgba(0,0,0,.5)"></button>
       </div>
-      <div class="hint" style="margin-top:6px">Pinch (or the zoom slider) to zoom · tap the white button to snap. <span id="snapMsg" style="color:var(--accent2)"></span></div>
+      <div class="hint" style="margin-top:6px">Pinch (or the zoom slider) to zoom — on phones with an ultra-wide lens the slider goes below 1× to zoom <b>out</b> · tap the white button to snap. <span id="snapMsg" style="color:var(--accent2)"></span></div>
 
       <!-- captured photo → review, then send or discard -->
       <div id="snapReview" style="display:none;margin-top:14px;border-top:1px solid var(--line);padding-top:14px">
@@ -1102,6 +1102,22 @@ async function saveCfg(patch){
 
 // ---- snapshot / camera (uses this machine's cameras via the browser) ----
 let camStream = null, camZoom = 1, snapBlob = null, snapBlobUrl = null;
+// Native camera zoom: many phones expose a real zoom capability whose MIN can be
+// below 1× (the ultra-wide lens) — that's how the stock app "zooms out". We drive
+// it via applyConstraints (optical/hybrid, incl. zoom-out); only when the track
+// has no zoom capability (most desktop webcams) do we fall back to CSS digital
+// zoom-IN (1–5×). camZoomNative decides which.
+let camTrack = null, camZoomNative = false, camZoomMin = 1, camZoomMax = 5, camZoomStep = 0.1;
+function _zoomClamp(v){ return Math.max(camZoomMin, Math.min(camZoomMax, v)); }
+async function setZoom(v){
+  camZoom = _zoomClamp(+v || camZoomMin);
+  const zs=$('#camZoomSlider'); if(zs && +zs.value!==camZoom) zs.value=camZoom;
+  const zl=$('#camZoomLabel'); if(zl) zl.textContent=camZoom.toFixed(1)+'×';
+  if(camZoomNative && camTrack){
+    try{ await camTrack.applyConstraints({advanced:[{zoom:camZoom}]}); }catch(e){}
+  }
+  applyPreviewTransform();
+}
 function setSnapMsg(t){ const m=$('#snapMsg'); if(m) m.textContent=t; }
 async function listCameras(selected){
   try{
@@ -1126,33 +1142,52 @@ async function startCamera(deviceId){
       : {facingMode:{ideal:'environment'}, ...HD} };
     camStream = await navigator.mediaDevices.getUserMedia(constraints);
     $('#camPreview').srcObject = camStream;
-    camZoom = 1; const zs=$('#camZoomSlider'); if(zs) zs.value = 1; applyPreviewTransform();
-    $('#camMsg').textContent = 'camera on';
-    await listCameras(deviceId || (camStream.getVideoTracks()[0]?.getSettings?.().deviceId));
+    // Detect the track's REAL zoom capability (min can be <1 = ultra-wide / zoom
+    // OUT). Fall back to CSS digital zoom-in (1–5×) if unsupported.
+    camTrack = camStream.getVideoTracks()[0] || null;
+    const caps = (camTrack && camTrack.getCapabilities) ? camTrack.getCapabilities() : {};
+    const zs=$('#camZoomSlider');
+    if(caps && caps.zoom && typeof caps.zoom.min==='number' && caps.zoom.max>caps.zoom.min){
+      camZoomNative = true;
+      camZoomMin = caps.zoom.min; camZoomMax = caps.zoom.max;
+      camZoomStep = caps.zoom.step || Math.max(0.1, (caps.zoom.max-caps.zoom.min)/100);
+      const cur = (camTrack.getSettings && camTrack.getSettings().zoom) || 1;
+      if(zs){ zs.min=camZoomMin; zs.max=camZoomMax; zs.step=camZoomStep; }
+      await setZoom(_zoomClamp(cur));
+    } else {
+      camZoomNative = false; camZoomMin=1; camZoomMax=5; camZoomStep=0.1;
+      if(zs){ zs.min=1; zs.max=5; zs.step=0.1; }
+      await setZoom(1);
+    }
+    $('#camMsg').textContent = camZoomNative ? 'camera on · optical zoom' : 'camera on';
+    await listCameras(deviceId || (camTrack && camTrack.getSettings?.().deviceId));
   }catch(e){
     $('#camMsg').textContent = 'camera error: '+(e.message||e.name);
   }
 }
 function stopCamera(){
   if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
+  camTrack=null;
   const v=$('#camPreview'); if(v) v.srcObject=null;
   const m=$('#camMsg'); if(m) m.textContent='';
 }
 function applyPreviewTransform(){
   const v=$('#camPreview'); if(!v) return;
+  // Native zoom is real (in the video frame already) → don't CSS-scale; only the
+  // digital fallback scales the preview. Mirror always applies.
+  const scale = camZoomNative ? 1 : camZoom;
   const mir=($('#camMirror')&&$('#camMirror').checked)?' scaleX(-1)':'';
-  v.style.transform = `scale(${camZoom})${mir}`;
+  v.style.transform = `scale(${scale})${mir}`;
 }
-// Pinch-to-zoom on the preview (touch). Slider handles desktop.
+// Pinch-to-zoom on the preview (touch). Slider handles desktop. Both route
+// through setZoom, which drives native optical zoom (incl. zoom-out) when available.
 (function(){
   const wrap=$('#camWrap'); if(!wrap) return;
   let startDist=0, startZoom=1;
   const D=t=>Math.hypot(t[0].clientX-t[1].clientX, t[0].clientY-t[1].clientY);
   wrap.addEventListener('touchstart', e=>{ if(e.touches.length===2){ startDist=D(e.touches); startZoom=camZoom; e.preventDefault(); } }, {passive:false});
   wrap.addEventListener('touchmove', e=>{ if(e.touches.length===2 && startDist>0){
-    camZoom=Math.max(1,Math.min(5, startZoom*(D(e.touches)/startDist)));
-    const zs=$('#camZoomSlider'); if(zs) zs.value=camZoom.toFixed(1);
-    applyPreviewTransform(); e.preventDefault();
+    setZoom(startZoom*(D(e.touches)/startDist)); e.preventDefault();
   } }, {passive:false});
   wrap.addEventListener('touchend', e=>{ if(e.touches.length<2) startDist=0; });
 })();
@@ -1164,8 +1199,9 @@ function snapPhoto(){
   // object-fit:cover crop of the video into 9:16 (what the preview shows)…
   let sw, sh;
   if(vw/vh > arT){ sh=vh; sw=vh*arT; } else { sw=vw; sh=vw/arT; }
-  // …then centre-crop by the zoom factor.
-  const z=Math.max(1, camZoom||1); sw/=z; sh/=z;
+  // …then centre-crop by the zoom factor — ONLY for the digital fallback. Native
+  // zoom is already baked into the video frame, so don't crop again.
+  const z = camZoomNative ? 1 : Math.max(1, camZoom||1); sw/=z; sh/=z;
   const sx=(vw-sw)/2, sy=(vh-sh)/2;
   // Output at the cropped region's NATIVE resolution (never upscale), capped so
   // files stay under the 8 MB send limit. ~8× the old hard 720×1280 at best.

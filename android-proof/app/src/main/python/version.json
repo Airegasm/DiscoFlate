@@ -1,6 +1,6 @@
 {
-  "version": "3.30.0",
-  "versionCode": 99,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.30.0/discoflate.apk",
-  "notes": "DiscoFlate v3.30.0 — Templates: save Ends/End Sequences, Polls, Competitions & Capacity Events as templates (new Templates sections). Gameplay presets/export now include Bonus Rounds (were being dropped). Discord tab: set the bot's profile picture (avatar). Camera: much higher capture quality — always requests a high resolution (dropdown-picked cameras used to fall back to ~640×480), defaults to the rear camera, and captures at native resolution instead of a hard 720×1280 cap."
+  "version": "3.31.0",
+  "versionCode": 100,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.31.0/discoflate.apk",
+  "notes": "DiscoFlate v3.31.0 — camera now uses the phone's REAL zoom (optical/hybrid) via the video track, so on ultra-wide-capable phones the zoom slider drops below 1× to zoom OUT just like the stock camera. The slider auto-ranges to the device's true min/max, with a live ×readout. Desktop webcams fall back to the old digital zoom-in."
 }
