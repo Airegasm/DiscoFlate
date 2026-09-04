@@ -1,6 +1,6 @@
 {
-  "version": "3.25.0",
-  "versionCode": 94,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.25.0/discoflate.apk",
-  "notes": "DiscoFlate v3.25.0 — per-range top-pumper tracking with new [leaderboard_range], [range_leader], and [range_leader_score] placeholders, plus a new 'award_prize' action type that grants a target (e.g. [range_leader]) N charges of a command with the cooldown bypassed — so the range leader can, say, fire a progression command 3× back-to-back."
+  "version": "3.26.0",
+  "versionCode": 95,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.26.0/discoflate.apk",
+  "notes": "DiscoFlate v3.26.0 — competition endings are now an ACTION BLOCK (Winner reward actions): fire [winner_score] to the pump, hand the winner a one-press Winner Button (runs its own mini-block, optional freeze + deadline), award_prize a command, or command_gate everyone else. New action types winner_button + command_gate (block_all_custom incl. roll / remove_block). Fire actions can pump until N% added or reached, block others while pumping, and run Post-Pump Actions when done. New placeholders [runnerup]/[runnerup_score], [session_leader]/[session_leader_score], [bonus_holders]. Per-range 'Allow Prize Commands' + 'Only' gates. Roll-offs can 'Add ALL player totals to the timer'. Legacy competition awards auto-migrate."
 }

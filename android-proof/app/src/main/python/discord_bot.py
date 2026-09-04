@@ -152,6 +152,37 @@ class RollerView(discord.ui.View):
         await interaction.response.edit_message(content=self.text(), view=self)
 
 
+class WinnerButtonView(discord.ui.View):
+    """A one-press prize button handed to a competition winner (or any target).
+    Only the target may press it; the press runs the button's mini action block
+    once, then the button greys out. Non-targets get a private 'not for you'."""
+
+    def __init__(self, bot, meta):
+        super().__init__(timeout=None)
+        self.bot = bot
+        self.meta = meta or {}
+        btn = discord.ui.Button(label=(self.meta.get("label") or "🎁 Claim your prize")[:80],
+                                style=discord.ButtonStyle.success)
+        btn.callback = self._press
+        self.add_item(btn)
+
+    async def _press(self, interaction: discord.Interaction):
+        eng = self.bot.engine
+        uid = str(interaction.user.id)
+        if not eng.winner_button_can_press(uid):
+            await interaction.response.send_message(
+                "🚫 This prize isn't yours to claim.", ephemeral=True)
+            return
+        for c in self.children:      # grey it the instant it's claimed
+            c.disabled = True
+        self.stop()
+        try:
+            await interaction.response.edit_message(view=self)
+        except Exception:  # noqa: BLE001 — expired/double-ack
+            pass
+        await eng.press_winner_button(uid, interaction.user.display_name)
+
+
 class BotManager:
     def __init__(self, engine, get_config) -> None:
         self.engine = engine
@@ -634,6 +665,15 @@ class BotManager:
             await self.broadcast(f"**{title}**\n{text}", None)
             return
         await self.broadcast("", None, embed=e, view=CompetitionEnterView(self, meta))
+
+    async def post_winner_button(self, title: str, text: str, meta: dict) -> None:
+        """A one-press Winner Button embed — only the target can press it."""
+        try:
+            e = discord.Embed(title=(title or "")[:256], description=(text or "")[:4096], color=0xF1C40F)
+        except Exception:  # noqa: BLE001
+            await self.broadcast(f"**{title}**\n{text}", None)
+            return
+        await self.broadcast("", None, embed=e, view=WinnerButtonView(self, meta))
 
     async def handle_vote_interaction(self, interaction, option_number: int) -> None:
         """Shared by the vote buttons and the /vote slash command: cast the

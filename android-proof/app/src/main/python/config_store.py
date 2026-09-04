@@ -34,7 +34,7 @@ DEFAULT_PUMPDIRECT_PATH = os.path.normpath(
 
 # Schema version of the stored config. Bump it + add a _migrate step whenever a
 # key is renamed/moved, so old configs upgrade instead of silently stranding data.
-CONFIG_VERSION = 3
+CONFIG_VERSION = 4
 
 # The dead "dice recharged" default that a remediation migration accidentally
 # promoted to the live cooldown-ready message. Migration v3 undoes that.
@@ -263,11 +263,18 @@ DEFAULTS = {
     #    pause_events, pause_events_scope,
     #    enable_commands_on, enable_commands: [names],   # usable during the event regardless
     #    actions: [{type: message|broadcast|fire|roll|capacity|wait|poll|
-    #               competition|award_prize|end_session, message, seconds,
+    #               competition|award_prize|winner_button|command_gate|
+    #               end_session, message, seconds (number OR [placeholder]),
     #               device_id, dice, sides, capacity_op, capacity_value,
     #               poll, broadcast, competition,
-    #               target, command, charges}]}   # award_prize: grant a target
-    #               (e.g. [range_leader]) N charges of a command
+    #               fire_mode (seconds|add|to) + fill_pct (fire: pump until N%
+    #                 added / reached; [secs] = the computed time),
+    #               target, command, charges, stash, lock, deadline,
+    #               deadline_message, timeout_message,   # award_prize
+    #               gate_mode (block_all|remove_block),  # command_gate
+    #               label, freeze, deadline, actions:[…]}]}  # winner_button:
+    #               a one-press button for a target (e.g. [winner]) that runs its
+    #               own nested action block; freeze blocks others until pressed
     # The action block runs sequentially; the event is "running" (its effects
     # active) until the block finishes. One-shot per session (re-armed by
     # session reset / activation).
@@ -282,12 +289,15 @@ DEFAULTS = {
     # roll; earlier rolls lock); results post per-player all at once. Each:
     #   {name, type ("rolloff"|"race"|"raffle"), command (entry command),
     #    duration, require_enter, required_entries, max_entries, metric
-    #    ("total"|"highest"|"count"), allow_reroll, reroll_count,
-    #    repeat_every, title, body, intro, entry_message,
-    #    win_message, no_winner_message, award_pump, award_seconds,
-    #    bonus_command_on, bonus_command, bonus_stashable, lock_progression,
-    #    bonus_after_pump, bonus_message, winner_deadline (s; 0=off — auto-fires
-    #    the winner's command if idle), deadline_message, timeout_message}
+    #    ("total"|"highest"|"count"), allow_reroll, reroll_count, roll_specs,
+    #    repeat_every, repeat_message, title, body, intro, entry_message,
+    #    win_message, no_winner_message,
+    #    add_all_totals (bool: fire EVERY finisher's total, each credited),
+    #    win_actions: [action rows run on a win — fire [winner_score], hand a
+    #      winner_button, award_prize a command, command_gate others, …],
+    #    no_winner_actions: [action rows run when nobody qualified]}
+    #    Legacy award_pump/bonus_command/lock/deadline fields migrate to
+    #    win_actions (config_version 4).
     "competitions": [],
 
     # Polls — named, referenced by a "poll" action (in timed events, capacity-
@@ -465,6 +475,36 @@ def _migrate(cfg: dict) -> dict:
         (cfg.get("roll") or {}).pop("cooldown_reset_message", None)
         if (cfg.get("cooldown_reset_message") or "").strip() == _DEAD_RECHARGE_MSG:
             cfg["cooldown_reset_message"] = ""
+    if v < 4:
+        # v4: competition endings became an ACTION BLOCK (win_actions). Convert
+        # the old bespoke award fields (award_pump / bonus command / lock /
+        # deadline) into an equivalent block, then drop the dead keys.
+        for c in (cfg.get("competitions") or []):
+            if not isinstance(c, dict) or c.get("win_actions"):
+                continue
+            typ = (c.get("type") or "rolloff").lower()
+            acts = []
+            if c.get("award_pump"):
+                secs = "[winner_score]" if typ == "rolloff" else (c.get("award_seconds") or 0)
+                acts.append({"type": "fire", "seconds": secs, "message": ""})
+                if c.get("bonus_after_pump", True):
+                    acts.append({"type": "wait", "seconds": secs})
+            if c.get("bonus_command_on") and (c.get("bonus_command") or "").strip():
+                stash = bool(c.get("bonus_stashable"))
+                acts.append({"type": "award_prize", "target": "[winner]",
+                             "command": (c.get("bonus_command") or "").strip(), "charges": 0,
+                             "stash": stash, "lock": bool(c.get("lock_progression")),
+                             "deadline": 0 if stash else (c.get("winner_deadline") or 0),
+                             "message": c.get("bonus_message") or "",
+                             "deadline_message": c.get("deadline_message") or "",
+                             "timeout_message": c.get("timeout_message") or ""})
+            c["win_actions"] = acts
+            c.setdefault("no_winner_actions", [])
+            c.setdefault("add_all_totals", False)
+            for dead in ("award_pump", "award_seconds", "bonus_command_on", "bonus_command",
+                         "bonus_stashable", "lock_progression", "bonus_after_pump",
+                         "bonus_message", "winner_deadline", "deadline_message", "timeout_message"):
+                c.pop(dead, None)
     cfg["config_version"] = CONFIG_VERSION
     return cfg
 

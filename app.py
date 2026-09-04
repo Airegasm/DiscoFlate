@@ -1162,6 +1162,7 @@ async def main() -> None:
     engine.embed_cb = botmgr.post_embed               # polls post as rich embeds
     engine.broadcast_embed_cb = botmgr.post_broadcast_embed  # broadcast actions post as embeds
     engine.comp_embed_cb = botmgr.post_competition_embed      # competitions post an Enter Challenge embed
+    engine.winner_button_cb = botmgr.post_winner_button       # Winner Button posts a one-press prize embed
 
     async def _end_session(post_off_message: bool = False):
         # Deactivate. End Sequence calls this WITHOUT the off-message;
