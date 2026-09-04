@@ -74,6 +74,95 @@ _DEFAULT_LIST_KEYS = {
 }
 
 
+# ── Shareable "gameplay settings": EVERYTHING on the Game, Commands, Events,
+# and Templates tabs — the safe data people can trade. Deliberately EXCLUDES
+# everything personal/connection: discord_token, devices, vendors (creds),
+# listen targets / server IDs / announce channel, allow-lists, cooldown-exempt
+# names/IDs, operator name, mock/pumpdirect/runtime state.
+_GAMEPLAY_KEYS = [
+    # Commands tab
+    "command_prefix", "command_names", "roll", "roll_enabled", "system_buffer_seconds",
+    "capacity_message", "pumptimer_message", "pump_message",
+    "cooldown_message", "cooldown_reset_message",
+    "commands", "broadcasts", "modes", "max_roll_prize", "prizes",
+    # Game tab
+    "cooldown_seconds", "auto_report",
+    "listener_message_on", "listener_message_off",
+    "pause_message", "resume_message", "paused_notice_message",
+    "output_headers", "rich_output",
+    "capacity_ranges", "always_on_enabled", "always_on_commands",
+    # Events tab
+    "events", "capacity_events", "polls",
+    "event_in_process_message", "event_cooldown_message",
+    # Templates tab
+    "templates",
+]
+# List keys → identity fn, for "add missing only" additive merge (by name/key).
+_GAMEPLAY_LIST_KEYS = {
+    "commands": lambda c: (c.get("name") or "").strip().lower(),
+    "broadcasts": lambda b: (b.get("name") or "").strip().lower(),
+    "modes": lambda m: (m.get("name") or "").strip().lower(),
+    "prizes": lambda p: (p.get("command") or "").strip().lower(),
+    "events": lambda e: (e.get("name") or "").strip().lower(),
+    "capacity_events": lambda e: ((e.get("name") or "").strip() or str(e.get("at") or "")).lower(),
+    "polls": lambda p: (p.get("name") or "").strip().lower(),
+    "capacity_ranges": lambda r: f"{r.get('min')}-{r.get('max')}",
+    "always_on_commands": lambda a: (a.get("name") if isinstance(a, dict) else str(a) or "").strip().lower(),
+}
+
+
+def _gp_blank(v) -> bool:
+    return v is None or v == "" or v == [] or v == {}
+
+
+def _gameplay_export(cfg: dict) -> dict:
+    return {k: cfg[k] for k in _GAMEPLAY_KEYS if k in cfg}
+
+
+def _gameplay_merge(cur: dict, incoming: dict, mode: str) -> dict:
+    """Fold shared gameplay settings into the live config. `incoming` is
+    filtered to the safe keys first (a tampered file can't smuggle a token,
+    devices, or creds). mode 'replace' overwrites those keys; 'add' keeps
+    everything you have and only adds missing list items / fills blank fields."""
+    inc = {k: v for k, v in (incoming or {}).items() if k in _GAMEPLAY_KEYS}
+    out = dict(cur)
+    if mode == "replace":
+        out.update(inc)
+        return out
+    # ---- add missing / blank only ----
+    for k, keyfn in _GAMEPLAY_LIST_KEYS.items():
+        if k not in inc:
+            continue
+        current = list(cur.get(k) or [])
+        have = {keyfn(x) for x in current}
+        current += [x for x in (inc[k] or []) if keyfn(x) not in have]
+        out[k] = current
+    if "templates" in inc:
+        t = dict(cur.get("templates") or {"commands": [], "events": [], "ranges": []})
+        for sub in ("commands", "events", "ranges"):
+            cl = list(t.get(sub) or [])
+            kf = (lambda x: f"{x.get('min')}-{x.get('max')}") if sub == "ranges" \
+                else (lambda x: (x.get("name") or "").strip().lower())
+            have = {kf(x) for x in cl}
+            cl += [x for x in ((inc["templates"] or {}).get(sub) or []) if kf(x) not in have]
+            t[sub] = cl
+        out["templates"] = t
+    handled = set(_GAMEPLAY_LIST_KEYS) | {"templates"}
+    for k in _GAMEPLAY_KEYS:
+        if k in handled or k not in inc:
+            continue
+        cv = cur.get(k)
+        if _gp_blank(cv):
+            out[k] = inc[k]
+        elif isinstance(cv, dict) and isinstance(inc[k], dict):
+            merged = dict(cv)   # fill only blank/missing leaves (command_names, roll, auto_report, …)
+            for sk, sv in inc[k].items():
+                if _gp_blank(merged.get(sk)):
+                    merged[sk] = sv
+            out[k] = merged
+    return out
+
+
 def _merge_defaults(cur: dict, dflt: dict) -> dict:
     """Additively top up the config with shipped defaults: reset the scalar/message
     keys, KEEP every command/range/event/etc. you already have (an edited default or
@@ -790,6 +879,27 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         await botmgr.ensure(cfg.get("discord_token"), force=True)
         return web.json_response({"ok": True})
 
+    async def export_gameplay(request):
+        # Shareable: the whole Game/Commands/Events/Templates set, no secrets.
+        await guard(request)
+        return web.json_response({"discoflate_gameplay": VERSION,
+                                  **_gameplay_export(config_store.load())})
+
+    async def import_gameplay(request):
+        await guard(request)
+        body = await _json(request)
+        data = body.get("data") if isinstance(body, dict) else None
+        mode = "replace" if (body or {}).get("mode") == "replace" else "add"
+        if not isinstance(data, dict):
+            raise web.HTTPBadRequest(text="expected {mode, data}")
+        # must look like a gameplay file (share at least a couple safe keys)
+        if len(set(_GAMEPLAY_KEYS) & set(data)) < 2:
+            raise web.HTTPBadRequest(text="that doesn't look like a DiscoFlate gameplay file")
+        merged = _gameplay_merge(config_store.load(), data, mode)
+        cfg = config_store.save(config_store._coerce_numbers(merged))
+        engine.set_config(cfg)
+        return web.json_response(_public_state(engine, botmgr))
+
     async def check_updates(request):
         await guard(request)
         result = {"current_version": VERSION, "current_code": VERSION_CODE,
@@ -959,6 +1069,8 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/restore-defaults", restore_defaults),
         web.post("/api/config/export", export_config),
         web.post("/api/config/import", import_config),
+        web.post("/api/gameplay/export", export_gameplay),
+        web.post("/api/gameplay/import", import_gameplay),
         web.post("/api/check-updates", check_updates),
         web.post("/api/pull-updates", pull_updates),
     ])

@@ -1,6 +1,6 @@
 {
-  "version": "3.16.0",
-  "versionCode": 82,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.16.0/discoflate.apk",
-  "notes": "DiscoFlate v3.16.0 \u2014 timed events no longer prefix an output header; broadcast actions (timed events, capacity-event blocks, poll outcomes) now post as rich embed cards."
+  "version": "3.17.0",
+  "versionCode": 83,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.17.0/discoflate.apk",
+  "notes": "DiscoFlate v3.17.0 \u2014 Export/Import Gameplay Settings (Help tab): share your whole Game/Commands/Events/Templates setup as a safe file (no token/devices/servers/creds). Import asks whether to replace everything or only add what's missing."
 }
