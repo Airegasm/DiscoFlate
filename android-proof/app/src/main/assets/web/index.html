@@ -1282,15 +1282,22 @@ async function autoCheckUpdates(){
   }catch(e){}
 }
 function installUpdate(){ if(window.Android && window.Android.openUrl && updApkUrl) window.Android.openUrl(updApkUrl); }
+// Phone save: prefer the filename-aware bridge; fall back to the old
+// saveConfig (fixed name) on older APKs; return false on desktop (→ blob).
+function saveToDownloads(name, text){
+  try{
+    if(window.Android && window.Android.saveFile){ window.Android.saveFile(name, text); return true; }
+    if(window.Android && window.Android.saveConfig){ window.Android.saveConfig(text); return true; }
+  }catch(e){}
+  return false;
+}
 // ---- config backup / restore ----
 function setBackupMsg(t){ const m=$('#backupMsg'); if(m){ m.textContent=t; clearTimeout(m._t); m._t=setTimeout(()=>{ if(m) m.textContent=''; }, 4000); } }
 async function exportConfig(){
   try{
     const cfg = await api('/api/config/export', {});
     const text = JSON.stringify(cfg, null, 2);
-    if(window.Android && window.Android.saveConfig){        // phone: save a file to Downloads
-      window.Android.saveConfig(text); setBackupMsg('saving to Downloads…'); return;
-    }
+    if(saveToDownloads('discoflate-backup.json', text)){ setBackupMsg('saving to Downloads…'); return; }
     const blob = new Blob([text], {type:'application/json'}); // desktop: browser download
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
     a.download = 'discoflate-backup.json'; document.body.appendChild(a); a.click();
@@ -1317,7 +1324,7 @@ async function exportGameplay(){
   try{
     const data = await api('/api/gameplay/export', {});
     const text = JSON.stringify(data, null, 2);
-    if(window.Android && window.Android.saveConfig){ window.Android.saveConfig(text); setGameplayMsg('saving to Downloads…'); return; }
+    if(saveToDownloads('discoflate-gameplay.json', text)){ setGameplayMsg('saving to Downloads…'); return; }
     const blob=new Blob([text],{type:'application/json'});
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
     a.download='discoflate-gameplay.json'; document.body.appendChild(a); a.click();

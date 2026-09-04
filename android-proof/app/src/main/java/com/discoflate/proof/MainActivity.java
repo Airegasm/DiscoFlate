@@ -278,9 +278,20 @@ public class MainActivity extends Activity {
         /** Save a config backup to the public Downloads folder (survives uninstall). */
         @JavascriptInterface
         public void saveConfig(final String json) {
+            saveFile("discoflate-backup.json", json);
+        }
+
+        /** Save arbitrary text to Downloads under a chosen filename (gameplay
+         *  export uses this so it doesn't collide with the config backup). */
+        @JavascriptInterface
+        public void saveFile(final String rawName, final String json) {
             if (json == null) return;
             runOnUiThread(() -> {
-                String name = "discoflate-backup.json";
+                // sanitize: basename only, must end .json
+                String base = (rawName == null ? "" : rawName).replaceAll(".*[/\\\\]", "").trim();
+                if (base.isEmpty()) base = "discoflate.json";
+                if (!base.toLowerCase().endsWith(".json")) base = base + ".json";
+                final String name = base;
                 try {
                     if (Build.VERSION.SDK_INT >= 29) {
                         ContentValues v = new ContentValues();
@@ -297,9 +308,9 @@ public class MainActivity extends Activity {
                             os.write(json.getBytes("UTF-8"));
                         }
                     }
-                    Toast.makeText(MainActivity.this, "Backup saved to Downloads/" + name, Toast.LENGTH_LONG).show();
+                    Toast.makeText(MainActivity.this, "Saved to Downloads/" + name, Toast.LENGTH_LONG).show();
                 } catch (Exception e) {
-                    Toast.makeText(MainActivity.this, "Backup save failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(MainActivity.this, "Save failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 }
             });
         }

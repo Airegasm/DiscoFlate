@@ -1,6 +1,6 @@
 {
-  "version": "3.17.1",
-  "versionCode": 84,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.17.1/discoflate.apk",
-  "notes": "DiscoFlate v3.17.1 \u2014 removes the 'dice recharged' cooldown-ready message that a remediation migration accidentally turned on. It's silent by default again; a migration clears it from existing configs (a custom message you set is kept)."
+  "version": "3.17.2",
+  "versionCode": 85,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.17.2/discoflate.apk",
+  "notes": "DiscoFlate v3.17.2 \u2014 fix: on Android, Export Gameplay Settings now saves as discoflate-gameplay.json instead of overwriting your discoflate-backup.json (a filename-aware save bridge)."
 }
