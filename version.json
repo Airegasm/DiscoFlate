@@ -1,6 +1,6 @@
 {
-  "version": "3.20.0",
-  "versionCode": 88,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.20.0/discoflate.apk",
-  "notes": "DiscoFlate v3.20.0 \u2014 Competitions: multiplayer roll-off / race / raffle events. Players !enter, compete during a window, winner gets their total fired + an optional winner-only command that can freeze everyone else's progression until used (with a new 'fire until capacity%' mode). Plus: [!command] fires a command from inside any message; [winner]/[winner_score]/[pump_msg] placeholders."
+  "version": "3.20.1",
+  "versionCode": 89,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.20.1/discoflate.apk",
+  "notes": "DiscoFlate v3.20.1 \u2014 competition winner idle deadline: give the winner a stated time limit to use their granted command; if they don't, it auto-fires so the game can't stall."
 }

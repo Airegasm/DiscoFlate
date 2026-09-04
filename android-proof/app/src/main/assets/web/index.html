@@ -2605,6 +2605,9 @@ function renderCompetitions(){
           `<label class="row" style="gap:6px"><input type="checkbox" ${cd.lock_progression?'checked':''} onchange="compRows[${i}].lock_progression=this.checked;scheduleSave()"> Lock everyone else's progression until they use it</label>`+
           `<label class="row" style="gap:6px"><input type="checkbox" ${cd.bonus_after_pump!==false?'checked':''} onchange="compRows[${i}].bonus_after_pump=this.checked;scheduleSave()"> Announce it only after the pump award finishes</label>`+
           `<label class="field">Grant message <span class="muted">([winner] [bonus_cmd])</span><input value="${esc(cd.bonus_message||'')}" placeholder="🎁 [winner] holds [bonus_cmd]!" onchange="compRows[${i}].bonus_message=this.value"></label>`+
+          `<label class="field">Use-it deadline (s) <span class="muted">(0 = no limit; else auto-fires if idle — not for stashable)</span> <input type="number" min="0" step="1" value="${cd.winner_deadline??0}" style="width:90px" onchange="compRows[${i}].winner_deadline=Math.max(0,+this.value||0);scheduleSave()"></label>`+
+          ((cd.winner_deadline>0)?`<label class="field">Deadline message <span class="muted">([winner] [bonus_cmd] [seconds])</span><input value="${esc(cd.deadline_message||'')}" placeholder="⏳ [winner], use [bonus_cmd] within [seconds]s!" onchange="compRows[${i}].deadline_message=this.value"></label>`+
+            `<label class="field">Auto-fire message<input value="${esc(cd.timeout_message||'')}" placeholder="⌛ Time's up — [bonus_cmd] fires automatically!" onchange="compRows[${i}].timeout_message=this.value"></label>`:'')+
         `</div>`:'')+
       `</div>`;
     }
@@ -2616,7 +2619,8 @@ function addCompetition(){
     max_entries:3,required_entries:1,require_enter:true,title:'',intro:'',entry_message:'',
     win_message:'🏆 [winner] wins with [winner_score]!',no_winner_message:'',
     award_pump:true,award_seconds:10,bonus_command_on:false,bonus_command:'',bonus_stashable:false,
-    lock_progression:false,bonus_after_pump:true,bonus_message:'🎁 [winner] now holds [bonus_cmd]!'});
+    lock_progression:false,bonus_after_pump:true,bonus_message:'🎁 [winner] now holds [bonus_cmd]!',
+    winner_deadline:0,deadline_message:'',timeout_message:''});
   compOpen.add(compRows.length-1); renderCompetitions(); scheduleSave();
 }
 function delCompetition(i){
@@ -2636,6 +2640,8 @@ function cleanCompetitions(){
     bonus_command_on:!!c.bonus_command_on, bonus_command:(c.bonus_command||'').trim(),
     bonus_stashable:!!c.bonus_stashable, lock_progression:!!c.lock_progression,
     bonus_after_pump:c.bonus_after_pump!==false, bonus_message:c.bonus_message||'',
+    winner_deadline:Math.max(0,+c.winner_deadline||0),
+    deadline_message:c.deadline_message||'', timeout_message:c.timeout_message||'',
   }));
 }
 function renamePoll(i, val){

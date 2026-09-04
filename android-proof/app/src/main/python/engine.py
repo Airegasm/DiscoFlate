@@ -106,6 +106,10 @@ class Engine:
         self._winner_grants: dict[str, str] = {}
         self._progression_lock: dict | None = None   # {"uid":.., "cmd":..} or None
         self._inline_depth: int = 0                  # recursion guard for [!command] inline fires
+        # Winner idle deadline: if the winner doesn't use their granted command
+        # within the limit, it auto-fires so the game can't stall.
+        self._bonus_pending: dict | None = None      # {"cmd":.., "uid":.., "who":.., "used":bool}
+        self._deadline_task: asyncio.Task | None = None
         # Post-event action blocks: run AFTER an event completes, detached — the
         # event has already cleared (effects lifted, marked done), so these are
         # NOT part of it. Session-scoped: cancelled on pause / reset / off.
@@ -1489,8 +1493,46 @@ class Engine:
             if cd.get("bonus_stashable"):
                 self._winner_grants[bkey + "\x00stash"] = "1"   # marker: don't clear on range change
             prefix = self.cfg.get("command_prefix", "!")
+            bctx = {**base, "bonus_cmd": f"{prefix}{bkey}"}
             bmsg = (cd.get("bonus_message") or "").strip() or "🎁 **[winner]** now holds **[bonus_cmd]**!"
-            await self._announce(self.render(bmsg, {**base, "bonus_cmd": f"{prefix}{bkey}"}), None)
+            await self._announce(self.render(bmsg, bctx), None)
+            # idle deadline: if they don't use it in time, auto-fire it so the
+            # game can't stall (announce the limit; a stashable grant is exempt).
+            try:
+                deadline = float(cd.get("winner_deadline") or 0)
+            except (TypeError, ValueError):
+                deadline = 0.0
+            if deadline > 0 and not cd.get("bonus_stashable"):
+                self._bonus_pending = {"cmd": bkey, "uid": str(winner_uid), "who": winner["name"], "used": False}
+                dmsg = (cd.get("deadline_message") or "").strip() or \
+                    "⏳ **[winner]**, use **[bonus_cmd]** within **[seconds]s** or it fires automatically!"
+                await self._announce(self.render(dmsg, {**bctx, "seconds": f"{deadline:g}"}), None)
+                self._deadline_task = asyncio.create_task(self._winner_deadline(deadline, bkey, cd))
+
+    async def _winner_deadline(self, seconds: float, bkey: str, cd: dict) -> None:
+        try:
+            await asyncio.sleep(seconds)
+        except asyncio.CancelledError:
+            return
+        bp = self._bonus_pending
+        if not bp or bp.get("used") or bp.get("cmd") != bkey:
+            return
+        cmd = self.find_command(bkey)
+        if cmd is None:
+            return
+        tmsg = (cd.get("timeout_message") or "").strip() or "⌛ Time's up — **[bonus_cmd]** fires automatically!"
+        prefix = self.cfg.get("command_prefix", "!")
+        await self._announce(self.render(tmsg, {"winner": bp["who"], "bonus_cmd": f"{prefix}{bkey}"}), None)
+        try:
+            await self.run_custom(cmd, bp["who"], uid=bp["uid"])   # run it AS the winner → lifts lock, fires
+        except Exception as e:  # noqa: BLE001
+            self._log("error", f"winner deadline auto-fire failed: {e}")
+
+    def _cancel_deadline(self) -> None:
+        if self._deadline_task is not None:
+            self._deadline_task.cancel()
+            self._deadline_task = None
+        self._bonus_pending = None
 
     def _cancel_competition(self) -> None:
         if self._comp_task is not None:
@@ -1503,6 +1545,7 @@ class Engine:
         if all_incl_stash:
             self._winner_grants.clear()
             self._progression_lock = None
+            self._cancel_deadline()
             return
         for k in [k for k in self._winner_grants if not k.endswith("\x00stash")]:
             if (k + "\x00stash") not in self._winner_grants:   # not stashable → range-scoped
@@ -1510,6 +1553,9 @@ class Engine:
         # a cleared progression-lock command means the lock lifts too
         if self._progression_lock and self._progression_lock["cmd"] not in self._winner_grants:
             self._progression_lock = None
+        # a cleared grant cancels its pending idle deadline
+        if self._bonus_pending and self._bonus_pending["cmd"] not in self._winner_grants:
+            self._cancel_deadline()
 
     # -- timed events -------------------------------------------------------- #
     async def _check_events(self) -> None:
@@ -1975,6 +2021,10 @@ class Engine:
             if str(uid) != self._winner_grants.get(cmdkey0):
                 return {"ok": False, "silent": True}
             winner_granted = True
+            # the winner used it in time → cancel the idle deadline
+            if self._bonus_pending and self._bonus_pending.get("cmd") == cmdkey0:
+                self._bonus_pending["used"] = True
+                self._cancel_deadline()
             # the winner using their granted command lifts the progression lock
             if self._progression_lock and self._progression_lock.get("cmd") == cmdkey0:
                 self._progression_lock = None
@@ -2510,6 +2560,7 @@ class Engine:
         self._capev_cancel_all(clear_session=False)
         self._cancel_poll_task()
         self._cancel_competition()
+        self._cancel_deadline()   # keep the grant, but don't auto-fire into a paused session
         self._event_last.clear()
         self._event_fires.clear()
         self._event_cooldown_until.clear()

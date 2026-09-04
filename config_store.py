@@ -278,7 +278,8 @@ DEFAULTS = {
     #    ("total"|"highest"|"count"), repeat_every, title, intro, entry_message,
     #    win_message, no_winner_message, award_pump, award_seconds,
     #    bonus_command_on, bonus_command, bonus_stashable, lock_progression,
-    #    bonus_after_pump, bonus_message}
+    #    bonus_after_pump, bonus_message, winner_deadline (s; 0=off — auto-fires
+    #    the winner's command if idle), deadline_message, timeout_message}
     "competitions": [],
 
     # Polls — named, referenced by a "poll" action (in timed events, capacity-
