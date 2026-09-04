@@ -400,6 +400,28 @@ class Engine:
                 self._log("error", f"capacity loop: {e}")
 
     # -- message rendering --------------------------------------------------- #
+    _IF_LINE = re.compile(r"^[ \t]*\[if(\s+not)?\s+([\w-]+)\][ \t]?", re.IGNORECASE)
+
+    def _apply_line_conditionals(self, text: str, values: dict) -> str:
+        """Per-LINE conditionals: a real line (\\n-separated, not soft-wrap) that
+        starts with `[if token]` shows only when that placeholder resolves to a
+        non-empty value; `[if not token]` shows only when it's empty/missing. The
+        `[if …]` prefix is stripped from kept lines; dropped lines vanish."""
+        if "[if" not in text.lower():
+            return text
+        kept = []
+        for line in text.split("\n"):
+            m = self._IF_LINE.match(line)
+            if not m:
+                kept.append(line)
+                continue
+            negate = bool(m.group(1))
+            present = str(values.get(m.group(2).lower(), "")).strip() != ""
+            if (not present) if negate else present:
+                kept.append(line[m.end():])   # strip the [if …] prefix, keep the line
+            # else: drop the whole line
+        return "\n".join(kept)
+
     def _render(self, template: str, ctx: dict) -> str:
         # Single-pass substitution: a placeholder inside a substituted VALUE is
         # never expanded again (a user nicknamed "[toppump]" stays literal
@@ -407,6 +429,9 @@ class Engine:
         out = template or ""
         if out:
             values = {str(k): ("" if v is None else str(v)) for k, v in ctx.items()}
+            # line conditionals first (they test the raw placeholder values), then
+            # normalise literal "\n" so multi-line [if] templates split correctly.
+            out = self._apply_line_conditionals(out.replace("\\n", "\n"), values)
 
             def _sub(m):
                 key = m.group(1) if m.group(1) is not None else m.group(2)
@@ -931,6 +956,14 @@ class Engine:
         self._users.clear()
         self._cooldowns.clear()
         self._log("bot", "user tracking reset")
+
+    def reset_current_leaderboard(self) -> None:
+        """Wipe the CURRENT-session Top Pumpers (session + per-range pump boards)
+        and the tracked-users list. Lifetime stats are untouched."""
+        self._pump_time.clear()
+        self._pump_range.clear()
+        self._users.clear()
+        self._log("bot", "current-session leaderboard reset")
 
     # -- capacity events ------------------------------------------------------ #
     def _capev_effect(self, fx: str) -> bool:

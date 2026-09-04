@@ -416,17 +416,18 @@
         <span class="muted">Placeholders: <code>[capacity] [capacity_bar] [commands]</code> … see <b>Help</b>. Enter = newline.</span></div>
     </div>
 
-    <!-- tracked users -->
+    <!-- leaderboards -->
     <div class="card" data-tab="dashboard">
-      <h2>Tracked users</h2>
-      <div id="users"><div class="muted">No one has rolled yet.</div></div>
-      <div class="row" style="margin-top:10px">
-        <button class="ghost" onclick="controlLeaderboard()">🏆 Broadcast Users</button>
-        <div style="flex:1"></div>
-        <button class="ghost" onclick="if(confirm('Reset session user tracking? Clears the tracked-users list and their cooldowns.')) act('/api/reset-users')">Reset tracking</button>
-        <button class="warn" onclick="if(confirm('Wipe the ALL-TIME leaderboard? This can\'t be undone.')) act('/api/reset-lifetime')">Reset lifetime</button>
+      <h2>Leaderboards</h2>
+      <div id="users"><div class="muted">No one has pumped yet.</div></div>
+      <div class="row" style="margin-top:12px;gap:8px;align-items:center;flex-wrap:wrap">
+        <span class="muted">Broadcast Top Pumpers:</span>
+        <button class="ghost" onclick="controlLeaderboard()">🏆 Current</button>
+        <button class="ghost" title="Reset the current-session Top Pumpers" onclick="if(confirm('Reset the current-session Top Pumpers & tracked list? Lifetime is untouched.')) act('/api/reset-session-leaderboard')">🗑</button>
+        <button class="ghost" onclick="controlLeaderboardLife()">🏆 Lifetime</button>
+        <button class="ghost" title="Wipe the all-time leaderboard" onclick="if(confirm('Wipe the ALL-TIME leaderboard? This can\'t be undone.')) act('/api/reset-lifetime')">🗑</button>
       </div>
-      <div class="hint">Broadcast Users posts the leaderboard to your channel (same as the <code>leaderboard</code> command). Needs Activation on + a channel selected. <b>Reset tracking</b> clears this session's users; <b>Reset lifetime</b> wipes the persistent all-time leaderboard (the <code>toppumpers-life</code> command).</div>
+      <div class="hint">Posts the Top Pumpers to your channel (same as the <code>leaderboard</code> / <code>toppumpers-life</code> commands) — needs Activation on + a channel selected. The 🗑 next to each resets that board: <b>Current</b> clears this session's pumpers &amp; tracked list; <b>Lifetime</b> wipes the persistent all-time board.</div>
     </div>
 
     <!-- capacity ranges -->
@@ -936,6 +937,7 @@ esphome dashboard config/</code></pre>
         <div class="colsec">
           <h3>Message placeholders</h3>
           <div class="hint" style="margin-top:0">Any of these can go in any message field; they're filled in when the bot posts.</div>
+          <div class="hint" style="margin-top:0"><b>Conditional lines:</b> start a line with <code>[if&nbsp;name]</code> and it shows <b>only</b> when that placeholder has a value — e.g. <code>[if runnerup]🥈 Runner-up: [runnerup]</code> only appears when there was a runner-up. Use <code>[if not name]</code> for the opposite. Works with <b>any</b> placeholder below, on a per-line basis (soft word-wrap doesn't count — only real line breaks).</div>
           <table><tbody>
             <tr><td><code>[user]</code></td><td>the person's name (plain text)</td></tr>
             <tr><td><code>[mention]</code></td><td>@pings the person (a real Discord mention)</td></tr>
@@ -1301,6 +1303,7 @@ async function controlStop(){ ctl(sessionPaused ? '/api/control/resume' : '/api/
 async function controlPump(){ ctl('/api/control/pump', {seconds: parseFloat($('#ctrlPump').value)||5}); }
 async function controlCapacity(){ ctl('/api/control/capacity', {}); }
 async function controlLeaderboard(){ ctl('/api/control/leaderboard', {}); }
+async function controlLeaderboardLife(){ ctl('/api/control/leaderboard-life', {}); }
 async function controlBroadcast(){
   const sel=$('#ctrlBroadcast'); const name = sel ? sel.value : '';
   const b = broadcastRows.find(x=>(x.name||'')===name);

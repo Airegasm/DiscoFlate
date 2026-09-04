@@ -676,6 +676,15 @@ class BotManager:
         await self.broadcast(txt, None, embed=self._status_embed("leaderboard", txt))
         return {"ok": True}
 
+    async def operator_broadcast_leaderboard_life(self) -> dict:
+        cfg = self.get_config()
+        err = self._operator_ready(cfg)
+        if err:
+            return {"ok": False, "error": err}
+        txt = self.engine.leaderboard_life_text()
+        await self.broadcast(txt, None, embed=self._status_embed("leaderboard_life", txt))
+        return {"ok": True}
+
     async def operator_cleanup(self, n: int) -> dict:
         """Delete the bot's OWN last `n` messages in each broadcast channel
         (listen targets + announce channel). Deleting one's own messages needs no

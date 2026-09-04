@@ -1,6 +1,6 @@
 {
-  "version": "3.36.0",
-  "versionCode": 106,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.36.0/discoflate.apk",
-  "notes": "DiscoFlate v3.36.0 (consolidation, part 4) — two action types collapse further. 'message' now has a Style dropdown (plain / embed) AND can carry the optional gated button, absorbing the old 'embed' action. 'award_prize' + 'award_amount' become one 'award' action with a dropdown: bonus command / volume seconds / volume %. Everything auto-migrates. Also: Dashboard Controls are now a true fixed-width grid (uniform buttons + right-sized fields — no more stretched dropdowns), and Stop moved up next to Session reset."
+  "version": "3.37.0",
+  "versionCode": 107,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.37.0/discoflate.apk",
+  "notes": "DiscoFlate v3.37.0 — 'Tracked users' is now 'Leaderboards': a 'Broadcast Top Pumpers:' line with Current + Lifetime buttons, each with a 🗑 that confirms before resetting that board (Current = this session's pumpers & tracked list; Lifetime = the all-time board). New conditional message lines: start a line with [if name] and it shows only when that placeholder has a value (e.g. [if runnerup]🥈 Runner-up: [runnerup]); [if not name] for the inverse; works with any placeholder. Awards to a placeholder with no value (e.g. [runnerup] when there wasn't one) quietly skip."
 }

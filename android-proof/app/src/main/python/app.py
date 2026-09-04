@@ -821,6 +821,11 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         engine.reset_lifetime()
         return web.json_response({"ok": True})
 
+    async def reset_session_leaderboard(request):
+        await guard(request)
+        engine.reset_current_leaderboard()
+        return web.json_response({"ok": True})
+
     # ---- operator controls (act as the owner, posting into the channel) -----
     async def control_roll(request):
         await guard(request)
@@ -856,6 +861,10 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     async def control_leaderboard(request):
         await guard(request)
         return web.json_response(await botmgr.operator_broadcast_leaderboard())
+
+    async def control_leaderboard_life(request):
+        await guard(request)
+        return web.json_response(await botmgr.operator_broadcast_leaderboard_life())
 
     async def control_broadcast(request):
         await guard(request)
@@ -1163,6 +1172,8 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/abort", abort),
         web.post("/api/capacity", set_capacity),
         web.post("/api/reset-users", reset_users),
+        web.post("/api/reset-session-leaderboard", reset_session_leaderboard),
+        web.post("/api/control/leaderboard-life", control_leaderboard_life),
         web.post("/api/reset-lifetime", reset_lifetime),
         web.post("/api/session-reset", session_reset),
         web.post("/api/control/roll", control_roll),
