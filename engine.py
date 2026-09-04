@@ -1103,6 +1103,29 @@ class Engine:
                     else:
                         await self._announce((f"**{title}**\n" if title else "") + body, None)
                     continue
+                if typ == "command":
+                    # run another custom command by name (credited to the block's
+                    # runner). Depth-guarded so a command that runs itself can't loop.
+                    cmdname = (a.get("command") or "").strip()
+                    cmd2 = self.find_command(cmdname) if cmdname else None
+                    if cmd2 is None:
+                        self._log("error", f"{name}: command action — no command '{cmdname}'")
+                        continue
+                    if self._inline_depth >= 3:
+                        self._log("error", f"{name}: command action '{cmdname}' — nesting too deep, skipped")
+                        continue
+                    self._inline_depth += 1
+                    try:
+                        res = await self.run_custom(cmd2, who or self._anon_label(), uid=uid)
+                        # fire/roll/say return reply text the caller posts; actions-
+                        # type commands self-announce and return no reply.
+                        if res.get("reply"):
+                            await self._announce(res["reply"], None)
+                    except Exception as e:  # noqa: BLE001
+                        self._log("error", f"{name}: command action '{cmdname}' failed: {e}")
+                    finally:
+                        self._inline_depth -= 1
+                    continue
                 if typ == "capacity":
                     op = (a.get("capacity_op") or "add").lower()
                     val = float(a.get("capacity_value") or 0)
@@ -1655,9 +1678,8 @@ class Engine:
         required-entries threshold (else eliminated)."""
         c = self._comp
         req_enter = c["def"].get("require_enter", True)
-        # roll-off: must complete ALL rolls (submitted) to qualify; others use
-        # the required-entries threshold.
-        need = self._comp_rolls(c["def"]) if c["type"] == "rolloff" else int(c.get("required_entries") or 0)
+        # roll-off: must complete ALL rolls (submitted) to qualify.
+        need = self._comp_rolls(c["def"])
         out = []
         for uid, p in c["players"].items():
             if req_enter and not p["entered"]:
@@ -1791,23 +1813,17 @@ class Engine:
                 remaining = end - time.monotonic()
                 if remaining <= 0:
                     break
-                # 'race': end early the moment someone eligible finishes
-                if typ == "race" and self._comp_eligible():
-                    break
                 await asyncio.sleep(min(remaining, repeat) if repeat else min(remaining, 1.0))
-                if repeat and time.monotonic() < end - 1 and typ != "race":
+                if repeat and time.monotonic() < end - 1:
                     await _post(_repost_text(max(0, end - time.monotonic())))
-            # decide winner among eligible players
+            # decide winner among eligible players (roll-off: highest score wins;
+            # ties broken at random). race & raffle were removed for a redesign —
+            # any legacy value is treated as a roll-off.
             elig = self._comp_eligible()
             if elig:
-                if typ == "raffle":
-                    winner_uid, winner = random.choice(elig)
-                elif typ == "race":
-                    winner_uid, winner = min(elig, key=lambda kv: kv[1]["done_at"] or float("inf"))
-                else:  # rolloff
-                    top = max(p["score"] for _, p in elig)
-                    winners = [(u, p) for u, p in elig if p["score"] == top]
-                    winner_uid, winner = random.choice(winners)
+                top = max(p["score"] for _, p in elig)
+                winners = [(u, p) for u, p in elig if p["score"] == top]
+                winner_uid, winner = random.choice(winners)
         except asyncio.CancelledError:
             self._log("bot", f"COMPETITION '{name}' cancelled")
             self._comp = None
@@ -1815,7 +1831,7 @@ class Engine:
         # "Add ALL Player Totals to Timer": every finisher's total is fired to
         # the pump and credited to THAT player (not just the winner's) — fairer
         # for a running session contest where everyone's rolls should count.
-        if cd.get("add_all_totals") and typ == "rolloff" and winner is not None:
+        if cd.get("add_all_totals") and winner is not None:
             for u, p in self._comp["players"].items():
                 if p.get("done_at") is None:
                     continue
@@ -1839,13 +1855,11 @@ class Engine:
     def _comp_intro(self, cd: dict, entry_key: str, duration: float) -> str:
         prefix = self.cfg.get("command_prefix", "!")
         en = f"{prefix}{self.builtin_names()['enter']}"
-        typ = (cd.get("type") or "rolloff").lower()
         need = int(cd.get("required_entries") or 0)
-        line = {"race": "first to finish wins", "raffle": "random winner drawn"}.get(typ, "highest score wins")
         parts = [f"Type `{en}` to join"]
-        if entry_key and typ != "raffle":
+        if entry_key:
             parts.append(f"then use `{prefix}{entry_key}`" + (f" ×{need}" if need else ""))
-        return f"**{line.upper()}** — " + ", ".join(parts) + f". {duration:g}s!"
+        return "**HIGHEST SCORE WINS** — " + ", ".join(parts) + f". {duration:g}s!"
 
     def _comp_standings(self) -> str:
         rows = sorted(self._comp["players"].values(), key=lambda p: p["score"], reverse=True)

@@ -34,7 +34,7 @@ DEFAULT_PUMPDIRECT_PATH = os.path.normpath(
 
 # Schema version of the stored config. Bump it + add a _migrate step whenever a
 # key is renamed/moved, so old configs upgrade instead of silently stranding data.
-CONFIG_VERSION = 4
+CONFIG_VERSION = 5
 
 # The dead "dice recharged" default that a remediation migration accidentally
 # promoted to the live cooldown-ready message. Migration v3 undoes that.
@@ -263,9 +263,10 @@ DEFAULTS = {
     #    disable_always_on, disable_always_on_scope,
     #    pause_events, pause_events_scope,
     #    enable_commands_on, enable_commands: [names],   # usable during the event regardless
-    #    actions: [{type: message|embed_message|broadcast|fire|roll|capacity|wait|
-    #               poll|competition|bonus_round|award_prize|award_amount|
-    #               winner_button|session_leader_event|command_gate|end_session,
+    #    actions: [{type: message|embed_message|broadcast|command|fire|roll|
+    #               capacity|wait|poll|competition|bonus_round|award_prize|
+    #               award_amount|winner_button|session_leader_event|command_gate|
+    #               end_session, command (run a named custom command),
     #               title (embed_message/*_button titlebar),
     #               bonus_round (name),   # start a named Bonus Round
     #               unit (secs|pct) + amount,   # award_amount: bank a bonus amount
@@ -520,6 +521,13 @@ def _migrate(cfg: dict) -> dict:
                          "bonus_stashable", "lock_progression", "bonus_after_pump",
                          "bonus_message", "winner_deadline", "deadline_message", "timeout_message"):
                 c.pop(dead, None)
+    if v < 5:
+        # v5: race & raffle competition types were removed (pending a proper
+        # redesign) — they forced pointless dice rolls. Any legacy competition of
+        # those types becomes a roll-off (highest score wins).
+        for c in (cfg.get("competitions") or []):
+            if isinstance(c, dict) and (c.get("type") or "").lower() in ("race", "raffle"):
+                c["type"] = "rolloff"
     cfg["config_version"] = CONFIG_VERSION
     return cfg
 

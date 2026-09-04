@@ -1,6 +1,6 @@
 {
-  "version": "3.32.0",
-  "versionCode": 102,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.32.0/discoflate.apk",
-  "notes": "DiscoFlate v3.32.0 — Dashboard Controls redesigned: one feature per row (BUTTON then its field), readable on mobile. New 🧹 Cleanup [N] control deletes the bot's own last N messages across your channel(s) — works any time, no Manage-Messages permission needed (own messages)."
+  "version": "3.33.0",
+  "versionCode": 103,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.33.0/discoflate.apk",
+  "notes": "DiscoFlate v3.33.0 (consolidation, part 1) — new 'command' action runs a named custom command from any action block (recursion-guarded). Race & raffle competition types removed pending a proper redesign (they forced pointless dice rolls and race had a winner-selection bug); competitions are roll-off for now, and any legacy race/raffle auto-migrates to roll-off."
 }

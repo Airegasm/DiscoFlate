@@ -612,7 +612,7 @@
           <input id="cmdEnter" value="enter" style="width:130px"></label>
         <span class="muted">Players type <code>!enter</code> to join, then compete.</span>
       </div>
-      <div class="hint" style="max-width:880px">A competition is an <b>action</b> (start it from a timed event or capacity-event block). Players <b>!enter</b> during the window, then compete via an entry command; enter AND meet the required entries or you're eliminated. Prizes are a <b>Winner reward action block</b> — fire <code>[winner_score]</code> to the pump, hand the winner a one-press <b>winner_button</b>, <b>award_prize</b> a command, or <b>command_gate</b> everyone else. Types: <b>Roll-off</b> (highest score by total / highest single / most uses), <b>Race</b> (first to finish the required entries), <b>Raffle</b> (random winner among qualifiers). Placeholders: <code>[winner]</code> <code>[winner_score]</code> <code>[runnerup]</code> <code>[total_score]</code> (all finishers combined) <code>[results]</code> (full scoreboard).</div>
+      <div class="hint" style="max-width:880px">A competition is an <b>action</b> (start it from a timed event or capacity-event block). Players <b>!enter</b> during the window, then compete via an entry command; enter AND meet the required entries or you're eliminated. Prizes are a <b>Winner reward action block</b> — fire <code>[winner_score]</code> to the pump, hand the winner a one-press <b>winner_button</b>, <b>award_prize</b> a command, or <b>command_gate</b> everyone else. Currently a <b>Roll-off</b> (highest score wins — by total, highest single, or most uses via the <b>metric</b>). <i>Race &amp; raffle are being redesigned and will return.</i> Placeholders: <code>[winner]</code> <code>[winner_score]</code> <code>[runnerup]</code> <code>[total_score]</code> (all finishers combined) <code>[results]</code> (full scoreboard).</div>
       <div id="competitions" style="margin-top:10px"></div>
       <div class="row" style="margin-top:10px">
         <button class="ghost" onclick="addCompetition()">+ Add competition</button>
@@ -2557,7 +2557,7 @@ function actionRow(base, rr, j, a, condLabels){
     cond=`<label class="field">Run <select onchange="${T('if_option')}=+this.value;scheduleSave()">${opts}</select></label>`;
   }
   const typeSel = cond + `<label class="field">Action <select onchange="${T('type')}=this.value;${rr}();scheduleSave()">`+
-    ['message','embed_message','broadcast','fire','roll','capacity','wait','poll','competition','bonus_round','award_prize','award_amount','winner_button','session_leader_event','command_gate','end_session'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`;
+    ['message','embed_message','broadcast','command','fire','roll','capacity','wait','poll','competition','bonus_round','award_prize','award_amount','winner_button','session_leader_event','command_gate','end_session'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`;
   let fields='';
   if(typ==='wait')
     fields += `<label class="field">Seconds <span class="muted">(number or [placeholder])</span> <input value="${esc(String(a.seconds??10))}" placeholder="10 or [winner_score]" style="width:150px" onchange="${T('seconds')}=this.value;scheduleSave()"></label>`;
@@ -2589,6 +2589,8 @@ function actionRow(base, rr, j, a, condLabels){
     fields += `<label class="field">Bonus round <select onchange="${T('bonus_round')}=this.value;scheduleSave()">${bonusRoundNameOpts(a.bonus_round)}</select></label>`;
   if(typ==='broadcast')
     fields += `<label class="field">Broadcast <select onchange="${T('broadcast')}=this.value;scheduleSave()">${broadcastNameOpts(a.broadcast)}</select></label>`;
+  if(typ==='command')
+    fields += `<label class="field">Command <select onchange="${T('command')}=this.value;scheduleSave()">${cmdNameOpts(a.command)}</select></label>`;
   if(typ==='award_amount')
     fields += `<label class="field">Target <input value="${esc(a.target||'[winner]')}" placeholder="[winner]" style="width:150px" onchange="${T('target')}=this.value;scheduleSave()"></label>`+
       `<label class="field">Unit <select onchange="${T('unit')}=this.value;scheduleSave()">`+
@@ -2816,8 +2818,7 @@ function renderCompetitions(){
       const cd=c;
       html+=`<div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end">`+
         `<label class="field">Name <input value="${esc(cd.name||'')}" style="width:150px" onchange="compRows[${i}].name=this.value"></label>`+
-        `<label class="field">Type <select onchange="compRows[${i}].type=this.value;renderCompetitions();scheduleSave()">`+
-          ['rolloff','race','raffle'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`+
+        `<label class="field">Type <span class="muted" style="font-size:13px">Roll-off <i>(race &amp; raffle coming back after a redesign)</i></span></label>`+
         `<label class="field">Duration (s) <input type="number" min="5" max="3600" value="${cd.duration??60}" style="width:90px" onchange="compRows[${i}].duration=Math.max(5,Math.min(3600,+this.value||60));scheduleSave()"></label>`+
         `<label class="field">Repeat every (s) <input type="number" min="0" step="5" value="${cd.repeat_every??0}" style="width:90px" onchange="compRows[${i}].repeat_every=Math.max(0,+this.value||0);scheduleSave()"></label>`+
       `</div>`+
@@ -2881,7 +2882,7 @@ function delCompetition(i){
 }
 function cleanCompetitions(){
   return compRows.filter(c=>(c.name||'').trim()).map(c=>({
-    name:(c.name||'').trim(), type:['rolloff','race','raffle'].includes(c.type)?c.type:'rolloff',
+    name:(c.name||'').trim(), type:'rolloff',   /* race & raffle removed pending redesign */
     command:(c.command||'').trim(), duration:Math.max(5,Math.min(3600,+c.duration||60)),
     repeat_every:Math.max(0,+c.repeat_every||0), metric:['total','highest','count'].includes(c.metric)?c.metric:'total',
     max_entries:Math.max(0,+c.max_entries||0), required_entries:Math.max(0,+c.required_entries||0),
