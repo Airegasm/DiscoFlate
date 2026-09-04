@@ -704,6 +704,13 @@ class Engine:
                 self._inline_depth -= 1
         return re.sub(r"\s*\[!([\w-]+)\]\s*", " ", text).strip()
 
+    async def render_inline(self, template: str, extra: dict | None = None) -> str:
+        """Render a message AND fire any [!command] tokens in it (as the system),
+        returning the text with those tokens stripped. For message paths that
+        DON'T go through _announce — e.g. the activation ON message, which is
+        posted straight to the channel by the web layer."""
+        return await self._run_inline_commands(self.render(template, extra))
+
     async def _announce(self, text: str, image: str | None, replace_key: str | None = None) -> None:
         text = await self._run_inline_commands(text)
         if not text and image is None:

@@ -1,6 +1,6 @@
 {
-  "version": "3.28.0",
-  "versionCode": 97,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.28.0/discoflate.apk",
-  "notes": "DiscoFlate v3.28.0 — new [total_score] placeholder: the combined dice total of ALL finishers in a competition (live during a run, final afterward). Pairs with a roll-off's 'Add ALL totals' so you can announce the pooled score."
+  "version": "3.29.0",
+  "versionCode": 98,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.29.0/discoflate.apk",
+  "notes": "DiscoFlate v3.29.0 — fix: [!command] tokens in the Activation ON message now actually fire (like they do in every other announced message). The ON message went straight to the channel and skipped inline-command firing; now it fires them and strips the tokens (an ON message that was only [!command] posts nothing)."
 }

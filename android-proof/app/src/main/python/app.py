@@ -586,12 +586,19 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         cfg = config_store.update({"listener_enabled": bool(body.get("enabled"))})
         engine.set_config(cfg)
         engine._log("bot", f"listener {'ENABLED' if cfg['listener_enabled'] else 'muted'}")
-        msg = (cfg.get("listener_message_on") if cfg["listener_enabled"]
+        enabled = cfg["listener_enabled"]
+        msg = (cfg.get("listener_message_on") if enabled
                else cfg.get("listener_message_off")) or ""
         if msg.strip():
-            # Always append a non-editable attribution footer (Discord subtext).
-            footer = f"-# DiscoFlate v{VERSION} by AireGasm"
-            await botmgr.announce(f"{engine.render(msg.strip())}\n{footer}", None)
+            # The ON message fires any [!command] tokens (like every other
+            # announced message); the OFF message renders text only (no fires as
+            # the session is closing). render_inline strips fired tokens, so a
+            # message that was ONLY [!command] posts nothing.
+            text = (await engine.render_inline(msg.strip())) if enabled else engine.render(msg.strip())
+            if text.strip():
+                # Always append a non-editable attribution footer (Discord subtext).
+                footer = f"-# DiscoFlate v{VERSION} by AireGasm"
+                await botmgr.announce(f"{text}\n{footer}", None)
         return web.json_response(_public_state(engine, botmgr))
 
     async def command_toggle(request):
