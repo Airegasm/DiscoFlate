@@ -1,6 +1,6 @@
 {
-  "version": "3.31.0",
-  "versionCode": 100,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.31.0/discoflate.apk",
-  "notes": "DiscoFlate v3.31.0 — camera now uses the phone's REAL zoom (optical/hybrid) via the video track, so on ultra-wide-capable phones the zoom slider drops below 1× to zoom OUT just like the stock camera. The slider auto-ranges to the device's true min/max, with a live ×readout. Desktop webcams fall back to the old digital zoom-in."
+  "version": "3.31.1",
+  "versionCode": 101,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.31.1/discoflate.apk",
+  "notes": "DiscoFlate v3.31.1 — fix: the front camera now picks up its real zoom range (e.g. down to 0.7×). The zoom capability often isn't reported until the camera track is fully live, so we now wait for the track and poll before reading it — previously the front cam fell back to a 1.0× floor. Zoom range is shown in the camera status."
 }

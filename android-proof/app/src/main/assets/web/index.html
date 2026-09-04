@@ -1128,6 +1128,23 @@ async function listCameras(selected){
       : `<option value="">no cameras found</option>`;
   }catch(e){}
 }
+// The zoom capability (min/max) can be absent right after getUserMedia — the
+// front camera especially only reports it once the track is fully live. Wait for
+// the preview's metadata, then poll getCapabilities() briefly until zoom shows.
+async function _readZoomCaps(track, video){
+  if(!track || !track.getCapabilities) return null;
+  try{
+    if(video && video.readyState < 1){
+      await new Promise(r=>{ video.addEventListener('loadedmetadata', r, {once:true}); setTimeout(r, 1500); });
+    }
+  }catch(e){}
+  for(let i=0;i<10;i++){
+    let c={}; try{ c=track.getCapabilities()||{}; }catch(e){}
+    if(c.zoom && typeof c.zoom.min==='number' && typeof c.zoom.max==='number') return c.zoom;
+    await new Promise(r=>setTimeout(r, 150));   // ~1.5s total grace for the track to populate
+  }
+  return null;
+}
 async function startCamera(deviceId){
   stopCamera();
   try{
@@ -1142,15 +1159,18 @@ async function startCamera(deviceId){
       : {facingMode:{ideal:'environment'}, ...HD} };
     camStream = await navigator.mediaDevices.getUserMedia(constraints);
     $('#camPreview').srcObject = camStream;
-    // Detect the track's REAL zoom capability (min can be <1 = ultra-wide / zoom
-    // OUT). Fall back to CSS digital zoom-in (1–5×) if unsupported.
     camTrack = camStream.getVideoTracks()[0] || null;
-    const caps = (camTrack && camTrack.getCapabilities) ? camTrack.getCapabilities() : {};
+    // Detect the track's REAL zoom range (min can be <1 = ultra-wide / zoom OUT).
+    // CRUCIAL: the zoom capability — especially on the FRONT camera — is often
+    // NOT populated the instant getUserMedia resolves; it appears once the track
+    // is live. So wait for readiness and poll before deciding. Fall back to CSS
+    // digital zoom-in (1–5×) only if the camera truly has no zoom capability.
     const zs=$('#camZoomSlider');
-    if(caps && caps.zoom && typeof caps.zoom.min==='number' && caps.zoom.max>caps.zoom.min){
+    const zoomCap = await _readZoomCaps(camTrack, $('#camPreview'));
+    if(zoomCap && zoomCap.max>zoomCap.min){
       camZoomNative = true;
-      camZoomMin = caps.zoom.min; camZoomMax = caps.zoom.max;
-      camZoomStep = caps.zoom.step || Math.max(0.1, (caps.zoom.max-caps.zoom.min)/100);
+      camZoomMin = zoomCap.min; camZoomMax = zoomCap.max;
+      camZoomStep = zoomCap.step || Math.max(0.1, (zoomCap.max-zoomCap.min)/100);
       const cur = (camTrack.getSettings && camTrack.getSettings().zoom) || 1;
       if(zs){ zs.min=camZoomMin; zs.max=camZoomMax; zs.step=camZoomStep; }
       await setZoom(_zoomClamp(cur));
@@ -1159,7 +1179,8 @@ async function startCamera(deviceId){
       if(zs){ zs.min=1; zs.max=5; zs.step=0.1; }
       await setZoom(1);
     }
-    $('#camMsg').textContent = camZoomNative ? 'camera on · optical zoom' : 'camera on';
+    $('#camMsg').textContent = camZoomNative
+      ? `camera on · zoom ${camZoomMin.toFixed(1)}–${camZoomMax.toFixed(1)}×` : 'camera on';
     await listCameras(deviceId || (camTrack && camTrack.getSettings?.().deviceId));
   }catch(e){
     $('#camMsg').textContent = 'camera error: '+(e.message||e.name);
