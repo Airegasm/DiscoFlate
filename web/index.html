@@ -2594,9 +2594,12 @@ function renderCompetitions(){
         `<label class="field">Max entries/person <input type="number" min="0" value="${cd.max_entries??3}" style="width:90px" onchange="compRows[${i}].max_entries=+this.value;scheduleSave()"></label>`+
         `<label class="field">Required to qualify <input type="number" min="0" value="${cd.required_entries??1}" style="width:90px" title="must complete this many entries or be eliminated" onchange="compRows[${i}].required_entries=+this.value;scheduleSave()"></label>`+
       `</div>`:'')+
-      `<label class="row" style="gap:6px"><input type="checkbox" ${cd.require_enter!==false?'checked':''} onchange="compRows[${i}].require_enter=this.checked;scheduleSave()"> Require <code>!enter</code> to join</label>`+
-      `<label class="field">Title <input value="${esc(cd.title||'')}" placeholder="ROLL-OFF!" onchange="compRows[${i}].title=this.value"></label>`+
-      `<label class="field">Intro <span class="muted">([enter_cmd] [command] [duration])</span><textarea rows="2" onchange="compRows[${i}].intro=this.value">${esc(cd.intro||'')}</textarea></label>`+
+      (typ==='rolloff'?`<div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end">`+
+        `<label class="row" style="gap:6px"><input type="checkbox" ${cd.allow_reroll?'checked':''} onchange="compRows[${i}].allow_reroll=this.checked;renderCompetitions();scheduleSave()"> Allow rerolls</label>`+
+        (cd.allow_reroll?`<label class="field">Rerolls per player <span class="muted">(only the latest roll; earlier rolls lock in)</span> <input type="number" min="0" value="${cd.reroll_count??1}" style="width:80px" onchange="compRows[${i}].reroll_count=Math.max(0,+this.value||0);scheduleSave()"></label>`:'')+
+      `</div>`:'')+
+      `<label class="field">Titlebar <input value="${esc(cd.title||'')}" placeholder="ROLL-OFF!" onchange="compRows[${i}].title=this.value"></label>`+
+      `<label class="field">Body <span class="muted">(embed text under the titlebar · placeholders work)</span><textarea rows="3" onchange="compRows[${i}].body=this.value">${esc(cd.body||'')}</textarea></label>`+
       (typ!=='raffle'?`<label class="field">Entry reply <span class="muted">([user] [value] [score] [entries])</span><input value="${esc(cd.entry_message||'')}" placeholder="🎲 [user] entered [value] — total [score]" onchange="compRows[${i}].entry_message=this.value"></label>`:'')+
       `<label class="field">Win message <span class="muted">([winner] [winner_score])</span><textarea rows="2" onchange="compRows[${i}].win_message=this.value">${esc(cd.win_message||'')}</textarea></label>`+
       `<label class="field">No-winner message<input value="${esc(cd.no_winner_message||'')}" placeholder="🏁 nobody qualified." onchange="compRows[${i}].no_winner_message=this.value"></label>`+
@@ -2623,7 +2626,8 @@ function renderCompetitions(){
 }
 function addCompetition(){
   compRows.push({name:'',type:'rolloff',command:'',duration:60,repeat_every:15,metric:'total',
-    max_entries:3,required_entries:1,require_enter:true,title:'',intro:'',entry_message:'',
+    max_entries:3,required_entries:1,require_enter:true,title:'',body:'',intro:'',entry_message:'',
+    allow_reroll:false,reroll_count:1,
     win_message:'🏆 [winner] wins with [winner_score]!',no_winner_message:'',
     award_pump:true,award_seconds:10,bonus_command_on:false,bonus_command:'',bonus_stashable:false,
     lock_progression:false,bonus_after_pump:true,bonus_message:'🎁 [winner] now holds [bonus_cmd]!',
@@ -2641,7 +2645,8 @@ function cleanCompetitions(){
     command:(c.command||'').trim(), duration:Math.max(5,Math.min(3600,+c.duration||60)),
     repeat_every:Math.max(0,+c.repeat_every||0), metric:['total','highest','count'].includes(c.metric)?c.metric:'total',
     max_entries:Math.max(0,+c.max_entries||0), required_entries:Math.max(0,+c.required_entries||0),
-    require_enter:c.require_enter!==false, title:c.title||'', intro:c.intro||'', entry_message:c.entry_message||'',
+    require_enter:c.require_enter!==false, title:c.title||'', body:c.body||'', intro:c.intro||'', entry_message:c.entry_message||'',
+    allow_reroll:!!c.allow_reroll, reroll_count:Math.max(0,+c.reroll_count||0),
     win_message:c.win_message||'', no_winner_message:c.no_winner_message||'',
     award_pump:!!c.award_pump, award_seconds:Math.max(0,+c.award_seconds||0),
     bonus_command_on:!!c.bonus_command_on, bonus_command:(c.bonus_command||'').trim(),

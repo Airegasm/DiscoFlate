@@ -1,6 +1,6 @@
 {
-  "version": "3.21.0",
-  "versionCode": 90,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.21.0/discoflate.apk",
-  "notes": "DiscoFlate v3.21.0 \u2014 new command type 'actions': a full action sequence like events (message/broadcast/fire/roll/capacity/wait/poll/competition/end_session), so one command can do a whole series of things and even trigger competitions/polls. Existing command types unchanged. 'Owner-only' relabeled 'Owner/Bot Internal Only'."
+  "version": "3.22.0",
+  "versionCode": 91,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.22.0/discoflate.apk",
+  "notes": "DiscoFlate v3.22.0 \u2014 competitions get a button-driven flow: an embed with an Enter Challenge button + timer (no more !enter), each player rolls PRIVATELY (ephemeral) with an optional reroll budget (only the latest roll; earlier lock in; final Roll becomes Submit), and their result posts to the channel all at once. Plus titlebar + body fields."
 }

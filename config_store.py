@@ -273,9 +273,13 @@ DEFAULTS = {
     # action (timed events / capacity-event blocks). Players type the enter
     # command to join, then compete via the entry command during a window; the
     # winner (by type/metric) gets rewards. Each:
+    # Players join via an "Enter Challenge" button on the embed and roll
+    # privately (ephemeral), with an optional reroll budget (only the latest
+    # roll; earlier rolls lock); results post per-player all at once. Each:
     #   {name, type ("rolloff"|"race"|"raffle"), command (entry command),
     #    duration, require_enter, required_entries, max_entries, metric
-    #    ("total"|"highest"|"count"), repeat_every, title, intro, entry_message,
+    #    ("total"|"highest"|"count"), allow_reroll, reroll_count,
+    #    repeat_every, title, body, intro, entry_message,
     #    win_message, no_winner_message, award_pump, award_seconds,
     #    bonus_command_on, bonus_command, bonus_stashable, lock_progression,
     #    bonus_after_pump, bonus_message, winner_deadline (s; 0=off — auto-fires

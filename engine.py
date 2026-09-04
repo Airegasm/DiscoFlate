@@ -150,6 +150,7 @@ class Engine:
         self.cancel_games_cb = None            # async () -> None : cancel all live minigame views
         self.embed_cb = None                   # async (title, text) -> None : rich embed post (polls)
         self.broadcast_embed_cb = None         # async (text) -> None : broadcast-preset embed
+        self.comp_embed_cb = None              # async (title, text, meta) -> None : competition embed + Enter button
         self.bot_connected: bool = False
 
         # Device add/search/use debug flows into the Activity log too (not just stdout).
@@ -1281,9 +1282,66 @@ class Engine:
     def _comp_player(self, uid, who: str) -> dict:
         p = self._comp["players"].setdefault(str(uid), {"name": who, "score": 0.0,
                                                          "entries": 0, "entered": False,
-                                                         "done_at": None})
+                                                         "done_at": None, "rolls": []})
         p["name"] = who
         return p
+
+    # -- ephemeral-roller API (driven by the Discord "Enter Challenge" flow) --
+    def competition_window_open(self) -> bool:
+        return self._comp is not None
+
+    def competition_join(self, uid, who: str) -> dict:
+        """A player pressed 'Enter Challenge'. Registers them and returns the
+        roller config (how many rolls, how many rerolls). Refuses if they've
+        already submitted."""
+        if self._comp is None:
+            return {"ok": False, "error": "This challenge has ended."}
+        cd = self._comp["def"]
+        p = self._comp_player(uid, who)
+        if p.get("done_at") is not None:
+            return {"ok": False, "error": "You've already locked in your rolls!"}
+        p["entered"] = True
+        rolls = int(self._comp.get("cap") or 0) or int(cd.get("required_entries") or 0) or 1
+        rerolls = int(cd.get("reroll_count") or 0) if cd.get("allow_reroll") else 0
+        return {"ok": True, "rolls": rolls, "rerolls": max(0, rerolls),
+                "metric": self._comp.get("metric", "total")}
+
+    def competition_roll_value(self) -> float:
+        """Produce one roll value from the entry command's dice (no state change;
+        the roller View manages pending/locked/reroll)."""
+        if self._comp is None:
+            return 0.0
+        entry = self.find_command(self._comp["cmd"])
+        return self._comp_value(entry) if entry else float(self._roll_total(1, 6)[0])
+
+    def competition_submit(self, uid, who: str, rolls: list) -> dict:
+        """Record a player's finished rolls, score them by the metric, mark them
+        done. Returns the all-at-once summary for the channel announcement."""
+        if self._comp is None:
+            return {"ok": False, "error": "This challenge has ended."}
+        p = self._comp_player(uid, who)
+        if p.get("done_at") is not None:
+            return {"ok": False, "error": "already submitted"}
+        vals = []
+        for r in (rolls or []):
+            try:
+                vals.append(float(r))
+            except (TypeError, ValueError):
+                pass
+        p["rolls"] = vals
+        p["entries"] = len(vals)
+        metric = self._comp.get("metric", "total")
+        if metric == "highest":
+            p["score"] = max(vals) if vals else 0.0
+        elif metric == "count":
+            p["score"] = float(len(vals))
+        else:
+            p["score"] = float(sum(vals))
+        p["entered"] = True
+        p["done_at"] = time.monotonic()
+        shown = ", ".join(f"{v:g}" for v in vals)
+        summary = f"🎲 **{who}** rolled {shown} → **{p['score']:g}**!" if vals else f"🎲 **{who}** entered."
+        return {"ok": True, "summary": summary, "total": p["score"]}
 
     def _comp_eligible(self) -> list:
         """Players who qualify to win: entered (if required) and met the
@@ -1390,17 +1448,27 @@ class Engine:
         self._comp = {"def": cd, "cmd": entry_key, "metric": cd.get("metric", "total"),
                       "cap": int(cd.get("max_entries") or 0), "players": {}, "type": typ,
                       "required_entries": int(cd.get("required_entries") or 0)}
-        prefix = self.cfg.get("command_prefix", "!")
+        rolls = int(self._comp.get("cap") or 0) or int(cd.get("required_entries") or 0) or 1
+        rerolls = int(cd.get("reroll_count") or 0) if cd.get("allow_reroll") else 0
         title = "🏁 " + self.render((cd.get("title") or name).strip())
-        intro = self.render((cd.get("intro") or "").strip(),
-                            {"enter_cmd": f"{prefix}{self.builtin_names()['enter']}",
-                             "command": f"{prefix}{entry_key}" if entry_key else "",
-                             "duration": f"{duration:g}"})
+        body = self.render((cd.get("body") or cd.get("intro") or "").strip()) or self._comp_intro(cd, entry_key, duration)
+        meta = {"name": name, "rolls": rolls, "rerolls": max(0, rerolls), "type": typ}
         self._log("bot", f"COMPETITION '{name}' ({typ}) started [{source}]")
         winner_uid = winner = None
+
+        async def _post(extra=""):
+            t = f"{body}\n\n{extra}".strip() if extra else body
+            if self.comp_embed_cb:
+                try:
+                    await self.comp_embed_cb(title, t, meta)
+                    return
+                except Exception as e:  # noqa: BLE001
+                    self._log("error", f"competition embed failed: {e}")
+            await self._announce_poll(title, t)   # fallback: plain embed, !enter flow
+
         try:
             end = time.monotonic() + duration
-            await self._announce_poll(title, intro or self._comp_intro(cd, entry_key, duration))
+            await _post(f"⏳ **{self._fmt_duration(duration)}** to enter & roll!")
             while True:
                 remaining = end - time.monotonic()
                 if remaining <= 0:
@@ -1410,7 +1478,7 @@ class Engine:
                     break
                 await asyncio.sleep(min(remaining, repeat) if repeat else min(remaining, 1.0))
                 if repeat and time.monotonic() < end - 1 and typ != "race":
-                    await self._announce_poll(title + " — standings", self._comp_standings())
+                    await _post(self._comp_standings() + f"\n⏳ **{self._fmt_duration(max(0, end - time.monotonic()))}** left")
             # decide winner among eligible players
             elig = self._comp_eligible()
             if elig:

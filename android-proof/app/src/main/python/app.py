@@ -1161,6 +1161,7 @@ async def main() -> None:
     engine.cancel_games_cb = botmgr.cancel_all_games  # session pause kills live games
     engine.embed_cb = botmgr.post_embed               # polls post as rich embeds
     engine.broadcast_embed_cb = botmgr.post_broadcast_embed  # broadcast actions post as embeds
+    engine.comp_embed_cb = botmgr.post_competition_embed      # competitions post an Enter Challenge embed
 
     async def _end_session(post_off_message: bool = False):
         # Deactivate. End Sequence calls this WITHOUT the off-message;

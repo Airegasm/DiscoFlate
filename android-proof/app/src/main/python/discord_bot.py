@@ -60,6 +60,98 @@ class PollVoteView(discord.ui.View):
             self.add_item(PollVoteButton(bot, i, str(lab)))
 
 
+class CompetitionEnterView(discord.ui.View):
+    """The public competition embed's 'Enter Challenge' button — opens each
+    player's private (ephemeral) roller."""
+
+    def __init__(self, bot, meta):
+        super().__init__(timeout=None)
+        self.bot = bot
+        self.meta = meta or {}
+
+    @discord.ui.button(label="🎲 Enter Challenge", style=discord.ButtonStyle.success)
+    async def enter(self, interaction: discord.Interaction, button: discord.ui.Button):
+        eng = self.bot.engine
+        if not eng.competition_window_open():
+            await interaction.response.send_message("⌛ This challenge has ended.", ephemeral=True)
+            return
+        res = eng.competition_join(str(interaction.user.id), interaction.user.display_name)
+        if not res.get("ok"):
+            await interaction.response.send_message("🚫 " + res.get("error", "can't join"), ephemeral=True)
+            return
+        view = RollerView(self.bot, interaction.user.display_name, res["rolls"], res["rerolls"])
+        await interaction.response.send_message(view.text(), view=view, ephemeral=True)
+
+
+class RollerView(discord.ui.View):
+    """A player's private roller: roll N times; the latest roll can be rerolled
+    up to `rerolls` times; each Roll locks the previous; the final Roll becomes
+    Submit, which posts their result to the channel all at once."""
+
+    def __init__(self, bot, who, rolls: int, rerolls: int):
+        super().__init__(timeout=300)
+        self.bot = bot
+        self.who = who
+        self.n = max(1, int(rolls))
+        self.rerolls_left = max(0, int(rerolls))
+        self.locked = []
+        self.pending = self.bot.engine.competition_roll_value()   # first roll
+        self._sync_buttons()
+
+    def _final(self):
+        return len(self.locked) + 1 >= self.n   # the pending roll is the last one
+
+    def text(self):
+        slot = len(self.locked) + 1
+        line = f"🎲 **Roll {slot}/{self.n}: {self.pending:g}**"
+        if self.locked:
+            line += "\nLocked: " + ", ".join(f"{v:g}" for v in self.locked)
+        if self.rerolls_left:
+            line += f"\n🔄 Rerolls left: {self.rerolls_left}"
+        line += "\n\n" + ("**Submit** to lock it all in!" if self._final()
+                          else "**Roll** to keep this and roll the next.")
+        return line
+
+    def _sync_buttons(self):
+        self.roll_btn.label = "✅ Submit" if self._final() else "🎲 Roll"
+        self.roll_btn.style = discord.ButtonStyle.success if self._final() else discord.ButtonStyle.primary
+        self.reroll_btn.label = f"🔄 Reroll ({self.rerolls_left})"
+        self.reroll_btn.disabled = self.rerolls_left <= 0
+
+    @discord.ui.button(label="🎲 Roll", style=discord.ButtonStyle.primary)
+    async def roll_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.is_finished():
+            return
+        self.locked.append(self.pending)      # lock the current (latest) roll
+        if len(self.locked) >= self.n:        # that was the final → submit
+            for c in self.children:
+                c.disabled = True
+            self.stop()
+            res = self.bot.engine.competition_submit(
+                str(interaction.user.id), self.who, self.locked)
+            total = res.get("total", sum(self.locked))
+            try:
+                await interaction.response.edit_message(
+                    content=f"✅ Locked in: {', '.join(f'{v:g}' for v in self.locked)} → **{total:g}**", view=self)
+            except Exception:  # noqa: BLE001
+                pass
+            if res.get("ok") and res.get("summary"):
+                await self.bot.broadcast(res["summary"], None)   # per-player, all at once
+            return
+        self.pending = self.bot.engine.competition_roll_value()  # next slot
+        self._sync_buttons()
+        await interaction.response.edit_message(content=self.text(), view=self)
+
+    @discord.ui.button(label="🔄 Reroll", style=discord.ButtonStyle.secondary)
+    async def reroll_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.is_finished() or self.rerolls_left <= 0:
+            return
+        self.rerolls_left -= 1
+        self.pending = self.bot.engine.competition_roll_value()  # reroll the latest only
+        self._sync_buttons()
+        await interaction.response.edit_message(content=self.text(), view=self)
+
+
 class BotManager:
     def __init__(self, engine, get_config) -> None:
         self.engine = engine
@@ -532,6 +624,16 @@ class BotManager:
             await self.broadcast(text, None)
             return
         await self.broadcast("", None, embed=e)
+
+    async def post_competition_embed(self, title: str, text: str, meta: dict) -> None:
+        """Competition announcement: a rich embed with an 'Enter Challenge'
+        button that opens each player's private roller."""
+        try:
+            e = discord.Embed(title=(title or "")[:256], description=(text or "")[:4096], color=0xE67E22)
+        except Exception:  # noqa: BLE001
+            await self.broadcast(f"**{title}**\n{text}", None)
+            return
+        await self.broadcast("", None, embed=e, view=CompetitionEnterView(self, meta))
 
     async def handle_vote_interaction(self, interaction, option_number: int) -> None:
         """Shared by the vote buttons and the /vote slash command: cast the
