@@ -676,6 +676,48 @@ class BotManager:
         await self.broadcast(txt, None, embed=self._status_embed("leaderboard", txt))
         return {"ok": True}
 
+    async def operator_cleanup(self, n: int) -> dict:
+        """Delete the bot's OWN last `n` messages in each broadcast channel
+        (listen targets + announce channel). Deleting one's own messages needs no
+        Manage-Messages permission. Not gated on activation — cleanup should work
+        even after the session's off."""
+        if not self._client or not self._client.is_ready():
+            return {"ok": False, "error": "bot not connected"}
+        cfg = self.get_config()
+        chan_ids = {str(t["channel_id"]) for t in self._targets(cfg)}
+        ann = str(cfg.get("announce_channel_id") or "").strip()
+        if ann:
+            chan_ids.add(ann)
+        if not chan_ids:
+            return {"ok": False, "error": "no server/channel selected"}
+        try:
+            n = max(1, min(100, int(n or 1)))
+        except (TypeError, ValueError):
+            n = 1
+        me = self._client.user
+        deleted = 0
+        for cid in chan_ids:
+            ch = await self._channel(cid)
+            if ch is None:
+                continue
+            try:
+                mine = []
+                async for msg in ch.history(limit=300):
+                    if me and msg.author and msg.author.id == me.id:
+                        mine.append(msg)
+                        if len(mine) >= n:
+                            break
+                for msg in mine:
+                    try:
+                        await msg.delete()
+                        deleted += 1
+                    except Exception as e:  # noqa: BLE001 — already gone / too old / perms
+                        self.engine._log("error", f"cleanup delete failed: {e}")
+            except Exception as e:  # noqa: BLE001 — no read-history perm, etc.
+                self.engine._log("error", f"cleanup history failed: {e}")
+        self.engine._log("bot", f"cleanup — deleted {deleted} of the bot's own message(s)")
+        return {"ok": True, "deleted": deleted}
+
     async def post_embed(self, title: str, text: str, options: list | None = None) -> None:
         """Broadcast a rich embed (polls). Always an embed — not gated on
         rich_output. When `options` (poll option labels) is given, the embed

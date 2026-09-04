@@ -122,6 +122,14 @@
     /* both toggles drop onto their own row below the status pills */
     .toggles{flex-basis:100%;margin-left:0;justify-content:flex-end}
   }
+  /* operator Controls: one feature per row — BUTTON then its field(s) */
+  .ctrlgrid{display:flex;flex-direction:column;gap:8px}
+  .ctrlrow{display:flex;gap:10px;align-items:center;flex-wrap:nowrap}
+  .ctrlrow>button{min-width:200px;text-align:left;flex:none}
+  .ctrlrow .ctrlfield{display:flex;gap:6px;align-items:center;flex:1;min-width:0}
+  .ctrlrow .ctrlfield select,.ctrlrow .ctrlfield input{min-width:0}
+  .ctrlrow .ctrlfield select{flex:1}
+  @media(max-width:560px){ .ctrlrow>button{min-width:150px} }
 </style>
 </head>
 <body>
@@ -182,26 +190,36 @@
       <!-- operator controls: fire real in-channel actions as the owner -->
       <div style="border-top:1px solid var(--line);margin-top:16px;padding-top:14px">
         <h2 style="margin-bottom:10px">Controls</h2>
-        <div class="row" style="gap:8px;align-items:center">
-          <select id="ctrlDice"></select><span class="muted">d</span><select id="ctrlSides"></select>
-          <button onclick="controlRoll()">🎲 Roll</button>
-          <button class="bad" id="ctrlStopBtn" onclick="controlStop()" title="Pause the whole session: pumps off, events + games cancelled, commands latched until Resume">🛑 Stop</button>
-          <div style="flex:1"></div>
-          <span class="muted">Pump</span>
-          <input type="number" id="ctrlPump" value="5" min="1" step="0.5" style="width:80px">
-          <span class="muted">secs</span>
-          <button onclick="controlPump()">💨 Pump</button>
+        <div class="ctrlgrid">
+          <div class="ctrlrow">
+            <button onclick="controlRoll()">🎲 Roll</button>
+            <span class="ctrlfield"><select id="ctrlDice"></select><span class="muted">d</span><select id="ctrlSides"></select></span>
+          </div>
+          <div class="ctrlrow">
+            <button onclick="controlPump()">💨 Pump</button>
+            <span class="ctrlfield"><input type="number" id="ctrlPump" value="5" min="1" step="0.5" style="width:90px"><span class="muted">secs</span></span>
+          </div>
+          <div class="ctrlrow">
+            <button class="ghost" onclick="controlCapacity()">📊 Broadcast Capacity</button>
+          </div>
+          <div class="ctrlrow">
+            <button class="ghost" onclick="controlBroadcast()">📢 Broadcast Custom</button>
+            <select id="ctrlBroadcast" class="ctrlfield"></select>
+          </div>
+          <div class="ctrlrow">
+            <button class="ghost" onclick="controlPoll()">🗳 Start Poll</button>
+            <select id="ctrlPoll" class="ctrlfield"></select>
+          </div>
+          <div class="ctrlrow">
+            <button class="ghost" onclick="controlCleanup()">🧹 Cleanup</button>
+            <span class="ctrlfield"><input type="number" id="ctrlCleanup" value="1" min="1" max="100" step="1" style="width:80px"><span class="muted">of the bot's last messages</span></span>
+          </div>
+          <div class="ctrlrow">
+            <button class="bad" id="ctrlStopBtn" onclick="controlStop()" title="Pause the whole session: pumps off, events + games cancelled, commands latched until Resume">🛑 Stop</button>
+          </div>
         </div>
-        <div class="row" style="gap:8px;margin-top:10px;flex-wrap:wrap">
-          <button class="ghost" onclick="controlCapacity()">📊 Broadcast Capacity</button>
-          <select id="ctrlBroadcast" style="max-width:220px"></select>
-          <button class="ghost" onclick="controlBroadcast()">📢 Broadcast Custom</button>
-          <select id="ctrlPoll" style="max-width:180px"></select>
-          <button class="ghost" onclick="controlPoll()">🗳 Start Poll</button>
-          <div style="flex:1"></div>
-          <span class="muted" id="ctrlMsg"></span>
-        </div>
-        <div class="hint" id="ctrlHint">These post to your Discord channel <b>as the Owner</b> (set at the <b>top of this page</b>) — exactly as if that person typed the command. If the Owner is blank, they post as the <b>bot's own Discord name</b>. Only work when <b>Activation is on</b>, the <b>bot is connected</b>, and a <b>channel is selected</b>.</div>
+        <div class="row" style="margin-top:8px"><span class="muted" id="ctrlMsg"></span></div>
+        <div class="hint" id="ctrlHint">These post to your Discord channel <b>as the Owner</b> (set at the <b>top of this page</b>) — exactly as if that person typed the command. If the Owner is blank, they post as the <b>bot's own Discord name</b>. Only work when <b>Activation is on</b>, the <b>bot is connected</b>, and a <b>channel is selected</b>. <b>Cleanup</b> deletes the bot's own recent posts and works any time.</div>
       </div>
     </div>
 
@@ -1291,6 +1309,12 @@ async function controlPoll(){
   const sel=$('#ctrlPoll'); const name = sel ? sel.value : '';
   if(!name){ const m=$('#ctrlMsg'); if(m){ m.textContent='pick a poll first'; setTimeout(()=>{if(m)m.textContent='';},2500);} return; }
   ctl('/api/control/poll', {name});
+}
+async function controlCleanup(){
+  const n = Math.max(1, Math.min(100, parseInt($('#ctrlCleanup').value,10)||1));
+  if(!confirm(`Delete the bot's last ${n} message${n===1?'':'s'} in your channel(s)? This can't be undone.`)) return;
+  const r = await ctl('/api/control/cleanup', {count:n});
+  const m=$('#ctrlMsg'); if(m && r && r.ok){ m.textContent=`🧹 deleted ${r.deleted}`; setTimeout(()=>{if(m)m.textContent='';},3500); }
 }
 function renderPollDropdown(){
   const sel=$('#ctrlPoll'); if(!sel) return;
@@ -3655,7 +3679,7 @@ async function doSave(){
 // config save for them is pointless and used to race their endpoint's rev bump.
 const NO_AUTOSAVE_IDS = new Set(['mock','listener','silenceOnOff','token','announceChan',
   'raEnabled','raNewIp','capSlider','capInput','ctrlDice','ctrlSides','ctrlPump',
-  'ctrlBroadcast','ctrlPoll','camSelect','camMirror','camZoomSlider','snapCaption','importFile']);
+  'ctrlBroadcast','ctrlPoll','ctrlCleanup','camSelect','camMirror','camZoomSlider','snapCaption','importFile']);
 function maybeSave(e){ if(e.target && NO_AUTOSAVE_IDS.has(e.target.id)) return; scheduleSave(); }
 document.addEventListener('input', maybeSave);
 document.addEventListener('change', maybeSave);

@@ -862,6 +862,11 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         b = await _json(request)
         return web.json_response(await botmgr.operator_broadcast_custom((b.get("message") or "")))
 
+    async def control_cleanup(request):
+        await guard(request)
+        b = await _json(request)
+        return web.json_response(await botmgr.operator_cleanup(_num(b.get("count")) or 1))
+
     async def restore_defaults(request):
         await guard(request)
         try:
@@ -1168,6 +1173,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/control/capacity", control_capacity),
         web.post("/api/control/leaderboard", control_leaderboard),
         web.post("/api/control/broadcast", control_broadcast),
+        web.post("/api/control/cleanup", control_cleanup),
         web.post("/api/restore-defaults", restore_defaults),
         web.post("/api/config/export", export_config),
         web.post("/api/config/import", import_config),
