@@ -34,7 +34,7 @@ DEFAULT_PUMPDIRECT_PATH = os.path.normpath(
 
 # Schema version of the stored config. Bump it + add a _migrate step whenever a
 # key is renamed/moved, so old configs upgrade instead of silently stranding data.
-CONFIG_VERSION = 10
+CONFIG_VERSION = 11
 
 # The dead "dice recharged" default that a remediation migration accidentally
 # promoted to the live cooldown-ready message. Migration v3 undoes that.
@@ -195,10 +195,10 @@ DEFAULTS = {
     # type "game-*" (pushluck/simon/balloon/rps/slots/blackjack) → button/
     #   ephemeral minigames (minigames.py). Params: pl_* (pushluck), sm_* (simon),
     #   bl_cells/bl_pops/bl_points (balloon), rps_wins (rps), sl_symbols (slots).
-    #   game_intro = message with the Play button. game_tiers = [{op, min, message,
-    #   fires, actions}] score→outcome; the highest matching value (per `op`: >= >
-    #   = != < <=) the final score reaches broadcasts + fires + runs its action
-    #   block (credited to the player). A luck modifier (a flat ± added to the
+    #   game_intro = message with the Play button. game_tiers = [{op, min,
+    #   actions}] score→outcome (v11): the highest matching value (per `op`:
+    #   >= > = != < <=) the final score reaches runs its ACTION BLOCK after the
+    #   labeled score line posts (fires credited to the player). A luck modifier (a flat ± added to the
     #   final score before tier lookup) may be set per range (the range's
     #   cooldowns[cmd].luck) or on the Always-On entry; a range the game is a
     #   member of takes precedence over Always-On. [score] and [luck] are
@@ -900,6 +900,27 @@ def _collapse_v10(c: dict) -> dict:
     return c
 
 
+def _collapse_v11(c: dict) -> None:
+    """v11: minigame tiers are pure `score op N` + ACTION BLOCK — the old
+    per-tier device-fire rows and result-message template become fire rows +
+    a message row at the front of the tier's block. Shape-keyed & idempotent
+    (the popped keys are gone afterwards); walks templates too."""
+    def _tier(t):
+        fires = t.pop("fires", None)
+        msg = (t.pop("message", "") or "").strip()
+        if fires or msg:
+            rows = _v10_fire_rows(fires) + ([_v10_msg_row(msg)] if msg else [])
+            t["actions"] = rows + list(t.get("actions") or [])
+    def _cmds(lst):
+        for cmd in (lst or []):
+            if isinstance(cmd, dict):
+                for t in (cmd.get("game_tiers") or []):
+                    if isinstance(t, dict):
+                        _tier(t)
+    _cmds(c.get("commands"))
+    _cmds((c.get("templates") or {}).get("commands"))
+
+
 def _migrate(cfg: dict) -> dict:
     """Ordered upgrades for configs written by older versions. Each step bumps
     config_version; unknown future keys always pass through untouched."""
@@ -1017,6 +1038,12 @@ def _migrate(cfg: dict) -> dict:
         for p in (cfg.get("gameplay_presets") or []):
             if isinstance(p, dict):
                 _collapse_v10(p.get("data") or {})
+    if v < 11:
+        # v11: minigame tiers become pure action blocks (see _collapse_v11).
+        _collapse_v11(cfg)
+        for p in (cfg.get("gameplay_presets") or []):
+            if isinstance(p, dict):
+                _collapse_v11(p.get("data") or {})
     cfg["config_version"] = CONFIG_VERSION
     return cfg
 

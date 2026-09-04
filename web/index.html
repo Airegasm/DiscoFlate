@@ -68,12 +68,6 @@
   .gpill.on.gblock{background:var(--bad)}
   .gpill.on.gallow{background:var(--on);color:#04320c}
   .gpill.on.gresume{background:var(--warn);color:#3a2a00}
-  /* uniform editor grid: parameter fields line up in responsive columns;
-     a .span child takes the full row. Used by every editor's parameter rows. */
-  .fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px 14px;align-items:end}
-  .fgrid>.span{grid-column:1/-1}
-  .fgrid label.field{white-space:normal;min-width:0}
-  .fgrid label.field input,.fgrid label.field select{width:100%;box-sizing:border-box}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--off)}
   .dot.on{background:var(--on);box-shadow:0 0 8px var(--on)}
   .dot.bad{background:var(--bad)}
@@ -125,7 +119,8 @@
     td textarea,.dev textarea{min-width:0}
     td input[type=text],td input:not([type]),
     .dev input[type=text],.dev input:not([type]){min-width:0}
-    input[type=number]{width:100%!important} /* !important: beats the inline width:80px on number fields */
+    /* number fields keep their compact inline widths on phones — full-width
+       number boxes exploded every field row onto its own line */
     label.field,label.field .muted{white-space:normal}
     .dev{flex-wrap:wrap}
     .dev .grow{flex-basis:100%}
@@ -475,31 +470,34 @@
 
     <!-- system commands + roll/cooldown settings (one section) -->
     <div class="card span" data-tab="commands">
-      <h2>System commands</h2>
-      <!-- command names: one compact row -->
-      <div class="row" style="gap:16px;align-items:flex-end">
+      <details class="help"><summary><h2>System commands</h2></summary>
+      <div class="row" style="gap:16px;align-items:flex-end;margin-top:8px">
         <label class="field">Prefix <input id="prefix" value="!" style="width:60px"></label>
-        <label class="field">Capacity <input id="cmdCapacity" value="capacity" style="width:120px"></label>
-        <label class="field">Help <input id="cmdHelp" value="aghelp" style="width:120px"></label>
-        <label class="field">Leaderboard <input id="cmdLeaderboard" value="leaderboard" style="width:130px"></label>
-        <label class="field">Lifetime leaderboard <input id="cmdLeaderboardLife" value="toppumpers-life" style="width:150px"></label>
-        <label class="field">Pump timer <input id="cmdPumptimer" value="pumptimer" style="width:130px"></label>
-        <label class="field">Anti-spam buffer <span class="muted">(s)</span> <input type="number" id="systemBuffer" value="8" min="0" step="1" style="width:70px"></label>
+        <label class="field">Anti-spam buffer (s) <input type="number" id="systemBuffer" value="8" min="0" step="1" style="width:80px" title="quietly ignore back-to-back uses of the same command within N seconds (0 = off)"></label>
       </div>
-      <div class="hint" style="margin-top:4px">Help (DMs the command list), Leaderboard (top pumpers this session) &amp; Lifetime leaderboard (all-time top pumpers, persists across sessions &amp; restarts) output isn't editable.
-        The <b>anti-spam buffer</b> quietly ignores back-to-back uses of the same command within that many seconds (0 = off). Dice rolls are just custom commands with a <b>roll</b> action.</div>
-      <div class="row" style="gap:16px;align-items:flex-start;margin-top:12px">
-        <label class="field" style="flex:1">Capacity command reply <textarea id="capacityMsg" rows="4"></textarea></label>
-        <label class="field" style="flex:1">Pump timer reply <span class="muted">([timer])</span> <textarea id="pumptimerMsg" rows="4"></textarea></label>
+      <!-- each command's NAME sits next to ITS reply -->
+      <div class="row" style="gap:12px;align-items:flex-start;margin-top:10px;flex-wrap:nowrap">
+        <label class="field" style="width:160px;flex:none">Capacity command <input id="cmdCapacity" value="capacity"></label>
+        <label class="field" style="flex:1">Reply <textarea id="capacityMsg" rows="2"></textarea></label>
+      </div>
+      <div class="row" style="gap:12px;align-items:flex-start;margin-top:8px;flex-wrap:nowrap">
+        <label class="field" style="width:160px;flex:none">Pump timer command <input id="cmdPumptimer" value="pumptimer"></label>
+        <label class="field" style="flex:1">Reply <span class="muted">([timer])</span> <textarea id="pumptimerMsg" rows="2"></textarea></label>
+      </div>
+      <div class="row" style="gap:16px;align-items:flex-end;margin-top:8px">
+        <label class="field">Help <input id="cmdHelp" value="aghelp" style="width:130px" title="DMs the command list — output isn't editable"></label>
+        <label class="field">Leaderboard <input id="cmdLeaderboard" value="leaderboard" style="width:140px" title="top pumpers this session — output isn't editable"></label>
+        <label class="field">Lifetime leaderboard <input id="cmdLeaderboardLife" value="toppumpers-life" style="width:150px" title="all-time top pumpers — output isn't editable"></label>
       </div>
       <div class="row" style="gap:16px;align-items:flex-start;margin-top:10px">
         <label class="field" style="flex:1">Cooldown message <span class="muted">([cmd] = the command)</span>
           <input id="cooldownMsg" placeholder="⏳ [mention], [cmd] is on cooldown — [cooldown]s left"></label>
       </div>
       <div class="row" style="gap:16px;align-items:flex-start;margin-top:10px">
-        <label class="field" style="flex:1">Operator Pump message <span class="muted">(posted by Dashboard → Controls → 💨 Pump · [secs] [secs2capacity] [capacity] [timer] [operator])</span>
-          <textarea id="pumpMsg" rows="3"></textarea></label>
+        <label class="field" style="flex:1">Operator Pump message <span class="muted">(Dashboard → Controls → 💨 Pump · [secs] [secs2capacity] [capacity] [timer] [operator] · reuse it anywhere as <code>[pump_msg]</code>)</span>
+          <textarea id="pumpMsg" rows="2"></textarea></label>
       </div>
+      </details>
 
       <div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px">
         <button class="ghost" onclick="togglePrizes()">🏆 Perfect Prizes <span id="prizeChevron">▸</span></button>
@@ -608,7 +606,7 @@
 
     <!-- competitions -->
     <div class="card span" data-tab="events">
-      <details class="help" style="margin-top:14px"><summary><h2>🏁 Competitions</h2></summary>
+      <details class="help"><summary><h2>🏁 Competitions</h2></summary>
       <div class="hint" style="max-width:880px;margin-top:8px">A competition is an <b>action</b> (start it from any action block). Fully <b>button-driven</b>: players press <b>Enter Challenge</b> on the embed and roll privately — the rolls you define below, in order (complete them all to qualify). Results post all at once; highest score wins by the <b>Win by</b> metric. Winner / no-winner outcomes are <b>action blocks</b> — e.g. an embed message row, <code>fire [winner_score]</code>, <b>award</b> a bonus command, or <b>command_gate</b> everyone else. <i>Race &amp; raffle are being redesigned and will return.</i> Placeholders: <code>[winner]</code> <code>[winner_score]</code> <code>[runnerup]</code> <code>[total_score]</code> <code>[results]</code>.</div>
       <div id="competitions" style="margin-top:10px"></div>
       <div class="row" style="margin-top:10px">
@@ -616,8 +614,11 @@
         <div style="flex:1"></div>
       </div>
       </details>
+    </div>
 
-      <details class="help" style="margin-top:14px"><summary><h2>🤝 Bonus Rounds</h2></summary>
+    <!-- bonus rounds -->
+    <div class="card span" data-tab="events">
+      <details class="help"><summary><h2>🤝 Bonus Rounds</h2></summary>
       <div class="hint" style="max-width:880px">A Bonus Round is a <b>teamwork cash-in</b>, started by a <b>bonus_round</b> action. First bank amounts with an <b>award</b> action (volume secs/%) (pump <b>seconds</b> or <b>capacity %</b>, on <code>[winner]</code>/<code>[range_leader]</code>/<code>[session_leader]</code>/…). The round posts an embed with a <b>Confirm</b> button for bonus holders; once the needed holders confirm (<b>all</b>, or just the <b>top holder</b>) before the timer, your action block runs with the pooled <code>[total_bonus_secs]</code> / <code>[total_bonus_pct]</code> — then the banks are spent. Use <code>fire [total_bonus_secs]</code> or <code>add % [total_bonus_pct]</code> to apply them.</div>
       <div id="bonusRounds" style="margin-top:10px"></div>
       <div class="row" style="margin-top:10px">
@@ -747,7 +748,7 @@
         <li><b>game-rps</b> — Rock-Paper-Scissors vs the bot, first to <b>Rounds to win</b>. Score = rounds you won.</li>
         <li><b>game-slots</b> — a <b>public</b> one-pull slot machine (no Play button): running the command spins 3 reels in-channel. Score = 3 (three of a kind), 1 (a pair), 0 (no match). Set # symbols (more = rarer wins).</li>
         <li><b>game-blackjack</b> — ephemeral 21 vs the dealer: <b>Hit</b> / <b>Stand</b>. Score = 0 bust/lose · 1 push · 2 win · 3 natural blackjack.</li>
-        <li>Most games post a public <b>▶ Play</b> button locked to whoever ran the command; play is private (ephemeral) until the tiered result broadcasts (slots is the exception — it's fully public). Every result is <b>labelled with the game</b> and respects <b>cross-server anonymity</b> (real name only where the player is a member). Placeholders <code>[score]</code>, <code>[luck]</code>, <code>[secs]</code> work in tier messages. A tier's <b>action block</b> can do anything — including an <b>achievement</b> row that counts toward a Perfect Prize (“3 blackjacks → bonus command”).</li>
+        <li>Most games post a public <b>▶ Play</b> button locked to whoever ran the command; play is private (ephemeral) until the labeled score line broadcasts (slots is the exception — it's fully public; every result respects <b>cross-server anonymity</b>). A tier is just <b>score op N</b> + an <b>action block</b> run after the score posts — message rows for flavor, fire rows credited to the player, an <b>award</b>, or an <b>achievement</b> row counting toward a Perfect Prize (“3 blackjacks → bonus command”). <code>[score]</code> and <code>[game]</code> work inside.</li>
         <li><b>Minigame luck</b> — a flat <b>±</b> added to the final score before the tier is picked. Set it per <b>range</b> (in that range's command table) for range-bound games, or on the game's <b>Always-On</b> entry for always-on ones.</li>
       </ul>
       <h3 style="margin:14px 0 6px">Per-command options</h3>
@@ -2107,14 +2108,17 @@ function renderAlwaysOn(){
     const cmdObj = commandRows.find(c=>(c.name||'').trim().toLowerCase()===aoName(a).toLowerCase());
     const isGameCmd = !!cmdObj && (cmdObj.type||'').indexOf('game-')===0;
     const luckField = isGameCmd
-      ? `<span class="muted">luck</span><input type="number" min="-1000" max="1000" step="1" value="${lk}" placeholder="0" style="width:60px" title="± added to the minigame score (a range this game is in overrides this)" oninput="setAlwaysOn(${idx},'luck',this.value)">`
+      ? `<label class="field">Luck <input type="number" min="-1000" max="1000" step="1" value="${lk}" placeholder="0" style="width:90px" title="± added to the minigame score" oninput="setAlwaysOn(${idx},'luck',this.value)"></label>`
       : '';
-    return `<div class="row" style="gap:8px;align-items:center;margin-bottom:4px;flex-wrap:wrap">`+
-      `<b style="min-width:120px">!${esc(aoName(a))}</b>`+
-      `<span class="muted">cooldown</span><input type="number" min="0" step="1" value="${cd}" placeholder="def" style="width:70px" oninput="setAlwaysOn(${idx},'cooldown',this.value)"><span class="muted">s</span>`+
-      `<span class="muted">max/person</span><input type="number" min="0" step="1" value="${mu}" placeholder="∞" style="width:70px" oninput="setAlwaysOn(${idx},'max_uses',this.value)">`+
-      luckField+
-      `<button class="ghost" onclick="removeAlwaysOnIdx(${idx})">✕</button>`+
+    // name on its own line, then ONE compact row: fields + delete
+    return `<div style="margin-bottom:10px">`+
+      `<b>!${esc(aoName(a))}</b>`+
+      `<div class="row" style="gap:12px;align-items:flex-end;margin-top:4px;flex-wrap:nowrap">`+
+        `<label class="field">Cooldown (s) <input type="number" min="0" step="1" value="${cd}" placeholder="def" style="width:90px" oninput="setAlwaysOn(${idx},'cooldown',this.value)"></label>`+
+        `<label class="field">Max/person <input type="number" min="0" step="1" value="${mu}" placeholder="∞" style="width:90px" oninput="setAlwaysOn(${idx},'max_uses',this.value)"></label>`+
+        luckField+
+        `<button class="ghost" onclick="removeAlwaysOnIdx(${idx})">✕</button>`+
+      `</div>`+
     `</div>`;
   }).join('');
   const names = new Set(alwaysOnList.map(a=>aoName(a).toLowerCase()));
@@ -2240,45 +2244,45 @@ function pruneOrphanMemberships(){
 // "Add Device Fire" rows — multiple devices, each on for its own seconds,
 // independently. `arr` is the command field holding the rows ('fires' or 'fail_fires').
 // ---- minigame outcome tiers (score → message + device fires) ----
+let tierOpen = new Set();
 function gameTiersEditor(i, c){
   const tiers = c.game_tiers||[];
-  const rows = tiers.map((t,j)=>
-    `<div class="dev" style="flex-direction:column;align-items:stretch;gap:6px">`+
-      `<div class="row" style="gap:8px;align-items:center">`+
-        `<span class="muted">when score</span>`+
-        `<select onchange="setTier(${i},${j},'op',this.value)">`+
+  const rows = tiers.map((t,j)=>{
+    const key=`tier:${i}:${j}`;
+    const na=(t.actions||[]).length;
+    if(!tierOpen.has(key)){
+      // COLLAPSED: one row — condition · gist · edit / delete
+      const firstMsg=(((t.actions||[]).find(x=>x&&x.type==='message')||{}).message||'').split('\n')[0];
+      const gist=[firstMsg, `${na} action${na===1?'':'s'}`].filter(Boolean).join(' · ');
+      return `<div class="dev" style="gap:8px">`+
+        `<b style="min-width:110px;white-space:nowrap">score ${esc(t.op||'>=')} ${t.min??0}</b>`+
+        `<span class="muted" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(gist)}</span>`+
+        `<button class="ghost" title="Edit" onclick="tierOpen.add('${key}');renderCommands()">✏️</button>`+
+        `<button class="ghost" title="Delete" onclick="removeTier(${i},${j})">✕</button>`+
+      `</div>`;
+    }
+    return `<div class="dev" style="flex-direction:column;align-items:stretch;gap:6px">`+
+      `<div class="row" style="gap:8px;align-items:center;flex-wrap:nowrap">`+
+        `<span class="muted" style="white-space:nowrap">when score</span>`+
+        `<select style="width:70px" onchange="setTier(${i},${j},'op',this.value)">`+
           ['>=','>','=','!=','<','<='].map(o=>`<option value="${o}" ${(t.op||'>=')===o?'selected':''}>${o}</option>`).join('')+`</select>`+
         `<input type="number" value="${t.min??0}" style="width:80px" onchange="setTier(${i},${j},'min',this.value)">`+
         `<div style="flex:1"></div>`+
-        `<button class="ghost" onclick="removeTier(${i},${j})">✕</button>`+
+        `<button class="ghost" title="Collapse" onclick="tierOpen.delete('${key}');renderCommands()">▾</button>`+
+        `<button class="ghost" title="Delete" onclick="removeTier(${i},${j})">✕</button>`+
       `</div>`+
-      `<textarea rows="2" placeholder="broadcast on this tier · [user] [score] [secs] [secs2capacity] …" onchange="setTier(${i},${j},'message',this.value)">${esc(t.message||'')}</textarea>`+
-      tierFiresEditor(i,j,t)+
-      `<div style="border-top:1px solid var(--line);padding-top:4px"><div class="muted" style="margin-bottom:4px">Actions on this tier <span class="muted">(runs after the result — award, capacity, competition, message, …)</span></div>`+
-        ((t.actions||[]).map((a,k)=>actionRow(`commandRows[${i}].game_tiers[${j}].actions`,'renderCommands',k,a)).join(''))+
-        `<button class="ghost" style="margin-top:4px" onclick="commandRows[${i}].game_tiers[${j}].actions=commandRows[${i}].game_tiers[${j}].actions||[];commandRows[${i}].game_tiers[${j}].actions.push({type:'message',message:''});renderCommands();scheduleSave()">+ Add tier action</button></div>`+
-    `</div>`).join('');
-  return `<div class="muted" style="margin:8px 0 4px">Outcome tiers <span class="muted">— pick an operator (≥, &gt;, =, ≠, &lt;, ≤) &amp; value; among all tiers that match the final score, the <b>highest value</b> wins (add a <b>≥ 0</b> tier as the floor/loss).</span></div>`+
+      actionsSection('⚙️ Actions on this tier', `commandRows[${i}].game_tiers[${j}].actions`, 'renderCommands',
+        t.actions, "{type:'message',message:''}",
+        'Run after the score line posts — message/fire rows (fires credit the player), award, achievement, capacity, … <code>[score]</code> and <code>[game]</code> work.')+
+    `</div>`;
+  }).join('');
+  return `<div class="muted" style="margin:8px 0 4px">Outcome tiers <span class="muted">— among all tiers the final score matches, the <b>highest value</b> wins (add a <b>≥ 0</b> tier as the floor/loss).</span></div>`+
     (rows||'<div class="muted" style="margin-bottom:4px">no tiers yet</div>')+
-    `<button class="ghost" style="margin-top:6px" onclick="addTier(${i})">+ Add tier</button>`;
-}
-function tierFiresEditor(i,j,t){
-  const fires=t.fires||[];
-  const rows=fires.map((f,k)=>
-    `<div class="row" style="gap:8px;align-items:center">`+
-      `<span class="muted">Device</span><select onchange="setTierFire(${i},${j},${k},'device_id',this.value)">${cmdDeviceOpts(f.device_id)}</select>`+
-      `<span class="muted">for</span><input type="number" value="${f.seconds??''}" min="0" step="0.5" style="width:70px" onchange="setTierFire(${i},${j},${k},'seconds',this.value)"><span class="muted">s</span>`+
-      `<button class="ghost" onclick="removeTierFire(${i},${j},${k})">✕</button>`+
-    `</div>`).join('');
-  return `<div style="border-top:1px solid var(--line);padding-top:4px"><div class="muted" style="margin-bottom:4px">Fires on this tier (credited to the player)</div>${rows}`+
-    `<button class="ghost" style="margin-top:4px" onclick="addTierFire(${i},${j})">+ Add Device Fire</button></div>`;
+    `<button class="ghost" style="margin-top:6px" onclick="addTier(${i});tierOpen.add('tier:${i}:'+(commandRows[${i}].game_tiers.length-1))">+ Add tier</button>`;
 }
 function setTier(i,j,field,val){ const t=(commandRows[i].game_tiers||[])[j]; if(!t) return; t[field]=(field==='min')?(val===''?0:+val):val; scheduleSave(); }
-function addTier(i){ commandRows[i].game_tiers=commandRows[i].game_tiers||[]; commandRows[i].game_tiers.push({op:'>=',min:0,message:'',fires:[],actions:[]}); renderCommands(); scheduleSave(); }
+function addTier(i){ commandRows[i].game_tiers=commandRows[i].game_tiers||[]; commandRows[i].game_tiers.push({op:'>=',min:0,actions:[]}); renderCommands(); scheduleSave(); }
 function removeTier(i,j){ (commandRows[i].game_tiers||[]).splice(j,1); renderCommands(); scheduleSave(); }
-function setTierFire(i,j,k,field,val){ const f=(((commandRows[i].game_tiers||[])[j]||{}).fires||[])[k]; if(!f) return; f[field]=(field==='seconds')?(val===''?null:+val):(val||null); scheduleSave(); }
-function addTierFire(i,j){ const t=(commandRows[i].game_tiers||[])[j]; if(!t) return; t.fires=t.fires||[]; t.fires.push({device_id:null,seconds:5}); renderCommands(); scheduleSave(); }
-function removeTierFire(i,j,k){ const t=(commandRows[i].game_tiers||[])[j]; if(!t) return; (t.fires||[]).splice(k,1); renderCommands(); scheduleSave(); }
 function renderCommands(){
   const box = $('#commands'); box.innerHTML='';
   if(!commandRows.length){ box.innerHTML='<div class="muted">No custom commands yet.</div>'; return; }
@@ -2286,15 +2290,17 @@ function renderCommands(){
     allDevices.map(d=>`<option value="${esc(d.id)}" ${sel===d.id?'selected':''}>${esc(d.label)}</option>`).join('');
   commandRows.forEach((c,i)=>{
     const open = cmdOpen.has(i);
-    const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap='10px';
+    const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap=open?'10px':'0px';
     const pf = ($('#prefix')?.value)||'!';
-    // COMPACT HEADER (always shown)
+    // COMPACT HEADER (always shown) — one row: game commands show their game,
+    // plain ones nothing (everything is actions; no point saying so)
+    const meta = [(c.type||'').indexOf('game-')===0 ? c.type.replace('game-','🎮 ') : '',
+                  c.owner_only ? 'owner-only' : ''].filter(Boolean).join(' · ');
     let html =
-      `<div class="row" style="gap:10px">`+
+      `<div class="row" style="gap:10px;flex-wrap:nowrap">`+
         `<label class="row" style="gap:5px" title="enabled"><input type="checkbox" ${c.enabled!==false?'checked':''} onchange="toggleCmd(${i}, this.checked)"></label>`+
         `<b style="min-width:120px">${pf}${esc(c.name||'(unnamed)')}</b>`+
-        `<span class="muted">${esc(c.type||'actions')}${c.owner_only?' · owner-only':''}</span>`+
-        `<div style="flex:1"></div>`+
+        `<span class="muted" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(meta)}</span>`+
         `<button class="ghost" title="Duplicate" onclick="copyCommand(${i})">📋</button>`+
         `<button class="ghost" title="Save as template" onclick="saveTemplate('commands',${i})">💾</button>`+
         `<button class="ghost" title="${open?'Collapse':'Edit'}" onclick="toggleCmdOpen(${i})">${open?'▾':'✏️'}</button>`+
@@ -2303,23 +2309,25 @@ function renderCommands(){
     if(open){
       const typ=(c.type||'actions'), isGame=typ.indexOf('game-')===0;
       html +=
-      `<div class="fgrid">`+
-        `<label class="field">Name <input value="${esc(c.name||'')}" placeholder="spin" onchange="renameCommand(${i}, this.value)"></label>`+
-        `<label class="field">Type <select onchange="commandRows[${i}].type=this.value;renderCommands()">`+
+      `<div class="row" style="gap:12px;align-items:flex-end">`+
+        `<label class="field">Name <input value="${esc(c.name||'')}" placeholder="spin" style="width:180px" onchange="renameCommand(${i}, this.value)"></label>`+
+        `<label class="field">Type <select style="width:210px" onchange="commandRows[${i}].type=this.value;renderCommands()">`+
           [['actions','actions'],['game-pushluck','minigame · push luck'],['game-simon','minigame · simon'],['game-balloon','minigame · balloon'],['game-rps','minigame · rock paper scissors'],['game-slots','minigame · slots'],['game-blackjack','minigame · blackjack']].map(([v,l])=>`<option value="${v}" ${typ===v?'selected':''}>${l}</option>`).join('')+`</select></label>`+
-        (typ==='game-pushluck'?`<label class="field">Bust start % <input type="number" min="0" max="100" value="${c.pl_bust_start??15}" onchange="commandRows[${i}].pl_bust_start=+this.value"></label>`+
-          `<label class="field">+% / pump <input type="number" min="0" max="100" value="${c.pl_bust_step??12}" onchange="commandRows[${i}].pl_bust_step=+this.value"></label>`+
-          `<label class="field">Max pumps <input type="number" min="1" value="${c.pl_max_pumps??8}" onchange="commandRows[${i}].pl_max_pumps=+this.value"></label>`+
-          `<label class="field">Points/pump <input type="number" min="0" step="0.5" value="${c.pl_points??1}" onchange="commandRows[${i}].pl_points=+this.value"></label>`:'')+
-        (typ==='game-simon'?`<label class="field">Symbols <input type="number" min="2" max="6" value="${c.sm_symbols??4}" onchange="commandRows[${i}].sm_symbols=+this.value"></label>`+
-          `<label class="field">Max rounds <input type="number" min="1" value="${c.sm_max_rounds??8}" onchange="commandRows[${i}].sm_max_rounds=+this.value"></label>`+
-          `<label class="field">Reveal (s) <input type="number" min="1" step="0.5" value="${c.sm_reveal??3}" onchange="commandRows[${i}].sm_reveal=+this.value"></label>`:'')+
-        (typ==='game-balloon'?`<label class="field">Cells <input type="number" min="2" max="20" value="${c.bl_cells??9}" onchange="commandRows[${i}].bl_cells=+this.value"></label>`+
-          `<label class="field">Balloons <input type="number" min="1" value="${c.bl_pops??3}" onchange="commandRows[${i}].bl_pops=+this.value"></label>`+
-          `<label class="field">Points/cell <input type="number" min="0" step="0.5" value="${c.bl_points??1}" onchange="commandRows[${i}].bl_points=+this.value"></label>`:'')+
-        (typ==='game-rps'?`<label class="field">Rounds to win <input type="number" min="1" value="${c.rps_wins??3}" onchange="commandRows[${i}].rps_wins=+this.value"></label>`:'')+
-        (typ==='game-slots'?`<label class="field">Symbols <span class="muted">(more = rarer wins)</span> <input type="number" min="2" max="8" value="${c.sl_symbols??6}" onchange="commandRows[${i}].sl_symbols=+this.value"></label>`:'')+
       `</div>`+
+      (isGame?`<div class="row" style="gap:12px;align-items:flex-end;flex-wrap:nowrap">`:'')+
+        (typ==='game-pushluck'?`<label class="field">Bust start % <input type="number" min="0" max="100" value="${c.pl_bust_start??15}" style="width:80px" onchange="commandRows[${i}].pl_bust_start=+this.value"></label>`+
+          `<label class="field">+% / pump <input type="number" min="0" max="100" value="${c.pl_bust_step??12}" style="width:80px" onchange="commandRows[${i}].pl_bust_step=+this.value"></label>`+
+          `<label class="field">Max pumps <input type="number" min="1" value="${c.pl_max_pumps??8}" style="width:80px" onchange="commandRows[${i}].pl_max_pumps=+this.value"></label>`+
+          `<label class="field">Points/pump <input type="number" min="0" step="0.5" value="${c.pl_points??1}" style="width:90px" onchange="commandRows[${i}].pl_points=+this.value"></label>`:'')+
+        (typ==='game-simon'?`<label class="field">Symbols <input type="number" min="2" max="6" value="${c.sm_symbols??4}" style="width:80px" onchange="commandRows[${i}].sm_symbols=+this.value"></label>`+
+          `<label class="field">Max rounds <input type="number" min="1" value="${c.sm_max_rounds??8}" style="width:80px" onchange="commandRows[${i}].sm_max_rounds=+this.value"></label>`+
+          `<label class="field">Reveal (s) <input type="number" min="1" step="0.5" value="${c.sm_reveal??3}" style="width:80px" onchange="commandRows[${i}].sm_reveal=+this.value"></label>`:'')+
+        (typ==='game-balloon'?`<label class="field">Cells <input type="number" min="2" max="20" value="${c.bl_cells??9}" style="width:80px" onchange="commandRows[${i}].bl_cells=+this.value"></label>`+
+          `<label class="field">Balloons <input type="number" min="1" value="${c.bl_pops??3}" style="width:80px" onchange="commandRows[${i}].bl_pops=+this.value"></label>`+
+          `<label class="field">Points/cell <input type="number" min="0" step="0.5" value="${c.bl_points??1}" style="width:90px" onchange="commandRows[${i}].bl_points=+this.value"></label>`:'')+
+        (typ==='game-rps'?`<label class="field">Rounds to win <input type="number" min="1" value="${c.rps_wins??3}" style="width:90px" onchange="commandRows[${i}].rps_wins=+this.value"></label>`:'')+
+        (typ==='game-slots'?`<label class="field">Symbols <input type="number" min="2" max="8" value="${c.sl_symbols??6}" style="width:80px" title="more symbols = rarer wins" onchange="commandRows[${i}].sl_symbols=+this.value"></label>`:'')+
+      (isGame?`</div>`:'')+
       `<div class="muted" style="font-size:12px">${cmdRangeSummary(c.name)}</div>`+
       `<div class="row" style="gap:16px">`+
         `<label class="field" title="EXTRA restriction on top of range membership: even where the command is a member, it only responds while capacity is inside this band. 'All ranges' (default) = no extra gate.">Range gate <select onchange="commandRows[${i}].range_gate=this.value;scheduleSave()">${rangeGateOptions(c.range_gate)}</select></label>`+
@@ -2334,9 +2342,9 @@ function renderCommands(){
       (isGame
         ? `<label class="field">Intro message <span class="muted">(shown with the ▶ Play button · [user] [mention])</span><input value="${esc(c.game_intro||'')}" onchange="commandRows[${i}].game_intro=this.value"></label>`+
           gameTiersEditor(i, c)
-        : `<div style="border-top:1px solid var(--line);padding-top:8px;margin-top:4px"><div class="muted" style="margin-bottom:6px"><b>Actions</b> — run in order when the command is used. Fires credit the runner; the bot speaks through <b>message</b> rows (a fire/roll publishes <code>[secs]</code>/<code>[result]</code> for rows after it).</div>`+
-          ((c.actions||[]).map((a,j)=>actionRow(`commandRows[${i}].actions`,'renderCommands',j,a)).join('')||'<div class="muted">no actions yet</div>')+
-          `<button class="ghost" style="margin-top:6px" onclick="commandRows[${i}].actions=commandRows[${i}].actions||[];commandRows[${i}].actions.push({type:'fire',seconds:3});renderCommands();scheduleSave()">+ Add action</button></div>`)+
+        : actionsSection('⚙️ Actions', `commandRows[${i}].actions`, 'renderCommands',
+            c.actions, "{type:'fire',fire_mode:'seconds',seconds:3}",
+            'Run in order when the command is used. Fires credit the runner; the bot speaks through <b>message</b> rows (a fire/roll publishes <code>[secs]</code>/<code>[result]</code> for rows after it).'))+
       `<label class="field">Starts events <input value="${esc((c.start_events||[]).join(', '))}" placeholder="event names, comma-separated" onchange="commandRows[${i}].start_events=idList(this.value)"></label>`;
     }
     el.innerHTML = html;
@@ -2344,10 +2352,6 @@ function renderCommands(){
   });
 }
 function addCommand(){ commandRows.push({name:'',type:'actions',actions:[{type:'fire',fire_mode:'seconds',seconds:3}],enabled:true,owner_only:false,start_events:[],range_gate:'all',description:'',hide_in_list:false,react_only:false,react_emoji:'',game_intro:'',game_tiers:[]}); renderCommands(); renderRanges(); }
-function cleanFires(arr){
-  return (arr||[]).filter(f=>f && (f.seconds!=null && f.seconds!=='' || f.device_id!=null))
-    .map(f=>({device_id: f.device_id||null, seconds: (f.seconds===''||f.seconds==null)?null:+f.seconds}));
-}
 function cleanCommands(){
   return commandRows.filter(c=>(c.name||'').trim()).map(c=>{
     const typ=c.type||'actions', isGame=typ.indexOf('game-')===0;
@@ -2366,7 +2370,7 @@ function cleanCommands(){
         sm_symbols:c.sm_symbols??4, sm_max_rounds:c.sm_max_rounds??8, sm_reveal:c.sm_reveal??3,
         bl_cells:c.bl_cells??9, bl_pops:c.bl_pops??3, bl_points:c.bl_points??1, rps_wins:c.rps_wins??3, sl_symbols:c.sl_symbols??6,
         game_intro:c.game_intro||'',
-        game_tiers:(c.game_tiers||[]).map(t=>({op:t.op||'>=', min:+t.min||0, message:t.message||'', fires:cleanFires(t.fires), actions:cleanActionRows(t.actions)})),
+        game_tiers:(c.game_tiers||[]).map(t=>({op:t.op||'>=', min:+t.min||0, actions:cleanActionRows(t.actions)})),
       });
     } else {
       o.actions = cleanActionRows(c.actions);
@@ -2434,17 +2438,16 @@ function renderEvents(){
   if(!eventRows.length){ box.innerHTML='<div class="muted">No events yet.</div>'; return; }
   eventRows.forEach((e,i)=>{
     const mode=e.mode||'loop', open=evtOpen.has(i);
-    const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap='10px';
+    const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap=open?'10px':'0px';
     // COMPACT HEADER (always shown)
     const nact=(e.actions||[]).length;
     const summary = [mode, `${nact} action${nact===1?'':'s'}`, (mode!=='once' && e.max_repeats)?('×'+e.max_repeats):'', e.every?('every '+e.every+'s'):'']
       .filter(Boolean).join(' · ');
     let html =
-      `<div class="row" style="gap:10px">`+
+      `<div class="row" style="gap:10px;flex-wrap:nowrap">`+
         `<label class="row" style="gap:5px" title="enabled"><input type="checkbox" ${e.enabled!==false?'checked':''} onchange="eventRows[${i}].enabled=this.checked"></label>`+
         `<b style="min-width:120px">${esc(e.name||'(unnamed)')}</b>`+
-        `<span class="muted">${esc(summary)}</span>`+
-        `<div style="flex:1"></div>`+
+        `<span class="muted" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(summary)}</span>`+
         `<button class="ghost" title="Duplicate" onclick="copyEvent(${i})">📋</button>`+
         `<button class="ghost" title="Save as template" onclick="saveTemplate('events',${i})">💾</button>`+
         `<button class="ghost" title="${open?'Collapse':'Edit'}" onclick="toggleEvtOpen(${i})">${open?'▾':'✏️'}</button>`+
@@ -2452,31 +2455,33 @@ function renderEvents(){
       `</div>`;
     if(open){
       html +=
-      // --- timing ---
-      `<div class="fgrid">`+
-        `<label class="field">Name <input value="${esc(e.name||'')}" placeholder="event name" onchange="renameEvent(${i},this.value)"></label>`+
-        `<label class="field">Mode <select onchange="eventRows[${i}].mode=this.value;renderEvents()">`+
+      // --- timing: name+mode, then the numeric trio on ONE compact row ---
+      `<div class="row" style="gap:12px;align-items:flex-end">`+
+        `<label class="field">Name <input value="${esc(e.name||'')}" placeholder="event name" style="width:200px" onchange="renameEvent(${i},this.value)"></label>`+
+        `<label class="field">Mode <select style="width:110px" onchange="eventRows[${i}].mode=this.value;renderEvents()">`+
           `<option value="loop" ${mode!=='once'?'selected':''}>loop</option><option value="once" ${mode==='once'?'selected':''}>once</option></select></label>`+
-        `<label class="field">Every (s) <input type="number" min="1" step="1" value="${e.every??''}" onchange="eventRows[${i}].every=+this.value"></label>`+
-        (mode!=='once'?`<label class="field">Max repeats <input type="number" min="0" step="1" value="${e.max_repeats??''}" placeholder="∞" title="stop after N repeats (blank = unlimited)" onchange="eventRows[${i}].max_repeats=(this.value===''?null:+this.value)"></label>`:'')+
-        `<label class="field">Cooldown (s) <span class="muted">(after it finishes)</span> <input type="number" min="0" step="1" value="${e.cooldown??''}" placeholder="0" onchange="eventRows[${i}].cooldown=(this.value===''?null:+this.value)"></label>`+
+      `</div>`+
+      `<div class="row" style="gap:12px;align-items:flex-end;flex-wrap:nowrap">`+
+        `<label class="field">Every (s) <input type="number" min="1" step="1" value="${e.every??''}" style="width:90px" onchange="eventRows[${i}].every=+this.value"></label>`+
+        (mode!=='once'?`<label class="field">Max repeats <input type="number" min="0" step="1" value="${e.max_repeats??''}" placeholder="∞" style="width:90px" title="stop after N repeats (blank = unlimited)" onchange="eventRows[${i}].max_repeats=(this.value===''?null:+this.value)"></label>`:'')+
+        `<label class="field">Cooldown (s) <input type="number" min="0" step="1" value="${e.cooldown??''}" placeholder="0" style="width:90px" title="cooldown after it finishes" onchange="eventRows[${i}].cooldown=(this.value===''?null:+this.value)"></label>`+
       `</div>`+
       // --- lifecycle ticks ---
       `<div class="row" style="gap:16px;flex-wrap:wrap">`+
         `<label class="row" style="gap:6px" title="fire the first loop the moment it's activated, instead of waiting one interval"><input type="checkbox" ${e.fire_immediately?'checked':''} onchange="eventRows[${i}].fire_immediately=this.checked"> Trigger First Loop Immediately</label>`+
         (mode!=='once'?`<label class="row" style="gap:6px" title="each round's messages replace the previous round's so the channel isn't spammed; the end block's first message replaces the last round"><input type="checkbox" ${e.clean_previous?'checked':''} onchange="eventRows[${i}].clean_previous=this.checked"> Clean up previous round</label>`:'')+
       `</div>`+
-      // --- the three blocks: activation → each round → end ---
-      `<details class="help" style="margin-top:4px;border-top:1px solid var(--line);padding-top:8px" ${(e.activation_actions||[]).length?'open':''}>`+
-        `<summary><b>🚀 On activation</b> <span class="muted">(${(e.activation_actions||[]).length} — run once when a command starts this event, before round 1)</span></summary>`+
-        `<div style="margin-top:6px">`+
-        ((e.activation_actions||[]).map((a,j)=>actionRow(`eventRows[${i}].activation_actions`,'renderEvents',j,a)).join('')||'<div class="muted">none yet</div>')+
-        `<button class="ghost" style="margin-top:6px" onclick="eventRows[${i}].activation_actions=eventRows[${i}].activation_actions||[];eventRows[${i}].activation_actions.push({type:'message',message:''});renderEvents();scheduleSave()">+ Add activation action</button>`+
-      `</div></details>`+
-      `<div style="border-top:1px solid var(--line);padding-top:8px;margin-top:8px"><div class="muted" style="margin-bottom:6px"><b>🔁 Each round</b> — actions run in order (<code>[current_loop]</code> <code>[event]</code> <code>[next_round]</code> work; the bot speaks through <b>message</b> rows):</div>`+
-        ((e.actions||[]).map((a,j)=>actionRow(`eventRows[${i}].actions`,'renderEvents',j,a)).join('')||'<div class="muted" style="margin-bottom:6px">no actions yet</div>')+
-        `<button class="ghost" style="margin-top:4px" onclick="eventRows[${i}].actions=eventRows[${i}].actions||[];eventRows[${i}].actions.push({type:'message',message:''});renderEvents();scheduleSave()">+ Add action</button></div>`;
-      html += postActionsSection(`eventRows[${i}].post_actions`, 'renderEvents', e.post_actions, timedEvPollLabels(e));
+      // --- the three blocks: activation → each round → end (all collapsible) ---
+      actionsSection('🚀 On activation', `eventRows[${i}].activation_actions`, 'renderEvents',
+        e.activation_actions, "{type:'message',message:''}",
+        'Run once when a command starts this event, before round 1.')+
+      actionsSection('🔁 Each round', `eventRows[${i}].actions`, 'renderEvents',
+        e.actions, "{type:'message',message:''}",
+        'Run in order every round — <code>[current_loop]</code> <code>[event]</code> <code>[next_round]</code> work; the bot speaks through <b>message</b> rows.')+
+      actionsSection('🏁 When it ends', `eventRows[${i}].post_actions`, 'renderEvents',
+        e.post_actions, "{type:'message',message:''}",
+        'Run AFTER the final round, detached from the event — e.g. “wait 5m → do X”.',
+        timedEvPollLabels(e).length?timedEvPollLabels(e):null);
     }
     el.innerHTML=html; box.appendChild(el);
   });
@@ -2592,12 +2597,59 @@ function pollLabelsByName(name){
   const p = pollRows.find(x=>(x.name||'').trim().toLowerCase()===String(name||'').trim().toLowerCase());
   return p ? (p.options||[]).map(o=>(o.label||'').trim()) : [];
 }
+// ---- collapsible action-block sections (every editor's blocks) ----
+// open/closed state persists across re-renders, keyed by the block's base expr.
+let secOpen = new Set();
+function secToggle(el, key){ if(el.open) secOpen.add(key); else secOpen.delete(key); }
+// A collapsible action-block section: summary = label + row count; body = the
+// rows + an add button (+ optional note). `addRow` = the JS literal pushed by
+// the add button; `condLabels` (post-event blocks) = the poll-winner gate.
+function actionsSection(label, base, rr, arr, addRow, note, condLabels){
+  arr = arr || [];
+  const open = secOpen.has(base);
+  return `<details class="help" style="border-top:1px solid var(--line);padding-top:8px;margin-top:6px" ${open?'open':''} ontoggle="secToggle(this,'${base}')">`+
+    `<summary><b>${label}</b> <span class="muted">(${arr.length} action${arr.length===1?'':'s'})</span></summary>`+
+    `<div style="margin-top:6px">`+
+    (note?`<div class="muted" style="margin-bottom:6px">${note}</div>`:'')+
+    (arr.map((a,j)=>actionRow(base,rr,j,a,condLabels)).join('')||'<div class="muted">none yet</div>')+
+    `<button class="ghost" style="margin-top:6px" onclick="${base}=${base}||[];${base}.push(${addRow});secOpen.add('${base}');actOpen.add('${base}['+(${base}.length-1)+']');${rr}();scheduleSave()">+ Add action</button>`+
+    `</div></details>`;
+}
 // Generic action-block row shared by capacity events and poll options.
 // `base` = the JS expression for the actions array; `rr` = re-render fn name.
 // `condLabels` (post-event blocks only): when provided, prepend a "Run: Always
 // / If option N won" gate tied to the last poll's winner.
+// Per-action-row expand/collapse (keyed by base+index; new rows open themselves).
+let actOpen = new Set();
+// One-line gist of a row for its collapsed state.
+function actGist(a){
+  const t=(a.type||'message');
+  const s=v=>String(v==null?'':v);
+  if(t==='message') return (a.style==='embed'?'embed · ':'')+s(a.message).split('\n')[0];
+  if(t==='fire') return (a.fire_mode==='to')?`to ${s(a.fill_pct)}%`:(a.fire_mode==='add')?`add ${s(a.fill_pct)}%`:`${s(a.seconds??3)}s`;
+  if(t==='roll') return (a.dice||a.sides)?`${s(a.dice)||'rng'}d${s(a.sides)||'rng'}`:'range dice';
+  if(t==='chance') return `${s(a.chance??50)}%`;
+  if(t==='capacity') return `${a.capacity_op==='set'?'set':'add'} ${s(a.capacity_value)}%`;
+  if(t==='wait') return `${s(a.seconds??10)}s`;
+  if(t==='award') return (a.award_type==='secs'||a.award_type==='pct')?`${s(a.amount)} ${a.award_type} → ${s(a.target)||'[winner]'}`:`!${s(a.command)||'?'} → ${s(a.target)||'[winner]'}`;
+  if(t==='command_gate') return `${(a.modifiers||[]).length} modifier${(a.modifiers||[]).length===1?'':'s'}`;
+  return s(a[t])||'';   // poll/competition/bonus_round/broadcast/command name
+}
 function actionRow(base, rr, j, a, condLabels){
   const typ=(a.type||'message');
+  const rowKey = `${base}[${j}]`;
+  if(!actOpen.has(rowKey)){
+    // COLLAPSED: one row — handle · type · gist · duplicate / edit / delete
+    const bA=esc(base), kA=esc(rowKey);
+    return `<div class="dev" style="gap:8px" ondragover="actDragOver(event)" ondrop="actDrop(event,'${bA}',${j},'${rr}')">`+
+      `<span class="draghandle" draggable="true" title="Drag to reorder" ondragstart="actDragStart(event,'${bA}',${j})" ondragend="actDragEnd(event)">⋮⋮</span>`+
+      `<b style="min-width:110px">${esc(typ)}</b>`+
+      `<span class="muted" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(actGist(a))}</span>`+
+      `<button class="ghost" title="Duplicate" onclick="actCopy('${bA}',${j},'${rr}')">📋</button>`+
+      `<button class="ghost" title="Edit" onclick="actOpen.add('${kA}');${rr}()">✏️</button>`+
+      `<button class="ghost" title="Delete" onclick="${base}.splice(${j},1);${rr}();scheduleSave()">✕</button>`+
+    `</div>`;
+  }
   const T = f=>`${base}[${j}].${f}`;
   let cond='';
   if(condLabels){
@@ -2610,25 +2662,25 @@ function actionRow(base, rr, j, a, condLabels){
     }
     cond=`<label class="field">Run <select onchange="${T('if_option')}=+this.value;scheduleSave()">${opts}</select></label>`;
   }
-  const typeSel = cond + `<label class="field">Action <select onchange="${T('type')}=this.value;${rr}();scheduleSave()">`+
-    ['message','broadcast','command','fire','roll','chance','capacity','wait','poll','competition','bonus_round','award','command_gate','stop_devices','end_session'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`;
-  let fields='';
+  const typeSel = `<select onchange="${T('type')}=this.value;${rr}();scheduleSave()">`+
+    ['message','broadcast','command','fire','roll','chance','capacity','wait','poll','competition','bonus_round','award','command_gate','stop_devices','end_session'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select>`;
+  let fields=cond;
   if(typ==='wait')
-    fields += `<label class="field">Seconds <span class="muted">(number or [placeholder])</span> <input value="${esc(String(a.seconds??10))}" placeholder="10 or [winner_score]" style="width:150px" onchange="${T('seconds')}=this.value;scheduleSave()"></label>`;
+    fields += `<label class="field">Seconds <input value="${esc(String(a.seconds??10))}" placeholder="10" title="a number or a [placeholder] like [winner_score]" style="width:110px" onchange="${T('seconds')}=this.value;scheduleSave()"></label>`;
   if(typ==='fire'){
     const fm = a.fire_mode||'seconds';
     fields += `<label class="field">Amount <select onchange="${T('fire_mode')}=this.value;${rr}();scheduleSave()">`+
       [['seconds','seconds'],['add','add %'],['to','to %']].map(([v,l])=>`<option value="${v}" ${fm===v?'selected':''}>${l}</option>`).join('')+`</select></label>`;
     if(fm==='seconds')
-      fields += `<label class="field">Seconds <span class="muted">(number or [placeholder])</span> <input value="${esc(String(a.seconds??3))}" placeholder="3 or [winner_score]" style="width:150px" onchange="${T('seconds')}=this.value;scheduleSave()"></label>`;
+      fields += `<label class="field">Seconds <input value="${esc(String(a.seconds??3))}" placeholder="3" title="a number or a [placeholder] like [winner_score]" style="width:110px" onchange="${T('seconds')}=this.value;scheduleSave()"></label>`;
     else
-      fields += `<label class="field">${fm==='to'?'To capacity %':'Add %'} <span class="muted">(pumps until ${fm==='to'?'it reaches':'it adds'} this · [secs] = the time it takes)</span> <input value="${esc(String(a.fill_pct??10))}" placeholder="10 or [placeholder]" style="width:150px" onchange="${T('fill_pct')}=this.value;scheduleSave()"></label>`;
+      fields += `<label class="field">${fm==='to'?'To %':'Add %'} <input value="${esc(String(a.fill_pct??10))}" placeholder="10" title="pumps until capacity ${fm==='to'?'reaches':'adds'} this — [secs] = the time it takes" style="width:110px" onchange="${T('fill_pct')}=this.value;scheduleSave()"></label>`;
     fields += `<label class="row" style="gap:6px"><input type="checkbox" ${a.block_during?'checked':''} onchange="${T('block_during')}=this.checked;${rr}();scheduleSave()"> Block others while pumping</label>`;
   }
   if(typ==='roll')
-    fields += `<label class="field">Dice <span class="muted">(fallback — the range's dice win)</span> <input type="number" min="1" value="${a.dice??''}" placeholder="rng" style="width:70px" onchange="${T('dice')}=(this.value===''?null:+this.value);scheduleSave()"></label>`+
-      `<label class="field">Sides <input type="number" min="1" value="${a.sides??''}" placeholder="rng" style="width:70px" onchange="${T('sides')}=(this.value===''?null:+this.value);scheduleSave()"></label>`+
-      `<label class="field">Luck % <span class="muted">(±force max/min · range luck wins)</span> <input type="number" min="-100" max="100" step="1" value="${a.luck??''}" placeholder="0" style="width:80px" onchange="${T('luck')}=(this.value===''?null:+this.value);scheduleSave()"></label>`;
+    fields += `<label class="field">Dice <select style="width:80px" title="fallback — the range's dice win" onchange="${T('dice')}=(this.value===''?null:+this.value);scheduleSave()"><option value="" ${!a.dice?'selected':''}>rng</option>${d20Options(a.dice)}</select></label>`+
+      `<label class="field">Sides <select style="width:80px" title="fallback — the range's sides win" onchange="${T('sides')}=(this.value===''?null:+this.value);scheduleSave()"><option value="" ${!a.sides?'selected':''}>rng</option>${d20Options(a.sides)}</select></label>`+
+      `<label class="field">Luck % <input type="number" min="-100" max="100" step="1" value="${a.luck??''}" placeholder="0" style="width:80px" title="± % chance to force max/min — range luck wins" onchange="${T('luck')}=(this.value===''?null:+this.value);scheduleSave()"></label>`;
   if(typ==='chance')
     fields += `<label class="field">Chance % <input type="number" min="0" max="100" step="1" value="${a.chance??50}" style="width:80px" onchange="${T('chance')}=Math.max(0,Math.min(100,+this.value||0));scheduleSave()"></label>`+
       `<label class="field">Luck % <span class="muted">(±force win/loss)</span> <input type="number" min="-100" max="100" step="1" value="${a.luck??''}" placeholder="0" style="width:80px" onchange="${T('luck')}=(this.value===''?null:+this.value);scheduleSave()"></label>`;
@@ -2674,12 +2726,12 @@ function actionRow(base, rr, j, a, condLabels){
       fields += `<label class="field">Amount <span class="muted">(${at==='pct'?'capacity %':'pump seconds'} · number or [placeholder])</span> <input value="${esc(String(a.amount??10))}" placeholder="10 or [winner_score]" style="width:150px" onchange="${T('amount')}=this.value;scheduleSave()"></label>`;
     }
   }
-  if(typ==='command_gate')
-    fields += `<span class="muted">stack modifiers below ↓</span>`;
-  if(typ==='stop_devices')
-    fields += `<span class="muted">stops ALL devices now (kills any running pump)</span>`;
-  if(typ==='end_session')
-    fields += `<span class="muted">ends the session · posts your OFF message ${'⚠ nothing after this runs'}</span>`;
+  // type notes: shrinkable so the row never wraps into multiple lines
+  const NOTE={command_gate:'modifiers below ↓',
+    stop_devices:'stops ALL devices now',
+    end_session:'ends the session ⚠ nothing after runs'};
+  if(NOTE[typ])
+    fields += `<span class="muted" style="flex:1 1 100px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${NOTE[typ]}">${NOTE[typ]}</span>`;
   // the bot speaks ONLY through message rows — results flow on as placeholders
   // (a fire/roll publishes [secs]/[result], an award [target]/[bonus_cmd]/[amount],
   // a chance [roll]/[chance]) so put a message row after the row that produces them.
@@ -2701,7 +2753,7 @@ function actionRow(base, rr, j, a, condLabels){
       al+
       `<div class="muted">When pressed (or on deadline), run:</div>`+
       ((a.actions||[]).map((x,k)=>actionRow(nb,rr,k,x)).join('')||'<div class="muted">no actions yet</div>')+
-      `<button class="ghost" style="margin-top:4px;align-self:flex-start" onclick="${nb}=${nb}||[];${nb}.push({type:'fire',fire_mode:'to',fill_pct:100});${rr}();scheduleSave()">+ Add button action</button>`+
+      `<button class="ghost" style="margin-top:4px;align-self:flex-start" onclick="${nb}=${nb}||[];${nb}.push({type:'fire',fire_mode:'to',fill_pct:100});actOpen.add('${nb}['+(${nb}.length-1)+']');${rr}();scheduleSave()">+ Add button action</button>`+
     `</div>`;
   }
   if(typ==='fire'){
@@ -2710,7 +2762,7 @@ function actionRow(base, rr, j, a, condLabels){
     nested = `<div class="colsec" style="margin-left:12px;border-left:2px solid var(--line);padding-left:10px;margin-top:6px;gap:6px">`+
       `<div class="muted">Post-Pump Actions <span class="muted">(run once this pump expires; the fire waits it out${a.block_during?', blocking others':''})</span></div>`+
       (has?(a.post_actions||[]).map((x,k)=>actionRow(nb,rr,k,x)).join(''):'')+
-      `<button class="ghost" style="margin-top:4px;align-self:flex-start" onclick="${nb}=${nb}||[];${nb}.push({type:'message',message:''});${rr}();scheduleSave()">+ Add post-pump action</button>`+
+      `<button class="ghost" style="margin-top:4px;align-self:flex-start" onclick="${nb}=${nb}||[];${nb}.push({type:'message',message:''});actOpen.add('${nb}['+(${nb}.length-1)+']');${rr}();scheduleSave()">+ Add post-pump action</button>`+
     `</div>`;
   }
   if(typ==='chance'){
@@ -2718,10 +2770,10 @@ function actionRow(base, rr, j, a, condLabels){
     nested = `<div class="colsec" style="margin-left:12px;border-left:2px solid var(--line);padding-left:10px;margin-top:6px;gap:6px">`+
       `<div class="muted">🟢 On WIN <span class="muted">(runs in order · [roll] [chance] [won] flow on)</span></div>`+
       ((a.win_actions||[]).map((x,k)=>actionRow(wb,rr,k,x)).join('')||'<div class="muted">no win actions yet</div>')+
-      `<button class="ghost" style="align-self:flex-start" onclick="${wb}=${wb}||[];${wb}.push({type:'message',message:''});${rr}();scheduleSave()">+ Add win action</button>`+
+      `<button class="ghost" style="align-self:flex-start" onclick="${wb}=${wb}||[];${wb}.push({type:'message',message:''});actOpen.add('${wb}['+(${wb}.length-1)+']');${rr}();scheduleSave()">+ Add win action</button>`+
       `<div class="muted" style="margin-top:6px">🔴 On MISS</div>`+
       ((a.miss_actions||[]).map((x,k)=>actionRow(mb,rr,k,x)).join('')||'<div class="muted">no miss actions yet</div>')+
-      `<button class="ghost" style="align-self:flex-start" onclick="${mb}=${mb}||[];${mb}.push({type:'message',message:''});${rr}();scheduleSave()">+ Add miss action</button>`+
+      `<button class="ghost" style="align-self:flex-start" onclick="${mb}=${mb}||[];${mb}.push({type:'message',message:''});actOpen.add('${mb}['+(${mb}.length-1)+']');${rr}();scheduleSave()">+ Add miss action</button>`+
     `</div>`;
   }
   if(typ==='command_gate'){
@@ -2746,14 +2798,19 @@ function actionRow(base, rr, j, a, condLabels){
       `<button class="ghost" style="margin-top:4px;align-self:flex-start" onclick="${nb}=${nb}||[];${nb}.push({op:'block_all'});${rr}();scheduleSave()">+ Add modifier</button>`+
     `</div>`;
   }
-  const bAttr=esc(base);
+  const bAttr=esc(base), kAttr=esc(rowKey);
+  // header: handle · type · note · buttons pinned right (never wraps);
+  // the type's fields get their own tidy row below.
   return `<div class="dev" style="flex-direction:column;align-items:stretch;gap:6px" ondragover="actDragOver(event)" ondrop="actDrop(event,'${bAttr}',${j},'${rr}')">`+
-    `<div class="row" style="gap:8px;align-items:flex-end">`+
+    `<div class="row" style="gap:8px;flex-wrap:nowrap;align-items:center">`+
     `<span class="draghandle" draggable="true" title="Drag to reorder" ondragstart="actDragStart(event,'${bAttr}',${j})" ondragend="actDragEnd(event)">⋮⋮</span>`+
-    `${typeSel}${fields}`+
+    typeSel+
     `<div style="flex:1"></div>`+
     `<button class="ghost" title="Duplicate" onclick="actCopy('${bAttr}',${j},'${rr}')">📋</button>`+
-    `<button class="ghost" onclick="${base}.splice(${j},1);${rr}();scheduleSave()">✕</button></div>`+msg+nested+`</div>`;
+    `<button class="ghost" title="Collapse" onclick="actOpen.delete('${kAttr}');${rr}()">▾</button>`+
+    `<button class="ghost" title="Delete" onclick="${base}.splice(${j},1);${rr}();scheduleSave()">✕</button></div>`+
+    (fields?`<div class="row" style="gap:12px;align-items:flex-end">${fields}</div>`:'')+
+    msg+nested+`</div>`;
 }
 // action-row copy + drag-reorder (works within one action block, at any nesting)
 let _actDrag=null;
@@ -2770,21 +2827,8 @@ function actDrop(e, base, j, rr){
   const [it]=arr.splice(from,1); arr.splice(from<j?j-1:j,0,it);
   eval(rr+'()'); scheduleSave();
 }
-function capEvActionRow(i, j, a){ return actionRow(`capEvRows[${i}].actions`, 'renderCapEvents', j, a); }
 // A collapsible "Post Event Commands" block: actions that run AFTER the event
 // completes, detached (not part of it). Reused by capacity + timed events.
-function postActionsSection(base, rr, arr, pollLabels){
-  arr = arr || [];
-  const hasPoll = pollLabels && pollLabels.length;
-  const cond = hasPoll ? pollLabels : null;   // only show the "if option won" gate when the event runs a poll
-  const note = hasPoll ? ' · each action can be gated on which poll option won' : '';
-  return `<details class="help" style="margin-top:8px;border-top:1px solid var(--line);padding-top:8px" ${arr.length?'open':''}>`+
-    `<summary><b>🏁 When it ends</b> <span class="muted">(${arr.length} — run AFTER the event completes &amp; its effects clear; not part of it, e.g. “wait 5m → do X”${note})</span></summary>`+
-    `<div style="margin-top:6px">`+
-    (arr.map((a,j)=>actionRow(base, rr, j, a, cond)).join('')||'<div class="muted">none yet</div>')+
-    `<button class="ghost" style="margin-top:6px" onclick="${base}=${base}||[];${base}.push({type:'message',message:''});${rr}();scheduleSave()">+ Add end action</button>`+
-    `</div></details>`;
-}
 // Which poll (if any) an event runs — so its post-event actions can gate on the winner.
 function capEvPollLabels(e){
   const pa=(e.actions||[]).find(a=>(a.type==='poll')&&a.poll);
@@ -2799,11 +2843,11 @@ function renderCapEvents(){
   if(!capEvRows.length){ box.innerHTML='<div class="muted">No capacity events yet.</div>'; return; }
   capEvRows.forEach((e,i)=>{
     const open=capEvOpen.has(i);
-    const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap='10px';
+    const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap=open?'10px':'0px';
     const fx=`${(e.actions||[]).length} action${(e.actions||[]).length===1?'':'s'}`;
     let html =
       // whole header toggles this event open/closed (checkbox + delete are guarded)
-      `<div class="row" style="gap:10px;cursor:pointer" onclick="toggleCapEvOpen(${i})" title="${open?'Collapse':'Expand'}">`+
+      `<div class="row" style="gap:10px;cursor:pointer;flex-wrap:nowrap" onclick="toggleCapEvOpen(${i})" title="${open?'Collapse':'Expand'}">`+
         `<span class="muted" style="width:14px;text-align:center">${open?'▾':'▸'}</span>`+
         `<label class="row" style="gap:5px" title="enabled" onclick="event.stopPropagation()"><input type="checkbox" ${e.enabled!==false?'checked':''} onchange="capEvRows[${i}].enabled=this.checked;scheduleSave()"></label>`+
         `<b style="min-width:120px">${esc(e.name||'(unnamed)')}</b>`+
@@ -2814,19 +2858,17 @@ function renderCapEvents(){
       `</div>`;
     if(open){
       html +=
-      `<div class="fgrid">`+
-        `<label class="field">Name <input value="${esc(e.name||'')}" placeholder="halfway-chaos" onchange="capEvRows[${i}].name=this.value"></label>`+
-        `<label class="field">Triggers at capacity % <span class="muted">(1–999)</span> <input type="number" min="1" max="999" step="1" value="${e.at??50}" onchange="capEvRows[${i}].at=Math.max(1,Math.min(999,+this.value||1));scheduleSave()"></label>`+
+      `<div class="row" style="gap:12px;align-items:flex-end">`+
+        `<label class="field">Name <input value="${esc(e.name||'')}" placeholder="halfway-chaos" style="width:200px" onchange="capEvRows[${i}].name=this.value"></label>`+
+        `<label class="field">Triggers at % <input type="number" min="1" max="999" step="1" value="${e.at??50}" style="width:90px" title="capacity threshold (1–999; above 100 only inside an End Sequence)" onchange="capEvRows[${i}].at=Math.max(1,Math.min(999,+this.value||1));scheduleSave()"></label>`+
       `</div>`+
-      `<div class="colsec" style="gap:8px">`+
-        `<div class="hint" style="margin:0">Everything the event does lives in the block below: a <b>stop_devices</b> action kills any running pump, and a <b>command_gate</b> action gates play — Block/Allow/Resume commands (all, one, range, always-on) or events (one, all timed, all capacity). A <b>Resume</b> row at the end lifts it; leave it off to persist for the session.</div>`+
-      `</div>`+
-      `<div style="border-top:1px solid var(--line);padding-top:8px">`+
-        `<div class="muted" style="margin-bottom:6px"><b>During the Event</b> — the action block runs in order; the event's restrictions hold until it finishes.</div>`+
-        ((e.actions||[]).map((a,j)=>capEvActionRow(i,j,a)).join('')||'<div class="muted" style="margin-bottom:6px">no actions yet</div>')+
-        `<button class="ghost" style="margin-top:6px" onclick="capEvRows[${i}].actions=capEvRows[${i}].actions||[];capEvRows[${i}].actions.push({type:'message',message:''});renderCapEvents();scheduleSave()">+ Add action</button>`+
-      `</div>`+
-      postActionsSection(`capEvRows[${i}].post_actions`, 'renderCapEvents', e.post_actions, capEvPollLabels(e));
+      actionsSection('⚡ During the event', `capEvRows[${i}].actions`, 'renderCapEvents',
+        e.actions, "{type:'message',message:''}",
+        'Runs in order; the event counts as running until the block finishes. A <b>stop_devices</b> row kills any running pump; a <b>command_gate</b> row gates play (a <b>Resume</b> row at the end lifts it — leave it off to persist for the session).')+
+      actionsSection('🏁 When it ends', `capEvRows[${i}].post_actions`, 'renderCapEvents',
+        e.post_actions, "{type:'message',message:''}",
+        'Run AFTER the event completes &amp; its effects clear — not part of it.',
+        capEvPollLabels(e).length?capEvPollLabels(e):null);
     }
     el.innerHTML=html; box.appendChild(el);
   });
@@ -2851,10 +2893,10 @@ function renderPolls(){
   if(!pollRows.length){ box.innerHTML='<div class="muted">No polls yet.</div>'; return; }
   pollRows.forEach((p,i)=>{
     const open=pollOpen.has(i);
-    const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap='10px';
+    const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap=open?'10px':'0px';
     const nopts=(p.options||[]).length;
     let html =
-      `<div class="row" style="gap:10px">`+
+      `<div class="row" style="gap:10px;flex-wrap:nowrap">`+
         `<b style="min-width:120px">${esc(p.name||'(unnamed)')}</b>`+
         `<span class="muted" style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(p.title||'')} · ${nopts} option${nopts===1?'':'s'} · ${p.duration??60}s</span>`+
         `<button class="ghost" title="${open?'Collapse':'Edit'}" onclick="togglePollOpen(${i})">${open?'▾':'✏️'}</button>`+
@@ -2863,10 +2905,10 @@ function renderPolls(){
       `</div>`;
     if(open){
       html +=
-      `<div class="fgrid">`+
-        `<label class="field">Name <span class="muted">(how actions reference it)</span> <input value="${esc(p.name||'')}" placeholder="chaos-vote" onchange="renamePoll(${i},this.value)"></label>`+
-        `<label class="field">Duration (s) <input type="number" min="5" max="3600" value="${p.duration??60}" onchange="pollRows[${i}].duration=Math.max(5,Math.min(3600,+this.value||60));scheduleSave()"></label>`+
-        `<label class="field">Repeat message every (s) <span class="muted">(0 = off)</span> <input type="number" min="0" step="5" value="${p.repeat_every??0}" onchange="pollRows[${i}].repeat_every=Math.max(0,+this.value||0);scheduleSave()"></label>`+
+      `<div class="row" style="gap:12px;align-items:flex-end">`+
+        `<label class="field">Name <input value="${esc(p.name||'')}" placeholder="chaos-vote" title="how actions reference it" style="width:200px" onchange="renamePoll(${i},this.value)"></label>`+
+        `<label class="field">Duration (s) <input type="number" min="5" max="3600" value="${p.duration??60}" style="width:90px" onchange="pollRows[${i}].duration=Math.max(5,Math.min(3600,+this.value||60));scheduleSave()"></label>`+
+        `<label class="field">Repeat every (s) <input type="number" min="0" step="5" value="${p.repeat_every??0}" style="width:90px" title="repost the poll every N seconds (0 = off)" onchange="pollRows[${i}].repeat_every=Math.max(0,+this.value||0);scheduleSave()"></label>`+
       `</div>`+
       `<label class="field">Title <span class="muted">(embed shows “Poll: &lt;title&gt;”)</span><input value="${esc(p.title||'')}" placeholder="What happens next?" onchange="pollRows[${i}].title=this.value"></label>`+
       `<label class="field">Body <span class="muted">(under the title · placeholders work)</span><textarea rows="3" onchange="pollRows[${i}].body=this.value">${esc(p.body||'')}</textarea></label>`;
@@ -2878,9 +2920,8 @@ function renderPolls(){
             `<label class="row" style="gap:5px" title="wins if nobody votes"><input type="radio" name="pollfb-${i}" style="width:auto" ${o.fallback?'checked':''} onchange="setPollFallback(${i},${k})"> Fallback</label>`+
             `<button class="ghost" onclick="if(confirm('Remove option ${k+1} and its actions?')){pollRows[${i}].options.splice(${k},1);renderPolls();scheduleSave();}">✕</button>`+
           `</div>`+
-          `<div class="muted" style="font-size:12px">Actions when this option <b>wins</b>:</div>`+
-          ((o.actions||[]).map((a,j)=>actionRow(`pollRows[${i}].options[${k}].actions`,'renderPolls',j,a)).join('')||'<div class="muted">none yet</div>')+
-          `<button class="ghost" style="align-self:flex-start" onclick="pollRows[${i}].options[${k}].actions=pollRows[${i}].options[${k}].actions||[];pollRows[${i}].options[${k}].actions.push({type:'message',message:''});renderPolls();scheduleSave()">+ Add action</button>`+
+          actionsSection('🏆 If this option wins', `pollRows[${i}].options[${k}].actions`, 'renderPolls',
+            o.actions, "{type:'message',message:''}")+
         `</div>`;
       });
       html += `<div class="row" style="gap:10px">`+
@@ -2900,8 +2941,8 @@ function renderCompetitions(){
   if(!compRows.length){ box.innerHTML='<div class="muted">No competitions yet.</div>'; return; }
   compRows.forEach((c,i)=>{
     const open=compOpen.has(i); const typ=c.type||'rolloff';
-    const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap='10px';
-    let html=`<div class="row" style="gap:10px;cursor:pointer" onclick="toggleCompOpen(${i})">`+
+    const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap=open?'10px':'0px';
+    let html=`<div class="row" style="gap:10px;cursor:pointer;flex-wrap:nowrap" onclick="toggleCompOpen(${i})">`+
       `<span class="muted" style="width:14px">${open?'▾':'▸'}</span>`+
       `<b style="min-width:120px">${esc(c.name||'(unnamed)')}</b>`+
       `<span class="pill" style="padding:2px 10px;font-size:11px">${esc(typ)}</span>`+
@@ -2910,19 +2951,21 @@ function renderCompetitions(){
       `<button class="ghost" onclick="event.stopPropagation();delCompetition(${i})">✕</button></div>`;
     if(open){
       const cd=c;
-      html+=`<div class="fgrid">`+
-        `<label class="field">Name <input value="${esc(cd.name||'')}" onchange="compRows[${i}].name=this.value"></label>`+
-        `<label class="field">Type <span class="muted" style="font-size:13px">Roll-off <i>(race &amp; raffle coming back after a redesign)</i></span></label>`+
-        `<label class="field">Duration (s) <input type="number" min="5" max="3600" value="${cd.duration??60}" onchange="compRows[${i}].duration=Math.max(5,Math.min(3600,+this.value||60));scheduleSave()"></label>`+
-        `<label class="field">Repeat every (s) <input type="number" min="0" step="5" value="${cd.repeat_every??0}" onchange="compRows[${i}].repeat_every=Math.max(0,+this.value||0);scheduleSave()"></label>`+
-        (typ==='rolloff'?`<label class="field">Win by <select onchange="compRows[${i}].metric=this.value;scheduleSave()">`+
-          [['total','highest total'],['highest','highest single'],['count','most rolls']].map(([v,t])=>`<option value="${v}" ${(cd.metric||'total')===v?'selected':''}>${t}</option>`).join('')+`</select></label>`:'')+
+      html+=`<div class="row" style="gap:12px;align-items:flex-end">`+
+        `<label class="field">Name <input value="${esc(cd.name||'')}" style="width:200px" onchange="compRows[${i}].name=this.value"></label>`+
+        `<label class="field">Duration (s) <input type="number" min="5" max="3600" value="${cd.duration??60}" style="width:90px" onchange="compRows[${i}].duration=Math.max(5,Math.min(3600,+this.value||60));scheduleSave()"></label>`+
+        `<label class="field">Repeat every (s) <input type="number" min="0" step="5" value="${cd.repeat_every??0}" style="width:90px" onchange="compRows[${i}].repeat_every=Math.max(0,+this.value||0);scheduleSave()"></label>`+
+        (typ==='rolloff'?`<label class="field">Win by <select style="width:150px" onchange="compRows[${i}].metric=this.value;scheduleSave()">`+
+          [['total','highest total'],['highest','highest single'],['count','most rolls']].map(([v,t])=>`<option value="${v}" ${(cd.metric||'total')===v?'selected':''}>${t}</option>`).join('')+`</select></label>`+
+        `<label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" ${cd.allow_reroll?'checked':''} onchange="compRows[${i}].allow_reroll=this.checked;renderCompetitions();scheduleSave()"> Allow rerolls</label>`+
+        (cd.allow_reroll?`<label class="field">Rerolls <input type="number" min="0" value="${cd.reroll_count??1}" style="width:70px" title="per player — only the latest roll rerolls; earlier rolls lock in" onchange="compRows[${i}].reroll_count=Math.max(0,+this.value||0);scheduleSave()"></label>`:'')+
+        `<label class="row" style="gap:6px;white-space:nowrap" title="fire EVERY finisher's total, each credited separately — otherwise add a 'fire [winner_score]' row to the winner block for just the winner's"><input type="checkbox" ${cd.add_all_totals?'checked':''} onchange="compRows[${i}].add_all_totals=this.checked;scheduleSave()"> Add ALL totals</label>`:'')+
       `</div>`+
       ((cd.repeat_every>0)?`<label class="field">Repeat message <span class="muted">(blank = default · [remaining] time left · [standings] the board)</span><textarea rows="2" placeholder="⏳ [remaining] left! Standings:\n[standings]" onchange="compRows[${i}].repeat_message=this.value">${esc(cd.repeat_message||'')}</textarea></label>`:'')+
       (typ==='rolloff'?
       `<div style="border-top:1px solid var(--line);padding-top:8px"><div class="muted" style="margin-bottom:6px"><b>The rolls</b> — each player rolls these in order (one row = one roll). Set the dice &amp; a per-roll luck (±% to force max/min).</div>`+
         ((cd.roll_specs||[]).map((rs,k)=>
-          `<div class="row" style="gap:8px;align-items:center;margin-bottom:4px">`+
+          `<div class="row" style="gap:8px;align-items:center;margin-bottom:4px;flex-wrap:nowrap">`+
             `<span class="muted" style="min-width:52px">Roll ${k+1}</span>`+
             `<select onchange="compRows[${i}].roll_specs[${k}].dice=+this.value;scheduleSave()">${d20Options(rs.dice??1)}</select><span class="muted">d</span>`+
             `<select onchange="compRows[${i}].roll_specs[${k}].sides=+this.value;scheduleSave()">${d20Options(rs.sides??6)}</select>`+
@@ -2931,22 +2974,16 @@ function renderCompetitions(){
           `</div>`).join('')||'<div class="muted">no rolls yet</div>')+
         `<button class="ghost" style="margin-top:6px" onclick="compRows[${i}].roll_specs=compRows[${i}].roll_specs||[];compRows[${i}].roll_specs.push({dice:1,sides:6,luck:0});renderCompetitions();scheduleSave()">+ Add roll</button>`+
       `</div>`:'')+
-      (typ==='rolloff'?`<div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end">`+
-        `<label class="row" style="gap:6px"><input type="checkbox" ${cd.allow_reroll?'checked':''} onchange="compRows[${i}].allow_reroll=this.checked;renderCompetitions();scheduleSave()"> Allow rerolls</label>`+
-        (cd.allow_reroll?`<label class="field">Rerolls per player <span class="muted">(only the latest roll; earlier rolls lock in)</span> <input type="number" min="0" value="${cd.reroll_count??1}" style="width:80px" onchange="compRows[${i}].reroll_count=Math.max(0,+this.value||0);scheduleSave()"></label>`:'')+
-      `</div>`:'')+
+
       `<label class="field">Titlebar <input value="${esc(cd.title||'')}" placeholder="ROLL-OFF!" onchange="compRows[${i}].title=this.value"></label>`+
       `<label class="field">Body <span class="muted">(embed text under the titlebar · placeholders work)</span><textarea rows="3" onchange="compRows[${i}].body=this.value">${esc(cd.body||'')}</textarea></label>`+
       // rewards = a full action block run when there's a winner
-      `<div style="border-top:1px solid var(--line);padding-top:8px">`+
-        (typ==='rolloff'?`<label class="row" style="gap:6px;margin-bottom:6px"><input type="checkbox" ${cd.add_all_totals?'checked':''} onchange="compRows[${i}].add_all_totals=this.checked;scheduleSave()"> Add <b>ALL</b> player totals to the timer <span class="muted">(each credited separately — otherwise add a <code>fire [winner_score]</code> action below for just the winner's)</span></label>`:'')+
-        `<div class="muted" style="margin-bottom:6px"><b>Winner reward actions</b> — run in order when there's a winner. Placeholders: <code>[winner]</code> <code>[winner_score]</code> <code>[runnerup]</code> <code>[results]</code> <code>[mention]</code>. Fires credit the winner (use <code>fire [winner_score]</code> to add their total). Post a <b>message/embed</b> with a gated button, <b>award</b> a command/amount, or <b>command_gate</b> everyone else.</div>`+
-        ((cd.win_actions||[]).map((a,j)=>actionRow(`compRows[${i}].win_actions`,'renderCompetitions',j,a)).join('')||'<div class="muted" style="margin-bottom:6px">no reward actions yet</div>')+
-        `<button class="ghost" style="margin-top:6px" onclick="compRows[${i}].win_actions=compRows[${i}].win_actions||[];compRows[${i}].win_actions.push({type:'message',message:''});renderCompetitions();scheduleSave()">+ Add reward action</button>`+
-        `<div class="muted" style="margin:10px 0 6px"><b>No-winner actions</b> <span class="muted">(optional · run when nobody qualified)</span></div>`+
-        ((cd.no_winner_actions||[]).map((a,j)=>actionRow(`compRows[${i}].no_winner_actions`,'renderCompetitions',j,a)).join('')||'<div class="muted" style="margin-bottom:6px">none</div>')+
-        `<button class="ghost" style="margin-top:6px" onclick="compRows[${i}].no_winner_actions=compRows[${i}].no_winner_actions||[];compRows[${i}].no_winner_actions.push({type:'message',message:''});renderCompetitions();scheduleSave()">+ Add no-winner action</button>`+
-      `</div>`;
+      actionsSection('🏆 Winner reward actions', `compRows[${i}].win_actions`, 'renderCompetitions',
+        cd.win_actions, "{type:'message',message:''}",
+        'Run in order on a win. <code>[winner]</code> <code>[winner_score]</code> <code>[runnerup]</code> <code>[results]</code> work; fires credit the winner (<code>fire [winner_score]</code> adds their total).')+
+      actionsSection('🚫 No-winner actions', `compRows[${i}].no_winner_actions`, 'renderCompetitions',
+        cd.no_winner_actions, "{type:'message',message:''}",
+        'Run when nobody qualified.');
     }
     el.innerHTML=html; box.appendChild(el);
   });
@@ -2997,19 +3034,18 @@ function renderBonusRounds(){
   if(!bonusRoundRows.length){ box.innerHTML='<div class="muted">No bonus rounds yet.</div>'; return; }
   bonusRoundRows.forEach((b,i)=>{
     const open=bonusOpen.has(i);
-    const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap='10px';
-    let html=`<div class="row" style="gap:10px;cursor:pointer" onclick="toggleBonusOpen(${i})">`+
+    const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap=open?'10px':'0px';
+    let html=`<div class="row" style="gap:10px;cursor:pointer;flex-wrap:nowrap" onclick="toggleBonusOpen(${i})">`+
       `<span class="muted" style="width:14px">${open?'▾':'▸'}</span>`+
       `<b style="min-width:120px">${esc(b.name||'(unnamed)')}</b>`+
       `<span class="pill" style="padding:2px 10px;font-size:11px">teamwork</span>`+
       `<span class="muted" style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">confirm: ${esc(b.confirm||'all')} · ${b.duration??60}s</span>`+
       `<button class="ghost" onclick="event.stopPropagation();delBonusRound(${i})">✕</button></div>`;
     if(open){
-      html+=`<div class="fgrid">`+
-        `<label class="field">Name <input value="${esc(b.name||'')}" onchange="bonusRoundRows[${i}].name=this.value"></label>`+
-        `<label class="field">Type <select disabled><option>teamwork</option></select></label>`+
-        `<label class="field">Duration (s) <input type="number" min="5" max="3600" value="${b.duration??60}" onchange="bonusRoundRows[${i}].duration=Math.max(5,Math.min(3600,+this.value||60));scheduleSave()"></label>`+
-        `<label class="field">Confirm from <select onchange="bonusRoundRows[${i}].confirm=this.value;scheduleSave()">`+
+      html+=`<div class="row" style="gap:12px;align-items:flex-end">`+
+        `<label class="field">Name <input value="${esc(b.name||'')}" style="width:200px" onchange="bonusRoundRows[${i}].name=this.value"></label>`+
+        `<label class="field">Duration (s) <input type="number" min="5" max="3600" value="${b.duration??60}" style="width:90px" onchange="bonusRoundRows[${i}].duration=Math.max(5,Math.min(3600,+this.value||60));scheduleSave()"></label>`+
+        `<label class="field">Confirm from <select style="width:170px" onchange="bonusRoundRows[${i}].confirm=this.value;scheduleSave()">`+
           [['all','all bonus holders'],['leader','top bonus holder']].map(([v,l])=>`<option value="${v}" ${(b.confirm||'all')===v?'selected':''}>${l}</option>`).join('')+`</select></label>`+
       `</div>`+
       `<label class="field">Titlebar <input value="${esc(b.title||'')}" placeholder="BONUS ROUND!" onchange="bonusRoundRows[${i}].title=this.value"></label>`+
@@ -3017,10 +3053,9 @@ function renderBonusRounds(){
       `<label class="field">No-holders message <span class="muted">(nobody has a banked bonus)</span><input value="${esc(b.no_holders_message||'')}" placeholder="(silent)" onchange="bonusRoundRows[${i}].no_holders_message=this.value"></label>`+
       `<label class="field">Expired message <span class="muted">(not confirmed in time)</span><input value="${esc(b.expire_message||'')}" placeholder="(silent)" onchange="bonusRoundRows[${i}].expire_message=this.value"></label>`+
       `<div style="border-top:1px solid var(--line);padding-top:8px">`+
-        `<div class="muted" style="margin-bottom:6px"><b>On activation</b> — run when confirmed. Pooled: <code>[total_bonus_secs]</code> <code>[total_bonus_pct]</code> (then banks are spent).</div>`+
-        ((b.actions||[]).map((a,j)=>actionRow(`bonusRoundRows[${i}].actions`,'renderBonusRounds',j,a)).join('')||'<div class="muted" style="margin-bottom:6px">no actions yet</div>')+
-        `<button class="ghost" style="margin-top:6px" onclick="bonusRoundRows[${i}].actions=bonusRoundRows[${i}].actions||[];bonusRoundRows[${i}].actions.push({type:'fire',seconds:'[total_bonus_secs]',message:'🎉 Teamwork! +[secs]s'});renderBonusRounds();scheduleSave()">+ Add activation action</button>`+
-      `</div>`;
+      actionsSection('🎉 On activation', `bonusRoundRows[${i}].actions`, 'renderBonusRounds',
+        b.actions, "{type:'fire',fire_mode:'seconds',seconds:'[total_bonus_secs]'}",
+        'Run when confirmed. Pooled: <code>[total_bonus_secs]</code> <code>[total_bonus_pct]</code> (then banks are spent).');
     }
     el.innerHTML=html; box.appendChild(el);
   });
@@ -3426,16 +3461,16 @@ function renderPrizes(){
         `<label class="row" style="gap:6px"><input type="checkbox" ${p.enabled!==false?'checked':''} onchange="prizeRows[${i}].enabled=this.checked;scheduleSave()"> on</label>`+
         `<div style="flex:1"></div><button class="ghost" onclick="delPrize(${i})">✕</button>`+
       `</div>`+
-      `<div class="fgrid">`+
-        `<label class="field">Name <input value="${esc(p.name||'')}" placeholder="a special reward" onchange="prizeRows[${i}].name=this.value;scheduleSave()"></label>`+
-        `<label class="field">Counter <span class="muted">("roll" = perfect rolls)</span> <input value="${esc(p.counter||'roll')}" placeholder="roll" onchange="prizeRows[${i}].counter=this.value;scheduleSave()"></label>`+
-        `<label class="field">Perfects to unlock <input type="number" value="${p.goal??3}" min="1" onchange="prizeRows[${i}].goal=+this.value;scheduleSave()"></label>`+
-        `<label class="field">Range gate <span class="muted">(where progress counts)</span> <select onchange="prizeRows[${i}].range_gate=this.value;scheduleSave()">${rangeGateOptions(p.range_gate)}</select></label>`+
+      `<div class="row" style="gap:12px;align-items:flex-end">`+
+        `<label class="field">Name <input value="${esc(p.name||'')}" placeholder="a special reward" style="width:200px" onchange="prizeRows[${i}].name=this.value;scheduleSave()"></label>`+
+        `<label class="field">Counter <input value="${esc(p.counter||'roll')}" placeholder="roll" style="width:110px" title="&quot;roll&quot; = perfect rolls; any name an achievement action bumps" onchange="prizeRows[${i}].counter=this.value;scheduleSave()"></label>`+
+        `<label class="field">Perfects <input type="number" value="${p.goal??3}" min="1" style="width:80px" title="perfects needed to unlock" onchange="prizeRows[${i}].goal=+this.value;scheduleSave()"></label>`+
+        `<label class="field">Range gate <select style="width:150px" title="where progress counts" onchange="prizeRows[${i}].range_gate=this.value;scheduleSave()">${rangeGateOptions(p.range_gate)}</select></label>`+
       `</div>`+
       `<label class="field">Progress message <span class="muted">(each perfect · [count] [goal] [remaining] [counter] [prize])</span><textarea rows="2" onchange="prizeRows[${i}].progress_message=this.value">${esc(p.progress_message||'')}</textarea></label>`+
-      `<div style="border-top:1px solid var(--line);padding-top:8px"><div class="muted" style="margin-bottom:6px"><b>On unlock</b> — run for the earner (an <b>award</b> row with target <code>[user]</code> grants them a bonus command):</div>`+
-        ((p.actions||[]).map((a,j)=>actionRow(`prizeRows[${i}].actions`,'renderPrizes',j,a)).join('')||'<div class="muted">no unlock actions yet</div>')+
-        `<button class="ghost" style="margin-top:6px" onclick="prizeRows[${i}].actions=prizeRows[${i}].actions||[];prizeRows[${i}].actions.push({type:'award',award_type:'command',target:'[user]',charges:1,stash:true});renderPrizes();scheduleSave()">+ Add unlock action</button></div>`;
+      actionsSection('🏆 On unlock', `prizeRows[${i}].actions`, 'renderPrizes',
+        p.actions, "{type:'award',award_type:'command',target:'[user]',charges:1,stash:true}",
+        'Run for the earner — an <b>award</b> row with target <code>[user]</code> grants them a bonus command.');
     box.appendChild(el);
   });
 }

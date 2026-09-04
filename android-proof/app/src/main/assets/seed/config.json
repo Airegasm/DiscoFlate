@@ -1,6 +1,6 @@
 {
   "discord_token": "",
-  "config_version": 10,
+  "config_version": 11,
   "config_rev": 0,
   "command_prefix": "!",
   "listener_enabled": false,
@@ -197,33 +197,48 @@
           {
             "op": ">=",
             "min": 0,
-            "message": "\ud83d\udca5 **[user]** busted out with **[score]**. Womp womp.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-            "fires": [
+            "actions": [
               {
-                "device_id": null,
-                "seconds": 5
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 5,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83d\udca5 **[user]** busted out with **[score]**. Womp womp.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
               }
             ]
           },
           {
             "op": ">=",
             "min": 3,
-            "message": "\ud83d\ude05 **[user]** banked **[score]** \u2014 a little reward!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-            "fires": [
+            "actions": [
               {
-                "device_id": null,
-                "seconds": 15
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 15,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83d\ude05 **[user]** banked **[score]** \u2014 a little reward!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
               }
             ]
           },
           {
             "op": ">=",
             "min": 6,
-            "message": "\ud83d\udd25 **[user]** cashed out a huge **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-            "fires": [
+            "actions": [
               {
-                "device_id": null,
-                "seconds": 28
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 28,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83d\udd25 **[user]** cashed out a huge **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
               }
             ]
           }
@@ -268,55 +283,80 @@
           {
             "op": ">=",
             "min": 0,
-            "message": "\u274c **[user]** fumbled at round **[score]**.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-            "fires": [
+            "actions": [
               {
-                "device_id": null,
-                "seconds": 5
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 5,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\u274c **[user]** fumbled at round **[score]**.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
               }
             ]
           },
           {
             "op": ">=",
             "min": 1,
-            "message": "\ud83d\udc4f **[user]** reached round **[score]** \u2014 nice!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-            "fires": [
+            "actions": [
               {
-                "device_id": null,
-                "seconds": 15
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 15,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83d\udc4f **[user]** reached round **[score]** \u2014 nice!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
               }
             ]
           },
           {
             "op": ">=",
             "min": 3,
-            "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-            "fires": [
+            "actions": [
               {
-                "device_id": null,
-                "seconds": 20
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 20,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
               }
             ]
           },
           {
             "op": ">=",
             "min": 6,
-            "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-            "fires": [
+            "actions": [
               {
-                "device_id": null,
-                "seconds": 35
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 35,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
               }
             ]
           },
           {
             "op": ">=",
             "min": 8,
-            "message": "\ud83c\udfc6 **[user]** got a PERFECT SCORE **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-            "fires": [
+            "actions": [
               {
-                "device_id": null,
-                "seconds": 50
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 50,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83c\udfc6 **[user]** got a PERFECT SCORE **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
               }
             ]
           }
@@ -361,44 +401,64 @@
           {
             "op": ">=",
             "min": 0,
-            "message": "\ud83d\udca5 **[user]** popped a balloon and walked away with the bare minimum.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-            "fires": [
+            "actions": [
               {
-                "device_id": null,
-                "seconds": 5
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 5,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83d\udca5 **[user]** popped a balloon and walked away with the bare minimum.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
               }
             ]
           },
           {
             "op": ">=",
             "min": 1,
-            "message": "\ud83c\udf88 **[user]** cashed out **[score]** \u2014 nice haul!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-            "fires": [
+            "actions": [
               {
-                "device_id": null,
-                "seconds": 10
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 10,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83c\udf88 **[user]** cashed out **[score]** \u2014 nice haul!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
               }
             ]
           },
           {
             "op": ">=",
             "min": 3,
-            "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-            "fires": [
+            "actions": [
               {
-                "device_id": null,
-                "seconds": 20
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 20,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
               }
             ]
           },
           {
             "op": ">=",
             "min": 5,
-            "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-            "fires": [
+            "actions": [
               {
-                "device_id": null,
-                "seconds": 35
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 35,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
               }
             ]
           }
@@ -443,33 +503,48 @@
           {
             "op": ">=",
             "min": 0,
-            "message": "\ud83d\udc80 **[user]** got swept by the bot in rock, paper, scissors. \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-            "fires": [
+            "actions": [
               {
-                "device_id": null,
-                "seconds": 5
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 5,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83d\udc80 **[user]** got swept by the bot in rock, paper, scissors. \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
               }
             ]
           },
           {
             "op": ">=",
             "min": 1,
-            "message": "\ud83d\ude05 **[user]** fought to **[score]** round(s) but lost the match.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-            "fires": [
+            "actions": [
               {
-                "device_id": null,
-                "seconds": 10
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 10,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83d\ude05 **[user]** fought to **[score]** round(s) but lost the match.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
               }
             ]
           },
           {
             "op": ">=",
             "min": 3,
-            "message": "\ud83c\udfc6 **[user]** BEAT the bot! **+[secs]s** added to the pump timer!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-            "fires": [
+            "actions": [
               {
-                "device_id": null,
-                "seconds": 25
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 25,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83c\udfc6 **[user]** BEAT the bot! **+[secs]s** added to the pump timer!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
               }
             ]
           }
@@ -514,33 +589,48 @@
           {
             "op": ">=",
             "min": 0,
-            "message": "\ud83c\udfb0 no match \u2014 better luck next pull, **[user]** - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
-            "fires": [
+            "actions": [
               {
-                "device_id": null,
-                "seconds": 5
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 5,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83c\udfb0 no match \u2014 better luck next pull, **[user]** - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
               }
             ]
           },
           {
             "op": ">=",
             "min": 1,
-            "message": "\ud83c\udfb0 **[user]** hit a pair \u2014 small win! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
-            "fires": [
+            "actions": [
               {
-                "device_id": null,
-                "seconds": 15
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 15,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83c\udfb0 **[user]** hit a pair \u2014 small win! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
               }
             ]
           },
           {
             "op": ">=",
             "min": 3,
-            "message": "\ud83c\udfb0\ud83c\udf89 **JACKPOT!** **[user]** hit three of a kind! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
-            "fires": [
+            "actions": [
               {
-                "device_id": null,
-                "seconds": 35
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 35,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83c\udfb0\ud83c\udf89 **JACKPOT!** **[user]** hit three of a kind! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
               }
             ]
           }
@@ -585,44 +675,64 @@
           {
             "op": ">=",
             "min": 0,
-            "message": "\ud83c\udccf **[user]** lost the hand. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
-            "fires": [
+            "actions": [
               {
-                "device_id": null,
-                "seconds": 5
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 5,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83c\udccf **[user]** lost the hand. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
               }
             ]
           },
           {
             "op": ">=",
             "min": 1,
-            "message": "\ud83c\udccf **[user]** pushed \u2014 a wash. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
-            "fires": [
+            "actions": [
               {
-                "device_id": null,
-                "seconds": 10
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 10,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83c\udccf **[user]** pushed \u2014 a wash. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
               }
             ]
           },
           {
             "op": ">=",
             "min": 2,
-            "message": "\ud83c\udccf **[user]** beat the dealer! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
-            "fires": [
+            "actions": [
               {
-                "device_id": null,
-                "seconds": 20
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 20,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83c\udccf **[user]** beat the dealer! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
               }
             ]
           },
           {
             "op": ">=",
             "min": 3,
-            "message": "\ud83c\udccf\ud83c\udca1 **BLACKJACK!** **[user] dominated the dealer!** \u2014 [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
-            "fires": [
+            "actions": [
               {
-                "device_id": null,
-                "seconds": 40
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 40,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83c\udccf\ud83c\udca1 **BLACKJACK!** **[user] dominated the dealer!** \u2014 [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
               }
             ]
           }
@@ -1422,33 +1532,48 @@
         {
           "op": ">=",
           "min": 0,
-          "message": "\ud83d\udca5 **[user]** busted out with **[score]**. Womp womp.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-          "fires": [
+          "actions": [
             {
-              "device_id": null,
-              "seconds": 5
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 5,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\ud83d\udca5 **[user]** busted out with **[score]**. Womp womp.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
         {
           "op": ">=",
           "min": 3,
-          "message": "\ud83d\ude05 **[user]** banked **[score]** \u2014 a little reward!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-          "fires": [
+          "actions": [
             {
-              "device_id": null,
-              "seconds": 15
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 15,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\ud83d\ude05 **[user]** banked **[score]** \u2014 a little reward!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
         {
           "op": ">=",
           "min": 6,
-          "message": "\ud83d\udd25 **[user]** cashed out a huge **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-          "fires": [
+          "actions": [
             {
-              "device_id": null,
-              "seconds": 28
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 28,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\ud83d\udd25 **[user]** cashed out a huge **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         }
@@ -1494,55 +1619,80 @@
         {
           "op": ">=",
           "min": 0,
-          "message": "\u274c **[user]** fumbled at round **[score]**.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-          "fires": [
+          "actions": [
             {
-              "device_id": null,
-              "seconds": 5
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 5,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\u274c **[user]** fumbled at round **[score]**.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
         {
           "op": ">=",
           "min": 1,
-          "message": "\ud83d\udc4f **[user]** reached round **[score]** \u2014 nice!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-          "fires": [
+          "actions": [
             {
-              "device_id": null,
-              "seconds": 15
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 15,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\ud83d\udc4f **[user]** reached round **[score]** \u2014 nice!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
         {
           "op": ">=",
           "min": 3,
-          "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-          "fires": [
+          "actions": [
             {
-              "device_id": null,
-              "seconds": 20
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 20,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
         {
           "op": ">=",
           "min": 6,
-          "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-          "fires": [
+          "actions": [
             {
-              "device_id": null,
-              "seconds": 35
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 35,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
         {
           "op": ">=",
           "min": 8,
-          "message": "\ud83c\udfc6 **[user]** got a PERFECT SCORE **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-          "fires": [
+          "actions": [
             {
-              "device_id": null,
-              "seconds": 50
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 50,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\ud83c\udfc6 **[user]** got a PERFECT SCORE **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         }
@@ -1588,44 +1738,64 @@
         {
           "op": ">=",
           "min": 0,
-          "message": "\ud83d\udca5 **[user]** popped a balloon and walked away with the bare minimum.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-          "fires": [
+          "actions": [
             {
-              "device_id": null,
-              "seconds": 5
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 5,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\ud83d\udca5 **[user]** popped a balloon and walked away with the bare minimum.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
         {
           "op": ">=",
           "min": 1,
-          "message": "\ud83c\udf88 **[user]** cashed out **[score]** \u2014 nice haul!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-          "fires": [
+          "actions": [
             {
-              "device_id": null,
-              "seconds": 10
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 10,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\ud83c\udf88 **[user]** cashed out **[score]** \u2014 nice haul!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
         {
           "op": ">=",
           "min": 3,
-          "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-          "fires": [
+          "actions": [
             {
-              "device_id": null,
-              "seconds": 20
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 20,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
         {
           "op": ">=",
           "min": 5,
-          "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-          "fires": [
+          "actions": [
             {
-              "device_id": null,
-              "seconds": 35
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 35,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         }
@@ -1671,33 +1841,48 @@
         {
           "op": ">=",
           "min": 0,
-          "message": "\ud83d\udc80 **[user]** got swept by the bot in rock, paper, scissors. \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-          "fires": [
+          "actions": [
             {
-              "device_id": null,
-              "seconds": 5
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 5,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\ud83d\udc80 **[user]** got swept by the bot in rock, paper, scissors. \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
         {
           "op": ">=",
           "min": 1,
-          "message": "\ud83d\ude05 **[user]** fought to **[score]** round(s) but lost the match.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-          "fires": [
+          "actions": [
             {
-              "device_id": null,
-              "seconds": 10
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 10,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\ud83d\ude05 **[user]** fought to **[score]** round(s) but lost the match.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
         {
           "op": ">=",
           "min": 3,
-          "message": "\ud83c\udfc6 **[user]** BEAT the bot! **+[secs]s** added to the pump timer!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**",
-          "fires": [
+          "actions": [
             {
-              "device_id": null,
-              "seconds": 25
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 25,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\ud83c\udfc6 **[user]** BEAT the bot! **+[secs]s** added to the pump timer!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         }
@@ -1743,33 +1928,48 @@
         {
           "op": ">=",
           "min": 0,
-          "message": "\ud83c\udfb0 no match \u2014 better luck next pull, **[user]** - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
-          "fires": [
+          "actions": [
             {
-              "device_id": null,
-              "seconds": 5
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 5,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\ud83c\udfb0 no match \u2014 better luck next pull, **[user]** - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
             }
           ]
         },
         {
           "op": ">=",
           "min": 1,
-          "message": "\ud83c\udfb0 **[user]** hit a pair \u2014 small win! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
-          "fires": [
+          "actions": [
             {
-              "device_id": null,
-              "seconds": 15
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 15,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\ud83c\udfb0 **[user]** hit a pair \u2014 small win! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
             }
           ]
         },
         {
           "op": ">=",
           "min": 3,
-          "message": "\ud83c\udfb0\ud83c\udf89 **JACKPOT!** **[user]** hit three of a kind! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
-          "fires": [
+          "actions": [
             {
-              "device_id": null,
-              "seconds": 35
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 35,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\ud83c\udfb0\ud83c\udf89 **JACKPOT!** **[user]** hit three of a kind! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
             }
           ]
         }
@@ -1815,44 +2015,64 @@
         {
           "op": ">=",
           "min": 0,
-          "message": "\ud83c\udccf **[user]** lost the hand. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
-          "fires": [
+          "actions": [
             {
-              "device_id": null,
-              "seconds": 5
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 5,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\ud83c\udccf **[user]** lost the hand. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
             }
           ]
         },
         {
           "op": ">=",
           "min": 1,
-          "message": "\ud83c\udccf **[user]** pushed \u2014 a wash. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
-          "fires": [
+          "actions": [
             {
-              "device_id": null,
-              "seconds": 10
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 10,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\ud83c\udccf **[user]** pushed \u2014 a wash. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
             }
           ]
         },
         {
           "op": ">=",
           "min": 2,
-          "message": "\ud83c\udccf **[user]** beat the dealer! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
-          "fires": [
+          "actions": [
             {
-              "device_id": null,
-              "seconds": 20
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 20,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\ud83c\udccf **[user]** beat the dealer! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
             }
           ]
         },
         {
           "op": ">=",
           "min": 3,
-          "message": "\ud83c\udccf\ud83c\udca1 **BLACKJACK!** **[user] dominated the dealer!** \u2014 [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s",
-          "fires": [
+          "actions": [
             {
-              "device_id": null,
-              "seconds": 40
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 40,
+              "device_id": null
+            },
+            {
+              "type": "message",
+              "message": "\ud83c\udccf\ud83c\udca1 **BLACKJACK!** **[user] dominated the dealer!** \u2014 [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
             }
           ]
         }

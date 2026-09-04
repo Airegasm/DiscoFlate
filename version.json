@@ -1,6 +1,6 @@
 {
-  "version": "3.43.0",
-  "versionCode": 113,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.43.0/discoflate.apk",
-  "notes": "DiscoFlate v3.43.0 — the consolidation finale (config v10). EVERYTHING is an action block now: commands and timed events lose their legacy type dropdowns (a command is its gates + an action block; minigames keep their tiers), replies and per-action announce boxes are gone — the bot speaks only through message rows, with roll/fire/award results flowing into later rows as placeholders. New chance action (odds + nested win/miss blocks) and stop_devices action. command_gate gets Block/Allow/Resume pills over commands AND events (block one event, pause all timed or all capacity events). The builtin !agroll chat command is now a plain custom command (range dice + luck still rule). Competitions are fully button-driven (entry command removed). Timed-event rounds run detached so a wait/poll never stalls the session. Templates moved to System. Everything auto-migrates, presets and templates included."
+  "version": "3.44.0",
+  "versionCode": 114,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.44.0/discoflate.apk",
+  "notes": "DiscoFlate v3.44.0 — minigame tiers join the action system (config v11): a tier is just 'score op N' + an action block (its old result message and device fires migrate to message/fire rows; the game still posts its labeled, anonymity-safe score line). Big UI compaction pass from live feedback: every action row and tier is collapsible to a one-line summary with a gist; block sections collapse with counts; all card titlebars keep their buttons on one row; Always-On, events, polls, competitions, capacity events, prizes and system commands use compact one-row parameter layouts (no more full-page number boxes — the phone-width CSS that exploded rows is gone); System commands is collapsible with each command's reply next to its name; roll actions use dice/sides dropdowns; competitions put Win by, rerolls and Add-ALL-totals on the parameter row; Competitions and Bonus Rounds are separate cards. Everything auto-migrates."
 }

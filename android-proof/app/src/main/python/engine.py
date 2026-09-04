@@ -3442,10 +3442,11 @@ class Engine:
         return best[1] if best else {}
 
     async def game_result(self, cmd: dict, score, who: str, uid) -> dict:
-        """Fire the winning tier's devices (credited to the player) and build the
-        public broadcast for a finished minigame. Always labels which game it was
-        and returns both a real (named) and an anonymized version so the bot can
-        respect cross-server anonymity (real name only where the player is a member)."""
+        """Build the public score line for a finished minigame — always labeled
+        with the game, in real + anonymized versions so the bot can respect
+        cross-server anonymity. The winning tier is just `score op N` + an
+        ACTION BLOCK (v11): the bot runs it via run_actions after the score
+        posts, so the tier's fires/messages are ordinary rows."""
         luck = self.game_luck(cmd)
         if luck:
             try:
@@ -3453,9 +3454,9 @@ class Engine:
             except (TypeError, ValueError):
                 pass
         tier = self.game_tier_for(cmd, score)
+        # legacy pre-v11 tiers: device-fire rows + a result-message template
         fired = await self._run_fires(tier.get("fires"), who, uid)
-        # Finishing a game activates its start_events, same as a say command
-        # (the UI has always offered "Starts events" on game types).
+        # Finishing a game activates its start_events, same as any command.
         ev_posts, _ = await self.start_events(cmd.get("start_events"), uid, who)
         total = round(sum(f["duration"] for f in fired), 1)
         name = self.game_display_name(cmd)   # full game name (Rock Paper Scissors, …)
@@ -3464,22 +3465,20 @@ class Engine:
                 "secs2capacity": (self._secs_to_capacity(total, self._active_id()) if fired else "0"),
                 "game": name}
         header = f"🎮 **{name}**\n"   # every result says which game it was for
-        tmpl = tier.get("message") or ""
+        tmpl = tier.get("message") or ""   # legacy pre-v11 (now a message row)
         real = header + (self.render(tmpl, {"user": who, "mention": self._mention(uid, who), **base})
                          or f"**{who}** scored **{score}**.")
         anon = self._anon_label()
         anon_msg = header + (self.render(tmpl, {"user": anon, "mention": anon, **base})
                              or f"**{anon}** scored **{score}**.")
         self._log("roll", f"{who} finished {name} — score {score}" + (f", fired {total}s" if fired else ""))
-        # The tier's optional ACTION BLOCK runs after the result is posted (the
-        # bot calls run_actions), so a tier can do anything an event can.
         return {"real": real, "anon": anon_msg, "events_posted": ev_posts,
                 "tier_actions": tier.get("actions") or [], "score": score}
 
     async def run_actions(self, actions, name: str, uid=None, who: str | None = None,
-                          score=None) -> None:
+                          score=None, game: str | None = None) -> None:
         """Public entry to run an action block from the bot layer (e.g. a minigame
-        tier's block, after its result is posted), crediting the player."""
+        tier's block, after its score line posts), crediting the player."""
         if not actions:
             return
         xc = {}
@@ -3488,6 +3487,8 @@ class Engine:
             xc["target"] = who or ""
         if score is not None:
             xc["score"] = score
+        if game:
+            xc["game"] = game
         await self._run_action_block(actions, name, hdr="🎮",
                                      uid=(str(uid) if uid is not None else None),
                                      who=who, extra_ctx=xc)
