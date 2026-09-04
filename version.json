@@ -1,6 +1,6 @@
 {
-  "version": "3.22.0",
-  "versionCode": 91,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.22.0/discoflate.apk",
-  "notes": "DiscoFlate v3.22.0 \u2014 competitions get a button-driven flow: an embed with an Enter Challenge button + timer (no more !enter), each player rolls PRIVATELY (ephemeral) with an optional reroll budget (only the latest roll; earlier lock in; final Roll becomes Submit), and their result posts to the channel all at once. Plus titlebar + body fields."
+  "version": "3.23.0",
+  "versionCode": 92,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.23.0/discoflate.apk",
+  "notes": "DiscoFlate v3.23.0 \u2014 roll-off competitions define each roll as a row (its own NdN dice + per-roll luck) instead of a plain roll count; the number of rows is the number of rolls. Entry command dropped for roll-offs (the Enter button drives it)."
 }

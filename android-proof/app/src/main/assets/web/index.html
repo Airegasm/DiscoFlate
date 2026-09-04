@@ -2587,13 +2587,25 @@ function renderCompetitions(){
         `<label class="field">Duration (s) <input type="number" min="5" max="3600" value="${cd.duration??60}" style="width:90px" onchange="compRows[${i}].duration=Math.max(5,Math.min(3600,+this.value||60));scheduleSave()"></label>`+
         `<label class="field">Repeat standings (s) <input type="number" min="0" step="5" value="${cd.repeat_every??0}" style="width:90px" onchange="compRows[${i}].repeat_every=Math.max(0,+this.value||0);scheduleSave()"></label>`+
       `</div>`+
-      (typ!=='raffle'?`<div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end">`+
+      (typ==='rolloff'?`<div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end">`+
+        `<label class="field">Win by <select onchange="compRows[${i}].metric=this.value;scheduleSave()">`+
+          [['total','highest total'],['highest','highest single'],['count','most rolls']].map(([v,t])=>`<option value="${v}" ${(cd.metric||'total')===v?'selected':''}>${t}</option>`).join('')+`</select></label>`+
+      `</div>`+
+      `<div style="border-top:1px solid var(--line);padding-top:8px"><div class="muted" style="margin-bottom:6px"><b>The rolls</b> — each player rolls these in order (one row = one roll). Set the dice &amp; a per-roll luck (±% to force max/min).</div>`+
+        ((cd.roll_specs||[]).map((rs,k)=>
+          `<div class="row" style="gap:8px;align-items:center;margin-bottom:4px">`+
+            `<span class="muted" style="min-width:52px">Roll ${k+1}</span>`+
+            `<select onchange="compRows[${i}].roll_specs[${k}].dice=+this.value;scheduleSave()">${d20Options(rs.dice??1)}</select><span class="muted">d</span>`+
+            `<select onchange="compRows[${i}].roll_specs[${k}].sides=+this.value;scheduleSave()">${d20Options(rs.sides??6)}</select>`+
+            `<span class="muted">luck</span><input type="number" min="-100" max="100" step="1" value="${rs.luck??0}" style="width:70px" onchange="compRows[${i}].roll_specs[${k}].luck=+this.value;scheduleSave()"><span class="muted">%</span>`+
+            `<button class="ghost" onclick="compRows[${i}].roll_specs.splice(${k},1);renderCompetitions();scheduleSave()">✕</button>`+
+          `</div>`).join('')||'<div class="muted">no rolls yet</div>')+
+        `<button class="ghost" style="margin-top:6px" onclick="compRows[${i}].roll_specs=compRows[${i}].roll_specs||[];compRows[${i}].roll_specs.push({dice:1,sides:6,luck:0});renderCompetitions();scheduleSave()">+ Add roll</button>`+
+      `</div>`
+      :(typ==='race'?`<div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end">`+
         `<label class="field">Entry command <select onchange="compRows[${i}].command=this.value;scheduleSave()">${cmdOpts(cd.command)}</select></label>`+
-        (typ==='rolloff'?`<label class="field">Win by <select onchange="compRows[${i}].metric=this.value;scheduleSave()">`+
-          [['total','highest total'],['highest','highest single'],['count','most uses']].map(([v,t])=>`<option value="${v}" ${(cd.metric||'total')===v?'selected':''}>${t}</option>`).join('')+`</select></label>`:'')+
-        `<label class="field">Max entries/person <input type="number" min="0" value="${cd.max_entries??3}" style="width:90px" onchange="compRows[${i}].max_entries=+this.value;scheduleSave()"></label>`+
-        `<label class="field">Required to qualify <input type="number" min="0" value="${cd.required_entries??1}" style="width:90px" title="must complete this many entries or be eliminated" onchange="compRows[${i}].required_entries=+this.value;scheduleSave()"></label>`+
-      `</div>`:'')+
+        `<label class="field">Entries to finish <input type="number" min="1" value="${cd.required_entries??3}" style="width:90px" onchange="compRows[${i}].required_entries=+this.value;scheduleSave()"></label>`+
+      `</div>`:''))+
       (typ==='rolloff'?`<div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end">`+
         `<label class="row" style="gap:6px"><input type="checkbox" ${cd.allow_reroll?'checked':''} onchange="compRows[${i}].allow_reroll=this.checked;renderCompetitions();scheduleSave()"> Allow rerolls</label>`+
         (cd.allow_reroll?`<label class="field">Rerolls per player <span class="muted">(only the latest roll; earlier rolls lock in)</span> <input type="number" min="0" value="${cd.reroll_count??1}" style="width:80px" onchange="compRows[${i}].reroll_count=Math.max(0,+this.value||0);scheduleSave()"></label>`:'')+
@@ -2627,7 +2639,7 @@ function renderCompetitions(){
 function addCompetition(){
   compRows.push({name:'',type:'rolloff',command:'',duration:60,repeat_every:15,metric:'total',
     max_entries:3,required_entries:1,require_enter:true,title:'',body:'',intro:'',entry_message:'',
-    allow_reroll:false,reroll_count:1,
+    allow_reroll:false,reroll_count:1,roll_specs:[{dice:1,sides:6,luck:0},{dice:1,sides:6,luck:0},{dice:1,sides:6,luck:0}],
     win_message:'🏆 [winner] wins with [winner_score]!',no_winner_message:'',
     award_pump:true,award_seconds:10,bonus_command_on:false,bonus_command:'',bonus_stashable:false,
     lock_progression:false,bonus_after_pump:true,bonus_message:'🎁 [winner] now holds [bonus_cmd]!',
@@ -2647,6 +2659,7 @@ function cleanCompetitions(){
     max_entries:Math.max(0,+c.max_entries||0), required_entries:Math.max(0,+c.required_entries||0),
     require_enter:c.require_enter!==false, title:c.title||'', body:c.body||'', intro:c.intro||'', entry_message:c.entry_message||'',
     allow_reroll:!!c.allow_reroll, reroll_count:Math.max(0,+c.reroll_count||0),
+    roll_specs:(c.roll_specs||[]).map(r=>({dice:+r.dice||1, sides:+r.sides||6, luck:+r.luck||0})),
     win_message:c.win_message||'', no_winner_message:c.no_winner_message||'',
     award_pump:!!c.award_pump, award_seconds:Math.max(0,+c.award_seconds||0),
     bonus_command_on:!!c.bonus_command_on, bonus_command:(c.bonus_command||'').trim(),

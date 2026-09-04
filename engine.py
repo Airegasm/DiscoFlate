@@ -1290,6 +1290,28 @@ class Engine:
     def competition_window_open(self) -> bool:
         return self._comp is not None
 
+    def _comp_rolls(self, cd: dict) -> int:
+        specs = cd.get("roll_specs") or []
+        if specs:
+            return len(specs)
+        return int(cd.get("max_entries") or 0) or int(cd.get("required_entries") or 0) or 1
+
+    def _roll_spec(self, spec: dict) -> float:
+        """Roll one roll-off row: its own NdN dice with a per-row luck modifier
+        (positive % = chance to force the max, negative % = force the min)."""
+        dice = max(1, int(spec.get("dice") or 1))
+        sides = max(1, int(spec.get("sides") or 6))
+        total, _ = self._roll_total(dice, sides)
+        try:
+            luck = float(spec.get("luck") or 0)
+        except (TypeError, ValueError):
+            luck = 0.0
+        if luck > 0 and random.random() * 100 < min(100.0, luck):
+            total = dice * sides
+        elif luck < 0 and random.random() * 100 < min(100.0, -luck):
+            total = dice
+        return float(total)
+
     def competition_join(self, uid, who: str) -> dict:
         """A player pressed 'Enter Challenge'. Registers them and returns the
         roller config (how many rolls, how many rerolls). Refuses if they've
@@ -1301,16 +1323,20 @@ class Engine:
         if p.get("done_at") is not None:
             return {"ok": False, "error": "You've already locked in your rolls!"}
         p["entered"] = True
-        rolls = int(self._comp.get("cap") or 0) or int(cd.get("required_entries") or 0) or 1
         rerolls = int(cd.get("reroll_count") or 0) if cd.get("allow_reroll") else 0
-        return {"ok": True, "rolls": rolls, "rerolls": max(0, rerolls),
+        return {"ok": True, "rolls": self._comp_rolls(cd), "rerolls": max(0, rerolls),
                 "metric": self._comp.get("metric", "total")}
 
-    def competition_roll_value(self) -> float:
-        """Produce one roll value from the entry command's dice (no state change;
-        the roller View manages pending/locked/reroll)."""
+    def competition_roll_value(self, slot=None) -> float:
+        """Produce one roll value for the given 0-based slot. With per-roll specs
+        (roll-off rows) each slot uses its own NdN + luck; otherwise falls back
+        to the entry command's dice."""
         if self._comp is None:
             return 0.0
+        specs = self._comp["def"].get("roll_specs") or []
+        if specs:
+            i = 0 if slot is None else max(0, min(len(specs) - 1, int(slot)))
+            return self._roll_spec(specs[i])
         entry = self.find_command(self._comp["cmd"])
         return self._comp_value(entry) if entry else float(self._roll_total(1, 6)[0])
 
@@ -1348,7 +1374,9 @@ class Engine:
         required-entries threshold (else eliminated)."""
         c = self._comp
         req_enter = c["def"].get("require_enter", True)
-        need = int(c.get("required_entries") or 0)
+        # roll-off: must complete ALL rolls (submitted) to qualify; others use
+        # the required-entries threshold.
+        need = self._comp_rolls(c["def"]) if c["type"] == "rolloff" else int(c.get("required_entries") or 0)
         out = []
         for uid, p in c["players"].items():
             if req_enter and not p["entered"]:
@@ -1448,7 +1476,7 @@ class Engine:
         self._comp = {"def": cd, "cmd": entry_key, "metric": cd.get("metric", "total"),
                       "cap": int(cd.get("max_entries") or 0), "players": {}, "type": typ,
                       "required_entries": int(cd.get("required_entries") or 0)}
-        rolls = int(self._comp.get("cap") or 0) or int(cd.get("required_entries") or 0) or 1
+        rolls = self._comp_rolls(cd)
         rerolls = int(cd.get("reroll_count") or 0) if cd.get("allow_reroll") else 0
         title = "🏁 " + self.render((cd.get("title") or name).strip())
         body = self.render((cd.get("body") or cd.get("intro") or "").strip()) or self._comp_intro(cd, entry_key, duration)

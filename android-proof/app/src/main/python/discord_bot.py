@@ -95,7 +95,7 @@ class RollerView(discord.ui.View):
         self.n = max(1, int(rolls))
         self.rerolls_left = max(0, int(rerolls))
         self.locked = []
-        self.pending = self.bot.engine.competition_roll_value()   # first roll
+        self.pending = self.bot.engine.competition_roll_value(0)   # first roll (slot 0)
         self._sync_buttons()
 
     def _final(self):
@@ -138,7 +138,7 @@ class RollerView(discord.ui.View):
             if res.get("ok") and res.get("summary"):
                 await self.bot.broadcast(res["summary"], None)   # per-player, all at once
             return
-        self.pending = self.bot.engine.competition_roll_value()  # next slot
+        self.pending = self.bot.engine.competition_roll_value(len(self.locked))  # next slot
         self._sync_buttons()
         await interaction.response.edit_message(content=self.text(), view=self)
 
@@ -147,7 +147,7 @@ class RollerView(discord.ui.View):
         if self.is_finished() or self.rerolls_left <= 0:
             return
         self.rerolls_left -= 1
-        self.pending = self.bot.engine.competition_roll_value()  # reroll the latest only
+        self.pending = self.bot.engine.competition_roll_value(len(self.locked))  # reroll the current slot only
         self._sync_buttons()
         await interaction.response.edit_message(content=self.text(), view=self)
 
