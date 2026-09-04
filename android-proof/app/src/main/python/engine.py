@@ -162,6 +162,10 @@ class Engine:
         # tier bumping "blackjack").
         self._prize_prog: dict = {}
         self._in_prize: bool = False   # re-entrancy guard: no bumps inside a prize block
+        # Activation ordering: while set, events hold their first rounds until
+        # the ON message (+ its [!command]s) has posted — finish_activation()
+        # releases them (safety-released after 8s if nothing calls it).
+        self._activation_hold: float | None = None
         self._pump_time: dict[str, dict] = {}    # uid -> {name, seconds, capacity} (session leaderboard)
         # Per-range leaderboards: (min,max) -> {uid: {name, seconds, capacity}}.
         # Same shape as _pump_time but scoped to the range the pump landed in, for
@@ -239,17 +243,30 @@ class Engine:
             self._event_activator.clear()
             self._current_range_key = None
             self._end_triggered = False
+            # HOLD events until the activation flow finishes: the ON message
+            # posts FIRST, then its [!command]s fire, then finish_activation()
+            # releases the first rounds. Safety-released after 8s regardless.
+            self._activation_hold = time.monotonic()
         elif self._listener_was and not now_on:
-            # Deactivation: freeze the session clock at its final value (the OFF
-            # message renders [uptime] right after this), then clear cooldowns
-            # and cancel timed events.
+            # Deactivation KILLS EVERYTHING RUNNING: freeze the session clock at
+            # its final value (the OFF message renders [uptime] right after),
+            # then cancel competitions, polls, bonus rounds, winner buttons,
+            # deadlines, events & capacity events, lift every gate, clear
+            # cooldowns/grants — and (async) stop all device fires + live games.
             if self._session_start is not None:
                 self._session_frozen = max(0.0, time.monotonic() - self._session_start)
                 self._session_start = None
             self._capev_cancel_all(clear_session=True)
             self._cancel_poll_task()
             self._cancel_competition()
+            self._cancel_winner_button()
+            self._cancel_bonus_round()
+            self._cancel_deadline()
             self._clear_winner_grants(all_incl_stash=True)
+            self._cmd_gate_block = False
+            self._cmd_gate_allow.clear()
+            self._cmd_gate_blocked_cmds.clear()
+            self._cmd_gate_blocked_events.clear()
             self._cooldowns.clear()
             self._event_last.clear()
             self._events_done.clear()
@@ -257,7 +274,12 @@ class Engine:
             self._event_cooldown_until.clear()
             self._event_activator.clear()
             self._runtime_events_on.clear()
-            self._log("bot", "deactivated — cooldowns cleared, events cancelled")
+            self._activation_hold = None
+            self._log("bot", "deactivated — everything running cancelled, cooldowns cleared")
+            try:
+                asyncio.create_task(self._deactivate_kill())
+            except RuntimeError:
+                pass   # no running loop (headless/startup) — nothing is firing anyway
         self._listener_was = now_on
 
     def _device(self, device_id: str | None) -> dict | None:
@@ -740,11 +762,35 @@ class Engine:
                 self._inline_depth -= 1
         return re.sub(r"\s*\[!([\w-]+)\]\s*", " ", text).strip()
 
+    def strip_inline(self, text: str) -> str:
+        """Remove [!command] tokens WITHOUT firing them — for posting a message
+        first and firing its commands afterwards (the activation ON flow)."""
+        return re.sub(r"\s*\[!([\w-]+)\]\s*", " ", text or "").strip()
+
+    async def fire_inline(self, template: str) -> None:
+        """Fire the [!command] tokens of a message that was already posted
+        (its text stripped via strip_inline)."""
+        await self._run_inline_commands(template)
+
+    def finish_activation(self) -> None:
+        """The activation flow is done (ON message posted, its [!command]s
+        fired) — release timed & capacity events to run their first rounds."""
+        self._activation_hold = None
+
+    async def _deactivate_kill(self) -> None:
+        """Activation OFF: stop every running device fire and kill any live
+        minigame views (the bot layer disables + refunds them)."""
+        await self.abort(reason="activation off")
+        if self.cancel_games_cb:
+            try:
+                await self.cancel_games_cb()
+            except Exception as e:  # noqa: BLE001
+                self._log("error", f"cancelling games failed: {e}")
+
     async def render_inline(self, template: str, extra: dict | None = None) -> str:
         """Render a message AND fire any [!command] tokens in it (as the system),
-        returning the text with those tokens stripped. For message paths that
-        DON'T go through _announce — e.g. the activation ON message, which is
-        posted straight to the channel by the web layer."""
+        returning the text with those tokens stripped — for message paths that
+        don't go through _announce."""
         return await self._run_inline_commands(self.render(template, extra))
 
     async def _announce(self, text: str, image: str | None, replace_key: str | None = None) -> None:
@@ -1023,6 +1069,10 @@ class Engine:
         has triggered, and the session end cancels them)."""
         if not self.cfg.get("listener_enabled") or self._end_triggered:
             return
+        if self._activation_hold is not None:
+            if time.monotonic() - self._activation_hold < 8.0:
+                return
+            self._activation_hold = None
         if self._capev_effect("pause_capacity"):
             return   # a command_gate has paused all capacity events
         for ev in self.cfg.get("capacity_events", []):
@@ -2413,6 +2463,11 @@ class Engine:
         while the listener is enabled (so they don't fire on a paused/off bot)."""
         if not self.cfg.get("listener_enabled"):
             return
+        if self._activation_hold is not None:
+            # activation in flight: the ON message + its [!command]s go first
+            if time.monotonic() - self._activation_hold < 8.0:
+                return
+            self._activation_hold = None
         if self._capev_effect("pause_events"):
             return   # a capacity event has paused all timed events
         now = time.monotonic()

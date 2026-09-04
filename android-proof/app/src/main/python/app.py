@@ -605,17 +605,23 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         engine.set_config(cfg)
         engine._log("bot", f"listener {'ENABLED' if cfg['listener_enabled'] else 'muted'}")
         enabled = cfg["listener_enabled"]
-        msg = (cfg.get("listener_message_on") if enabled
-               else cfg.get("listener_message_off")) or ""
-        if msg.strip():
-            # The ON message fires any [!command] tokens (like every other
-            # announced message); the OFF message renders text only (no fires as
-            # the session is closing). render_inline strips fired tokens, so a
-            # message that was ONLY [!command] posts nothing.
-            text = (await engine.render_inline(msg.strip())) if enabled else engine.render(msg.strip())
+        msg = ((cfg.get("listener_message_on") if enabled
+               else cfg.get("listener_message_off")) or "").strip()
+        footer = f"-# DiscoFlate v{VERSION} by AireGasm"
+        if enabled:
+            # STRICT activation order: 1) the ON message posts, 2) its
+            # [!command] tokens fire, 3) events release their first rounds.
+            # (Events are held by the engine's activation hold until step 3.)
+            if msg:
+                text = engine.render(engine.strip_inline(msg))
+                if text.strip():
+                    await botmgr.announce(f"{text}\n{footer}", None)
+                await engine.fire_inline(msg)
+            engine.finish_activation()
+        elif msg:
+            # OFF message renders text only — no fires, the session is closing.
+            text = engine.render(msg)
             if text.strip():
-                # Always append a non-editable attribution footer (Discord subtext).
-                footer = f"-# DiscoFlate v{VERSION} by AireGasm"
                 await botmgr.announce(f"{text}\n{footer}", None)
         return web.json_response(_public_state(engine, botmgr))
 
