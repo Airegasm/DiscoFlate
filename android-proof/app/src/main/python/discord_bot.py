@@ -674,6 +674,13 @@ class BotManager:
                 await self.broadcast(res["broadcast"], None)
             return
 
+        if action == "enter":
+            # only live during a competition — enter_competition returns None otherwise
+            reply = self.engine.enter_competition(str(message.author.id), who)
+            if reply:
+                await self.broadcast(reply, None)
+            return
+
         if action == "help":
             text = self.engine.help_text(prefix)
             mention = message.author.mention   # <@id> — pings them in the channel

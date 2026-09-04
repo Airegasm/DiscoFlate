@@ -932,5 +932,6 @@
   },
   "capacity_events": [],
   "polls": [],
-  "gameplay_presets": []
+  "gameplay_presets": [],
+  "competitions": []
 }

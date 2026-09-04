@@ -576,6 +576,24 @@
       </details>
     </div>
 
+    <!-- competitions -->
+    <div class="card span" data-tab="events">
+      <details class="help"><summary><h2>🏁 Competitions</h2></summary>
+      <div class="row" style="gap:10px;align-items:flex-end;margin-top:8px">
+        <label class="field">Join command <span class="muted">(only active during a competition)</span>
+          <input id="cmdEnter" value="enter" style="width:130px"></label>
+        <span class="muted">Players type <code>!enter</code> to join, then compete.</span>
+      </div>
+      <div class="hint" style="max-width:880px">A competition is an <b>action</b> (start it from a timed event or capacity-event block). Players <b>!enter</b> during the window, then compete via an entry command; enter AND meet the required entries or you're eliminated. Winner gets rewards. Types: <b>Roll-off</b> (highest score by total / highest single / most uses), <b>Race</b> (first to finish the required entries), <b>Raffle</b> (random winner among qualifiers). Placeholders: <code>[winner]</code> <code>[winner_score]</code>.</div>
+      <div id="competitions" style="margin-top:10px"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" onclick="addCompetition()">+ Add competition</button>
+        <div style="flex:1"></div>
+        <button onclick="saveEvents()">Save events</button>
+      </div>
+      </details>
+    </div>
+
     <!-- templates -->
     <div class="card span" data-tab="templates">
       <h2>Templates</h2>
@@ -875,6 +893,8 @@ esphome dashboard config/</code></pre>
             <tr><td><code>[user]</code></td><td>the person's name (plain text)</td></tr>
             <tr><td><code>[mention]</code></td><td>@pings the person (a real Discord mention)</td></tr>
             <tr><td><code>[operator]</code></td><td>the bot operator's name</td></tr>
+            <tr><td><code>[winner]</code> / <code>[winner_score]</code></td><td>the most recent competition's winner and their winning score</td></tr>
+            <tr><td><code>[pump_msg]</code></td><td>the operator Pump message (rendered), for reuse in other messages</td></tr>
             <tr><td><code>[capacity]</code></td><td>current capacity %, e.g. 47.5</td></tr>
             <tr><td><code>[capacity_bar]</code></td><td>emoji bar 🟩🟩🟩⬛⬛</td></tr>
             <tr><td><code>[timer]</code> / <code>[total_secs]</code></td><td>seconds left on the active pump</td></tr>
@@ -901,6 +921,9 @@ esphome dashboard config/</code></pre>
             <tr><td><code>[secs2capacity]</code></td><td>% capacity this fire will add</td></tr>
             <tr><td><code>[sides]</code></td><td>number of sides</td></tr>
             <tr><td><code>[cmd_remain]</code></td><td>this person's uses left for the command — the word <b>“unlimited”</b> when the command has no per-person limit (blank Max/person)</td></tr>
+            <tr><td><code>[value]</code> <code>[score]</code> <code>[entries]</code></td><td>competition entry reply: this entry's value, the player's running score, and how many entries they've made</td></tr>
+            <tr><td><code>[bonus_cmd]</code></td><td>competition grant message: the winner-only command they've unlocked</td></tr>
+            <tr><td><code>[!command]</code></td><td><b>fires that custom command</b> when the message is posted (milestones, events, broadcasts) and is removed from the text — e.g. <code>the room tenses… [!burst]</code>. One level deep (a fired command can't chain more).</td></tr>
           </tbody></table>
           <h3 style="margin-top:14px">Cooldown / prize replies</h3>
           <table><tbody>
@@ -1478,6 +1501,7 @@ async function saveDiscord(){
       leaderboard_life: ($('#cmdLeaderboardLife').value||'toppumpers-life').trim().toLowerCase(),
       pumptimer: ($('#cmdPumptimer').value||'pumptimer').trim().toLowerCase(),
       vote: (($('#cmdVote')&&$('#cmdVote').value)||'agvote').trim().toLowerCase(),
+      enter: (($('#cmdEnter')&&$('#cmdEnter').value)||'enter').trim().toLowerCase(),
     },
     listen_targets: listenTargets,
     announce_channel_id: announceChanId,
@@ -2054,7 +2078,8 @@ function renderCommands(){
         `<label class="field">Type <select onchange="commandRows[${i}].type=this.value;renderCommands()">`+
           ['fire','roll','say','chance','poll','game-pushluck','game-simon','game-balloon','game-rps','game-slots','game-blackjack'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`+
         (typ==='poll'?`<label class="field">Poll <select onchange="commandRows[${i}].poll=this.value;scheduleSave()">${pollNameOpts(c.poll)}</select></label>`:'')+
-        (typ==='fire'?`<label class="field">Seconds <input type="number" value="${c.seconds??''}" min="0" step="0.5" style="width:80px" onchange="commandRows[${i}].seconds=+this.value"></label>`:'')+
+        (typ==='fire'?`<label class="field">Seconds <input type="number" value="${c.seconds??''}" min="0" step="0.5" style="width:80px" onchange="commandRows[${i}].seconds=+this.value"></label>`+
+          `<label class="field">Fire until % <span class="muted">(optional — runs until capacity hits this; great for a winner's progression command)</span> <input type="number" value="${c.fire_until??''}" min="1" max="999" step="1" placeholder="off" style="width:90px" onchange="commandRows[${i}].fire_until=(this.value===''?null:+this.value)"></label>`:'')+
         (typ==='roll'?`<label class="field">Dice <select onchange="commandRows[${i}].dice=+this.value"><option value="">rng</option>${d20Options(c.dice)}</select></label>`+
           `<label class="field">Sides <select onchange="commandRows[${i}].sides=+this.value"><option value="">rng</option>${d20Options(c.sides)}</select></label>`:'')+
         (typ==='chance'?`<label class="field">Chance % <input type="number" value="${c.chance??50}" min="0" max="100" step="1" style="width:80px" onchange="commandRows[${i}].chance=Math.max(0,Math.min(100,+this.value||0))"></label>`+
@@ -2117,6 +2142,7 @@ function cleanCommands(){
     description: c.description||'', hide_in_list: !!c.hide_in_list, mention: !!c.mention,
     react_only: !!c.react_only, react_emoji: (c.react_emoji||'').trim(),
     poll: (c.poll||'').trim()||null,
+    fire_until: (c.fire_until>0)?+c.fire_until:null,
     // chance + multi-device fire
     fires: cleanFires(c.fires),
     fail_fires: cleanFires(c.fail_fires),
@@ -2245,9 +2271,10 @@ function renderEvents(){
       // --- action ---
       `<div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end;border-top:1px solid var(--line);padding-top:10px">`+
         `<label class="field">Action <select onchange="eventRows[${i}].action=this.value;renderEvents()">`+
-          ['message','broadcast','fire','roll','capacity','chance','poll'].map(a=>`<option value="${a}" ${act===a?'selected':''}>${a}</option>`).join('')+`</select></label>`+
+          ['message','broadcast','fire','roll','capacity','chance','poll','competition'].map(a=>`<option value="${a}" ${act===a?'selected':''}>${a}</option>`).join('')+`</select></label>`+
         (act==='broadcast'?`<label class="field">Broadcast <select onchange="eventRows[${i}].broadcast=this.value;scheduleSave()">${broadcastNameOpts(e.broadcast)}</select></label>`:'')+
         (act==='poll'?`<label class="field">Poll <span class="muted">(runs in the background)</span> <select onchange="eventRows[${i}].poll=this.value;scheduleSave()">${pollNameOpts(e.poll)}</select></label>`:'')+
+        (act==='competition'?`<label class="field">Competition <select onchange="eventRows[${i}].competition=this.value;scheduleSave()">${compNameOpts(e.competition)}</select></label>`:'')+
         (act==='fire'?`<label class="field">Seconds <input type="number" min="0" step="0.5" value="${e.seconds??''}" style="width:80px" onchange="eventRows[${i}].seconds=+this.value"></label>`+deviceField:'')+
         (act==='roll'?`<label class="field">Dice <input type="number" min="1" value="${e.dice??''}" placeholder="rng" style="width:70px" onchange="eventRows[${i}].dice=+this.value"></label>`+
             `<label class="field">Sides <input type="number" min="1" value="${e.sides??''}" placeholder="rng" style="width:70px" onchange="eventRows[${i}].sides=+this.value"></label>`+deviceField:'')+
@@ -2285,7 +2312,7 @@ function cleanEvents(){
     max_repeats:(e.max_repeats==null||e.max_repeats===''||+e.max_repeats<0)?null:+e.max_repeats, fire_immediately:!!e.fire_immediately, clean_previous:!!e.clean_previous, action:e.action||'message',
     message:e.message||'', seconds:(e.seconds>0)?+e.seconds:null, dice:(e.dice>0)?+e.dice:null, sides:(e.sides>0)?+e.sides:null,
     capacity_op:e.capacity_op||'add', capacity_value:e.capacity_value??0, device_id:e.device_id||null,
-    poll:(e.poll||'').trim()||null, broadcast:(e.broadcast||'').trim()||null,
+    poll:(e.poll||'').trim()||null, broadcast:(e.broadcast||'').trim()||null, competition:(e.competition||'').trim()||null,
     cooldown:(e.cooldown==null||e.cooldown==='')?null:+e.cooldown,
     activation_message:e.activation_message||'', end_message:e.end_message||'',
     chance:(e.chance==null||e.chance==='')?null:+e.chance, luck:(e.luck==null||e.luck==='')?null:+e.luck,
@@ -2296,7 +2323,7 @@ function cleanEvents(){
 }
 async function saveEvents(){
   await saveCfg({events: cleanEvents(), capacity_events: cleanCapEvents(), polls: cleanPolls(),
-                 command_names: gatherConfig().command_names});
+                 competitions: cleanCompetitions(), command_names: gatherConfig().command_names});
 }
 
 // ---- capacity events (one-shot threshold triggers) ----
@@ -2317,6 +2344,13 @@ function capScopeRadio(i, field){
 function pollNameOpts(sel){
   const names = pollRows.map(p=>(p.name||'').trim()).filter(Boolean);
   return `<option value="">— pick a poll —</option>`+
+    names.map(n=>`<option value="${esc(n)}" ${sel===n?'selected':''}>${esc(n)}</option>`).join('')+
+    ((sel&&!names.includes(sel))?`<option value="${esc(sel)}" selected>${esc(sel)} (missing)</option>`:'');
+}
+// Competition-name dropdown for "competition" actions.
+function compNameOpts(sel){
+  const names = compRows.map(c=>(c.name||'').trim()).filter(Boolean);
+  return `<option value="">— pick a competition —</option>`+
     names.map(n=>`<option value="${esc(n)}" ${sel===n?'selected':''}>${esc(n)}</option>`).join('')+
     ((sel&&!names.includes(sel))?`<option value="${esc(sel)}" selected>${esc(sel)} (missing)</option>`:'');
 }
@@ -2351,7 +2385,7 @@ function actionRow(base, rr, j, a, condLabels){
     cond=`<label class="field">Run <select onchange="${T('if_option')}=+this.value;scheduleSave()">${opts}</select></label>`;
   }
   const typeSel = cond + `<label class="field">Action <select onchange="${T('type')}=this.value;${rr}();scheduleSave()">`+
-    ['message','broadcast','fire','roll','capacity','wait','poll','end_session'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`;
+    ['message','broadcast','fire','roll','capacity','wait','poll','competition','end_session'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`;
   let fields='';
   if(typ==='fire'||typ==='wait')
     fields += `<label class="field">Seconds <input type="number" min="0" step="0.5" value="${a.seconds??(typ==='wait'?10:3)}" style="width:80px" onchange="${T('seconds')}=+this.value;scheduleSave()"></label>`;
@@ -2365,6 +2399,8 @@ function actionRow(base, rr, j, a, condLabels){
       `<label class="field">Value (%) <input type="number" step="1" value="${a.capacity_value??''}" style="width:80px" onchange="${T('capacity_value')}=+this.value;scheduleSave()"></label>`;
   if(typ==='poll')
     fields += `<label class="field">Poll <select onchange="${T('poll')}=this.value;scheduleSave()">${pollNameOpts(a.poll)}</select></label>`;
+  if(typ==='competition')
+    fields += `<label class="field">Competition <select onchange="${T('competition')}=this.value;scheduleSave()">${compNameOpts(a.competition)}</select></label>`;
   if(typ==='broadcast')
     fields += `<label class="field">Broadcast <select onchange="${T('broadcast')}=this.value;scheduleSave()">${broadcastNameOpts(a.broadcast)}</select></label>`;
   if(typ==='end_session')
@@ -2517,6 +2553,91 @@ function renderPolls(){
     el.innerHTML=html; box.appendChild(el);
   });
 }
+// ---- competitions (roll-off / race / raffle) ----
+let compRows = [];
+let compOpen = new Set();
+function toggleCompOpen(i){ if(compOpen.has(i)) compOpen.delete(i); else compOpen.add(i); renderCompetitions(); }
+function renderCompetitions(){
+  const box=$('#competitions'); if(!box) return; box.innerHTML='';
+  if(!compRows.length){ box.innerHTML='<div class="muted">No competitions yet.</div>'; return; }
+  const cmdOpts=(sel)=>`<option value="">— entry command —</option>`+
+    commandRows.map(c=>(c.name||'').trim()).filter(Boolean).map(n=>`<option value="${esc(n)}" ${sel===n?'selected':''}>!${esc(n)}</option>`).join('');
+  compRows.forEach((c,i)=>{
+    const open=compOpen.has(i); const typ=c.type||'rolloff';
+    const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap='10px';
+    let html=`<div class="row" style="gap:10px;cursor:pointer" onclick="toggleCompOpen(${i})">`+
+      `<span class="muted" style="width:14px">${open?'▾':'▸'}</span>`+
+      `<b style="min-width:120px">${esc(c.name||'(unnamed)')}</b>`+
+      `<span class="pill" style="padding:2px 10px;font-size:11px">${esc(typ)}</span>`+
+      `<span class="muted" style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(c.command?('!'+c.command):'')} · ${c.duration??60}s</span>`+
+      `<button class="ghost" onclick="event.stopPropagation();delCompetition(${i})">✕</button></div>`;
+    if(open){
+      const cd=c;
+      html+=`<div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end">`+
+        `<label class="field">Name <input value="${esc(cd.name||'')}" style="width:150px" onchange="compRows[${i}].name=this.value"></label>`+
+        `<label class="field">Type <select onchange="compRows[${i}].type=this.value;renderCompetitions();scheduleSave()">`+
+          ['rolloff','race','raffle'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select></label>`+
+        `<label class="field">Duration (s) <input type="number" min="5" max="3600" value="${cd.duration??60}" style="width:90px" onchange="compRows[${i}].duration=Math.max(5,Math.min(3600,+this.value||60));scheduleSave()"></label>`+
+        `<label class="field">Repeat standings (s) <input type="number" min="0" step="5" value="${cd.repeat_every??0}" style="width:90px" onchange="compRows[${i}].repeat_every=Math.max(0,+this.value||0);scheduleSave()"></label>`+
+      `</div>`+
+      (typ!=='raffle'?`<div class="row" style="gap:12px;flex-wrap:wrap;align-items:flex-end">`+
+        `<label class="field">Entry command <select onchange="compRows[${i}].command=this.value;scheduleSave()">${cmdOpts(cd.command)}</select></label>`+
+        (typ==='rolloff'?`<label class="field">Win by <select onchange="compRows[${i}].metric=this.value;scheduleSave()">`+
+          [['total','highest total'],['highest','highest single'],['count','most uses']].map(([v,t])=>`<option value="${v}" ${(cd.metric||'total')===v?'selected':''}>${t}</option>`).join('')+`</select></label>`:'')+
+        `<label class="field">Max entries/person <input type="number" min="0" value="${cd.max_entries??3}" style="width:90px" onchange="compRows[${i}].max_entries=+this.value;scheduleSave()"></label>`+
+        `<label class="field">Required to qualify <input type="number" min="0" value="${cd.required_entries??1}" style="width:90px" title="must complete this many entries or be eliminated" onchange="compRows[${i}].required_entries=+this.value;scheduleSave()"></label>`+
+      `</div>`:'')+
+      `<label class="row" style="gap:6px"><input type="checkbox" ${cd.require_enter!==false?'checked':''} onchange="compRows[${i}].require_enter=this.checked;scheduleSave()"> Require <code>!enter</code> to join</label>`+
+      `<label class="field">Title <input value="${esc(cd.title||'')}" placeholder="ROLL-OFF!" onchange="compRows[${i}].title=this.value"></label>`+
+      `<label class="field">Intro <span class="muted">([enter_cmd] [command] [duration])</span><textarea rows="2" onchange="compRows[${i}].intro=this.value">${esc(cd.intro||'')}</textarea></label>`+
+      (typ!=='raffle'?`<label class="field">Entry reply <span class="muted">([user] [value] [score] [entries])</span><input value="${esc(cd.entry_message||'')}" placeholder="🎲 [user] entered [value] — total [score]" onchange="compRows[${i}].entry_message=this.value"></label>`:'')+
+      `<label class="field">Win message <span class="muted">([winner] [winner_score])</span><textarea rows="2" onchange="compRows[${i}].win_message=this.value">${esc(cd.win_message||'')}</textarea></label>`+
+      `<label class="field">No-winner message<input value="${esc(cd.no_winner_message||'')}" placeholder="🏁 nobody qualified." onchange="compRows[${i}].no_winner_message=this.value"></label>`+
+      // rewards
+      `<div style="border-top:1px solid var(--line);padding-top:8px">`+
+        `<div class="muted" style="margin-bottom:6px"><b>Winner rewards</b></div>`+
+        `<label class="row" style="gap:6px"><input type="checkbox" ${cd.award_pump?'checked':''} onchange="compRows[${i}].award_pump=this.checked;renderCompetitions();scheduleSave()"> Add to pump `+
+          (typ==='rolloff'?`<span class="muted">(winner's total)</span>`:`<span class="muted">seconds:</span><input type="number" min="0" value="${cd.award_seconds??10}" style="width:70px" onclick="event.stopPropagation()" onchange="compRows[${i}].award_seconds=+this.value;scheduleSave()">`)+`</label>`+
+        `<label class="row" style="gap:6px;margin-top:4px"><input type="checkbox" ${cd.bonus_command_on?'checked':''} onchange="compRows[${i}].bonus_command_on=this.checked;renderCompetitions();scheduleSave()"> Grant winner-only command</label>`+
+        (cd.bonus_command_on?`<div class="colsec" style="gap:6px;margin-left:26px;margin-top:4px">`+
+          `<label class="field">Command <select onchange="compRows[${i}].bonus_command=this.value;scheduleSave()">${cmdOpts(cd.bonus_command)}</select></label>`+
+          `<label class="row" style="gap:6px"><input type="checkbox" ${cd.bonus_stashable?'checked':''} onchange="compRows[${i}].bonus_stashable=this.checked;scheduleSave()"> Stashable <span class="muted">(usable anytime; else only this range)</span></label>`+
+          `<label class="row" style="gap:6px"><input type="checkbox" ${cd.lock_progression?'checked':''} onchange="compRows[${i}].lock_progression=this.checked;scheduleSave()"> Lock everyone else's progression until they use it</label>`+
+          `<label class="row" style="gap:6px"><input type="checkbox" ${cd.bonus_after_pump!==false?'checked':''} onchange="compRows[${i}].bonus_after_pump=this.checked;scheduleSave()"> Announce it only after the pump award finishes</label>`+
+          `<label class="field">Grant message <span class="muted">([winner] [bonus_cmd])</span><input value="${esc(cd.bonus_message||'')}" placeholder="🎁 [winner] holds [bonus_cmd]!" onchange="compRows[${i}].bonus_message=this.value"></label>`+
+        `</div>`:'')+
+      `</div>`;
+    }
+    el.innerHTML=html; box.appendChild(el);
+  });
+}
+function addCompetition(){
+  compRows.push({name:'',type:'rolloff',command:'',duration:60,repeat_every:15,metric:'total',
+    max_entries:3,required_entries:1,require_enter:true,title:'',intro:'',entry_message:'',
+    win_message:'🏆 [winner] wins with [winner_score]!',no_winner_message:'',
+    award_pump:true,award_seconds:10,bonus_command_on:false,bonus_command:'',bonus_stashable:false,
+    lock_progression:false,bonus_after_pump:true,bonus_message:'🎁 [winner] now holds [bonus_cmd]!'});
+  compOpen.add(compRows.length-1); renderCompetitions(); scheduleSave();
+}
+function delCompetition(i){
+  const c=compRows[i]||{};
+  if(!confirm(`Delete competition "${c.name||'(unnamed)'}"? This can't be undone.`)) return;
+  compRows.splice(i,1); compOpen=shiftSet(compOpen,i); renderCompetitions(); scheduleSave();
+}
+function cleanCompetitions(){
+  return compRows.filter(c=>(c.name||'').trim()).map(c=>({
+    name:(c.name||'').trim(), type:['rolloff','race','raffle'].includes(c.type)?c.type:'rolloff',
+    command:(c.command||'').trim(), duration:Math.max(5,Math.min(3600,+c.duration||60)),
+    repeat_every:Math.max(0,+c.repeat_every||0), metric:['total','highest','count'].includes(c.metric)?c.metric:'total',
+    max_entries:Math.max(0,+c.max_entries||0), required_entries:Math.max(0,+c.required_entries||0),
+    require_enter:c.require_enter!==false, title:c.title||'', intro:c.intro||'', entry_message:c.entry_message||'',
+    win_message:c.win_message||'', no_winner_message:c.no_winner_message||'',
+    award_pump:!!c.award_pump, award_seconds:Math.max(0,+c.award_seconds||0),
+    bonus_command_on:!!c.bonus_command_on, bonus_command:(c.bonus_command||'').trim(),
+    bonus_stashable:!!c.bonus_stashable, lock_progression:!!c.lock_progression,
+    bonus_after_pump:c.bonus_after_pump!==false, bonus_message:c.bonus_message||'',
+  }));
+}
 function renamePoll(i, val){
   const neu=(val||'').trim().toLowerCase(), old=(pollRows[i].name||'').trim().toLowerCase();
   if(neu && neu!==old && pollRows.some((p,j)=>j!==i && (p.name||'').trim().toLowerCase()===neu)){
@@ -2542,6 +2663,7 @@ function cleanActionRows(arr){
     dice:(a.dice>0)?+a.dice:null, sides:(a.sides>0)?+a.sides:null,
     capacity_op:a.capacity_op==='set'?'set':'add', capacity_value:+a.capacity_value||0,
     poll:(a.poll||'').trim()||null, broadcast:(a.broadcast||'').trim()||null,
+    competition:(a.competition||'').trim()||null,
     if_option:(a.if_option>0)?+a.if_option:null}));
 }
 function cleanPolls(){
@@ -3020,7 +3142,9 @@ function applyState(st, full){
     eventRows = JSON.parse(JSON.stringify(st.events||[]));
     capEvRows = JSON.parse(JSON.stringify(st.capacity_events||[]));
     pollRows = JSON.parse(JSON.stringify(st.polls||[]));
+    compRows = JSON.parse(JSON.stringify(st.competitions||[]));
     if($('#cmdVote')) $('#cmdVote').value = (st.command_names||{}).vote||'agvote';
+    if($('#cmdEnter')) $('#cmdEnter').value = (st.command_names||{}).enter||'enter';
     if($('#eventInProcessMsg')) $('#eventInProcessMsg').value = st.event_in_process_message||'';
     if($('#eventCooldownMsg')) $('#eventCooldownMsg').value = st.event_cooldown_message||'';
     { const t = st.templates || {}; templatesData = {commands:t.commands||[], events:t.events||[], ranges:t.ranges||[]}; }
@@ -3033,6 +3157,7 @@ function applyState(st, full){
     renderEvents();
     renderCapEvents();
     renderPolls();
+    renderCompetitions();
     renderPollDropdown();
     renderTemplates();
     renderBroadcasts();
@@ -3109,7 +3234,8 @@ function gatherConfig(){
       leaderboard:($('#cmdLeaderboard').value||'leaderboard').trim().toLowerCase(),
       leaderboard_life:($('#cmdLeaderboardLife').value||'toppumpers-life').trim().toLowerCase(),
       pumptimer:($('#cmdPumptimer').value||'pumptimer').trim().toLowerCase(),
-      vote:(($('#cmdVote')&&$('#cmdVote').value)||'agvote').trim().toLowerCase() },
+      vote:(($('#cmdVote')&&$('#cmdVote').value)||'agvote').trim().toLowerCase(),
+      enter:(($('#cmdEnter')&&$('#cmdEnter').value)||'enter').trim().toLowerCase() },
     capacity_message:$('#capacityMsg').value, pumptimer_message:$('#pumptimerMsg').value,
     pump_message: $('#pumpMsg') ? $('#pumpMsg').value : '',
     listen_targets:listenTargets, announce_channel_id: announceChanId,
@@ -3132,7 +3258,7 @@ function gatherConfig(){
     rich_output: $('#richOutput') ? $('#richOutput').checked : false,
     prizes:cleanPrizes(),
     capacity_ranges:rangeRows, commands:cleanCommands(), modes:cleanModes(), events:cleanEvents(),
-    capacity_events:cleanCapEvents(), polls:cleanPolls(),
+    capacity_events:cleanCapEvents(), polls:cleanPolls(), competitions:cleanCompetitions(),
     event_in_process_message: $('#eventInProcessMsg') ? $('#eventInProcessMsg').value : '',
     event_cooldown_message: $('#eventCooldownMsg') ? $('#eventCooldownMsg').value : '',
     broadcasts: cleanBroadcasts(),

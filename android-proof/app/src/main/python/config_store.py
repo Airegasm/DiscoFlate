@@ -70,7 +70,7 @@ DEFAULTS = {
     "command_names": {"roll": "agroll", "capacity": "capacity",
                       "help": "aghelp", "leaderboard": "toppumpers",
                       "leaderboard_life": "toppumpers-life", "pumptimer": "pumptimer",
-                      "vote": "agvote"},
+                      "vote": "agvote", "enter": "enter"},
     # The !pumptimer built-in reply (always available). Placeholders: [timer]/[total_secs].
     "pumptimer_message": "⏱️ [timer] seconds left on the pump timer.",
 
@@ -268,6 +268,18 @@ DEFAULTS = {
     # active) until the block finishes. One-shot per session (re-armed by
     # session reset / activation).
     "capacity_events": [],
+
+    # Competitions ("roll-offs" & friends) — named, started by a "competition"
+    # action (timed events / capacity-event blocks). Players type the enter
+    # command to join, then compete via the entry command during a window; the
+    # winner (by type/metric) gets rewards. Each:
+    #   {name, type ("rolloff"|"race"|"raffle"), command (entry command),
+    #    duration, require_enter, required_entries, max_entries, metric
+    #    ("total"|"highest"|"count"), repeat_every, title, intro, entry_message,
+    #    win_message, no_winner_message, award_pump, award_seconds,
+    #    bonus_command_on, bonus_command, bonus_stashable, lock_progression,
+    #    bonus_after_pump, bonus_message}
+    "competitions": [],
 
     # Polls — named, referenced by a "poll" action (in timed events, capacity-
     # event blocks, poll winners) or a command of type "poll". Posted as a rich

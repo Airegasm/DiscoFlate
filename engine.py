@@ -92,6 +92,20 @@ class Engine:
         # Winning option (0-based) of the most recent poll, or None. Lets a
         # post-event action be gated on which option won (if_option, 1-based).
         self._last_poll_winner: int | None = None
+        # Competitions ("roll-offs"): one runs at a time. Players spam a
+        # designated command during a window; scores tally by a metric; the
+        # winner gets their total fired + optional winner-only range command.
+        self._comp: dict | None = None          # {def, cmd, ends_at, metric, cap, scores:{uid:{name,score,entries}}}
+        self._comp_task: asyncio.Task | None = None
+        self._last_winner: str = ""             # [winner] placeholder (most recent competition winner)
+        self._last_winner_score: float = 0.0
+        # Winner-only command grants: cmdkey -> uid. Only that user may run the
+        # command, and only within the current range (cleared on range change /
+        # session reset). The 'progression lock' freezes everyone else's
+        # capacity gains until the winner uses their granted command.
+        self._winner_grants: dict[str, str] = {}
+        self._progression_lock: dict | None = None   # {"uid":.., "cmd":..} or None
+        self._inline_depth: int = 0                  # recursion guard for [!command] inline fires
         # Post-event action blocks: run AFTER an event completes, detached — the
         # event has already cleared (effects lifted, marked done), so these are
         # NOT part of it. Session-scoped: cancelled on pause / reset / off.
@@ -178,6 +192,8 @@ class Engine:
                 self._session_start = None
             self._capev_cancel_all(clear_session=True)
             self._cancel_poll_task()
+            self._cancel_competition()
+            self._clear_winner_grants(all_incl_stash=True)
             self._cooldowns.clear()
             self._event_last.clear()
             self._events_done.clear()
@@ -387,6 +403,8 @@ class Engine:
             names = self.cfg.get("cooldown_exempt_names") or []
             op = str(names[0]).strip() if names else ""
         ctx["operator"] = op
+        ctx["winner"] = self._last_winner           # most recent competition winner
+        ctx["winner_score"] = f"{self._last_winner_score:g}" if self._last_winner else ""
         pz = self.active_prize() or {}
         ctx["max_roll_goal"] = pz.get("goal") if pz.get("goal") not in (None, "") else ""
         ctx["max_roll_command"] = f"{prefix}{(pz.get('command') or '').strip()}" if pz.get("command") else ""
@@ -401,6 +419,9 @@ class Engine:
         ctx["toppump-all"] = self.leaderboard_life_text()
         ctx["on_message"] = self._render((self.cfg.get("listener_message_on") or ""), ctx)
         ctx["off_message"] = self._render((self.cfg.get("listener_message_off") or ""), ctx)
+        # [pump_msg] = the operator Pump message, reusable in other messages
+        # ([secs]/[timer]/[secs2capacity] are blank here unless passed in extra).
+        ctx["pump_msg"] = self._render((self.cfg.get("pump_message") or ""), ctx)
         # [announce] = the current range's announce text (its own placeholders
         # resolved; [announce] inside it stays literal to avoid recursion).
         ann = (self.range_for(self.capacity).get("announce") or "").strip()
@@ -510,6 +531,10 @@ class Engine:
         key = (r.get("min"), r.get("max"))
         if key == self._current_range_key:
             return
+        # leaving a range clears any range-scoped winner-only grants (stashable
+        # ones persist), so a winner's command doesn't linger into the next band
+        if self._current_range_key is not None:
+            self._clear_winner_grants(all_incl_stash=False)
         self._current_range_key = key
 
         # Enable/disable events on entry.
@@ -595,7 +620,31 @@ class Engine:
             except Exception as e:  # noqa: BLE001
                 self._log("error", f"end session failed: {e}")
 
+    async def _run_inline_commands(self, text: str) -> str:
+        """[!command] tokens in an announced message FIRE that custom command
+        (as the system, uid=None) and are stripped from the text — so a
+        milestone/event/broadcast can trigger a real fire. One level deep only
+        (a command fired this way can't inline-fire more, preventing loops)."""
+        if not text or "[!" not in text or self._inline_depth:
+            return text
+        names = re.findall(r"\[!([\w-]+)\]", text)
+        for name in names:
+            cmd = self.find_command(name)
+            if cmd is None:
+                continue
+            self._inline_depth += 1
+            try:
+                await self.run_custom(cmd, self._anon_label(), uid=None)
+            except Exception as e:  # noqa: BLE001
+                self._log("error", f"inline [!{name}] failed: {e}")
+            finally:
+                self._inline_depth -= 1
+        return re.sub(r"\s*\[!([\w-]+)\]\s*", " ", text).strip()
+
     async def _announce(self, text: str, image: str | None, replace_key: str | None = None) -> None:
+        text = await self._run_inline_commands(text)
+        if not text and image is None:
+            return   # message was only [!command] token(s) — fired, nothing to post
         if self.announce_cb:
             try:
                 await self.announce_cb(text, image, replace_key)
@@ -962,6 +1011,12 @@ class Engine:
                     else:
                         await self._run_poll(pd, source=name)
                     continue
+                if typ == "competition":
+                    # non-blocking: start it in the background, block continues
+                    res = self.start_competition_bg(a.get("competition"), source=name)
+                    if not res.get("ok"):
+                        self._log("error", f"{name}: {res.get('error')}")
+                    continue
                 if typ == "end_session":
                     # End the session like the OFF switch: post an optional
                     # extra line, then the normal off-message + deactivate.
@@ -1202,6 +1257,260 @@ class Engine:
             self._poll_task = None
         self._poll = None
 
+    # -- competitions ("roll-offs" and friends) ------------------------------ #
+    def find_competition(self, name) -> dict | None:
+        key = str(name or "").strip().lower()
+        if not key:
+            return None
+        for c in self.cfg.get("competitions", []):
+            if (c.get("name") or "").strip().lower() == key:
+                return c
+        return None
+
+    def competition_active(self) -> bool:
+        return self._comp is not None
+
+    def _comp_player(self, uid, who: str) -> dict:
+        p = self._comp["players"].setdefault(str(uid), {"name": who, "score": 0.0,
+                                                         "entries": 0, "entered": False,
+                                                         "done_at": None})
+        p["name"] = who
+        return p
+
+    def _comp_eligible(self) -> list:
+        """Players who qualify to win: entered (if required) and met the
+        required-entries threshold (else eliminated)."""
+        c = self._comp
+        req_enter = c["def"].get("require_enter", True)
+        need = int(c.get("required_entries") or 0)
+        out = []
+        for uid, p in c["players"].items():
+            if req_enter and not p["entered"]:
+                continue
+            if p["entries"] < need:
+                continue
+            out.append((uid, p))
+        return out
+
+    def enter_competition(self, uid, who: str) -> str | None:
+        """The !enter system command — register for the running competition.
+        None if nothing's running (stay silent). Returns a reply otherwise."""
+        if self._comp is None:
+            return None
+        p = self._comp_player(uid, who)
+        if p["entered"]:
+            return f"✅ {who}, you're already in — go compete!"
+        p["entered"] = True
+        return f"🙋 **{who}** entered the {self._comp['def'].get('type', 'competition')}!"
+
+    def _comp_value(self, cmd: dict) -> float:
+        """The score contribution of one entry-command use, by the command type:
+        a roll's total, a fire's seconds, else 1 (a plain 'use')."""
+        typ = (cmd.get("type") or "fire").lower()
+        if typ == "roll":
+            rd, rs = self.range_dice(self.range_for(self.capacity))
+            dice = int(cmd.get("dice") or rd)
+            sides = int(cmd.get("sides") or rs)
+            total, _ = self._roll_total(dice, sides)
+            return float(total)
+        if typ == "fire":
+            try:
+                return float(cmd.get("seconds") or 1)
+            except (TypeError, ValueError):
+                return 1.0
+        return 1.0
+
+    async def competition_entry(self, cmd: dict, who: str, uid) -> dict:
+        """A use of the entry command while a competition is live. Bypasses the
+        command's normal cooldown/fire — it scores into the contest instead
+        (only the winner's total fires, at the end)."""
+        c = self._comp
+        cd = c["def"]
+        p = self._comp_player(uid, who)
+        if cd.get("require_enter", True) and not p["entered"]:
+            prefix = self.cfg.get("command_prefix", "!")
+            return {"ok": False, "error": f"🙋 {who}, type `{prefix}{self.builtin_names()['enter']}` to join first!"}
+        cap = int(c.get("cap") or 0)
+        if cap and p["entries"] >= cap:
+            return {"ok": False, "error": f"🚫 {who}, you're out of entries ({cap} max)."}
+        val = self._comp_value(cmd)
+        p["entries"] += 1
+        metric = c.get("metric", "total")
+        if metric == "highest":
+            p["score"] = max(p["score"], val)
+        elif metric == "count":
+            p["score"] = p["entries"]
+        else:  # total
+            p["score"] += val
+        need = int(c.get("required_entries") or 0)
+        if p["done_at"] is None and p["entries"] >= max(1, need):
+            p["done_at"] = time.monotonic()   # for 'race' (first to finish)
+        anon = self._anon_label()
+        base = {"value": f"{val:g}", "score": f"{p['score']:g}", "entries": p["entries"],
+                "max_entries": cap or "∞"}
+        tmpl = cd.get("entry_message") or "🎲 [user] entered **[value]** — total **[score]** ([entries] in)"
+        return {"ok": True, "device": False, "started": False, "competition": True,
+                "reply": self.render(tmpl, {"user": who, "mention": self._mention(uid, who), **base}),
+                "reply_anon": self.render(tmpl, {"user": anon, "mention": anon, **base})}
+
+    def start_competition_bg(self, name, source: str = "manual") -> dict:
+        cd = self.find_competition(name)
+        if cd is None:
+            return {"ok": False, "error": f"no competition named '{name}'"}
+        if self._comp is not None:
+            return {"ok": False, "error": "a competition is already running"}
+        if self._paused:
+            return {"ok": False, "error": "session is paused"}
+        self._comp_task = asyncio.create_task(self._run_competition(cd, source))
+        return {"ok": True}
+
+    async def _run_competition(self, cd: dict, source: str = "comp") -> None:
+        name = (cd.get("name") or "competition").strip()
+        typ = (cd.get("type") or "rolloff").lower()
+        entry = self.find_command(cd.get("command") or "")
+        entry_key = (cd.get("command") or "").strip().lower()
+        try:
+            duration = max(5.0, min(3600.0, float(cd.get("duration") or 60)))
+        except (TypeError, ValueError):
+            duration = 60.0
+        try:
+            repeat = max(0.0, float(cd.get("repeat_every") or 0))
+        except (TypeError, ValueError):
+            repeat = 0.0
+        if repeat and repeat < 5:
+            repeat = 5.0
+        self._comp = {"def": cd, "cmd": entry_key, "metric": cd.get("metric", "total"),
+                      "cap": int(cd.get("max_entries") or 0), "players": {}, "type": typ,
+                      "required_entries": int(cd.get("required_entries") or 0)}
+        prefix = self.cfg.get("command_prefix", "!")
+        title = "🏁 " + self.render((cd.get("title") or name).strip())
+        intro = self.render((cd.get("intro") or "").strip(),
+                            {"enter_cmd": f"{prefix}{self.builtin_names()['enter']}",
+                             "command": f"{prefix}{entry_key}" if entry_key else "",
+                             "duration": f"{duration:g}"})
+        self._log("bot", f"COMPETITION '{name}' ({typ}) started [{source}]")
+        winner_uid = winner = None
+        try:
+            end = time.monotonic() + duration
+            await self._announce_poll(title, intro or self._comp_intro(cd, entry_key, duration))
+            while True:
+                remaining = end - time.monotonic()
+                if remaining <= 0:
+                    break
+                # 'race': end early the moment someone eligible finishes
+                if typ == "race" and self._comp_eligible():
+                    break
+                await asyncio.sleep(min(remaining, repeat) if repeat else min(remaining, 1.0))
+                if repeat and time.monotonic() < end - 1 and typ != "race":
+                    await self._announce_poll(title + " — standings", self._comp_standings())
+            # decide winner among eligible players
+            elig = self._comp_eligible()
+            if elig:
+                if typ == "raffle":
+                    winner_uid, winner = random.choice(elig)
+                elif typ == "race":
+                    winner_uid, winner = min(elig, key=lambda kv: kv[1]["done_at"] or float("inf"))
+                else:  # rolloff
+                    top = max(p["score"] for _, p in elig)
+                    winners = [(u, p) for u, p in elig if p["score"] == top]
+                    winner_uid, winner = random.choice(winners)
+        except asyncio.CancelledError:
+            self._log("bot", f"COMPETITION '{name}' cancelled")
+            self._comp = None
+            raise
+        self._comp = None
+        await self._finish_competition(cd, name, entry, winner_uid, winner)
+
+    def _comp_intro(self, cd: dict, entry_key: str, duration: float) -> str:
+        prefix = self.cfg.get("command_prefix", "!")
+        en = f"{prefix}{self.builtin_names()['enter']}"
+        typ = (cd.get("type") or "rolloff").lower()
+        need = int(cd.get("required_entries") or 0)
+        line = {"race": "first to finish wins", "raffle": "random winner drawn"}.get(typ, "highest score wins")
+        parts = [f"Type `{en}` to join"]
+        if entry_key and typ != "raffle":
+            parts.append(f"then use `{prefix}{entry_key}`" + (f" ×{need}" if need else ""))
+        return f"**{line.upper()}** — " + ", ".join(parts) + f". {duration:g}s!"
+
+    def _comp_standings(self) -> str:
+        rows = sorted(self._comp["players"].values(), key=lambda p: p["score"], reverse=True)
+        rows = [p for p in rows if p["entered"] or not self._comp["def"].get("require_enter", True)]
+        if not rows:
+            return "No entrants yet — type the enter command to join!"
+        lines = [f"**{p['name']}** — {p['score']:g} ({p['entries']} in)" for p in rows[:10]]
+        return "\n".join(lines)
+
+    async def _finish_competition(self, cd: dict, name: str, entry, winner_uid, winner) -> None:
+        if winner is None:
+            self._last_winner, self._last_winner_score = "", 0.0
+            msg = (cd.get("no_winner_message") or "").strip() or f"🏁 **{name}**: no qualifying winner."
+            await self._announce(self.render(msg), None)
+            self._log("bot", f"COMPETITION '{name}' — no winner")
+            return
+        self._last_winner = winner["name"]
+        self._last_winner_score = winner["score"]
+        base = {"winner": winner["name"], "winner_score": f"{winner['score']:g}",
+                "mention": self._mention(winner_uid, winner["name"])}
+        # announce the win immediately
+        msg = (cd.get("win_message") or "").strip() or "🏆 **[winner]** wins with **[winner_score]**!"
+        await self._announce(self.render(msg, base), None)
+        self._log("bot", f"COMPETITION '{name}' — winner {winner['name']} ({winner['score']:g})")
+        bonus_on = bool(cd.get("bonus_command_on") and (cd.get("bonus_command") or "").strip())
+        bkey = cd["bonus_command"].strip().lower() if bonus_on else None
+        # Lock progression FIRST (if wanted) so the instant the contest ends,
+        # nobody but the winner can move the meter — through the whole award +
+        # suspense window — until the winner uses their granted command.
+        if bonus_on and cd.get("lock_progression"):
+            self._progression_lock = {"uid": str(winner_uid), "cmd": bkey}
+            self._log("bot", f"progression LOCKED until {winner['name']} uses !{bkey}")
+        # reward 1: fire the winner's total (rolloff) or fixed award seconds.
+        # bypass_lock — the winner's own reward fire runs despite the lock.
+        fired_secs = 0.0
+        if cd.get("award_pump"):
+            typ = (cd.get("type") or "rolloff").lower()
+            secs = winner["score"] if typ == "rolloff" else float(cd.get("award_seconds") or 0)
+            secs = round(max(0.0, secs), 1)
+            if secs > 0:
+                fr = self._begin_or_extend(self._active_id(), secs, f"competition {name} winner",
+                                           bypass_lock=True)
+                if fr.get("status") in ("started", "extended"):
+                    fired_secs = fr.get("added", 0.0)
+                    self.credit_pump(winner_uid, winner["name"], fired_secs, self._active_id())
+        # reward 2: winner-only bonus command. Optionally hold the announcement
+        # until the winner's fire has finished (a beat of suspense) — the pump
+        # runs up first, THEN they're told they hold the power.
+        if bonus_on:
+            if cd.get("bonus_after_pump", True) and fired_secs > 0:
+                try:
+                    await asyncio.sleep(fired_secs)
+                except asyncio.CancelledError:
+                    return   # session ended mid-wait → drop the grant
+            self._winner_grants[bkey] = str(winner_uid)
+            if cd.get("bonus_stashable"):
+                self._winner_grants[bkey + "\x00stash"] = "1"   # marker: don't clear on range change
+            prefix = self.cfg.get("command_prefix", "!")
+            bmsg = (cd.get("bonus_message") or "").strip() or "🎁 **[winner]** now holds **[bonus_cmd]**!"
+            await self._announce(self.render(bmsg, {**base, "bonus_cmd": f"{prefix}{bkey}"}), None)
+
+    def _cancel_competition(self) -> None:
+        if self._comp_task is not None:
+            self._comp_task.cancel()
+            self._comp_task = None
+        self._comp = None
+
+    def _clear_winner_grants(self, all_incl_stash: bool = False) -> None:
+        """Range change clears range-locked grants; session reset clears all."""
+        if all_incl_stash:
+            self._winner_grants.clear()
+            self._progression_lock = None
+            return
+        for k in [k for k in self._winner_grants if not k.endswith("\x00stash")]:
+            if (k + "\x00stash") not in self._winner_grants:   # not stashable → range-scoped
+                self._winner_grants.pop(k, None)
+        # a cleared progression-lock command means the lock lifts too
+        if self._progression_lock and self._progression_lock["cmd"] not in self._winner_grants:
+            self._progression_lock = None
+
     # -- timed events -------------------------------------------------------- #
     async def _check_events(self) -> None:
         """Fire each enabled event when its interval elapses. Events only run
@@ -1369,6 +1678,14 @@ class Engine:
                 await self._emit(self.render(msg, extra), sink, replace_key=replace_key)
             return
 
+        if action == "competition":
+            res = self.start_competition_bg(ev.get("competition"), source=f"event {name}")
+            if not res.get("ok"):
+                self._log("error", f"event '{name}': {res.get('error')}")
+            if msg:
+                await self._emit(self.render(msg, extra), sink, replace_key=replace_key)
+            return
+
         if action == "capacity":
             op = (ev.get("capacity_op") or "add").lower()
             try:
@@ -1417,7 +1734,8 @@ class Engine:
                 "leaderboard": (n.get("leaderboard") or "leaderboard").strip().lower(),
                 "leaderboard_life": (n.get("leaderboard_life") or "toppumpers-life").strip().lower(),
                 "pumptimer": (n.get("pumptimer") or "pumptimer").strip().lower(),
-                "vote": (n.get("vote") or "agvote").strip().lower()}
+                "vote": (n.get("vote") or "agvote").strip().lower(),
+                "enter": (n.get("enter") or "enter").strip().lower()}
 
     # -- pump-time leaderboard (per session) --------------------------------- #
     def buffer_ok(self, cmdkey: str) -> bool:
@@ -1580,6 +1898,8 @@ class Engine:
                             dice: int | None = None, sides: int | None = None) -> dict:
         if self._paused:
             return self._paused_result(who, uid)
+        if self._progression_lock is not None:
+            return {"ok": False, "silent": True}  # frozen until the competition winner acts
         target = self._active_id()
         if self._device(target) is None:
             return {"ok": False, "error": "no active device selected"}
@@ -1642,7 +1962,24 @@ class Engine:
             return self._paused_result(who, uid)
 
         cmdkey0 = name.lower()
-        capev_enabled = cmdkey0 in self._capev_enabled_cmds()
+        # Competition entry: while a competition is live, its entry command
+        # scores into the contest (cooldown bypassed, doesn't fire) instead of
+        # running normally.
+        if uid is not None and self._comp is not None and self._comp["cmd"] == cmdkey0:
+            return await self.competition_entry(cmd, who, uid)
+        # Winner-only grant: a command locked to a competition winner is silent
+        # for everyone else while the grant stands; the winner may run it even
+        # if it isn't a member of the current range.
+        winner_granted = False
+        if uid is not None and cmdkey0 in self._winner_grants and not cmdkey0.endswith("\x00stash"):
+            if str(uid) != self._winner_grants.get(cmdkey0):
+                return {"ok": False, "silent": True}
+            winner_granted = True
+            # the winner using their granted command lifts the progression lock
+            if self._progression_lock and self._progression_lock.get("cmd") == cmdkey0:
+                self._progression_lock = None
+                self._log("bot", "progression lock lifted — winner used their command")
+        capev_enabled = cmdkey0 in self._capev_enabled_cmds() or winner_granted
         # Capacity-event gate (chat only — uid is None for range-start/system
         # calls). An event's enable-list wins over its own disables AND over
         # range membership; normal ranges yield to capacity events here.
@@ -1652,6 +1989,12 @@ class Engine:
             return {"ok": False, "silent": True}  # not a member of the current range → ignore quietly
         if not self._range_gate_ok(cmd.get("range_gate")) and not capev_enabled:
             return {"ok": False, "silent": True}  # gated to a different capacity band
+        # progression lock: while a competition winner is expected to advance the
+        # range, everyone else's capacity-affecting commands are frozen (the
+        # winner's granted command already lifted the lock above).
+        if (self._progression_lock is not None and not winner_granted
+                and typ in ("fire", "roll", "chance")):
+            return {"ok": False, "silent": True}
         # The owner is never limited by cooldowns or per-person max-uses (they're
         # still subject to the in-progress event guard).
         owner_exempt = uid is not None and self._is_exempt(uid, who)
@@ -1829,7 +2172,16 @@ class Engine:
             detail = f"{duration:.1f}s"
 
         ev_posts, _ = await self.start_events(cmd.get("start_events"), uid, who)
-        fr = self._begin_or_extend(target, duration, f"{name} by {who}")
+        # "fire until capacity %" (winner-only progression command): the fire
+        # runs until capacity reaches fire_until, guaranteeing the range advances.
+        until = None
+        try:
+            fu = cmd.get("fire_until")
+            if fu not in (None, "", 0):
+                until = max(1.0, min(999.0, float(fu)))
+        except (TypeError, ValueError):
+            until = None
+        fr = self._begin_or_extend(target, duration, f"{name} by {who}", until_capacity=until)
         extended = fr["status"] == "extended"
         self.credit_pump(uid, who, fr.get("added", duration), target)
         # Extra "Add Device Fire" rows (fire type): each device runs independently.
@@ -1993,12 +2345,18 @@ class Engine:
         f = self._fires.get(device_id)
         return max(0.0, f["deadline"] - time.monotonic()) if f else 0.0
 
-    def _begin_or_extend(self, device_id: str, duration: float, reason: str) -> dict:
+    def _begin_or_extend(self, device_id: str, duration: float, reason: str,
+                         bypass_lock: bool = False, until_capacity: float | None = None) -> dict:
         # THE pause gate. Every path that can energize a device funnels through
         # here (rolls, commands, events, payoffs, prizes, web fires) — so nothing
         # can switch a pump on while the session is paused, even code added later.
         if self._paused:
             return {"status": "paused"}
+        # Progression lock: after a competition, everyone else's capacity gains
+        # are frozen until the winner uses their granted command (which passes
+        # bypass_lock). Keeps the range from advancing any other way.
+        if self._progression_lock is not None and not bypass_lock:
+            return {"status": "locked"}
         # disable_at_100 gates EVERY fire path here (chance, events, minigame
         # payoffs, prizes included). The threshold is the capacity cap so an
         # enabled End Sequence (which deliberately runs past 100%) still works.
@@ -2015,12 +2373,22 @@ class Engine:
             new_deadline = min(now + cap, f["deadline"] + duration)
             added = max(0.0, new_deadline - f["deadline"])
             f["deadline"] = new_deadline
+            if until_capacity is not None:
+                f["until_capacity"] = until_capacity
             f["extend"].set()
             return {"status": "extended", "added": round(added, 1), "remaining": round(new_deadline - now, 1)}
 
-        actual = min(cap, duration)
+        # "fire until capacity %" (winner-only progression command): run long
+        # enough to reach the target, exempt from the single-fire hard cap, with
+        # an absolute safety ceiling of ~2× a full fill.
+        if until_capacity is not None:
+            sec = (self._device(device_id) or {}).get("calibration_seconds_to_100") or 60
+            actual = min(float(sec) * 2, max(0.5, (until_capacity - self.capacity) / 100.0 * float(sec) + 5))
+        else:
+            actual = min(cap, duration)
         f = {"deadline": now + actual, "abort": asyncio.Event(),
-             "extend": asyncio.Event(), "alias": dev.get("label") or dev["host"]}
+             "extend": asyncio.Event(), "alias": dev.get("label") or dev["host"],
+             "until_capacity": until_capacity}
         self._fires[device_id] = f
         f["task"] = asyncio.create_task(self._run_fire(device_id, reason))
         if self._pump_id() == device_id:
@@ -2044,14 +2412,22 @@ class Engine:
                 await self._set_state(dev, True)
             self._log("device", f"{f['alias']} ON ({reason})")
             while f and device_id in self._fires:
+                # "fire until capacity %": stop the moment the target is reached
+                until = f.get("until_capacity")
+                if until is not None and self.capacity >= until:
+                    self._log("device", f"{f['alias']} reached {until:g}% — stopping")
+                    break
                 remaining = f["deadline"] - time.monotonic()
                 if remaining <= 0:
                     break
                 f["extend"].clear()
                 try:
-                    await asyncio.wait_for(self._wait_abort_or_extend(f), timeout=remaining)
+                    # poll capacity ~4×/s while chasing a target, else sleep to the deadline
+                    await asyncio.wait_for(self._wait_abort_or_extend(f),
+                                           timeout=min(remaining, 0.25) if until is not None else remaining)
                 except asyncio.TimeoutError:
-                    break
+                    if until is None:
+                        break
                 if f["abort"].is_set():
                     self._log("device", f"{f['alias']} interrupted")
                     break
@@ -2133,6 +2509,7 @@ class Engine:
         #    remainder locks and fired-markers survive the pause).
         self._capev_cancel_all(clear_session=False)
         self._cancel_poll_task()
+        self._cancel_competition()
         self._event_last.clear()
         self._event_fires.clear()
         self._event_cooldown_until.clear()
@@ -2345,6 +2722,9 @@ class Engine:
         self._cmd_uses.clear()
         self._last_fired.clear()
         self._last_poll_winner = None
+        self._cancel_competition()
+        self._clear_winner_grants(all_incl_stash=True)
+        self._last_winner = ""; self._last_winner_score = 0.0
         self._current_range_key = None
         self._end_triggered = False
         # Uptime restarts with the session — but only ticks if a session is
