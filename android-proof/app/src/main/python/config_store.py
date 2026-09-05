@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import tempfile
 import time
@@ -195,7 +196,8 @@ DEFAULTS = {
     # type "game-*" (pushluck/simon/balloon/rps/slots/blackjack) → button/
     #   ephemeral minigames (minigames.py). Params: pl_* (pushluck), sm_* (simon),
     #   bl_cells/bl_pops/bl_points (balloon), rps_wins (rps), sl_symbols (slots).
-    #   game_intro = message with the Play button. game_tiers = [{op, min,
+    #   game_intro = message with the Play button (game_intro_embed +
+    #   game_intro_title post it as an embed). game_tiers = [{op, min,
     #   actions}] score→outcome (v11): the highest matching value (per `op`:
     #   >= > = != < <=) the final score reaches runs its ACTION BLOCK after the
     #   labeled score line posts (fires credited to the player). A luck modifier (a flat ± added to the
@@ -397,16 +399,27 @@ _NUM_FIELDS = {
 }
 
 
+# Fields that accept a NUMBER OR a bare [placeholder] token (the engine's
+# _num_expr renders it at run time) — e.g. a fire row's seconds = [winner_score].
+_PLACEHOLDER_NUM_FIELDS = {"seconds", "fill_pct", "amount", "deadline"}
+_PLACEHOLDER_TOKEN = re.compile(r"^\s*\[[\w-]+\]\s*$")
+
+
 def _coerce_numbers(node):
     """Recursively force known-numeric fields to real numbers (junk → None).
     The UI interpolates these into HTML attributes assuming they're numbers,
-    so a hand-edited or tampered backup can't smuggle markup through them."""
+    so a hand-edited or tampered backup can't smuggle markup through them.
+    Placeholder-capable fields keep a bare [token] (always esc()'d in the UI)."""
     if isinstance(node, dict):
         for k, v in list(node.items()):
             if isinstance(v, (dict, list)):
                 _coerce_numbers(v)
             elif k in _NUM_FIELDS and v is not None and not isinstance(v, bool):
                 if isinstance(v, (int, float)):
+                    continue
+                if (k in _PLACEHOLDER_NUM_FIELDS and isinstance(v, str)
+                        and _PLACEHOLDER_TOKEN.match(v)):
+                    node[k] = v.strip()
                     continue
                 try:
                     f = float(v)

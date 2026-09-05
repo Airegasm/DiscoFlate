@@ -1,6 +1,6 @@
 {
-  "version": "3.44.1",
-  "versionCode": 115,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.44.1/discoflate.apk",
-  "notes": "DiscoFlate v3.44.1 — Activation OFF now kills EVERYTHING running: competitions, polls, bonus rounds, winner buttons, award deadlines, timed & capacity events (detached rounds and post blocks included), every command gate, cooldowns and grants — plus all device fires and live minigame views. Activation ON is strictly ordered: the ON message posts first, then its [!command] tokens fire, then timed events release their first rounds (8s safety release). Also: competition editor puts Allow-rerolls and Add-ALL-totals on the parameter row next to Win by."
+  "version": "3.44.2",
+  "versionCode": 116,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.44.2/discoflate.apk",
+  "notes": "DiscoFlate v3.44.2 — placeholder values like [total_score] survive in number-or-placeholder fields (seconds / fill % / amount / deadline) instead of being wiped to blank on load; minigames have NO built-in result line anymore — the winning tier's action block is the game's entire outcome (message rows announce it, [game]/[score]/[user] resolve; no message row = a quiet finish); the ▶ Play intro gains an embed tickbox with a Titlebar field."
 }

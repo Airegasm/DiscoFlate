@@ -835,7 +835,8 @@ class BotManager:
         try:
             res = await self.engine.game_result(cmd, score, who, uid)
             label = self.engine.game_display_name(cmd)
-            await self._broadcast_named(res.get("real"), res.get("anon"), uid, label=label, who=who)
+            if (res.get("real") or "").strip():   # tier message rows may replace the score line
+                await self._broadcast_named(res.get("real"), res.get("anon"), uid, label=label, who=who)
             # the winning tier's optional action block runs AFTER its result posts
             if res.get("tier_actions"):
                 await self.engine.run_actions(res["tier_actions"], f"{label} tier",
@@ -970,7 +971,14 @@ class BotManager:
                 intro = (res.get("reply") or "").strip() or f"🎮 **{who}** started **{custom.get('name')}** — press Play!"
                 view = minigames.make_play_view(self, custom, who, str(message.author.id))
                 try:
-                    view.message = await message.channel.send(self._hdr(cfg, glabel, who) + intro, view=view)
+                    if custom.get("game_intro_embed"):
+                        ttl = self.engine.render(
+                            (custom.get("game_intro_title") or "").strip() or f"🎮 {glabel}",
+                            {"user": who, "mention": message.author.mention})
+                        emb = discord.Embed(title=ttl[:256], description=intro[:4096], color=0x9B59B6)
+                        view.message = await message.channel.send(embed=emb, view=view)
+                    else:
+                        view.message = await message.channel.send(self._hdr(cfg, glabel, who) + intro, view=view)
                 except Exception as e:  # noqa: BLE001
                     await _reply(message, f"⚠️ couldn't start the game: {e}")
                 return

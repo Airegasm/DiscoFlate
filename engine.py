@@ -3519,13 +3519,17 @@ class Engine:
                 "secs": f"{total:.1f}", "seconds": f"{total:.1f}",
                 "secs2capacity": (self._secs_to_capacity(total, self._active_id()) if fired else "0"),
                 "game": name}
-        header = f"🎮 **{name}**\n"   # every result says which game it was for
-        tmpl = tier.get("message") or ""   # legacy pre-v11 (now a message row)
-        real = header + (self.render(tmpl, {"user": who, "mention": self._mention(uid, who), **base})
-                         or f"**{who}** scored **{score}**.")
-        anon = self._anon_label()
-        anon_msg = header + (self.render(tmpl, {"user": anon, "mention": anon, **base})
-                             or f"**{anon}** scored **{score}**.")
+        # NO built-in result line: the winning tier's block IS the announcement
+        # ([game]/[score]/[user] resolve inside its message rows; no message row
+        # = the game finishes quietly). Legacy pre-v11 tier message templates
+        # still render for un-migrated imports.
+        tmpl = tier.get("message") or ""
+        real = anon_msg = ""
+        if tmpl:
+            header = f"🎮 **{name}**\n"
+            real = header + self.render(tmpl, {"user": who, "mention": self._mention(uid, who), **base})
+            anon = self._anon_label()
+            anon_msg = header + self.render(tmpl, {"user": anon, "mention": anon, **base})
         self._log("roll", f"{who} finished {name} — score {score}" + (f", fired {total}s" if fired else ""))
         return {"real": real, "anon": anon_msg, "events_posted": ev_posts,
                 "tier_actions": tier.get("actions") or [], "score": score}

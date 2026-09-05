@@ -748,7 +748,7 @@
         <li><b>game-rps</b> — Rock-Paper-Scissors vs the bot, first to <b>Rounds to win</b>. Score = rounds you won.</li>
         <li><b>game-slots</b> — a <b>public</b> one-pull slot machine (no Play button): running the command spins 3 reels in-channel. Score = 3 (three of a kind), 1 (a pair), 0 (no match). Set # symbols (more = rarer wins).</li>
         <li><b>game-blackjack</b> — ephemeral 21 vs the dealer: <b>Hit</b> / <b>Stand</b>. Score = 0 bust/lose · 1 push · 2 win · 3 natural blackjack.</li>
-        <li>Most games post a public <b>▶ Play</b> button locked to whoever ran the command; play is private (ephemeral) until the labeled score line broadcasts (slots is the exception — it's fully public; every result respects <b>cross-server anonymity</b>). A tier is just <b>score op N</b> + an <b>action block</b> run after the score posts — message rows for flavor, fire rows credited to the player, an <b>award</b>, or an <b>achievement</b> row counting toward a Perfect Prize (“3 blackjacks → bonus command”). <code>[score]</code> and <code>[game]</code> work inside.</li>
+        <li>Most games post a public <b>▶ Play</b> button locked to whoever ran the command; play is private (ephemeral) until the winning tier's block announces the outcome (slots is the exception — it's fully public). A tier is just <b>score op N</b> + an <b>action block</b> — its message rows ARE the result announcement (<code>[score]</code> <code>[game]</code> <code>[user]</code> work), fire rows credit the player, and it can <b>award</b> or bump an <b>achievement</b> toward a Perfect Prize (“3 blackjacks → bonus command”).</li>
         <li><b>Minigame luck</b> — a flat <b>±</b> added to the final score before the tier is picked. Set it per <b>range</b> (in that range's command table) for range-bound games, or on the game's <b>Always-On</b> entry for always-on ones.</li>
       </ul>
       <h3 style="margin:14px 0 6px">Per-command options</h3>
@@ -2273,7 +2273,7 @@ function gameTiersEditor(i, c){
       `</div>`+
       actionsSection('⚙️ Actions on this tier', `commandRows[${i}].game_tiers[${j}].actions`, 'renderCommands',
         t.actions, "{type:'message',message:''}",
-        'Run after the score line posts — message/fire rows (fires credit the player), award, achievement, capacity, … <code>[score]</code> and <code>[game]</code> work.')+
+        'THE game’s entire outcome: message rows announce it (<code>[score]</code> <code>[game]</code> <code>[user]</code> work — embed away), fire rows credit the player, plus award / achievement / capacity / … No message row = the game finishes quietly.')+
     `</div>`;
   }).join('');
   return `<div class="muted" style="margin:8px 0 4px">Outcome tiers <span class="muted">— among all tiers the final score matches, the <b>highest value</b> wins (add a <b>≥ 0</b> tier as the floor/loss).</span></div>`+
@@ -2340,7 +2340,11 @@ function renderCommands(){
       `</div>`+
       `<label class="field">Description <input value="${esc(c.description||'')}" placeholder="what it does (shown in the command list)" onchange="commandRows[${i}].description=this.value"></label>`+
       (isGame
-        ? `<label class="field">Intro message <span class="muted">(shown with the ▶ Play button · [user] [mention])</span><input value="${esc(c.game_intro||'')}" onchange="commandRows[${i}].game_intro=this.value"></label>`+
+        ? `<div class="row" style="gap:12px;align-items:flex-end">`+
+            `<label class="field" style="flex:1">Intro message <span class="muted">(shown with the ▶ Play button · [user] [mention])</span><input value="${esc(c.game_intro||'')}" onchange="commandRows[${i}].game_intro=this.value"></label>`+
+            `<label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" ${c.game_intro_embed?'checked':''} onchange="commandRows[${i}].game_intro_embed=this.checked;renderCommands();scheduleSave()"> embed</label>`+
+            (c.game_intro_embed?`<label class="field">Titlebar <input value="${esc(c.game_intro_title||'')}" placeholder="🎮 game" style="width:200px" onchange="commandRows[${i}].game_intro_title=this.value;scheduleSave()"></label>`:'')+
+          `</div>`+
           gameTiersEditor(i, c)
         : actionsSection('⚙️ Actions', `commandRows[${i}].actions`, 'renderCommands',
             c.actions, "{type:'fire',fire_mode:'seconds',seconds:3}",
@@ -2369,7 +2373,7 @@ function cleanCommands(){
         pl_bust_start:c.pl_bust_start??15, pl_bust_step:c.pl_bust_step??12, pl_max_pumps:c.pl_max_pumps??8, pl_points:c.pl_points??1,
         sm_symbols:c.sm_symbols??4, sm_max_rounds:c.sm_max_rounds??8, sm_reveal:c.sm_reveal??3,
         bl_cells:c.bl_cells??9, bl_pops:c.bl_pops??3, bl_points:c.bl_points??1, rps_wins:c.rps_wins??3, sl_symbols:c.sl_symbols??6,
-        game_intro:c.game_intro||'',
+        game_intro:c.game_intro||'', game_intro_embed:!!c.game_intro_embed, game_intro_title:c.game_intro_title||'',
         game_tiers:(c.game_tiers||[]).map(t=>({op:t.op||'>=', min:+t.min||0, actions:cleanActionRows(t.actions)})),
       });
     } else {
