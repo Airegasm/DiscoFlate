@@ -100,11 +100,15 @@ _GAMEPLAY_KEYS = [
     "command_prefix", "command_names", "roll", "system_buffer_seconds",
     "capacity_message", "pumptimer_message", "pump_message",
     "cooldown_message",
+    "capacity_embed", "capacity_title", "pumptimer_embed", "pumptimer_title",
+    "cooldown_embed", "cooldown_title", "pump_embed", "pump_title",
     "commands", "broadcasts", "modes", "prizes",
     # Game tab
     "cooldown_seconds", "auto_report",
     "listener_message_on", "listener_message_off",
+    "listener_on_embed", "listener_on_title", "listener_off_embed", "listener_off_title",
     "pause_message", "resume_message", "paused_notice_message",
+    "pause_embed", "pause_title",
     "output_headers", "rich_output",
     "capacity_ranges", "always_on_enabled", "always_on_commands",
     # Events tab
@@ -235,6 +239,11 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "prefix": cfg.get("command_prefix", "!"),
         "command_names": cfg.get("command_names", {}),
         "capacity_message": cfg.get("capacity_message", ""),
+        "capacity_embed": bool(cfg.get("capacity_embed")), "capacity_title": cfg.get("capacity_title", ""),
+        "pumptimer_embed": bool(cfg.get("pumptimer_embed")), "pumptimer_title": cfg.get("pumptimer_title", ""),
+        "cooldown_embed": bool(cfg.get("cooldown_embed")), "cooldown_title": cfg.get("cooldown_title", ""),
+        "pump_embed": bool(cfg.get("pump_embed")), "pump_title": cfg.get("pump_title", ""),
+        "pause_embed": bool(cfg.get("pause_embed")), "pause_title": cfg.get("pause_title", ""),
         "pumptimer_message": cfg.get("pumptimer_message", ""),
         "pump_message": cfg.get("pump_message", ""),
         "system_buffer_seconds": cfg.get("system_buffer_seconds", 8),
@@ -273,6 +282,10 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "cooldown_exempt_names": cfg.get("cooldown_exempt_names", []),
         "operator_name": cfg.get("operator_name", ""),
         "listener_message_on": cfg.get("listener_message_on", ""),
+        "listener_on_embed": bool(cfg.get("listener_on_embed")),
+        "listener_on_title": cfg.get("listener_on_title", ""),
+        "listener_off_embed": bool(cfg.get("listener_off_embed")),
+        "listener_off_title": cfg.get("listener_off_title", ""),
         "listener_message_off": cfg.get("listener_message_off", ""),
         "pause_message": cfg.get("pause_message", ""),
         "resume_message": cfg.get("resume_message", ""),
@@ -514,6 +527,9 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                 raise web.HTTPConflict(text="config changed elsewhere — reload and retry")
         patch = {}
         for key in ("command_prefix", "command_names", "capacity_message",
+                    "capacity_embed", "capacity_title", "pumptimer_embed", "pumptimer_title",
+                    "cooldown_embed", "cooldown_title", "pump_embed", "pump_title",
+                    "pause_embed", "pause_title",
                     "system_buffer_seconds", "cooldown_message", "pumptimer_message", "pump_message",
                     "roll", "prizes", "capacity_ranges", "commands", "modes", "events",
                     "capacity_events", "polls", "competitions",
@@ -526,6 +542,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                     "always_on_enabled", "always_on_commands",
                     "event_in_process_message", "event_cooldown_message", "broadcasts",
                     "listener_message_on", "listener_message_off",
+                    "listener_on_embed", "listener_on_title", "listener_off_embed", "listener_off_title",
                     "pause_message", "resume_message", "paused_notice_message"):
             if key in body:
                 want = _TYPE_FLOOR.get(key)
@@ -608,6 +625,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         msg = ((cfg.get("listener_message_on") if enabled
                else cfg.get("listener_message_off")) or "").strip()
         footer = f"-# DiscoFlate v{VERSION} by AireGasm"
+        footer_plain = f"DiscoFlate v{VERSION} by AireGasm"
         if enabled:
             # STRICT activation order: 1) the ON message posts, 2) its
             # [!command] tokens fire, 3) events release their first rounds.
@@ -615,14 +633,22 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             if msg:
                 text = engine.render(engine.strip_inline(msg))
                 if text.strip():
-                    await botmgr.announce(f"{text}\n{footer}", None)
+                    if cfg.get("listener_on_embed"):
+                        ttl = engine.render((cfg.get("listener_on_title") or "").strip()) or "🟢 Activation ON"
+                        await botmgr.post_embed(ttl, text, footer=footer_plain)
+                    else:
+                        await botmgr.announce(f"{text}\n{footer}", None)
                 await engine.fire_inline(msg)
             engine.finish_activation()
         elif msg:
             # OFF message renders text only — no fires, the session is closing.
             text = engine.render(msg)
             if text.strip():
-                await botmgr.announce(f"{text}\n{footer}", None)
+                if cfg.get("listener_off_embed"):
+                    ttl = engine.render((cfg.get("listener_off_title") or "").strip()) or "🔴 Activation OFF"
+                    await botmgr.post_embed(ttl, text, footer=footer_plain)
+                else:
+                    await botmgr.announce(f"{text}\n{footer}", None)
         return web.json_response(_public_state(engine, botmgr))
 
     async def command_toggle(request):

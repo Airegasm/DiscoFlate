@@ -416,7 +416,15 @@ class BotManager:
                     if elapsed >= period:
                         elapsed = 0
                         txt = self.engine.auto_report_text(cfg.get("command_prefix", "!"))
-                        await self.broadcast(txt, None, embed=self._status_embed("auto", txt))
+                        are = None
+                        if ar.get("embed"):
+                            try:
+                                ttl = self.engine.render((ar.get("title") or "").strip()) or "📊 Auto-report"
+                                are = discord.Embed(title=ttl[:256], description=(txt or "")[:4096],
+                                                    color=self._EMBED_COLORS.get("auto", 0x2ECC71))
+                            except Exception:  # noqa: BLE001
+                                are = None
+                        await self.broadcast(txt, None, embed=are or self._status_embed("auto", txt))
                 except asyncio.CancelledError:
                     raise
                 except Exception as e:  # noqa: BLE001 — one bad tick must not kill the loop
@@ -512,9 +520,13 @@ class BotManager:
         image = _resolve_img(image)
         try:
             if embed is not None:
+                kw = {"embed": embed}
                 if view is not None:
-                    return await ch.send(embed=embed, view=view)
-                return await ch.send(embed=embed)
+                    kw["view"] = view
+                if image and not image.lower().startswith(("http://", "https://")) \
+                        and os.path.exists(image):
+                    kw["file"] = discord.File(image)   # shows inside the embed via attachment://
+                return await ch.send(**kw)
             if image and image.lower().startswith(("http://", "https://")):
                 return await ch.send(_clip(f"{text}\n{image}" if text else image))
             elif image and os.path.exists(image):
@@ -541,6 +553,19 @@ class BotManager:
             if title:
                 e.title = title[:256]
             return e
+        except Exception:  # noqa: BLE001
+            return None
+
+    def _cfg_embed(self, cfg, key: str, text: str, default_title: str, kind: str = "capacity"):
+        """Per-message embed toggle: when cfg[f"{key}_embed"] is on, wrap `text`
+        in an embed titled cfg[f"{key}_title"] (blank = default_title). Works
+        independently of rich_output; returns None when the toggle is off."""
+        if not cfg.get(f"{key}_embed"):
+            return None
+        try:
+            ttl = self.engine.render((cfg.get(f"{key}_title") or "").strip()) or default_title
+            return discord.Embed(title=ttl[:256], description=(text or "")[:4096],
+                                 color=self._EMBED_COLORS.get(kind, 0x5865F2))
         except Exception:  # noqa: BLE001
             return None
 
@@ -634,7 +659,8 @@ class BotManager:
             actual = res.get("added") if res.get("added") is not None else seconds
             extra = {"secs": f"{actual:.1f}", "seconds": f"{actual:.1f}",
                      "secs2capacity": self.engine._secs_to_capacity(actual, target)}
-            await self.broadcast(self.engine.render(tmpl, extra), None)
+            msg = self.engine.render(tmpl, extra)
+            await self.broadcast(msg, None, embed=self._cfg_embed(cfg, "pump", msg, "💨 Pump"))
         return res
 
     async def operator_stop(self, who: str) -> dict:
@@ -664,7 +690,8 @@ class BotManager:
         default = "📊 Capacity **[capacity]%**\n[capacity_bar]\nRolling **[dice]** · [announce]"
         tmpl = cfg.get("capacity_message") or default
         msg = self.engine.render(tmpl, {"dice": f"{rd}d{rs}", "sides": rs}) or "📊"
-        await self.broadcast(msg, None, embed=self._status_embed("capacity", msg))
+        await self.broadcast(msg, None, embed=self._cfg_embed(cfg, "capacity", msg, "📊 Capacity")
+                             or self._status_embed("capacity", msg))
         return {"ok": True}
 
     async def operator_broadcast_leaderboard(self) -> dict:
@@ -727,19 +754,30 @@ class BotManager:
         self.engine._log("bot", f"cleanup — deleted {deleted} of the bot's own message(s)")
         return {"ok": True, "deleted": deleted}
 
-    async def post_embed(self, title: str, text: str, options: list | None = None) -> None:
-        """Broadcast a rich embed (polls). Always an embed — not gated on
-        rich_output. When `options` (poll option labels) is given, the embed
-        carries tap-to-vote buttons; each tap answers the voter EPHEMERALLY
-        (only they see their choice) and fires the quiet vote broadcast."""
+    async def post_embed(self, title: str, text: str, options: list | None = None,
+                         image: str | None = None, footer: str | None = None) -> None:
+        """Broadcast a rich embed (polls, embed-ticked milestones & activation
+        messages). Always an embed — not gated on rich_output. `options` (poll
+        labels) adds tap-to-vote buttons; `image` shows inside the embed (a
+        local file attaches, a URL links); `footer` is embed subtext."""
         try:
             e = discord.Embed(title=(title or "")[:256], description=(text or "")[:4096],
                               color=0x9B59B6)
+            if footer:
+                e.set_footer(text=footer[:2048])
+            img_attach = None
+            if image:
+                if str(image).lower().startswith(("http://", "https://")):
+                    e.set_image(url=image)
+                else:
+                    img_attach = image
+                    resolved = _resolve_img(image) or image
+                    e.set_image(url=f"attachment://{os.path.basename(resolved)}")
         except Exception:  # noqa: BLE001 — no embed support → plain text
-            await self.broadcast(f"**{title}**\n{text}", None)
+            await self.broadcast(f"**{title}**\n{text}", image)
             return
         view = PollVoteView(self, options) if options else None
-        await self.broadcast("", None, embed=e, view=view)
+        await self.broadcast("", img_attach, embed=e, view=view)
 
     async def post_broadcast_embed(self, text: str) -> None:
         """A broadcast-preset action → a rich embed card (always an embed, like
@@ -942,7 +980,8 @@ class BotManager:
 
         if action == "pumptimer":
             tmpl = cfg.get("pumptimer_message") or "⏱️ [timer] seconds left on the pump timer."
-            await _reply(message, self.engine.render(tmpl))
+            txt = self.engine.render(tmpl)
+            await _reply(message, txt, embed=self._cfg_embed(cfg, "pumptimer", txt, "⏱️ Pump timer"))
             return
 
         if action == "capacity":
@@ -950,7 +989,8 @@ class BotManager:
             default = "📊 Capacity **[capacity]%**\n[capacity_bar]\nRolling **[dice]** · [announce]"
             tmpl = cfg.get("capacity_message") or default
             txt = self.engine.render(tmpl, {"dice": f"{rd}d{rs}", "sides": rs}) or "📊"
-            await _reply(message, txt, embed=self._status_embed("capacity", txt))
+            await _reply(message, txt, embed=self._cfg_embed(cfg, "capacity", txt, "📊 Capacity")
+                         or self._status_embed("capacity", txt))
             return
 
         if custom is not None:
@@ -961,8 +1001,16 @@ class BotManager:
                 return  # gated out (wrong range) → ignore quietly
             if not res.get("ok"):
                 # cooldown/out-of-uses/paused messages go through as-is; other errors get a ⚠️
-                await _reply(message, res["error"] if (res.get("cooldown") or res.get("used_up") or res.get("paused"))
-                             else f"⚠️ {res.get('error', 'could not run')}")
+                if res.get("cooldown"):
+                    await _reply(message, res["error"],
+                                 embed=self._cfg_embed(cfg, "cooldown", res["error"], "⏳ Cooldown"))
+                elif res.get("paused"):
+                    await _reply(message, res["error"],
+                                 embed=self._cfg_embed(cfg, "pause", res["error"], "⏸️ Session paused"))
+                elif res.get("used_up"):
+                    await _reply(message, res["error"])
+                else:
+                    await _reply(message, f"⚠️ {res.get('error', 'could not run')}")
                 return
             if res.get("game"):
                 # Minigame: post the public Play button (locked to the author). The

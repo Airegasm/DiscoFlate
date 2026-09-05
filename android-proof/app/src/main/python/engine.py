@@ -641,7 +641,16 @@ class Engine:
                 image = (r.get("image") or "").strip()
                 if text or image:
                     self._log("bot", f"milestone {mn}% → announcing")
-                    await self._announce(self.render(text) or f"Reached {mn}% capacity", image or None)
+                    body = self.render(text) or f"Reached {mn}% capacity"
+                    if r.get("milestone_embed") and self.embed_cb:
+                        ttl = self.render((r.get("milestone_title") or "").strip()) or f"📈 {mn}%"
+                        try:
+                            await self.embed_cb(ttl, body, None, image or None)
+                        except Exception as ex:  # noqa: BLE001
+                            self._log("error", f"milestone embed failed: {ex}")
+                            await self._announce(body, image or None)
+                    else:
+                        await self._announce(body, image or None)
 
     async def _check_range_entry(self) -> None:
         """When capacity moves into a new range, fire that range's start command
@@ -792,6 +801,18 @@ class Engine:
         returning the text with those tokens stripped — for message paths that
         don't go through _announce."""
         return await self._run_inline_commands(self.render(template, extra))
+
+    async def _announce_maybe_embed(self, key: str, body: str, default_title: str) -> None:
+        """Announce `body`, wrapped in an embed when cfg[f"{key}_embed"] is on —
+        titled cfg[f"{key}_title"] (blank = default_title)."""
+        if self.cfg.get(f"{key}_embed") and self.embed_cb:
+            ttl = self.render((self.cfg.get(f"{key}_title") or "").strip()) or default_title
+            try:
+                await self.embed_cb(ttl, body)
+                return
+            except Exception as ex:  # noqa: BLE001
+                self._log("error", f"{key} embed failed: {ex}")
+        await self._announce(body, None)
 
     async def _announce(self, text: str, image: str | None, replace_key: str | None = None) -> None:
         text = await self._run_inline_commands(text)
@@ -3774,7 +3795,8 @@ class Engine:
         tmpl = self.cfg.get("pause_message") or (
             "⏸️ **Session paused** by [user] — pumps are off and commands are "
             "disabled until the operator resumes.")
-        await self._announce(self.render(tmpl, {"user": who, "mention": who}), None)
+        await self._announce_maybe_embed("pause", self.render(tmpl, {"user": who, "mention": who}),
+                                         "⏸️ Session paused")
         return {"ok": True, "paused": True}
 
     async def resume(self, who: str = "") -> dict:
@@ -3789,7 +3811,8 @@ class Engine:
         self.cfg = cfg
         self._log("bot", f"SESSION RESUMED by {who}")
         tmpl = self.cfg.get("resume_message") or "▶️ **Session resumed** by [user] — pump away!"
-        await self._announce(self.render(tmpl, {"user": who, "mention": who}), None)
+        await self._announce_maybe_embed("pause", self.render(tmpl, {"user": who, "mention": who}),
+                                         "▶️ Session resumed")
         return {"ok": True, "paused": False}
 
     def refund_use(self, uid, cmdkey: str) -> None:

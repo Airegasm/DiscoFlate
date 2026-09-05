@@ -18,6 +18,14 @@
   "system_buffer_seconds": 8,
   "capacity_message": "[announce] - Current Capacity: **[capacity]%**\n[capacity_bar]",
   "pumptimer_message": "\u23f1\ufe0f [timer] seconds left on the pump timer.",
+  "capacity_embed": false,
+  "capacity_title": "",
+  "pumptimer_embed": false,
+  "pumptimer_title": "",
+  "cooldown_embed": false,
+  "cooldown_title": "",
+  "pump_embed": false,
+  "pump_title": "",
   "pump_message": "**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
   "cooldown_message": "\u23f3 [mention], [cmd] is on cooldown \u2014 [cooldown]s left until you can use it again.",
   "commands": [
@@ -994,13 +1002,21 @@
   "auto_report": {
     "enabled": true,
     "seconds": 300,
-    "message": "[Bot Report] **[operator]'s DiscoFlate Inflation Bot is now LIVE! ([uptime])**\n\n[announce] - Current Capacity: **[capacity]%**\n[capacity_bar]\n\n**[help_cmd]** for a list of commands.\n\n\n"
+    "message": "[Bot Report] **[operator]'s DiscoFlate Inflation Bot is now LIVE! ([uptime])**\n\n[announce] - Current Capacity: **[capacity]%**\n[capacity_bar]\n\n**[help_cmd]** for a list of commands.\n\n\n",
+    "embed": false,
+    "title": ""
   },
   "listener_message_on": "[Bot Status] **[operator]'s DiscoFlate Inflation Bot is now LIVE!**\n[commands]\n",
   "listener_message_off": "[Bot Status] **[operator]'s DiscoFlate Inflation Bot is now OFFLINE after running for [uptime]**\n[toppump]\n**Thanks for pumping!**",
+  "listener_on_embed": false,
+  "listener_on_title": "",
+  "listener_off_embed": false,
+  "listener_off_title": "",
   "pause_message": "\u23f8\ufe0f **Session paused** by [user] \u2014 pumps are off and commands are disabled until the operator resumes.",
   "resume_message": "\u25b6\ufe0f **Session resumed** by [user] \u2014 pump away!",
   "paused_notice_message": "\u23f8\ufe0f [mention], the session is paused \u2014 hang tight until the operator resumes.",
+  "pause_embed": false,
+  "pause_title": "",
   "output_headers": true,
   "rich_output": true,
   "capacity_ranges": [

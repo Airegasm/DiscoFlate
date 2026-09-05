@@ -72,6 +72,11 @@ DEFAULTS = {
                       "vote": "agvote", "enter": "enter"},
     # The !pumptimer built-in reply (always available). Placeholders: [timer]/[total_secs].
     "pumptimer_message": "⏱️ [timer] seconds left on the pump timer.",
+    # Per-message embed toggles + titlebars for the built-in replies/broadcasts.
+    "capacity_embed": False, "capacity_title": "",
+    "pumptimer_embed": False, "pumptimer_title": "",
+    "cooldown_embed": False, "cooldown_title": "",
+    "pump_embed": False, "pump_title": "",
 
     # The Pump operator-control's channel message. Placeholders: [secs]
     # [secs2capacity] [capacity] [timer] [operator].
@@ -87,6 +92,11 @@ DEFAULTS = {
     # Blank = say nothing. Supports [capacity] and the other placeholders.
     "listener_message_on": "",
     "listener_message_off": "",
+    # Post the ON/OFF message as an embed with this titlebar (blank = default).
+    "listener_on_embed": False,
+    "listener_on_title": "",
+    "listener_off_embed": False,
+    "listener_off_title": "",
 
     # Session pause (the dashboard STOP/RESUME button). While paused every
     # device-on path is latched off, running fires/events/minigames are
@@ -99,6 +109,9 @@ DEFAULTS = {
     "resume_message": "▶️ **Session resumed** by [user] — pump away!",
     # Reply to someone who runs a command while paused (per-user, buffered).
     "paused_notice_message": "⏸️ [mention], the session is paused — hang tight until the operator resumes.",
+    # ONE embed toggle + titlebar shared by all three pause/resume messages.
+    "pause_embed": False,
+    "pause_title": "",
 
     # The single server + channel the bot listens on (legacy / primary).
     # listen_channel_id "" = any channel in the selected server.
@@ -158,7 +171,8 @@ DEFAULTS = {
 
     # Bot auto-posts every N seconds to announce_channel. `message` is a custom
     # template ([capacity], [commands]); blank uses the built-in capacity+commands text.
-    "auto_report": {"enabled": False, "seconds": 300, "message": ""},
+    "auto_report": {"enabled": False, "seconds": 300, "message": "",
+                    "embed": False, "title": ""},
 
     # Channel the bot posts auto-reports and milestone messages into.
     "announce_channel_id": "",

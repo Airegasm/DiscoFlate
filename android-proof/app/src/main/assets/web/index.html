@@ -408,17 +408,33 @@
             <input type="number" id="autoSecs" value="300" min="15" step="5" style="width:90px"> seconds</label>
           <label class="field">Message <span class="muted">(blank = default)</span>
             <textarea id="autoMessage" rows="6" placeholder="Capacity [capacity]%\nCommands: [commands]"></textarea></label>
+          <div class="row" style="gap:12px;align-items:flex-end">
+            <label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" id="autoEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
+            <label class="field" style="flex:1">Titlebar <input id="autoTitle" placeholder="📊 Auto-report" onchange="scheduleSave()"></label>
+          </div>
         </div>
         <div class="colsec" style="flex:1;min-width:240px">
           <h3>Activation messages</h3>
           <label class="field">ON message
             <textarea id="listenerOn" rows="4" placeholder="blank = say nothing"></textarea></label>
+          <div class="row" style="gap:12px;align-items:flex-end">
+            <label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" id="listenerOnEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
+            <label class="field" style="flex:1">ON titlebar <input id="listenerOnTitle" placeholder="🟢 Activation ON" onchange="scheduleSave()"></label>
+          </div>
           <label class="field">OFF message
             <textarea id="listenerOff" rows="4" placeholder="blank = say nothing"></textarea></label>
+          <div class="row" style="gap:12px;align-items:flex-end">
+            <label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" id="listenerOffEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
+            <label class="field" style="flex:1">OFF titlebar <input id="listenerOffTitle" placeholder="🔴 Activation OFF" onchange="scheduleSave()"></label>
+          </div>
           <div class="hint" style="margin-top:6px">Both auto-append a fixed footer — <code>DiscoFlate v[version] by AireGasm</code> — as small subtext (not editable, only shown when the message isn't blank).</div>
         </div>
         <div class="colsec" style="flex:1;min-width:240px">
           <h3>Session pause (STOP button)</h3>
+          <div class="row" style="gap:12px;align-items:flex-end">
+            <label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" id="pauseEmbed" style="width:auto" onchange="scheduleSave()"> embed (all three)</label>
+            <label class="field" style="flex:1">Titlebar <input id="pauseTitle" placeholder="⏸️ Session" onchange="scheduleSave()"></label>
+          </div>
           <label class="field">Paused broadcast <span class="muted">([user] = who paused)</span>
             <textarea id="pauseMsg" rows="3" placeholder="⏸️ Session paused by [user]…"></textarea></label>
           <label class="field">Resumed broadcast
@@ -479,23 +495,31 @@
       <div class="row" style="gap:12px;align-items:flex-start;margin-top:10px;flex-wrap:nowrap">
         <label class="field" style="width:160px;flex:none">Capacity command <input id="cmdCapacity" value="capacity"></label>
         <label class="field" style="flex:1">Reply <textarea id="capacityMsg" rows="2"></textarea></label>
+        <label class="row" style="gap:6px;white-space:nowrap;margin-top:24px"><input type="checkbox" id="capacityEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
+        <label class="field" style="width:170px;flex:none">Titlebar <input id="capacityTitle" placeholder="📊 Capacity"></label>
       </div>
       <div class="row" style="gap:12px;align-items:flex-start;margin-top:8px;flex-wrap:nowrap">
         <label class="field" style="width:160px;flex:none">Pump timer command <input id="cmdPumptimer" value="pumptimer"></label>
         <label class="field" style="flex:1">Reply <span class="muted">([timer])</span> <textarea id="pumptimerMsg" rows="2"></textarea></label>
+        <label class="row" style="gap:6px;white-space:nowrap;margin-top:24px"><input type="checkbox" id="pumptimerEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
+        <label class="field" style="width:170px;flex:none">Titlebar <input id="pumptimerTitle" placeholder="⏱️ Pump timer"></label>
       </div>
       <div class="row" style="gap:16px;align-items:flex-end;margin-top:8px">
         <label class="field">Help <input id="cmdHelp" value="aghelp" style="width:130px" title="DMs the command list — output isn't editable"></label>
         <label class="field">Leaderboard <input id="cmdLeaderboard" value="leaderboard" style="width:140px" title="top pumpers this session — output isn't editable"></label>
         <label class="field">Lifetime leaderboard <input id="cmdLeaderboardLife" value="toppumpers-life" style="width:150px" title="all-time top pumpers — output isn't editable"></label>
       </div>
-      <div class="row" style="gap:16px;align-items:flex-start;margin-top:10px">
+      <div class="row" style="gap:12px;align-items:flex-end;margin-top:10px;flex-wrap:nowrap">
         <label class="field" style="flex:1">Cooldown message <span class="muted">([cmd] = the command)</span>
           <input id="cooldownMsg" placeholder="⏳ [mention], [cmd] is on cooldown — [cooldown]s left"></label>
+        <label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" id="cooldownEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
+        <label class="field" style="width:170px;flex:none">Titlebar <input id="cooldownTitle" placeholder="⏳ Cooldown"></label>
       </div>
-      <div class="row" style="gap:16px;align-items:flex-start;margin-top:10px">
+      <div class="row" style="gap:12px;align-items:flex-end;margin-top:10px;flex-wrap:nowrap">
         <label class="field" style="flex:1">Operator Pump message <span class="muted">(Dashboard → Controls → 💨 Pump · [secs] [secs2capacity] [capacity] [timer] [operator] · reuse it anywhere as <code>[pump_msg]</code>)</span>
           <textarea id="pumpMsg" rows="2"></textarea></label>
+        <label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" id="pumpEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
+        <label class="field" style="width:170px;flex:none">Titlebar <input id="pumpTitle" placeholder="💨 Pump"></label>
       </div>
       </details>
 
@@ -1776,10 +1800,16 @@ async function saveAutomation(){
     cooldown_exempt_user_ids: idList($('#cooldownExempt').value),
     cooldown_exempt_names: idList($('#cooldownExemptNames').value),
     auto_report: {enabled: $('#autoEnabled').checked, seconds: Math.max(15, parseInt($('#autoSecs').value)||300),
-                  message: $('#autoMessage').value},
+                  message: $('#autoMessage').value,
+                  embed: $('#autoEmbed')?$('#autoEmbed').checked:false,
+                  title: $('#autoTitle')?$('#autoTitle').value:''},
     listener_message_on: $('#listenerOn').value,
     listener_message_off: $('#listenerOff').value,
+    listener_on_embed: $('#listenerOnEmbed').checked, listener_on_title: $('#listenerOnTitle').value,
+    listener_off_embed: $('#listenerOffEmbed').checked, listener_off_title: $('#listenerOffTitle').value,
     pause_message: $('#pauseMsg').value,
+    pause_embed: $('#pauseEmbed')?$('#pauseEmbed').checked:false,
+    pause_title: $('#pauseTitle')?$('#pauseTitle').value:'',
     resume_message: $('#resumeMsg').value,
     paused_notice_message: $('#pausedNoticeMsg').value,
     output_headers: $('#outputHeaders').checked,
@@ -1891,6 +1921,10 @@ function renderRanges(){
           `<label class="field" style="flex:1">Announce <span class="muted">(ongoing)</span><textarea rows="4" onchange="rangeRows[${i}].announce=this.value">${esc(r.announce||'')}</textarea></label>`+
           `<label class="field" style="flex:1">Milestone <span class="muted">(once on entry)</span><textarea rows="4" onchange="rangeRows[${i}].milestone=this.value">${esc(r.milestone||'')}</textarea></label>`+
           imagePicker(i, 'image', 'Milestone image')+
+        `</div>`+
+        `<div class="row" style="gap:12px;align-items:flex-end">`+
+          `<label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" ${r.milestone_embed?'checked':''} onchange="rangeRows[${i}].milestone_embed=this.checked;renderRanges();scheduleSave()"> milestone as embed</label>`+
+          (r.milestone_embed?`<label class="field">Titlebar <input value="${esc(r.milestone_title||'')}" placeholder="📈 ${r.min??0}%" style="width:220px" onchange="rangeRows[${i}].milestone_title=this.value;scheduleSave()"></label>`:'')+
         `</div>`;
       }
     }
@@ -3591,12 +3625,22 @@ function applyState(st, full){
     $('#cooldownExempt').value = (st.cooldown_exempt_user_ids||[]).join(', ');
     $('#cooldownExemptNames').value = (st.cooldown_exempt_names||[]).join(', ');
     $('#cooldownMsg').value = st.cooldown_message||'';
+    if($('#capacityEmbed')){
+      $('#capacityEmbed').checked = !!st.capacity_embed; $('#capacityTitle').value = st.capacity_title||'';
+      $('#pumptimerEmbed').checked = !!st.pumptimer_embed; $('#pumptimerTitle').value = st.pumptimer_title||'';
+      $('#cooldownEmbed').checked = !!st.cooldown_embed; $('#cooldownTitle').value = st.cooldown_title||'';
+      $('#pumpEmbed').checked = !!st.pump_embed; $('#pumpTitle').value = st.pump_title||'';
+    }
     const ar = st.auto_report||{};
     $('#autoEnabled').checked = !!ar.enabled;
     $('#autoSecs').value = ar.seconds??300;
     $('#autoMessage').value = ar.message||'';
+    if($('#autoEmbed')){ $('#autoEmbed').checked = !!ar.embed; $('#autoTitle').value = ar.title||''; }
+    if($('#pauseEmbed')){ $('#pauseEmbed').checked = !!st.pause_embed; $('#pauseTitle').value = st.pause_title||''; }
     $('#listenerOn').value = st.listener_message_on||'';
     $('#listenerOff').value = st.listener_message_off||'';
+    if($('#listenerOnEmbed')){ $('#listenerOnEmbed').checked = !!st.listener_on_embed; $('#listenerOnTitle').value = st.listener_on_title||''; }
+    if($('#listenerOffEmbed')){ $('#listenerOffEmbed').checked = !!st.listener_off_embed; $('#listenerOffTitle').value = st.listener_off_title||''; }
     if($('#pauseMsg')) $('#pauseMsg').value = st.pause_message||'';
     if($('#resumeMsg')) $('#resumeMsg').value = st.resume_message||'';
     if($('#pausedNoticeMsg')) $('#pausedNoticeMsg').value = st.paused_notice_message||'';
@@ -3714,6 +3758,10 @@ function gatherConfig(){
       vote:(($('#cmdVote')&&$('#cmdVote').value)||'agvote').trim().toLowerCase(),
       enter:(($('#cmdEnter')&&$('#cmdEnter').value)||'enter').trim().toLowerCase() },
     capacity_message:$('#capacityMsg').value, pumptimer_message:$('#pumptimerMsg').value,
+    capacity_embed:$('#capacityEmbed')?$('#capacityEmbed').checked:false, capacity_title:$('#capacityTitle')?$('#capacityTitle').value:'',
+    pumptimer_embed:$('#pumptimerEmbed')?$('#pumptimerEmbed').checked:false, pumptimer_title:$('#pumptimerTitle')?$('#pumptimerTitle').value:'',
+    cooldown_embed:$('#cooldownEmbed')?$('#cooldownEmbed').checked:false, cooldown_title:$('#cooldownTitle')?$('#cooldownTitle').value:'',
+    pump_embed:$('#pumpEmbed')?$('#pumpEmbed').checked:false, pump_title:$('#pumpTitle')?$('#pumpTitle').value:'',
     pump_message: $('#pumpMsg') ? $('#pumpMsg').value : '',
     listen_targets:listenTargets, announce_channel_id: announceChanId,
     anon_user_label:$('#anonLabel').value,
@@ -3724,9 +3772,16 @@ function gatherConfig(){
     cooldown_exempt_user_ids: idList($('#cooldownExempt').value),
     cooldown_exempt_names: idList($('#cooldownExemptNames').value),
     cooldown_message:$('#cooldownMsg').value,
-    auto_report:{ enabled:$('#autoEnabled').checked, seconds:Math.max(15, parseInt($('#autoSecs').value)||300), message:$('#autoMessage').value },
+    auto_report:{ enabled:$('#autoEnabled').checked, seconds:Math.max(15, parseInt($('#autoSecs').value)||300), message:$('#autoMessage').value,
+      embed:$('#autoEmbed')?$('#autoEmbed').checked:false, title:$('#autoTitle')?$('#autoTitle').value:'' },
     listener_message_on:$('#listenerOn').value, listener_message_off:$('#listenerOff').value,
+    listener_on_embed:$('#listenerOnEmbed')?$('#listenerOnEmbed').checked:false,
+    listener_on_title:$('#listenerOnTitle')?$('#listenerOnTitle').value:'',
+    listener_off_embed:$('#listenerOffEmbed')?$('#listenerOffEmbed').checked:false,
+    listener_off_title:$('#listenerOffTitle')?$('#listenerOffTitle').value:'',
     pause_message: $('#pauseMsg') ? $('#pauseMsg').value : '',
+    pause_embed: $('#pauseEmbed')?$('#pauseEmbed').checked:false,
+    pause_title: $('#pauseTitle')?$('#pauseTitle').value:'',
     resume_message: $('#resumeMsg') ? $('#resumeMsg').value : '',
     paused_notice_message: $('#pausedNoticeMsg') ? $('#pausedNoticeMsg').value : '',
     output_headers: $('#outputHeaders') ? $('#outputHeaders').checked : false,

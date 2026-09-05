@@ -1,6 +1,6 @@
 {
-  "version": "3.44.2",
-  "versionCode": 116,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.44.2/discoflate.apk",
-  "notes": "DiscoFlate v3.44.2 — placeholder values like [total_score] survive in number-or-placeholder fields (seconds / fill % / amount / deadline) instead of being wiped to blank on load; minigames have NO built-in result line anymore — the winning tier's action block is the game's entire outcome (message rows announce it, [game]/[score]/[user] resolve; no message row = a quiet finish); the ▶ Play intro gains an embed tickbox with a Titlebar field."
+  "version": "3.44.3",
+  "versionCode": 117,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.44.3/discoflate.apk",
+  "notes": "DiscoFlate v3.44.3 \u2014 embed toggles (each with its own titlebar) for every remaining built-in message: range milestones (image now renders INSIDE the embed card), Activation ON/OFF, the capacity & pump-timer replies, the cooldown notice, the operator Pump broadcast, the auto-report, and one shared toggle for the three session pause/resume messages. Blank titlebars get sensible defaults; placeholders work in titles. Also fixed: the bot's send path used to drop images when posting embeds."
 }
