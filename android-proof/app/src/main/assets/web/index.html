@@ -74,6 +74,9 @@
   .overlay.show{display:flex}
   .overlay .page{background:var(--panel);border:1px solid var(--line);border-radius:14px;
        padding:20px;width:100%;max-width:860px}
+  /* overlay-editor rows: one line on desktop, wrapping stack on phones */
+  .ovedit{gap:10px;align-items:flex-end;flex-wrap:nowrap;margin-bottom:6px}
+  .ovedit .grow{flex:1}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--off)}
   .dot.on{background:var(--on);box-shadow:0 0 8px var(--on)}
   .dot.bad{background:var(--bad)}
@@ -135,6 +138,15 @@
     header{gap:10px}
     /* both toggles drop onto their own row below the status pills */
     .toggles{flex-basis:100%;margin-left:0;justify-content:flex-end}
+    /* overlay editor pages (Custom Buttons / Owner Commands / Overlay actions):
+       rows wrap into a stack; text fields span, number boxes stay compact */
+    .overlay{padding:1vh 6px}
+    .overlay .page{padding:14px 12px}
+    .ovedit{flex-wrap:wrap;row-gap:8px;padding-bottom:10px;margin-bottom:10px;
+            border-bottom:1px solid var(--line)}
+    .ovedit .field{flex:1 1 40%;min-width:0}
+    .ovedit .grow{flex:1 1 calc(100% - 56px)}   /* shares its line with the ✕ */
+    .ovedit .field input:not([type=number]),.ovedit .field select{width:100%!important;min-width:0}
   }
   /* operator Controls: one feature per row — BUTTON then its field(s) */
   /* operator Controls: every row a fixed 2-column grid (same template → columns
@@ -179,7 +191,7 @@
     <button class="tab-btn" data-go="chat">Chat</button>
     <button class="tab-btn" data-go="discord">Discord</button>
     <button class="tab-btn" data-go="devices">Devices</button>
-    <button class="tab-btn" data-go="snapshot">Snapshot</button>
+    <button class="tab-btn" data-go="snapshot">Camera</button>
     <button class="tab-btn" data-go="game">Game</button>
     <button class="tab-btn" data-go="commands">Commands</button>
     <button class="tab-btn" data-go="help">Help</button>
@@ -444,7 +456,7 @@
 
     <!-- snapshot -->
     <div class="card span" data-tab="snapshot">
-      <h2>Snapshot</h2>
+      <h2>📷 Camera</h2>
       <div class="row" style="gap:12px;align-items:flex-end;flex-wrap:wrap">
         <label class="field" style="min-width:220px">Camera
           <select id="camSelect" onchange="startCamera(this.value)"><option value="">— start camera to list —</option></select>
@@ -822,7 +834,7 @@
       </div>
       <div class="hint" id="updHint" style="display:none;white-space:pre-wrap;margin-top:8px"></div>
       <div class="hint">On the phone app this downloads &amp; installs the new APK; on desktop it pulls the latest code from GitHub (then restart DiscoFlate).
-        <b>Phone update stuck?</b> Delete old <code>discoflate*.apk</code> files from Downloads first, then update — the phone can re-install a cached old copy otherwise.</div>
+        Update APKs are <b>version-named</b> (<code>discoflate-vX.Y.Z.apk</code>) so downloads never collide — make sure you install the newest one. Old copies in Downloads are safe to delete. <b>Coming from v3.45 or older with a stuck update?</b> Delete any old <code>discoflate*.apk</code> files first — same-named downloads used to cache and re-install stale copies.</div>
       <div class="hint" style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px"><b>Backups &amp; presets moved to the <a style="cursor:pointer" onclick="showTab('system')">System tab</a>:</b> full config backup (token included) at the top, and shareable <b>Gameplay Presets</b> below it.</div>
     </div>
 
@@ -837,7 +849,7 @@
         <li><b>Perfect Prizes</b> — N perfect rolls (or any named achievement, e.g. a blackjack 21) runs an unlock action block for the earner — typically awarding a limited-charge bonus command. Re-earnable, range-gateable.</li>
         <li><b>End sequences</b> — let capacity run past 100% to a final burst threshold with its own entry milestone and final message/image.</li>
         <li><b>Timed events, modes, leaderboard, per-user cooldowns, anti-spam buffer,</b> and multi-server support with anonymized cross-server echoes.</li>
-        <li><b>Snapshot</b> — capture a webcam frame and post it to the channel.</li>
+        <li><b>Camera</b> — capture a webcam frame (Snapshot) and post it to the channel; the Chat tab's 🎥 section runs the virtual-camera overlay pipe for video calls. Heads-up: while the virtual cam runs it holds the physical webcam, so browser snapshots from that same camera may be busy.</li>
         <li><b>Operator Controls</b> — dashboard buttons (Roll, Stop, Pump, Broadcast Capacity/Users) that fire real in-channel actions <i>as the owner</i>, exactly as if they'd typed the command.</li>
         <li><b>Mock mode</b> — run the whole game with no hardware at all; set the virtual pump's calibration on the Devices tab.</li>
       </ul>
@@ -1515,9 +1527,27 @@ async function chatSend(){
   $('#chatMsg').textContent='…';
   try{
     const r = await api('/api/chat/send', {channel_id: cid, text: t});
-    if(r.ok){ $('#chatText').value=''; $('#chatMsg').textContent=''; setTimeout(()=>chatPoll(true), 400); }
+    if(r.ok){
+      $('#chatText').value='';
+      // owner_voice:false = the webhook fallback fired — it posted via the bot
+      $('#chatMsg').textContent = r.owner_voice===false ? '⚠ posted via the bot — no Manage Webhooks in this channel' : '';
+      if(r.owner_voice===false) setTimeout(()=>{ if($('#chatMsg').textContent.startsWith('⚠ posted via')) $('#chatMsg').textContent=''; }, 6000);
+      setTimeout(()=>chatPoll(true), 400);
+    }
     else $('#chatMsg').textContent = '⚠ ' + (r.error||'failed');
   }catch(e){ $('#chatMsg').textContent = '⚠ ' + (e.message||e); }
+}
+// upload media for an `overlay` action row (image or video → data/images)
+async function actMediaUpload(base, j, input, rr){
+  const f=input.files[0]; if(!f) return;
+  const fd=new FormData(); fd.append('file', f);
+  try{
+    const resp = await fetch('/api/upload', {method:'POST', body:fd});
+    if(!resp.ok){ toastMsg('⚠ upload failed: '+(await resp.text().catch(()=>resp.statusText))); return; }
+    const jd = await resp.json();
+    eval(base)[j].media = jd.path || jd.url || '';
+    window[rr](); scheduleSave();
+  }catch(e){ toastMsg('⚠ '+(e.message||e)); }
 }
 // ---- Custom Buttons + Owner Commands (Chat tab overlays; autosaved) ----
 let chatButtons = [];
@@ -1539,11 +1569,11 @@ function renderChatBtnEditor(){
     const tgt = kind==='poll' ? pollNameOpts(b.name)
               : kind==='owner' ? ownerCmdOpts(b.name)
               : cmdNameOpts(b.name);
-    return `<div class="row" style="gap:10px;align-items:flex-end;flex-wrap:nowrap;margin-bottom:6px">`+
+    return `<div class="row ovedit">`+
       `<label class="field">Label <input value="${esc(b.label||'')}" placeholder="🔥 Blast" style="width:170px" onchange="chatButtons[${i}].label=this.value;renderChatButtons();scheduleSave()"></label>`+
       `<label class="field">Does <select style="width:150px" onchange="chatButtons[${i}].kind=this.value;chatButtons[${i}].name='';renderChatBtnEditor();scheduleSave()">`+
         [['command','fire a !command'],['poll','start a poll'],['owner','post #owner cmd']].map(([v,l])=>`<option value="${v}" ${kind===v?'selected':''}>${l}</option>`).join('')+`</select></label>`+
-      `<label class="field" style="flex:1">Target <select style="width:100%" onchange="chatButtons[${i}].name=this.value;scheduleSave()">${tgt}</select></label>`+
+      `<label class="field grow">Target <select style="width:100%" onchange="chatButtons[${i}].name=this.value;scheduleSave()">${tgt}</select></label>`+
       `<button class="ghost" onclick="chatButtons.splice(${i},1);renderChatBtnEditor();renderChatButtons();scheduleSave()">✕</button>`+
     `</div>`;
   }).join('') || '<div class="muted">no buttons yet</div>';
@@ -1561,7 +1591,8 @@ async function chatButtonRun(i){
   const pf = b.kind==='owner' ? '#' : (($('#prefix')&&$('#prefix').value)||'!');
   try{
     const r = await api('/api/chat/send', {channel_id: cid, text: pf + b.name});
-    $('#chatMsg').textContent = r.ok ? '' : ('⚠ ' + (r.error||'failed'));
+    $('#chatMsg').textContent = !r.ok ? ('⚠ ' + (r.error||'failed'))
+      : (r.owner_voice===false ? '⚠ posted via the bot — no Manage Webhooks in this channel' : '');
     if(r.ok) setTimeout(()=>chatPoll(true), 400);
   }catch(e){ $('#chatMsg').textContent='⚠ '+(e.message||e); }
 }
@@ -1569,8 +1600,8 @@ function renderOcEditor(){
   const box=$('#ocRows'); if(!box) return;
   box.innerHTML = ownerCommands.map((o,i)=>
     `<div class="dev" style="flex-direction:column;align-items:stretch;gap:6px">`+
-      `<div class="row" style="gap:10px;align-items:flex-end;flex-wrap:nowrap">`+
-        `<label class="field">Name <span class="muted">(fires as #name)</span> <input value="${esc(o.name||'')}" placeholder="hype" style="width:180px" onchange="ownerCommands[${i}].name=this.value.trim().replace(/^#+/,'').replace(/\s+/g,'');renderOcEditor();scheduleSave()"></label>`+
+      `<div class="row" style="gap:10px;align-items:flex-end">`+
+        `<label class="field">Name <span class="muted">(fires as #name)</span> <input value="${esc(o.name||'')}" placeholder="hype" style="width:180px;max-width:60vw" onchange="ownerCommands[${i}].name=this.value.trim().replace(/^#+/,'').replace(/\s+/g,'');renderOcEditor();scheduleSave()"></label>`+
         `<div style="flex:1"></div>`+
         `<button class="ghost" onclick="ownerCommands.splice(${i},1);renderOcEditor();scheduleSave()">✕</button>`+
       `</div>`+
@@ -1621,10 +1652,10 @@ async function ovbUpload(i, input){
 function renderOvbEditor(){
   const box=$('#ovbRows'); if(!box) return;
   box.innerHTML = overlayButtons.map((b,i)=>
-    `<div class="row" style="gap:10px;align-items:flex-end;flex-wrap:nowrap;margin-bottom:6px">`+
+    `<div class="row ovedit">`+
       `<label class="field">Label <input value="${esc(b.label||'')}" placeholder="💥 Boom" style="width:150px" onchange="overlayButtons[${i}].label=this.value;renderOverlayButtons();scheduleSave()"></label>`+
-      `<label class="field" style="flex:1">Image <div class="row" style="gap:6px;flex-wrap:nowrap">`+
-        `<input value="${esc(b.image||'')}" placeholder="upload or filename from data/images" style="flex:1" onchange="overlayButtons[${i}].image=this.value;renderOverlayButtons();scheduleSave()">`+
+      `<label class="field grow">Image <div class="row" style="gap:6px;flex-wrap:nowrap">`+
+        `<input value="${esc(b.image||'')}" placeholder="upload or filename from data/images" style="flex:1;min-width:0" onchange="overlayButtons[${i}].image=this.value;renderOverlayButtons();scheduleSave()">`+
         `<label class="ghost" style="padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid var(--line)">⇧<input type="file" accept="image/*" style="display:none" onchange="ovbUpload(${i}, this)"></label>`+
       `</div></label>`+
       `<label class="field">Secs <input type="number" min="0.5" step="0.5" value="${b.seconds??5}" style="width:70px" onchange="overlayButtons[${i}].seconds=+this.value;scheduleSave()"></label>`+
@@ -2990,7 +3021,7 @@ let actOpen = new Set();
 function actGist(a){
   const t=(a.type||'message');
   const s=v=>String(v==null?'':v);
-  if(t==='message') return (a.style==='embed'?'embed · ':'')+s(a.message).split('\n')[0];
+  if(t==='message') return ((a.as==='owner')?'🎙 owner · ':(a.style==='embed'?'embed · ':''))+s(a.message).split('\n')[0];
   if(t==='fire') return (a.fire_mode==='to')?`to ${s(a.fill_pct)}%`:(a.fire_mode==='add')?`add ${s(a.fill_pct)}%`:`${s(a.seconds??3)}s`;
   if(t==='roll') return (a.dice||a.sides)?`${s(a.dice)||'rng'}d${s(a.sides)||'rng'}`:'range dice';
   if(t==='chance') return `${s(a.chance??50)}%`;
@@ -2998,6 +3029,7 @@ function actGist(a){
   if(t==='wait') return `${s(a.seconds??10)}s`;
   if(t==='award') return (a.award_type==='secs'||a.award_type==='pct')?`${s(a.amount)} ${a.award_type} → ${s(a.target)||'[winner]'}`:`!${s(a.command)||'?'} → ${s(a.target)||'[winner]'}`;
   if(t==='command_gate') return `${(a.modifiers||[]).length} modifier${(a.modifiers||[]).length===1?'':'s'}`;
+  if(t==='overlay') return (a.mode==='clear')?`clear ${s(a.layer)||'ALL'}`:`${s(a.mode)||'timed'} · ${s(a.media).split('/').pop()}`;
   return s(a[t])||'';   // poll/competition/bonus_round/broadcast/command name
 }
 function actionRow(base, rr, j, a, condLabels){
@@ -3028,7 +3060,7 @@ function actionRow(base, rr, j, a, condLabels){
     cond=`<label class="field">Run <select onchange="${T('if_option')}=+this.value;scheduleSave()">${opts}</select></label>`;
   }
   const typeSel = `<select onchange="${T('type')}=this.value;${rr}();scheduleSave()">`+
-    ['message','broadcast','command','fire','roll','chance','capacity','wait','poll','competition','bonus_round','award','command_gate','stop_devices','end_session'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select>`;
+    ['message','broadcast','command','fire','roll','chance','capacity','wait','poll','competition','bonus_round','award','command_gate','overlay','stop_devices','end_session'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select>`;
   let fields=cond;
   if(typ==='wait')
     fields += `<label class="field">Seconds <input value="${esc(String(a.seconds??10))}" placeholder="10" title="a number or a [placeholder] like [winner_score]" style="width:110px" onchange="${T('seconds')}=this.value;scheduleSave()"></label>`;
@@ -3052,12 +3084,19 @@ function actionRow(base, rr, j, a, condLabels){
   if(typ==='fire'||typ==='roll')
     fields += `<label class="field">Device <select onchange="${T('device_id')}=this.value||null">${cmdDeviceOpts(a.device_id)}</select></label>`;
   if(typ==='message'){
+    const asOwner=(a.as||'')==='owner';
+    fields += `<label class="field">As <select onchange="${T('as')}=this.value||null;${rr}();scheduleSave()"><option value="" ${!asOwner?'selected':''}>the bot</option><option value="owner" ${asOwner?'selected':''}>the OWNER</option></select></label>`;
+    if(asOwner){
+      fields += `<span class="muted" style="flex:1 1 120px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="posts with your Owner name + avatar via webhook; channels without Manage Webhooks are skipped quietly">🎙 owner voice · skips quietly without webhook permission</span>`;
+    }
     const st=(a.style||'plain');
+    if(!asOwner)
     fields += `<label class="field">Style <select onchange="${T('style')}=this.value;${rr}();scheduleSave()"><option value="plain" ${st!=='embed'?'selected':''}>plain</option><option value="embed" ${st==='embed'?'selected':''}>embed</option></select></label>`;
-    if(st==='embed') fields += `<label class="field">Titlebar <input value="${esc(a.title||'')}" placeholder="📢 Notice" style="width:170px" onchange="${T('title')}=this.value;scheduleSave()"></label>`;
+    if(!asOwner && st==='embed') fields += `<label class="field">Titlebar <input value="${esc(a.title||'')}" placeholder="📢 Notice" style="width:170px" onchange="${T('title')}=this.value;scheduleSave()"></label>`;
+    if(!asOwner)
     fields += `<label class="field">Button <select onchange="${T('target')}=this.value;${rr}();scheduleSave()">`+
         [['','— none —'],['winner','winner presses'],['runnerup','runner-up presses'],['range_leader','range leader presses'],['session_leader','session leader presses'],['top_bonus_holder','top bonus holder presses'],['everyone','anyone presses'],['allowlist','allowlist presses…']].map(([v,l])=>`<option value="${v}" ${(a.target||'')===v?'selected':''}>${l}</option>`).join('')+`</select></label>`;
-    if((a.target||'').trim()){
+    if(!asOwner && (a.target||'').trim()){
       fields += `<label class="field">Button label <input value="${esc(a.label||'')}" placeholder="🎁 Claim" style="width:150px" onchange="${T('label')}=this.value;scheduleSave()"></label>`+
         `<label class="row" style="gap:6px"><input type="checkbox" ${a.freeze?'checked':''} onchange="${T('freeze')}=this.checked;scheduleSave()"> Freeze others until pressed</label>`+
         `<label class="field">Deadline (s) <span class="muted">(0=none)</span> <input type="number" min="0" step="1" value="${a.deadline??0}" style="width:80px" onchange="${T('deadline')}=+this.value;scheduleSave()"></label>`;
@@ -3091,8 +3130,27 @@ function actionRow(base, rr, j, a, condLabels){
       fields += `<label class="field">Amount <span class="muted">(${at==='pct'?'capacity %':'pump seconds'} · number or [placeholder])</span> <input value="${esc(String(a.amount??10))}" placeholder="10 or [winner_score]" style="width:150px" onchange="${T('amount')}=this.value;scheduleSave()"></label>`;
     }
   }
+  if(typ==='overlay'){
+    const om=(a.mode||'timed');
+    fields += `<label class="field">Mode <select style="width:150px" onchange="${T('mode')}=this.value;${rr}();scheduleSave()">`+
+      [['timed','timed (secs)'],['hold','hold until cleared'],['once','video: play once'],['clear','clear layer(s)']].map(([v,l])=>`<option value="${v}" ${om===v?'selected':''}>${l}</option>`).join('')+`</select></label>`;
+    if(om!=='clear'){
+      fields += `<label class="field" style="flex:1;min-width:180px">Media <div class="row" style="gap:6px;flex-wrap:nowrap">`+
+        `<input value="${esc(a.media||'')}" placeholder="image or video (upload ⇧)" style="flex:1" onchange="${T('media')}=this.value;scheduleSave()">`+
+        `<label class="ghost" style="padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid var(--line)">⇧<input type="file" accept="image/*,video/*" style="display:none" onchange="actMediaUpload('${esc(base)}',${j},this,'${rr}')"></label>`+
+      `</div></label>`;
+      if(om==='timed')
+        fields += `<label class="field">Secs <input value="${esc(String(a.seconds??5))}" placeholder="5" style="width:70px" onchange="${T('seconds')}=this.value;scheduleSave()"></label>`;
+      fields += `<label class="field">Position <select style="width:120px" onchange="${T('pos')}=this.value;scheduleSave()">`+
+        ['center','top','bottom','left','right','top-left','top-right','bottom-left','bottom-right'].map(p=>`<option value="${p}" ${(a.pos||'center')===p?'selected':''}>${p}</option>`).join('')+`</select></label>`+
+        `<label class="field">Width <select style="width:85px" onchange="${T('scale')}=+this.value;scheduleSave()">`+
+        [[0.25,'25%'],[0.5,'50%'],[0.75,'75%'],[1,'100%']].map(([v,l])=>`<option value="${v}" ${(+a.scale||0.5)===v?'selected':''}>${l}</option>`).join('')+`</select></label>`;
+    }
+    fields += `<label class="field">Layer <input value="${esc(a.layer||'')}" placeholder="${om==='clear'?'blank = ALL':'optional slot'}" style="width:110px" title="a named slot — firing the same layer replaces it; clear removes it" onchange="${T('layer')}=this.value;scheduleSave()"></label>`;
+  }
   // type notes: shrinkable so the row never wraps into multiple lines
   const NOTE={command_gate:'modifiers below ↓',
+    overlay:'🎥 skips quietly if the virtual cam is off',
     stop_devices:'stops ALL devices now',
     end_session:'ends the session ⚠ nothing after runs'};
   if(NOTE[typ])
@@ -3105,7 +3163,7 @@ function actionRow(base, rr, j, a, condLabels){
   // some actions carry their OWN nested block: message (button allowlist + what
   // pressing it runs) and fire (Post-Pump Actions, run once the pump expires).
   let nested='';
-  if(typ==='message' && (a.target||'').trim()){
+  if(typ==='message' && (a.as||'')!=='owner' && (a.target||'').trim()){
     let al='';
     if((a.target||'')==='allowlist'){
       const rows=(a.allow||[]);
@@ -3477,8 +3535,11 @@ function cleanActionRows(arr){
       competition:(a.competition||'').trim()||null,
       target:(a.target||'').trim()||null, command:(a.command||'').trim()||null,
       if_option:(a.if_option>0)?+a.if_option:null};
-    if(t==='message') o.message=a.message||'';   // only message rows speak
+    if(t==='message'){ o.message=a.message||''; if((a.as||'')==='owner') o.as='owner'; }   // only message rows speak
     if(t==='roll') o.luck=(a.luck==null||a.luck==='')?null:+a.luck;
+    if(t==='overlay'){ o.mode=['hold','once','clear'].includes(a.mode)?a.mode:'timed';
+      o.media=(a.media||'').trim(); o.pos=a.pos||'center'; o.scale=+a.scale||0.5;
+      o.layer=(a.layer||'').trim()||null; }
     if(t==='chance'){ o.chance=(a.chance==null||a.chance==='')?50:Math.max(0,Math.min(100,+a.chance||0));
       o.luck=(a.luck==null||a.luck==='')?null:+a.luck;
       o.win_actions=cleanActionRows(a.win_actions); o.miss_actions=cleanActionRows(a.miss_actions); }

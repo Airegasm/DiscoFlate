@@ -202,6 +202,7 @@ class Engine:
         self.end_session_cb = None             # async () -> None : deactivate without the off-message
         self.cancel_games_cb = None            # async () -> None : cancel all live minigame views
         self.owner_say_cb = None               # async (text) -> None : owner-voiced broadcast (webhook skin)
+        self.overlay_cb = None                 # (spec dict) -> {ok,..} : virtual-camera overlay (quiet-fail)
         self.embed_cb = None                   # async (title, text) -> None : rich embed post (polls)
         self.broadcast_embed_cb = None         # async (text) -> None : broadcast-preset embed
         self.comp_embed_cb = None              # async (title, text, meta) -> None : competition embed + Enter button
@@ -1207,6 +1208,20 @@ class Engine:
                 if typ == "wait":
                     await asyncio.sleep(max(0.0, self._num_expr(a.get("seconds"), xc)))
                     continue
+                if typ == "message" and (a.get("as") or "").lower() == "owner":
+                    # Speak AS THE OWNER (webhook name+avatar). No Manage
+                    # Webhooks in a channel → that channel is skipped QUIETLY
+                    # (logged) — the block never crashes or stalls on it.
+                    body = R((a.get("message") or "").strip())
+                    if body:
+                        if self.owner_say_cb:
+                            try:
+                                await self.owner_say_cb(body, True)
+                            except Exception as ex:  # noqa: BLE001
+                                self._log("error", f"{name}: owner message failed: {ex}")
+                        else:
+                            self._log("bot", f"{name}: owner message skipped (no bot connected)")
+                    continue
                 if typ in ("message", "embed", "embed_message", "winner_button", "session_leader_event"):
                     # Unified post action: a `message` posted plain OR as an embed
                     # (style), OPTIONALLY with a button gated to a target (winner/
@@ -1541,6 +1556,25 @@ class Engine:
                     # blackjack 21-tier bumping "blackjack" toward a Perfect Prize.
                     await self._bump_achievement(
                         ((a.get("counter") or "").strip().lower()) or "roll", uid, who or "")
+                    continue
+                if typ == "overlay":
+                    # Play/clear a virtual-camera overlay. QUIETLY SKIPPED when
+                    # the camera isn't running/available (wrong platform, no
+                    # video call, missing deps) — never crashes or stalls.
+                    if self.overlay_cb is None:
+                        self._log("bot", f"{name}: overlay skipped (no virtual camera)")
+                        continue
+                    try:
+                        r = self.overlay_cb({"media": a.get("media"),
+                                             "mode": a.get("mode") or "timed",
+                                             "seconds": self._num_expr(a.get("seconds"), xc, 5.0),
+                                             "pos": a.get("pos") or "center",
+                                             "scale": a.get("scale"),
+                                             "layer": a.get("layer")})
+                        if not r.get("ok"):
+                            self._log("bot", f"{name}: overlay skipped — {r.get('error')}")
+                    except Exception as ex:  # noqa: BLE001
+                        self._log("error", f"{name}: overlay failed: {ex}")
                     continue
                 if typ == "stop_devices":
                     # One-shot: kill any running fire on every device right now.

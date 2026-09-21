@@ -244,9 +244,9 @@ class BotManager:
         self._chat_logs: dict[str, deque] = {}
         self._chat_hist: set = set()
         # Owner voice: per-channel webhook (posts AS the owner — their name +
-        # avatar) and the cached owner avatar URL.
+        # avatar) and the cached owner (avatar url, display name).
         self._webhooks: dict = {}
-        self._owner_avatar: dict = {}
+        self._owner_ident: dict = {}
 
     # -- minigame view registry ---------------------------------------------- #
     def _register_view(self, view) -> None:
@@ -732,21 +732,28 @@ class BotManager:
         return {"ok": True, "messages": entries, "perms": self.chat_perms(cid)}
 
     async def _owner_identity(self, cfg) -> tuple:
-        """(display name, avatar url|None) for the OWNER — the operator name and
-        the Discord avatar of the first exempt (owner) user id."""
-        who = (cfg.get("operator_name") or "").strip() or self._bot_name()
+        """(display name, avatar url|None) for the OWNER: the Dashboard Owner
+        name (cooldown_exempt_names[0]; operator_name = legacy/manual override),
+        else the owner user's own Discord display name — the bot's name only
+        when nothing else exists. Avatar = the owner user's."""
         ids = cfg.get("cooldown_exempt_user_ids") or []
         uid = str(ids[0]).strip() if ids and str(ids[0]).strip() else None
-        av = None
+        av = dn = ""
         if uid and self._client:
-            av = self._owner_avatar.get(uid)
-            if av is None:
+            hit = self._owner_ident.get(uid)
+            if hit is None:
                 try:
                     u = await self._client.fetch_user(int(uid))
-                    av = str(u.display_avatar.url)
+                    hit = (str(u.display_avatar.url),
+                           getattr(u, "display_name", None) or u.name)
                 except Exception:  # noqa: BLE001
-                    av = ""
-                self._owner_avatar[uid] = av
+                    hit = ("", "")
+                self._owner_ident[uid] = hit
+            av, dn = hit
+        names = cfg.get("cooldown_exempt_names") or []
+        nm = str(names[0]).strip() if names else ""
+        who = ((cfg.get("operator_name") or "").strip() or nm
+               or (dn or "").strip() or self._bot_name())
         return who, (av or None)
 
     async def _channel_webhook(self, ch):
@@ -767,10 +774,11 @@ class BotManager:
             self.engine._log("error", f"owner webhook unavailable in this channel: {e}")
             return None
 
-    async def owner_say(self, ch, text: str) -> bool:
+    async def owner_say(self, ch, text: str, strict: bool = False) -> bool:
         """Post AS THE OWNER: a webhook message wearing their name + avatar.
-        Falls back to a '**Owner:** …' line from the bot when webhooks aren't
-        available (grant the bot Manage Webhooks for the real skin)."""
+        Without webhook access: strict=False falls back to a '**Owner:** …'
+        line from the bot; strict=True SKIPS QUIETLY (logged, nothing posted,
+        never raises) — for message rows marked 'as the OWNER'."""
         text = (text or "").strip()
         if not text:
             return False
@@ -785,17 +793,20 @@ class BotManager:
             except Exception as e:  # noqa: BLE001
                 self.engine._log("error", f"owner webhook send failed: {e}")
                 self._webhooks.pop(str(ch.id), None)   # stale hook — re-create next time
+        if strict:
+            self.engine._log("bot", "owner message skipped (no Manage Webhooks here)")
+            return False
         await self._send(ch, f"**{who}:** {text}", None)
         return False
 
-    async def owner_broadcast(self, text: str) -> None:
-        """Owner-voiced text to every listen channel (used by #owner-command
-        rows inside action blocks)."""
+    async def owner_broadcast(self, text: str, strict: bool = False) -> None:
+        """Owner-voiced text to every listen channel (#owner-command rows and
+        'as the OWNER' message rows inside action blocks). Never raises."""
         cfg = self.get_config()
         for t in self._targets(cfg):
             ch = await self._channel(str(t["channel_id"]))
             if ch is not None:
-                await self.owner_say(ch, text)
+                await self.owner_say(ch, text, strict=strict)
 
     async def owner_chat(self, channel_id, text: str) -> dict:
         """Send from the panel Chat tab: plain text posts to the channel as the
@@ -820,12 +831,13 @@ class BotManager:
             body = self.engine.render((oc.get("message") or "").strip(),
                                       {"user": who, "mention": who})
             if body:
-                await self.owner_say(ch, body)
+                voiced = await self.owner_say(ch, body)
+                return {"ok": True, "owner_voice": voiced}
             return {"ok": True}
         if not text.startswith(prefix):
             # plain text speaks AS THE OWNER (webhook name+avatar; bot-prefixed fallback)
-            await self.owner_say(ch, text)
-            return {"ok": True}
+            voiced = await self.owner_say(ch, text)
+            return {"ok": True, "owner_voice": voiced}
         if not cfg.get("listener_enabled"):
             return {"ok": False, "error": "activation is off"}
         name = text[len(prefix):].split(" ", 1)[0].lower()
@@ -834,7 +846,7 @@ class BotManager:
             return {"ok": False, "error": f"no enabled command named {prefix}{name}"}
         ids = cfg.get("cooldown_exempt_user_ids") or []
         uid = str(ids[0]).strip() if ids and str(ids[0]).strip() else None
-        who = (cfg.get("operator_name") or "").strip() or self._bot_name()
+        who, _av = await self._owner_identity(cfg)
         res = await self.engine.run_custom(cmd, who, uid=uid)
         if res.get("game"):
             if uid is None:

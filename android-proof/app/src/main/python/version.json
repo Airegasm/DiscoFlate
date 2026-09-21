@@ -1,6 +1,6 @@
 {
-  "version": "3.46.0",
-  "versionCode": 120,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.46.0/discoflate-v3.46.0.apk",
-  "notes": "DiscoFlate v3.46.0 \u2014 the Chat tab speaks AS YOU: plain text (and #owner commands, everywhere they fire) posts through a per-channel webhook wearing your Owner name and Discord avatar, falling back to a 'Owner:'-prefixed bot post where Manage Webhooks isn't granted. Two invite links on the Discord tab: full (with Manage Webhooks) and a webhook-free one for cautious server admins. The Chat tab now reads the bot's live permissions in the scoped channel \u2014 Send disables with the missing permissions listed when the bot can't post, and the status line shows owner-voice/history availability. New Help section covers the Chat tab and granting Manage Webhooks on already-joined servers. Release APKs are now version-named (discoflate-vX.Y.Z.apk) so phone downloads stop piling up as 'discoflate (N).apk'."
+  "version": "3.47.0",
+  "versionCode": 121,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.47.0/discoflate-v3.47.0.apk",
+  "notes": "DiscoFlate v3.47.0 — overlays go live: a new 'play overlay' ACTION TYPE in every action block (commands, capacity/timed events, polls, competitions…) plays an image or video over the virtual camera — static/timed images, looping videos, hold-until-cleared, or play-once-then-die; named layers replace each other for scene building; quietly skips when the virtual camera isn't running. Video uploads up to 96MB. Message actions can post 'as the OWNER' (webhook voice; quietly skips without Manage Webhooks). Owner-voice fix: it now wears the Dashboard Owner name (or your Discord display name) instead of accidentally posting under the bot's own name — and the Chat tab says so out loud when it ever falls back to a bot post. Snapshot tab renamed Camera (with a single-webcam heads-up while the virtual cam runs). Custom Buttons / Owner Commands / Overlay actions editor pages now lay out properly on phones."
 }

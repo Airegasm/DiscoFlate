@@ -94,41 +94,73 @@ class VirtualCam:
         return {"ok": True}
 
     # -- overlays --------------------------------------------------------------#
-    def clear_overlays(self) -> dict:
+    _VIDEO_EXTS = (".mp4", ".webm", ".mov", ".mkv", ".avi", ".m4v")
+
+    def clear_overlays(self, layer: str | None = None) -> dict:
+        """Remove all overlays, or just the named layer."""
+        key = (layer or "").strip().lower()
         with self._lock:
-            self._overlays.clear()
+            for o in self._overlays:
+                if not key or o.get("layer") == key:
+                    o["dead"] = True
         return {"ok": True}
 
-    def fire_overlay(self, image: str, seconds=5.0, pos: str = "center",
-                     scale=0.5) -> dict:
-        """Play an image (PNG w/ alpha welcome) over the camera for N seconds.
-        `image` = a filename from data/images (or an absolute path). `pos` =
-        center / top / bottom / left / right / top-left / top-right /
-        bottom-left / bottom-right. `scale` = fraction of the frame WIDTH the
-        overlay spans (0.05–1.0)."""
+    def fire_overlay(self, media: str, seconds=5.0, pos: str = "center",
+                     scale=0.5, mode: str = "timed", layer: str | None = None) -> dict:
+        """Show a MEDIA layer over the camera. `media` = an image (PNG alpha
+        welcome) or a video file from data/images (or an absolute path).
+        mode: "timed"  = shown/looping for `seconds`
+              "hold"   = stays until cleared or replaced (video loops)
+              "once"   = a video plays through once, then removes itself
+              "clear"  = remove the named layer (or ALL when no layer given)
+        `layer` names the slot — firing the same layer name REPLACES it (scene
+        building). pos/scale as before (anchor + fraction of frame width)."""
         why = self.available()
         if why:
             return {"ok": False, "error": why}
-        name = str(image or "").strip()
+        mode = str(mode or "timed").lower()
+        key = (str(layer or "").strip().lower()) or None
+        if mode == "clear":
+            return self.clear_overlays(key)
+        name = str(media or "").strip()
         if not name:
-            return {"ok": False, "error": "no overlay image set"}
+            return {"ok": False, "error": "no overlay media set"}
         path = name if os.path.isabs(name) else os.path.join(self.images_dir,
                                                              os.path.basename(name))
-        img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
-        if img is None:
-            return {"ok": False, "error": f"couldn't read image: {name}"}
-        if img.ndim == 2:
-            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGRA)
-        elif img.shape[2] == 3:
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
         try:
             secs = max(0.5, float(seconds or 5))
             sc = max(0.05, min(1.0, float(scale or 0.5)))
         except (TypeError, ValueError):
             secs, sc = 5.0, 0.5
+        entry = {"layer": key, "pos": str(pos or "center").lower(), "scale": sc,
+                 "dead": False,
+                 "until": (time.monotonic() + secs) if mode == "timed" else None}
+        if os.path.splitext(path)[1].lower() in self._VIDEO_EXTS:
+            cap = cv2.VideoCapture(path)
+            ok, _f = cap.read()
+            if not ok:
+                cap.release()
+                return {"ok": False, "error": f"couldn't read video: {name}"}
+            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            entry.update({"kind": "video", "cap": cap,
+                          "loop": mode != "once"})
+        else:
+            img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+            if img is None:
+                return {"ok": False, "error": f"couldn't read image: {name}"}
+            if img.ndim == 2:
+                img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGRA)
+            elif img.shape[2] == 3:
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
+            if mode == "once":   # a play-once image is just a short timed one
+                entry["until"] = time.monotonic() + secs
+            entry.update({"kind": "image", "img": img})
         with self._lock:
-            self._overlays.append({"img": img, "until": time.monotonic() + secs,
-                                   "pos": str(pos or "center").lower(), "scale": sc})
+            if key:   # named slot: replace the previous holder
+                for o in self._overlays:
+                    if o.get("layer") == key:
+                        o["dead"] = True
+            self._overlays.append(entry)
         return {"ok": True, "overlays": len(self._overlays)}
 
     # -- the pipeline thread ---------------------------------------------------#
@@ -149,13 +181,32 @@ class VirtualCam:
     def _composite(self, frame):
         now = time.monotonic()
         with self._lock:
-            self._overlays = [o for o in self._overlays if o["until"] > now]
+            dead = [o for o in self._overlays
+                    if o.get("dead") or (o.get("until") and o["until"] <= now)]
+            self._overlays = [o for o in self._overlays if o not in dead]
             ovs = list(self._overlays)
+        for o in dead:   # release finished video captures
+            cap = o.get("cap")
+            if cap is not None:
+                try:
+                    cap.release()
+                except Exception:  # noqa: BLE001
+                    pass
         if not ovs:
             return frame
         H, W = frame.shape[:2]
         for o in ovs:
-            img = o["img"]
+            if o.get("kind") == "video":
+                ok, vf = o["cap"].read()
+                if not ok and o.get("loop"):
+                    o["cap"].set(cv2.CAP_PROP_POS_FRAMES, 0)
+                    ok, vf = o["cap"].read()
+                if not ok:
+                    o["dead"] = True   # play-once finished (or file went bad)
+                    continue
+                img = cv2.cvtColor(vf, cv2.COLOR_BGR2BGRA)   # opaque layer
+            else:
+                img = o["img"]
             tw = max(8, int(W * o["scale"]))
             th = max(8, int(img.shape[0] * tw / max(1, img.shape[1])))
             if th > H:

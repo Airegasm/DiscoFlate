@@ -475,6 +475,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     secret = _web_secret()
     net = net if net is not None else {}
     vcam = camera.VirtualCam(IMAGES_DIR)   # the Chat tab's OBS-style overlay pipe
+    net["vcam"] = vcam
 
     @web.middleware
     async def security_mw(request, handler):
@@ -1167,13 +1168,15 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     async def overlay_fire(request):
         await guard(request)
         b = await _json(request)
-        return web.json_response(vcam.fire_overlay(b.get("image"), b.get("seconds"),
-                                                   b.get("pos") or "center",
-                                                   b.get("scale")))
+        return web.json_response(vcam.fire_overlay(
+            b.get("media") or b.get("image"), b.get("seconds"),
+            b.get("pos") or "center", b.get("scale"),
+            mode=b.get("mode") or "timed", layer=b.get("layer")))
 
     async def overlay_clear(request):
         await guard(request)
-        return web.json_response(vcam.clear_overlays())
+        b = await _json(request)
+        return web.json_response(vcam.clear_overlays(b.get("layer")))
 
     async def upload(request):
         await guard(request)
@@ -1183,8 +1186,9 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         if field is None or field.name != "file":
             raise web.HTTPBadRequest(text="expected a 'file' field")
         ext = os.path.splitext(field.filename or "")[1].lower()
-        if ext not in (".png", ".jpg", ".jpeg", ".gif", ".webp"):
-            raise web.HTTPBadRequest(text="unsupported image type")
+        video = ext in (".mp4", ".webm", ".mov", ".mkv", ".avi", ".m4v")
+        if ext not in (".png", ".jpg", ".jpeg", ".gif", ".webp") and not video:
+            raise web.HTTPBadRequest(text="unsupported media type")
         name = f"{uuid.uuid4().hex}{ext}"
         dest = os.path.join(IMAGES_DIR, name)
         size = 0
@@ -1194,10 +1198,11 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                 if not chunk:
                     break
                 size += len(chunk)
-                if size > 8 * 1024 * 1024:  # 8 MB cap
+                cap = (96 if video else 8) * 1024 * 1024   # 8 MB images / 96 MB videos
+                if size > cap:
                     fh.close()
                     os.remove(dest)
-                    raise web.HTTPRequestEntityTooLarge(max_size=8 * 1024 * 1024, actual_size=size)
+                    raise web.HTTPRequestEntityTooLarge(max_size=cap, actual_size=size)
                 fh.write(chunk)
         # `path` is what the bot uploads to Discord (relative — resolved against
         # the data dir at send time, so configs stay portable and the page never
@@ -1367,6 +1372,18 @@ async def main() -> None:
     engine.winner_button_cb = botmgr.post_winner_button       # Winner Button posts a one-press prize embed
     engine.bonus_round_cb = botmgr.post_bonus_round_embed      # Bonus Round posts a teamwork confirm embed
     engine.owner_say_cb = botmgr.owner_broadcast               # #owner-command rows speak with the owner's skin
+    # `overlay` action rows → the virtual camera; quiet skip when it's not running
+    def _overlay_action(spec: dict) -> dict:
+        if not net.get("vcam"):
+            return {"ok": False, "error": "virtual camera unavailable"}
+        vc = net["vcam"]
+        if (spec.get("mode") or "") != "clear" and not vc.status()["running"]:
+            return {"ok": False, "error": "virtual camera not running"}
+        return vc.fire_overlay(spec.get("media"), spec.get("seconds"),
+                               spec.get("pos") or "center", spec.get("scale"),
+                               mode=spec.get("mode") or "timed",
+                               layer=spec.get("layer"))
+    engine.overlay_cb = _overlay_action
 
     async def _end_session(post_off_message: bool = False):
         # Deactivate. End Sequence calls this WITHOUT the off-message;
