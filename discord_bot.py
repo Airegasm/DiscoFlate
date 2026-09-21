@@ -243,6 +243,10 @@ class BotManager:
         # already got a one-time history backfill.
         self._chat_logs: dict[str, deque] = {}
         self._chat_hist: set = set()
+        # Owner voice: per-channel webhook (posts AS the owner — their name +
+        # avatar) and the cached owner avatar URL.
+        self._webhooks: dict = {}
+        self._owner_avatar: dict = {}
 
     # -- minigame view registry ---------------------------------------------- #
     def _register_view(self, view) -> None:
@@ -459,8 +463,11 @@ class BotManager:
             raise RuntimeError("the bot isn't connected — connect it first")
         await self._client.user.edit(avatar=data)
 
-    def invite_url(self) -> str | None:
-        """OAuth2 invite URL for this bot, once we know its application id."""
+    def invite_url(self, minimal: bool = False) -> str | None:
+        """OAuth2 invite URL for this bot, once we know its application id.
+        `minimal` omits Manage Webhooks — for servers whose admins won't grant
+        it; the Chat tab's owner voice then falls back to a '**Owner:** …' bot
+        post there. Everything else works identically."""
         if not self._client or not self._client.is_ready():
             return None
         app_id = self._client.application_id or (self._client.user and self._client.user.id)
@@ -468,6 +475,8 @@ class BotManager:
             return None
         # View Channels + Send Messages + Embed Links + Attach Files + Read History
         perms = 1024 | 2048 | 16384 | 32768 | 65536
+        if not minimal:
+            perms |= 536870912   # + Manage Webhooks (the Chat tab's owner voice)
         return (
             "https://discord.com/api/oauth2/authorize"
             f"?client_id={app_id}&permissions={perms}&scope=bot%20applications.commands"
@@ -669,6 +678,31 @@ class BotManager:
         except Exception:  # noqa: BLE001 — the log must never break dispatch
             pass
 
+    def chat_perms(self, channel_id) -> dict:
+        """The bot's effective permissions in a watched channel — what the Chat
+        tab needs to gate its UX. Local cache math only (no API calls)."""
+        cid = str(channel_id or "").strip()
+        try:
+            ch = self._client.get_channel(int(cid)) if self._client else None
+        except (TypeError, ValueError):
+            ch = None
+        if ch is None or getattr(ch, "guild", None) is None or ch.guild.me is None:
+            return {"known": False}
+        p = ch.permissions_for(ch.guild.me)
+        missing = [label for ok, label in (
+            (p.view_channel, "View Channel"),
+            (p.send_messages, "Send Messages"),
+            (p.embed_links, "Embed Links"),
+            (p.attach_files, "Attach Files"),
+            (p.read_message_history, "Read Message History"),
+            (p.manage_webhooks, "Manage Webhooks"),
+        ) if not ok]
+        return {"known": True,
+                "can_send": bool(p.view_channel and p.send_messages),
+                "owner_voice": bool(p.manage_webhooks),
+                "history": bool(p.read_message_history),
+                "missing": missing}
+
     async def chat_log(self, channel_id, after: str = "") -> dict:
         cid = str(channel_id or "").strip()
         if cid not in self._chat_watched(self.get_config()):
@@ -695,7 +729,73 @@ class BotManager:
                 entries = [e for e in entries if int(e["id"]) > a]
             except (TypeError, ValueError):
                 pass
-        return {"ok": True, "messages": entries}
+        return {"ok": True, "messages": entries, "perms": self.chat_perms(cid)}
+
+    async def _owner_identity(self, cfg) -> tuple:
+        """(display name, avatar url|None) for the OWNER — the operator name and
+        the Discord avatar of the first exempt (owner) user id."""
+        who = (cfg.get("operator_name") or "").strip() or self._bot_name()
+        ids = cfg.get("cooldown_exempt_user_ids") or []
+        uid = str(ids[0]).strip() if ids and str(ids[0]).strip() else None
+        av = None
+        if uid and self._client:
+            av = self._owner_avatar.get(uid)
+            if av is None:
+                try:
+                    u = await self._client.fetch_user(int(uid))
+                    av = str(u.display_avatar.url)
+                except Exception:  # noqa: BLE001
+                    av = ""
+                self._owner_avatar[uid] = av
+        return who, (av or None)
+
+    async def _channel_webhook(self, ch):
+        """The channel's DiscoFlate webhook (created on demand; needs the bot to
+        have Manage Webhooks there). None when unavailable — callers fall back."""
+        cid = str(ch.id)
+        wh = self._webhooks.get(cid)
+        if wh is not None:
+            return wh
+        try:
+            hooks = await ch.webhooks()
+            wh = next((h for h in hooks if h.name == "DiscoFlate" and h.token), None)
+            if wh is None:
+                wh = await ch.create_webhook(name="DiscoFlate", reason="DiscoFlate owner voice")
+            self._webhooks[cid] = wh
+            return wh
+        except Exception as e:  # noqa: BLE001 — usually missing Manage Webhooks
+            self.engine._log("error", f"owner webhook unavailable in this channel: {e}")
+            return None
+
+    async def owner_say(self, ch, text: str) -> bool:
+        """Post AS THE OWNER: a webhook message wearing their name + avatar.
+        Falls back to a '**Owner:** …' line from the bot when webhooks aren't
+        available (grant the bot Manage Webhooks for the real skin)."""
+        text = (text or "").strip()
+        if not text:
+            return False
+        cfg = self.get_config()
+        who, av = await self._owner_identity(cfg)
+        wh = await self._channel_webhook(ch)
+        if wh is not None:
+            try:
+                await wh.send(content=_clip(text), username=(who or "Owner")[:80],
+                              avatar_url=av)
+                return True
+            except Exception as e:  # noqa: BLE001
+                self.engine._log("error", f"owner webhook send failed: {e}")
+                self._webhooks.pop(str(ch.id), None)   # stale hook — re-create next time
+        await self._send(ch, f"**{who}:** {text}", None)
+        return False
+
+    async def owner_broadcast(self, text: str) -> None:
+        """Owner-voiced text to every listen channel (used by #owner-command
+        rows inside action blocks)."""
+        cfg = self.get_config()
+        for t in self._targets(cfg):
+            ch = await self._channel(str(t["channel_id"]))
+            if ch is not None:
+                await self.owner_say(ch, text)
 
     async def owner_chat(self, channel_id, text: str) -> dict:
         """Send from the panel Chat tab: plain text posts to the channel as the
@@ -716,13 +816,15 @@ class BotManager:
             oc = self.engine.find_owner_command(text[1:].split(" ", 1)[0])
             if oc is None:
                 return {"ok": False, "error": f"no owner command named {text.split(' ', 1)[0]}"}
-            who = (cfg.get("operator_name") or "").strip() or self._bot_name()
-            line = self.engine.owner_command_text(oc, who=who)
-            if line:
-                await self._send(ch, line, None)
+            who, _av = await self._owner_identity(cfg)
+            body = self.engine.render((oc.get("message") or "").strip(),
+                                      {"user": who, "mention": who})
+            if body:
+                await self.owner_say(ch, body)
             return {"ok": True}
         if not text.startswith(prefix):
-            await self._send(ch, text, None)
+            # plain text speaks AS THE OWNER (webhook name+avatar; bot-prefixed fallback)
+            await self.owner_say(ch, text)
             return {"ok": True}
         if not cfg.get("listener_enabled"):
             return {"ok": False, "error": "activation is off"}
@@ -1069,9 +1171,10 @@ class BotManager:
                 who = message.author.display_name
                 if not self.engine.is_owner(message.author.id, who):
                     return
-                line = self.engine.owner_command_text(oc, who=who, mention=message.author.mention)
-                if line:
-                    await message.channel.send(_clip(line))
+                body = self.engine.render((oc.get("message") or "").strip(),
+                                          {"user": who, "mention": message.author.mention})
+                if body:
+                    await self.owner_say(message.channel, body)
                 return
         if not content.startswith(prefix):
             return

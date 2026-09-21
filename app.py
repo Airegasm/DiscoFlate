@@ -287,6 +287,7 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "allow_dms": cfg.get("allow_dms", False),
         "server_channels": cfg.get("server_channels", {}),
         "invite_url": botmgr.invite_url(),
+        "invite_url_min": botmgr.invite_url(minimal=True),
         "cooldown_seconds": cfg.get("cooldown_seconds", 0),
         "cooldown_exempt_user_ids": cfg.get("cooldown_exempt_user_ids", []),
         "cooldown_exempt_names": cfg.get("cooldown_exempt_names", []),
@@ -1365,6 +1366,7 @@ async def main() -> None:
     engine.comp_embed_cb = botmgr.post_competition_embed      # competitions post an Enter Challenge embed
     engine.winner_button_cb = botmgr.post_winner_button       # Winner Button posts a one-press prize embed
     engine.bonus_round_cb = botmgr.post_bonus_round_embed      # Bonus Round posts a teamwork confirm embed
+    engine.owner_say_cb = botmgr.owner_broadcast               # #owner-command rows speak with the owner's skin
 
     async def _end_session(post_off_message: bool = False):
         # Deactivate. End Sequence calls this WITHOUT the off-message;

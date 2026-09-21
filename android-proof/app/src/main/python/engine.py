@@ -201,6 +201,7 @@ class Engine:
         self.announce_cb = None                # async (text, image) -> None
         self.end_session_cb = None             # async () -> None : deactivate without the off-message
         self.cancel_games_cb = None            # async () -> None : cancel all live minigame views
+        self.owner_say_cb = None               # async (text) -> None : owner-voiced broadcast (webhook skin)
         self.embed_cb = None                   # async (title, text) -> None : rich embed post (polls)
         self.broadcast_embed_cb = None         # async (text) -> None : broadcast-preset embed
         self.comp_embed_cb = None              # async (title, text, meta) -> None : competition embed + Enter button
@@ -1308,10 +1309,19 @@ class Engine:
                         oc = self.find_owner_command(cmdname)
                         if oc is None:
                             self._log("error", f"{name}: no owner command '{cmdname}'")
-                        else:
-                            line = self.owner_command_text(oc, extra=dict(xc))
-                            if line:
-                                await self._announce(line, None)
+                            continue
+                        op = (self.cfg.get("operator_name") or "").strip() or "Owner"
+                        body = self.render((oc.get("message") or "").strip(),
+                                           {**xc, "user": op})
+                        if not body:
+                            continue
+                        if self.owner_say_cb:
+                            try:
+                                await self.owner_say_cb(body)
+                                continue
+                            except Exception as ex:  # noqa: BLE001
+                                self._log("error", f"owner voice failed: {ex}")
+                        await self._announce(f"**{op}:** {body}", None)
                         continue
                     cmd2 = self.find_command(cmdname) if cmdname else None
                     if cmd2 is None:
