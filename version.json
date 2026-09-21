@@ -1,6 +1,6 @@
 {
-  "version": "3.55.1",
-  "versionCode": 134,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.55.1/discoflate-v3.55.1.apk",
-  "notes": "DiscoFlate v3.55.1 — fixes a bug where creating a new scene group did nothing. Groups are normally derived from the overlays that carry the name, so a brand-new group — which has no overlays yet — was erased the instant it was created. New groups are now remembered until you put something in them, so you can create one and then fill it."
+  "version": "3.55.2",
+  "versionCode": 135,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.55.2/discoflate-v3.55.2.apk",
+  "notes": "DiscoFlate v3.55.2 — fixes adding overlays on the Scenes tab, which has been broken since 3.51.0. A block of property-panel markup had been spliced into the function that builds a new overlay, so creating ANY overlay — media, text, timer, gauge, poll viewer — threw an error and silently did nothing. The panel's chroma-key controls are unaffected; this only removes the stray copy that ended up in the wrong place."
 }

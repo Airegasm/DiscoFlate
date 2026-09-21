@@ -2215,17 +2215,6 @@ function stgNewItem(kind, media, visible){
   if(kind==='pump_timer'){ o.fmt_on='PUMP [secs]s'; o.fmt_off='PUMP idle'; }
   if(kind==='device_timers'){ o.fmt_on='[name] [secs]s'; o.fmt_off='[name] idle'; o.show_idle=true; }
   if(kind==='timer'){ o.seconds=60; o.text='[secs]'; o.autostart=false; o.autovanish=false; }
-  if(isMedia)
-    rows += `<div class="row ovedit">`+
-      `<label class="row" style="gap:5px" title="knock a background colour out of the video so a plain .mp4 works as a transparent overlay — no alpha codec needed"><input type="checkbox" ${o.chroma_on?'checked':''} style="width:auto" onchange="stgItemSet('chroma_on',this.checked)"> 🟩 chroma key</label>`+
-      (o.chroma_on
-        ? F('Key colour', `<input type="color" value="${esc(o.chroma||'#00ff00')}" style="width:52px;padding:2px" onchange="stgItemSet('chroma',this.value)">`)+
-          F('Tolerance <span class="muted">(how much of that hue goes)</span>',
-            `<input type="number" min="1" max="120" value="${o.chroma_tol??35}" style="width:80px" onchange="stgItemSet('chroma_tol',+this.value)">`)+
-          F('Edge softness', `<input type="number" min="0" max="80" value="${o.chroma_soft??12}" style="width:80px" onchange="stgItemSet('chroma_soft',+this.value)">`)+
-          `<span class="muted">greens out; greys and skin are protected</span>`
-        : `<span class="muted">turn on to use a green-screen video over the camera</span>`)+
-      `</div>`;
   if(kind==='poll_viewer'){ o.w=0.34; o.h=0.30; o.auto_show=true; o.results_secs=8;
                             o.color='#f4a828'; o.bg='#12121a'; o.opacity=220;
                             o.visible=true; o.fade_out=0.6; }
