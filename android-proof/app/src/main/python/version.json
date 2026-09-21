@@ -1,6 +1,6 @@
 {
-  "version": "3.44.4",
-  "versionCode": 118,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.44.4/discoflate.apk",
-  "notes": "DiscoFlate v3.44.4 \u2014 local auth no longer depends on browser cookies: the panel page carries the auth secret and sends it as a header on every call, so cookie-blocking browsers (Opera/Opera GX shields, strict privacy modes, embedded docks) can save the token and use sensitive endpoints normally. The old 'missing local auth' failure also now explains the fix (reload the tab) instead of just failing."
+  "version": "3.45.0",
+  "versionCode": 119,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.45.0/discoflate.apk",
+  "notes": "DiscoFlate v3.45.0 \u2014 the Chat tab: a live mirror of any watched channel (bot posts included, history backfill) with a send box that posts as the bot or runs !commands AS THE OWNER (cooldown-exempt, owner-only allowed), plus the operator controls one click away. Custom Buttons (one-click launchers for !commands, polls, or #owner commands) and Custom Owner Commands (#name macros posted attributed to the Owner \u2014 usable from the Chat box, typed in Discord by the owner, from buttons, or from any action block's command row), both edited in overlay pages with autosave. Video foundation: voice/stage channels can be watched (\ud83d\udd0a in pickers); selecting one reveals the \ud83c\udfa5 section with an OBS-style VIRTUAL CAMERA (webcam \u2192 overlay compositor \u2192 a device you pick in Discord) and Overlay actions \u2014 buttons that play timed image layers over your live feed (full overlay/scene system coming). Launchers now self-heal pip (corpse cleanup, cache purge + retry, real error logs). Desktop camera deps auto-install; Windows needs OBS once for its virtual-cam driver."
 }

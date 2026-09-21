@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 PY_DST=android-proof/app/src/main/python
 ASSETS=android-proof/app/src/main/assets
 
-PY_FILES=(app.py config_store.py device_control.py discord_bot.py engine.py
+PY_FILES=(app.py camera.py config_store.py device_control.py discord_bot.py engine.py
           kasa_legacy.py minigames.py pumpdirect_import.py version.json
           default_preset.json)
 

@@ -1,3 +1,5 @@
 discord.py>=2.3
 aiohttp>=3.9
 pyaes>=1.6   # Tapo KLAP AES (optional; only if you use Tapo)
+opencv-python-headless>=4.8   # virtual camera compositor (Chat tab video overlays; desktop)
+pyvirtualcam>=0.11            # virtual camera output (Windows: install OBS once for its driver)

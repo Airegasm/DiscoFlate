@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import os
 import time
+from collections import deque
 import discord
 
 import config_store
@@ -237,6 +238,11 @@ class BotManager:
         # them), so a session pause can cancel them all. Views are pruned once
         # finished; a pause disables + refunds whatever is still live.
         self._active_views: set = set()
+        # Chat tab: rolling per-channel message log for the watched channels
+        # (fed by on_message — the bot's own posts included) + which channels
+        # already got a one-time history backfill.
+        self._chat_logs: dict[str, deque] = {}
+        self._chat_hist: set = set()
 
     # -- minigame view registry ---------------------------------------------- #
     def _register_view(self, view) -> None:
@@ -439,7 +445,9 @@ class BotManager:
             return []
         out = []
         for g in self._client.guilds:
-            chans = [{"id": str(c.id), "name": c.name} for c in g.text_channels]
+            chans = ([{"id": str(c.id), "name": c.name, "kind": "text"} for c in g.text_channels]
+                     + [{"id": str(c.id), "name": c.name, "kind": "voice"} for c in g.voice_channels]
+                     + [{"id": str(c.id), "name": c.name, "kind": "voice"} for c in g.stage_channels])
             out.append({"id": str(g.id), "name": g.name, "channels": chans})
         out.sort(key=lambda x: x["name"].lower())
         return out
@@ -608,6 +616,146 @@ class BotManager:
             msg = await self._send(ch, text, image, embed=embed, view=view)
             if replace_key and msg is not None:
                 self._track_msg(replace_key, cid, msg)
+
+    # -- Chat tab (panel-side owner cockpit) ---------------------------------- #
+    def _chat_watched(self, cfg) -> dict:
+        """{channel_id: label} for every watched channel (listen targets +
+        the announce channel)."""
+        out = {}
+        for t in self._targets(cfg):
+            out[str(t["channel_id"])] = (f'{t.get("guild_name") or "?"} · '
+                                         f'#{t.get("channel_name") or t["channel_id"]}')
+        ann = str(cfg.get("announce_channel_id") or "").strip()
+        if ann and ann not in out:
+            out[ann] = "announce channel"
+        return out
+
+    def _chan_kind(self, cid: str) -> str:
+        """'voice' when the id resolves to a voice/stage channel (video-capable),
+        else 'text'. Cache-only lookup; unknown → text."""
+        try:
+            ch = self._client.get_channel(int(cid)) if self._client else None
+            if isinstance(ch, (discord.VoiceChannel, discord.StageChannel)):
+                return "voice"
+        except Exception:  # noqa: BLE001
+            pass
+        return "text"
+
+    def chat_channels(self) -> list:
+        return [{"channel_id": cid, "label": lbl, "kind": self._chan_kind(cid)}
+                for cid, lbl in self._chat_watched(self.get_config()).items()]
+
+    def _chat_entry(self, message) -> dict:
+        text = (message.content or "").strip()
+        for e in (message.embeds or []):
+            part = " · ".join(x for x in ((e.title or "").strip() if e.title else "",
+                                          (e.description or "").strip() if e.description else "") if x)
+            if part:
+                text = (text + "\n" if text else "") + f"▧ {part}"
+        if message.attachments:
+            text = (text + "\n" if text else "") + f"[{len(message.attachments)} attachment(s)]"
+        return {"id": str(message.id),
+                "t": message.created_at.strftime("%H:%M:%S"),
+                "author": getattr(message.author, "display_name", None) or message.author.name,
+                "bot": bool(message.author.bot),
+                "text": text[:1500]}
+
+    def _chat_capture(self, message) -> None:
+        try:
+            cid = str(message.channel.id)
+            if cid not in self._chat_watched(self.get_config()):
+                return
+            self._chat_logs.setdefault(cid, deque(maxlen=200)).append(self._chat_entry(message))
+        except Exception:  # noqa: BLE001 — the log must never break dispatch
+            pass
+
+    async def chat_log(self, channel_id, after: str = "") -> dict:
+        cid = str(channel_id or "").strip()
+        if cid not in self._chat_watched(self.get_config()):
+            return {"ok": False, "error": "not a watched channel"}
+        if cid not in self._chat_hist:
+            # one-time backfill so the tab opens with recent context
+            self._chat_hist.add(cid)
+            ch = await self._channel(cid)
+            if ch is not None:
+                try:
+                    hist = [m async for m in ch.history(limit=40)]
+                    log = self._chat_logs.setdefault(cid, deque(maxlen=200))
+                    have = {e["id"] for e in log}
+                    merged = [self._chat_entry(m) for m in hist if str(m.id) not in have]
+                    both = sorted(merged + list(log), key=lambda e: int(e["id"]))
+                    log.clear()
+                    log.extend(both)
+                except Exception as e:  # noqa: BLE001 — e.g. no Read History perm
+                    self.engine._log("error", f"chat history fetch failed: {e}")
+        entries = list(self._chat_logs.get(cid) or [])
+        if after:
+            try:
+                a = int(after)
+                entries = [e for e in entries if int(e["id"]) > a]
+            except (TypeError, ValueError):
+                pass
+        return {"ok": True, "messages": entries}
+
+    async def owner_chat(self, channel_id, text: str) -> dict:
+        """Send from the panel Chat tab: plain text posts to the channel as the
+        bot; a !command executes AS THE OWNER (owner id when set → cooldown-
+        exempt + owner-only allowed) with its reply posted to that channel."""
+        cfg = self.get_config()
+        text = (text or "").strip()
+        if not text:
+            return {"ok": False, "error": "nothing to send"}
+        cid = str(channel_id or "").strip()
+        if cid not in self._chat_watched(cfg):
+            return {"ok": False, "error": "pick a watched channel"}
+        ch = await self._channel(cid)
+        if ch is None:
+            return {"ok": False, "error": "channel unavailable — is the bot connected?"}
+        prefix = cfg.get("command_prefix", "!")
+        if text.startswith("#") and prefix != "#":
+            oc = self.engine.find_owner_command(text[1:].split(" ", 1)[0])
+            if oc is None:
+                return {"ok": False, "error": f"no owner command named {text.split(' ', 1)[0]}"}
+            who = (cfg.get("operator_name") or "").strip() or self._bot_name()
+            line = self.engine.owner_command_text(oc, who=who)
+            if line:
+                await self._send(ch, line, None)
+            return {"ok": True}
+        if not text.startswith(prefix):
+            await self._send(ch, text, None)
+            return {"ok": True}
+        if not cfg.get("listener_enabled"):
+            return {"ok": False, "error": "activation is off"}
+        name = text[len(prefix):].split(" ", 1)[0].lower()
+        cmd = self.engine.find_command(name)
+        if cmd is None or not cmd.get("enabled", True):
+            return {"ok": False, "error": f"no enabled command named {prefix}{name}"}
+        ids = cfg.get("cooldown_exempt_user_ids") or []
+        uid = str(ids[0]).strip() if ids and str(ids[0]).strip() else None
+        who = (cfg.get("operator_name") or "").strip() or self._bot_name()
+        res = await self.engine.run_custom(cmd, who, uid=uid)
+        if res.get("game"):
+            if uid is None:
+                return {"ok": False, "error": "set the Owner user ID (Game tab) to start games from here"}
+            glabel = self.engine.game_display_name(cmd)
+            intro = (res.get("reply") or "").strip() or f"🎮 **{who}** started **{name}** — press Play!"
+            view = minigames.make_play_view(self, cmd, who, uid)
+            try:
+                view.message = await ch.send(self._hdr(cfg, glabel, who) + intro, view=view)
+            except Exception as e:  # noqa: BLE001
+                return {"ok": False, "error": f"couldn't start the game: {e}"}
+            return {"ok": True}
+        if not res.get("ok"):
+            return {"ok": False, "error": res.get("error") or "couldn't run"}
+        if (res.get("reply") or "").strip():
+            await self._send(ch, self._hdr(cfg, cmd.get("name") or "", who) + res["reply"], None)
+        for post in (res.get("events_posted") or []):
+            if isinstance(post, dict):
+                await self.broadcast(post.get("text", ""), post.get("image"),
+                                     replace_key=post.get("replace_key"))
+            else:
+                await self.broadcast(post, None)
+        return {"ok": True}
 
     # -- operator controls (dashboard buttons that act as the owner in-channel) --
     def _operator_ready(self, cfg) -> str | None:
@@ -904,11 +1052,27 @@ class BotManager:
         return {"ok": True}
 
     async def _handle(self, client: discord.Client, message: discord.Message) -> None:
+        self._chat_capture(message)   # Chat tab log — before ANY filtering
         if message.author.bot or (client.user and message.author.id == client.user.id):
             return
         cfg = self.get_config()
         prefix = cfg.get("command_prefix", "!")
         content = (message.content or "").strip()
+        # Owner Commands: the OWNER typing "#name" posts that macro attributed
+        # to them ("**Owner:** …"). Everyone else's #… is ignored quietly.
+        if content.startswith("#") and prefix != "#":
+            nm = content[1:].split(" ", 1)[0].lower()
+            oc = self.engine.find_owner_command(nm)
+            if oc is not None:
+                if not cfg.get("listener_enabled") or not self._allowed(cfg, message):
+                    return
+                who = message.author.display_name
+                if not self.engine.is_owner(message.author.id, who):
+                    return
+                line = self.engine.owner_command_text(oc, who=who, mention=message.author.mention)
+                if line:
+                    await message.channel.send(_clip(line))
+                return
         if not content.startswith(prefix):
             return
         cmd = content[len(prefix):].split(" ", 1)[0].lower()

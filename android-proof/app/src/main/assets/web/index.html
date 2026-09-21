@@ -68,6 +68,12 @@
   .gpill.on.gblock{background:var(--bad)}
   .gpill.on.gallow{background:var(--on);color:#04320c}
   .gpill.on.gresume{background:var(--warn);color:#3a2a00}
+  /* full-screen overlay editor pages (Custom Buttons / Owner Commands) */
+  .overlay{position:fixed;inset:0;background:rgba(4,6,10,.72);z-index:60;display:none;
+       align-items:flex-start;justify-content:center;padding:4vh 14px;overflow:auto}
+  .overlay.show{display:flex}
+  .overlay .page{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+       padding:20px;width:100%;max-width:860px}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--off)}
   .dot.on{background:var(--on);box-shadow:0 0 8px var(--on)}
   .dot.bad{background:var(--bad)}
@@ -170,6 +176,7 @@
 
   <nav class="tabs" id="tabbar">
     <button class="tab-btn" data-go="dashboard">Dashboard</button>
+    <button class="tab-btn" data-go="chat">Chat</button>
     <button class="tab-btn" data-go="discord">Discord</button>
     <button class="tab-btn" data-go="devices">Devices</button>
     <button class="tab-btn" data-go="snapshot">Snapshot</button>
@@ -238,6 +245,86 @@
         </div>
         <div class="row" style="margin-top:8px"><span class="muted" id="ctrlMsg"></span></div>
         <div class="hint" id="ctrlHint">These post to your Discord channel <b>as the Owner</b> (set at the <b>top of this page</b>) — exactly as if that person typed the command. If the Owner is blank, they post as the <b>bot's own Discord name</b>. Only work when <b>Activation is on</b>, the <b>bot is connected</b>, and a <b>channel is selected</b>. <b>Cleanup</b> deletes the bot's own recent posts and works any time.</div>
+      </div>
+    </div>
+
+    <!-- chat (owner cockpit) -->
+    <div class="card span" data-tab="chat">
+      <h2>💬 Chat</h2>
+      <div class="row" style="gap:10px;align-items:flex-end">
+        <label class="field">Channel <select id="chatChan" style="width:280px" onchange="chatSwitch()"></select></label>
+        <div style="flex:1"></div>
+        <button onclick="controlRoll()">🎲 Roll</button>
+        <button onclick="controlPump()">💨 Pump</button>
+        <button class="ghost" onclick="controlCapacity()">📊 Capacity</button>
+        <button class="ghost" onclick="controlCleanup()">🧹 Cleanup</button>
+      </div>
+      <div class="log" id="chatLog" style="height:440px;margin-top:10px"></div>
+      <div class="row" style="gap:8px;margin-top:8px;flex-wrap:nowrap">
+        <input id="chatText" placeholder="plain text posts via the bot · a !command runs as the Owner" style="flex:1" onkeydown="if(event.key==='Enter')chatSend()">
+        <button onclick="chatSend()">Send</button>
+      </div>
+      <div class="row" style="margin-top:4px"><span class="muted" id="chatMsg"></span></div>
+      <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap" id="chatCustomBtns"></div>
+      <div class="row" style="gap:8px;margin-top:6px">
+        <button class="ghost" onclick="openOverlay('btnOverlay')">🔧 Custom Buttons</button>
+        <button class="ghost" onclick="openOverlay('ocOverlay')">🔧 Custom Owner Commands</button>
+      </div>
+      <div id="overlaySec" style="display:none;border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
+        <div class="row" style="gap:12px;align-items:flex-end;flex-wrap:nowrap">
+          <b style="white-space:nowrap">🎥 Video channel</b>
+          <label class="field">Camera # <input type="number" id="vcamDev" value="0" min="0" style="width:70px"></label>
+          <label class="field">Size <select id="vcamRes" style="width:130px"><option>1280x720</option><option>1920x1080</option><option>640x480</option></select></label>
+          <button onclick="vcamStart()">▶ Start virtual cam</button>
+          <button class="ghost" onclick="vcamStop()">⏹ Stop</button>
+          <span class="muted" id="vcamMsg" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
+        </div>
+        <div class="hint">Start it, then pick the <b>virtual camera</b> as your webcam in Discord's voice &amp; video settings — overlays play on top of your live feed, OBS-style. Windows needs OBS installed once (its virtual-cam driver); Linux needs <code>v4l2loopback</code>.</div>
+        <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap" id="overlayBtns"></div>
+        <div class="row" style="gap:8px;margin-top:6px">
+          <button class="ghost" onclick="openOverlay('ovbOverlay')">🔧 Overlay actions</button>
+          <button class="ghost" onclick="api('/api/overlay/clear',{})">🧹 Clear overlays</button>
+        </div>
+      </div>
+      <div class="hint">A live mirror of the selected watched channel — everything the bot sees there, its own posts included. Sending posts <b>as the bot</b>; a <code>!command</code> executes <b>as the Owner</b> (cooldown-exempt, owner-only allowed) with its reply going to that channel. The control buttons share the Dashboard's dice/seconds settings.</div>
+    </div>
+
+    <!-- overlay editors (Chat tab) -->
+    <div class="overlay" id="btnOverlay">
+      <div class="page">
+        <div class="row" style="gap:10px;flex-wrap:nowrap">
+          <h2 style="margin:0">🔧 Custom Buttons</h2>
+          <div style="flex:1"></div>
+          <button class="ghost" onclick="closeOverlay('btnOverlay')">✕</button>
+        </div>
+        <div class="hint" style="margin-top:6px">One-click launchers shown on the <b>Chat</b> tab. A button can fire a <b>!command</b> (as the Owner, into the selected channel), start a <b>poll</b>, or post an <b>#owner command</b>. Everything autosaves.</div>
+        <div id="chatBtnRows" style="margin-top:10px"></div>
+        <button class="ghost" style="margin-top:8px" onclick="chatButtons.push({label:'',kind:'command',name:''});renderChatBtnEditor();renderChatButtons();scheduleSave()">+ Add button</button>
+      </div>
+    </div>
+    <div class="overlay" id="ocOverlay">
+      <div class="page">
+        <div class="row" style="gap:10px;flex-wrap:nowrap">
+          <h2 style="margin:0">🔧 Custom Owner Commands</h2>
+          <div style="flex:1"></div>
+          <button class="ghost" onclick="closeOverlay('ocOverlay')">✕</button>
+        </div>
+        <div class="hint" style="margin-top:6px">Message macros that post <b>attributed to the Owner</b> (“<b>Owner:</b> …”) instead of as the bot. Fire one as <code>#name</code> — from the Chat box, typed in Discord (<b>owner only</b>), from a Custom Button, or from any action block's <b>command</b> row. Placeholders work; everything autosaves.</div>
+        <div id="ocRows" style="margin-top:10px"></div>
+        <button class="ghost" style="margin-top:8px" onclick="ownerCommands.push({name:'',message:''});renderOcEditor();scheduleSave()">+ Add owner command</button>
+      </div>
+    </div>
+
+    <div class="overlay" id="ovbOverlay">
+      <div class="page">
+        <div class="row" style="gap:10px;flex-wrap:nowrap">
+          <h2 style="margin:0">🔧 Overlay actions</h2>
+          <div style="flex:1"></div>
+          <button class="ghost" onclick="closeOverlay('ovbOverlay')">✕</button>
+        </div>
+        <div class="hint" style="margin-top:6px">Buttons shown on the Chat tab when the selected channel is a <b>video</b> channel. Each plays an image (PNG with transparency works best) over the virtual camera for N seconds. Everything autosaves. The full overlay/scene system will build on these.</div>
+        <div id="ovbRows" style="margin-top:10px"></div>
+        <button class="ghost" style="margin-top:8px" onclick="overlayButtons.push({label:'',image:'',seconds:5,pos:'center',scale:0.5});renderOvbEditor();renderOverlayButtons();scheduleSave()">+ Add overlay action</button>
       </div>
     </div>
 
@@ -1329,6 +1416,184 @@ async function controlRoll(){ ctl('/api/control/roll', {dice:+$('#ctrlDice').val
 let sessionPaused = false;
 async function controlStop(){ ctl(sessionPaused ? '/api/control/resume' : '/api/control/stop', {}); }
 async function controlPump(){ ctl('/api/control/pump', {seconds: parseFloat($('#ctrlPump').value)||5}); }
+
+// ---- Chat tab (owner cockpit) ----
+let chatLast = '';    // newest message id rendered for the current channel
+let chatBusy = false;
+async function chatChannels(){
+  const sel=$('#chatChan'); if(!sel) return;
+  try{
+    const r = await api('/api/chat/channels', {});
+    const cur = sel.value;
+    chatChanKinds = {};
+    (r.channels||[]).forEach(c=>chatChanKinds[c.channel_id]=c.kind||'text');
+    sel.innerHTML = (r.channels||[]).map(c=>`<option value="${esc(c.channel_id)}" ${cur===c.channel_id?'selected':''}>${c.kind==='voice'?'🔊 ':''}${esc(c.label)}</option>`).join('')
+      || '<option value="">— no watched channels —</option>';
+    chatVideoUi();
+  }catch(e){}
+}
+function chatActive(){
+  const card=document.querySelector('.card[data-tab="chat"]');
+  return card && card.classList.contains('show') && document.visibilityState==='visible';
+}
+function chatSwitch(){ chatLast=''; const el=$('#chatLog'); if(el) el.innerHTML='<div class="muted">loading…</div>'; chatVideoUi(); chatPoll(true); }
+function chatRender(entries, replaceAll){
+  const el=$('#chatLog'); if(!el) return;
+  const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 40;
+  const html = entries.map(m=>
+    `<div><span class="t">${esc(m.t)}</span> <b style="color:${m.bot?'var(--accent2)':'var(--text)'}">${esc(m.author)}</b> ${esc(m.text).replace(/\n/g,'<br>')}</div>`).join('');
+  if(replaceAll) el.innerHTML = html || '<div class="muted">nothing here yet</div>';
+  else el.insertAdjacentHTML('beforeend', html);
+  if(atBottom || replaceAll) el.scrollTop = el.scrollHeight;
+}
+async function chatPoll(force){
+  if(chatBusy) return;
+  if(!force && !chatActive()) return;
+  const cid = $('#chatChan') && $('#chatChan').value;
+  if(!cid) return;
+  chatBusy = true;
+  try{
+    const r = await api('/api/chat/log', {channel_id: cid, after: chatLast});
+    if(r.ok && (r.messages||[]).length){
+      chatRender(r.messages, !chatLast);
+      chatLast = r.messages[r.messages.length-1].id;
+    } else if(r.ok && !chatLast){
+      chatRender([], true);
+    }
+  }catch(e){}finally{ chatBusy = false; }
+}
+async function chatSend(){
+  const cid=$('#chatChan').value, t=$('#chatText').value.trim();
+  if(!cid){ $('#chatMsg').textContent='⚠ pick a channel'; return; }
+  if(!t) return;
+  $('#chatMsg').textContent='…';
+  try{
+    const r = await api('/api/chat/send', {channel_id: cid, text: t});
+    if(r.ok){ $('#chatText').value=''; $('#chatMsg').textContent=''; setTimeout(()=>chatPoll(true), 400); }
+    else $('#chatMsg').textContent = '⚠ ' + (r.error||'failed');
+  }catch(e){ $('#chatMsg').textContent = '⚠ ' + (e.message||e); }
+}
+// ---- Custom Buttons + Owner Commands (Chat tab overlays; autosaved) ----
+let chatButtons = [];
+let ownerCommands = [];
+function openOverlay(id){ const el=document.getElementById(id); if(!el) return;
+  if(id==='btnOverlay') renderChatBtnEditor(); if(id==='ocOverlay') renderOcEditor();
+  el.classList.add('show'); }
+function closeOverlay(id){ const el=document.getElementById(id); if(el) el.classList.remove('show'); }
+function ownerCmdOpts(sel){
+  const names = ownerCommands.map(o=>(o.name||'').trim()).filter(Boolean);
+  return `<option value="">— pick —</option>`+
+    names.map(n=>`<option value="${esc(n)}" ${sel===n?'selected':''}>#${esc(n)}</option>`).join('')+
+    ((sel&&!names.includes(sel))?`<option value="${esc(sel)}" selected>#${esc(sel)} (missing)</option>`:'');
+}
+function renderChatBtnEditor(){
+  const box=$('#chatBtnRows'); if(!box) return;
+  box.innerHTML = chatButtons.map((b,i)=>{
+    const kind=b.kind||'command';
+    const tgt = kind==='poll' ? pollNameOpts(b.name)
+              : kind==='owner' ? ownerCmdOpts(b.name)
+              : cmdNameOpts(b.name);
+    return `<div class="row" style="gap:10px;align-items:flex-end;flex-wrap:nowrap;margin-bottom:6px">`+
+      `<label class="field">Label <input value="${esc(b.label||'')}" placeholder="🔥 Blast" style="width:170px" onchange="chatButtons[${i}].label=this.value;renderChatButtons();scheduleSave()"></label>`+
+      `<label class="field">Does <select style="width:150px" onchange="chatButtons[${i}].kind=this.value;chatButtons[${i}].name='';renderChatBtnEditor();scheduleSave()">`+
+        [['command','fire a !command'],['poll','start a poll'],['owner','post #owner cmd']].map(([v,l])=>`<option value="${v}" ${kind===v?'selected':''}>${l}</option>`).join('')+`</select></label>`+
+      `<label class="field" style="flex:1">Target <select style="width:100%" onchange="chatButtons[${i}].name=this.value;scheduleSave()">${tgt}</select></label>`+
+      `<button class="ghost" onclick="chatButtons.splice(${i},1);renderChatBtnEditor();renderChatButtons();scheduleSave()">✕</button>`+
+    `</div>`;
+  }).join('') || '<div class="muted">no buttons yet</div>';
+}
+function renderChatButtons(){
+  const box=$('#chatCustomBtns'); if(!box) return;
+  box.innerHTML = chatButtons.filter(b=>(b.label||'').trim()&&(b.name||'').trim())
+    .map((b)=>`<button class="ghost" onclick="chatButtonRun(${chatButtons.indexOf(b)})">${esc(b.label)}</button>`).join('');
+}
+async function chatButtonRun(i){
+  const b=chatButtons[i]; if(!b||!(b.name||'').trim()) return;
+  if((b.kind||'command')==='poll'){ ctl('/api/control/poll', {name:b.name}); return; }
+  const cid=$('#chatChan')&&$('#chatChan').value;
+  if(!cid){ $('#chatMsg').textContent='⚠ pick a channel first'; return; }
+  const pf = b.kind==='owner' ? '#' : (($('#prefix')&&$('#prefix').value)||'!');
+  try{
+    const r = await api('/api/chat/send', {channel_id: cid, text: pf + b.name});
+    $('#chatMsg').textContent = r.ok ? '' : ('⚠ ' + (r.error||'failed'));
+    if(r.ok) setTimeout(()=>chatPoll(true), 400);
+  }catch(e){ $('#chatMsg').textContent='⚠ '+(e.message||e); }
+}
+function renderOcEditor(){
+  const box=$('#ocRows'); if(!box) return;
+  box.innerHTML = ownerCommands.map((o,i)=>
+    `<div class="dev" style="flex-direction:column;align-items:stretch;gap:6px">`+
+      `<div class="row" style="gap:10px;align-items:flex-end;flex-wrap:nowrap">`+
+        `<label class="field">Name <span class="muted">(fires as #name)</span> <input value="${esc(o.name||'')}" placeholder="hype" style="width:180px" onchange="ownerCommands[${i}].name=this.value.trim().replace(/^#+/,'').replace(/\s+/g,'');renderOcEditor();scheduleSave()"></label>`+
+        `<div style="flex:1"></div>`+
+        `<button class="ghost" onclick="ownerCommands.splice(${i},1);renderOcEditor();scheduleSave()">✕</button>`+
+      `</div>`+
+      `<textarea rows="2" placeholder="what the Owner says · placeholders work" onchange="ownerCommands[${i}].message=this.value;scheduleSave()">${esc(o.message||'')}</textarea>`+
+    `</div>`).join('') || '<div class="muted">no owner commands yet</div>';
+}
+// ---- video channels: virtual camera + overlay actions ----
+let overlayButtons = [];
+let chatChanKinds = {};
+function chatIsVideo(){ const cid=$('#chatChan')&&$('#chatChan').value; return chatChanKinds[cid]==='voice'; }
+function chatVideoUi(){ const el=$('#overlaySec'); if(el) el.style.display = chatIsVideo() ? '' : 'none'; }
+async function vcamStart(){
+  const [w,h]=($('#vcamRes').value||'1280x720').split('x').map(Number);
+  $('#vcamMsg').textContent='starting…';
+  try{
+    const r = await api('/api/camera/start', {device:+$('#vcamDev').value||0, width:w, height:h, fps:30});
+    $('#vcamMsg').textContent = r.ok ? ('🟢 ' + (r.info||'running') + ' — pick the virtual camera in Discord') : ('⚠ ' + (r.error||'failed'));
+  }catch(e){ $('#vcamMsg').textContent='⚠ '+(e.message||e); }
+}
+async function vcamStop(){
+  try{ await api('/api/camera/stop', {}); $('#vcamMsg').textContent='stopped'; }
+  catch(e){ $('#vcamMsg').textContent='⚠ '+(e.message||e); }
+}
+function renderOverlayButtons(){
+  const box=$('#overlayBtns'); if(!box) return;
+  box.innerHTML = overlayButtons.filter(b=>(b.label||'').trim()&&(b.image||'').trim())
+    .map(b=>`<button onclick="overlayFire(${overlayButtons.indexOf(b)})">${esc(b.label)}</button>`).join('')
+    || '<span class="muted">no overlay actions yet — add some with 🔧</span>';
+}
+async function overlayFire(i){
+  const b=overlayButtons[i]; if(!b) return;
+  try{
+    const r = await api('/api/overlay/fire', {image:b.image, seconds:+b.seconds||5, pos:b.pos||'center', scale:+b.scale||0.5});
+    $('#vcamMsg').textContent = r.ok ? '' : ('⚠ ' + (r.error||'overlay failed'));
+  }catch(e){ $('#vcamMsg').textContent='⚠ '+(e.message||e); }
+}
+async function ovbUpload(i, input){
+  const f=input.files[0]; if(!f) return;
+  const fd=new FormData(); fd.append('file', f);
+  try{
+    const resp = await fetch('/api/upload', {method:'POST', body:fd});
+    if(!resp.ok){ toastMsg('⚠ upload failed'); return; }
+    const j = await resp.json();
+    overlayButtons[i].image = j.path || j.url || '';
+    renderOvbEditor(); renderOverlayButtons(); scheduleSave();
+  }catch(e){ toastMsg('⚠ '+(e.message||e)); }
+}
+function renderOvbEditor(){
+  const box=$('#ovbRows'); if(!box) return;
+  box.innerHTML = overlayButtons.map((b,i)=>
+    `<div class="row" style="gap:10px;align-items:flex-end;flex-wrap:nowrap;margin-bottom:6px">`+
+      `<label class="field">Label <input value="${esc(b.label||'')}" placeholder="💥 Boom" style="width:150px" onchange="overlayButtons[${i}].label=this.value;renderOverlayButtons();scheduleSave()"></label>`+
+      `<label class="field" style="flex:1">Image <div class="row" style="gap:6px;flex-wrap:nowrap">`+
+        `<input value="${esc(b.image||'')}" placeholder="upload or filename from data/images" style="flex:1" onchange="overlayButtons[${i}].image=this.value;renderOverlayButtons();scheduleSave()">`+
+        `<label class="ghost" style="padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid var(--line)">⇧<input type="file" accept="image/*" style="display:none" onchange="ovbUpload(${i}, this)"></label>`+
+      `</div></label>`+
+      `<label class="field">Secs <input type="number" min="0.5" step="0.5" value="${b.seconds??5}" style="width:70px" onchange="overlayButtons[${i}].seconds=+this.value;scheduleSave()"></label>`+
+      `<label class="field">Position <select style="width:130px" onchange="overlayButtons[${i}].pos=this.value;scheduleSave()">`+
+        ['center','top','bottom','left','right','top-left','top-right','bottom-left','bottom-right'].map(p=>`<option value="${p}" ${(b.pos||'center')===p?'selected':''}>${p}</option>`).join('')+`</select></label>`+
+      `<label class="field">Width <select style="width:90px" onchange="overlayButtons[${i}].scale=+this.value;scheduleSave()">`+
+        [[0.25,'25%'],[0.5,'50%'],[0.75,'75%'],[1,'100%']].map(([v,l])=>`<option value="${v}" ${(+b.scale||0.5)===v?'selected':''}>${l}</option>`).join('')+`</select></label>`+
+      `<button class="ghost" onclick="overlayButtons.splice(${i},1);renderOvbEditor();renderOverlayButtons();scheduleSave()">✕</button>`+
+    `</div>`).join('') || '<div class="muted">no overlay actions yet</div>';
+}
+setInterval(()=>chatPoll(false), 2000);
+document.addEventListener('click', e=>{
+  const b = e.target.closest && e.target.closest('[data-go="chat"]');
+  if(b){ chatChannels().then(()=>chatPoll(true)); }
+});
 async function controlCapacity(){ ctl('/api/control/capacity', {}); }
 async function controlLeaderboard(){ ctl('/api/control/leaderboard', {}); }
 async function controlLeaderboardLife(){ ctl('/api/control/leaderboard-life', {}); }
@@ -2595,11 +2860,15 @@ function broadcastNameOpts(sel){
     ((sel&&!names.includes(sel))?`<option value="${esc(sel)}" selected>${esc(sel)} (missing)</option>`:'');
 }
 // Custom-command dropdown for award / command actions (the command being granted/run).
-function cmdNameOpts(sel){
+// withOwner adds the #owner-command macros (valid for `command` rows only).
+function cmdNameOpts(sel, withOwner){
   const names = commandRows.map(c=>(c.name||'').trim()).filter(Boolean);
+  const oc = withOwner ? ownerCommands.map(o=>'#'+(o.name||'').trim()).filter(n=>n!=='#') : [];
+  const all = names.concat(oc);
   return `<option value="">— pick a command —</option>`+
     names.map(n=>`<option value="${esc(n)}" ${sel===n?'selected':''}>${esc(n)}</option>`).join('')+
-    ((sel&&!names.includes(sel))?`<option value="${esc(sel)}" selected>${esc(sel)} (missing)</option>`:'');
+    (oc.length?`<optgroup label="Owner commands">`+oc.map(n=>`<option value="${esc(n)}" ${sel===n?'selected':''}>${esc(n)}</option>`).join('')+`</optgroup>`:'')+
+    ((sel&&!all.includes(sel))?`<option value="${esc(sel)}" selected>${esc(sel)} (missing)</option>`:'');
 }
 // Timed + capacity event dropdown for command_gate block_event / unblock_event.
 // Unnamed capacity events use the engine's fallback key ("capacity-N").
@@ -2756,7 +3025,7 @@ function actionRow(base, rr, j, a, condLabels){
   if(typ==='broadcast')
     fields += `<label class="field">Broadcast <select onchange="${T('broadcast')}=this.value;scheduleSave()">${broadcastNameOpts(a.broadcast)}</select></label>`;
   if(typ==='command')
-    fields += `<label class="field">Command <select onchange="${T('command')}=this.value;scheduleSave()">${cmdNameOpts(a.command)}</select></label>`;
+    fields += `<label class="field">Command <select onchange="${T('command')}=this.value;scheduleSave()">${cmdNameOpts(a.command, true)}</select></label>`;
   if(typ==='award'){
     const at=(a.award_type||'command');
     fields += `<label class="field">Award <select onchange="${T('award_type')}=this.value;${rr}();scheduleSave()">`+
@@ -3681,6 +3950,10 @@ function applyState(st, full){
     { const t = st.templates || {}; templatesData = {commands:t.commands||[], events:t.events||[], ranges:t.ranges||[], polls:t.polls||[], competitions:t.competitions||[], capevents:t.capevents||[]}; }
     broadcastRows = JSON.parse(JSON.stringify(st.broadcasts||[]));
     prizeRows = JSON.parse(JSON.stringify(st.prizes||[]));
+    chatButtons = JSON.parse(JSON.stringify(st.chat_buttons||[]));
+    ownerCommands = JSON.parse(JSON.stringify(st.owner_commands||[]));
+    overlayButtons = JSON.parse(JSON.stringify(st.overlay_buttons||[]));
+    renderChatButtons(); renderOverlayButtons();
     renderCommands();
     renderAlwaysOn();
     renderEvents();
@@ -3795,6 +4068,13 @@ function gatherConfig(){
     output_headers: $('#outputHeaders') ? $('#outputHeaders').checked : false,
     rich_output: $('#richOutput') ? $('#richOutput').checked : false,
     prizes:cleanPrizes(),
+    chat_buttons: chatButtons.filter(b=>(b.label||'').trim()&&(b.name||'').trim())
+      .map(b=>({label:(b.label||'').trim(), kind:['poll','owner'].includes(b.kind)?b.kind:'command', name:(b.name||'').trim()})),
+    owner_commands: ownerCommands.filter(o=>(o.name||'').trim())
+      .map(o=>({name:(o.name||'').trim().replace(/^#+/,'').toLowerCase(), message:o.message||''})),
+    overlay_buttons: overlayButtons.filter(b=>(b.label||'').trim())
+      .map(b=>({label:(b.label||'').trim(), image:(b.image||'').trim(),
+                seconds:+b.seconds||5, pos:b.pos||'center', scale:+b.scale||0.5})),
     capacity_ranges:rangeRows, commands:cleanCommands(), modes:cleanModes(), events:cleanEvents(),
     capacity_events:cleanCapEvents(), polls:cleanPolls(), competitions:cleanCompetitions(),
     bonus_rounds:cleanBonusRounds(),

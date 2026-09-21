@@ -35,7 +35,8 @@ if not exist ".venv\Scripts\python.exe" (
   echo Creating virtual environment ^(.venv^) ...
   %PY% -m venv .venv
   ".venv\Scripts\python.exe" -m pip install --quiet --upgrade pip
-  ".venv\Scripts\python.exe" -m pip install --quiet -r requirements.txt || goto :pipfail
+  call :pip_sync
+  if errorlevel 1 goto :pipfail
   type nul > ".venv\.deps-ok"
 ) else (
   set "NEEDS_DEPS="
@@ -47,7 +48,8 @@ if not exist ".venv\Scripts\python.exe" (
   )
   if defined NEEDS_DEPS (
     echo Syncing dependencies ...
-    ".venv\Scripts\python.exe" -m pip install --quiet -r requirements.txt || goto :pipfail
+    call :pip_sync
+    if errorlevel 1 goto :pipfail
     type nul > ".venv\.deps-ok"
   )
 )
@@ -63,8 +65,36 @@ echo DiscoFlate has stopped.
 pause
 exit /b 0
 
+:pip_sync
+REM pip hygiene + install:
+REM  * delete '~xyz' corpse folders that interrupted installs leave in
+REM    site-packages (they cause "Ignoring invalid distribution" warnings)
+REM  * install requirements; if that fails, purge pip's download cache and
+REM    retry once (a corrupted cache is the usual silent culprit)
+REM  * if the log shows cache-corruption warnings even on success, purge the
+REM    cache so future runs are quiet
+for /d %%D in (".venv\Lib\site-packages\~*") do rd /s /q "%%D" 2>nul
+set "PIPLOG=%TEMP%\discoflate-pip.log"
+".venv\Scripts\python.exe" -m pip install --quiet -r requirements.txt > "%PIPLOG%" 2>&1
+if errorlevel 1 (
+  echo    pip hit trouble — cleaning its cache and retrying once ...
+  ".venv\Scripts\python.exe" -m pip cache purge >nul 2>&1
+  ".venv\Scripts\python.exe" -m pip install --quiet -r requirements.txt > "%PIPLOG%" 2>&1
+  if errorlevel 1 (
+    type "%PIPLOG%"
+    exit /b 1
+  )
+)
+findstr /c:"Cache entry deserialization failed" "%PIPLOG%" >nul 2>nul
+if not errorlevel 1 (
+  echo    cleaning a corrupted pip cache ...
+  ".venv\Scripts\python.exe" -m pip cache purge >nul 2>&1
+)
+exit /b 0
+
 :pipfail
 echo.
-echo !! pip install failed — check your internet connection and try again.
+echo !! pip install failed — the log above shows why. Common fixes: check your
+echo !! internet connection, then delete the .venv folder and run this again.
 pause
 exit /b 1

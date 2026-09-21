@@ -1301,7 +1301,18 @@ class Engine:
                 if typ == "command":
                     # run another custom command by name (credited to the block's
                     # runner). Depth-guarded so a command that runs itself can't loop.
+                    # "#name" runs an OWNER COMMAND instead: its message posts
+                    # attributed to the owner rather than as the bot.
                     cmdname = (a.get("command") or "").strip()
+                    if cmdname.startswith("#"):
+                        oc = self.find_owner_command(cmdname)
+                        if oc is None:
+                            self._log("error", f"{name}: no owner command '{cmdname}'")
+                        else:
+                            line = self.owner_command_text(oc, extra=dict(xc))
+                            if line:
+                                await self._announce(line, None)
+                        continue
                     cmd2 = self.find_command(cmdname) if cmdname else None
                     if cmd2 is None:
                         self._log("error", f"{name}: command action — no command '{cmdname}'")
@@ -1690,6 +1701,24 @@ class Engine:
                 self._log("error", f"end session failed: {e}")
 
     # -- polls ---------------------------------------------------------------- #
+    def find_owner_command(self, name) -> dict | None:
+        """#name → the Owner Command (owner-attributed message macro)."""
+        key = str(name or "").strip().lstrip("#").lower()
+        if not key:
+            return None
+        for oc in self.cfg.get("owner_commands", []):
+            if (oc.get("name") or "").strip().lower() == key:
+                return oc
+        return None
+
+    def owner_command_text(self, oc: dict, who: str = "", mention: str = "",
+                           extra: dict | None = None) -> str:
+        """Render an Owner Command as the owner speaking: '**Owner:** …'."""
+        op = (who or "").strip() or (self.cfg.get("operator_name") or "").strip() or "Owner"
+        body = self.render((oc.get("message") or "").strip(),
+                           {"user": op, "mention": mention or op, **(extra or {})})
+        return f"**{op}:** {body}" if body else ""
+
     def find_poll(self, name) -> dict | None:
         key = str(name or "").strip().lower()
         if not key:

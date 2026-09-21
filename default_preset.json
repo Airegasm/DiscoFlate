@@ -2515,5 +2515,8 @@
         "event_actions": []
       }
     ]
-  }
+  },
+  "owner_commands": [],
+  "chat_buttons": [],
+  "overlay_buttons": []
 }

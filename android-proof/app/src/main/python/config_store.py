@@ -229,6 +229,19 @@ DEFAULTS = {
     "always_on_enabled": False,
     "always_on_commands": [],
 
+    # Owner Commands (#name): message macros ONLY THE OWNER fires — posted
+    # ATTRIBUTED TO THE OWNER ("**Owner:** …") instead of as the bot. Usable
+    # from the Chat tab box, typed in Discord by the owner, from Custom
+    # Buttons, and from any action block's `command` row as "#name".
+    # Each: {name, message}
+    "owner_commands": [],
+    # Chat-tab Custom Buttons: one-click owner launchers.
+    # Each: {label, kind ("command"|"poll"|"owner"), name}
+    "chat_buttons": [],
+    # Overlay actions (Chat tab, VIDEO channels): buttons that play a timed
+    # image layer over the virtual camera. Each: {label, image, seconds, pos, scale}
+    "overlay_buttons": [],
+
     # Modes group several commands under one switch. Toggling a mode enables/
     # disables its member commands and optionally posts a message.
     # Each: {name, commands: [names], enabled, message_on, message_off}

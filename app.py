@@ -24,6 +24,7 @@ import uuid
 import aiohttp
 from aiohttp import web
 
+import camera
 import config_store
 import pumpdirect_import
 import kasa_legacy as kasa
@@ -79,6 +80,9 @@ _DEFAULT_SCALAR_KEYS = ["roll", "capacity_message", "pumptimer_message",
 _DEFAULT_LIST_KEYS = {
     "commands": lambda c: (c.get("name") or "").strip().lower(),
     "prizes": lambda p: ((p.get("name") if isinstance(p, dict) else "") or "").strip().lower(),
+    "owner_commands": lambda o: (o.get("name") or "").strip().lower(),
+    "chat_buttons": lambda bt: (bt.get("label") or "").strip().lower(),
+    "overlay_buttons": lambda bt: (bt.get("label") or "").strip().lower(),
     "modes": lambda m: (m.get("name") or "").strip().lower(),
     "events": lambda e: (e.get("name") or "").strip().lower(),
     "capacity_events": lambda e: ((e.get("name") or "").strip() or str(e.get("at") or "")).lower(),
@@ -102,7 +106,7 @@ _GAMEPLAY_KEYS = [
     "cooldown_message",
     "capacity_embed", "capacity_title", "pumptimer_embed", "pumptimer_title",
     "cooldown_embed", "cooldown_title", "pump_embed", "pump_title",
-    "commands", "broadcasts", "modes", "prizes",
+    "commands", "broadcasts", "modes", "prizes", "owner_commands", "chat_buttons", "overlay_buttons",
     # Game tab
     "cooldown_seconds", "auto_report",
     "listener_message_on", "listener_message_off",
@@ -123,6 +127,9 @@ _GAMEPLAY_LIST_KEYS = {
     "broadcasts": lambda b: (b.get("name") or "").strip().lower(),
     "modes": lambda m: (m.get("name") or "").strip().lower(),
     "prizes": lambda p: ((p.get("name") if isinstance(p, dict) else "") or "").strip().lower(),
+    "owner_commands": lambda o: (o.get("name") or "").strip().lower(),
+    "chat_buttons": lambda bt: (bt.get("label") or "").strip().lower(),
+    "overlay_buttons": lambda bt: (bt.get("label") or "").strip().lower(),
     "events": lambda e: (e.get("name") or "").strip().lower(),
     "capacity_events": lambda e: ((e.get("name") or "").strip() or str(e.get("at") or "")).lower(),
     "polls": lambda p: (p.get("name") or "").strip().lower(),
@@ -250,6 +257,9 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "cooldown_message": cfg.get("cooldown_message", ""),
         "roll": cfg.get("roll", {}),
         "prizes": cfg.get("prizes", []),
+        "owner_commands": cfg.get("owner_commands", []),
+        "chat_buttons": cfg.get("chat_buttons", []),
+        "overlay_buttons": cfg.get("overlay_buttons", []),
         "capacity_ranges": cfg.get("capacity_ranges", []),
         "commands": cfg.get("commands", []),
         "always_on_enabled": cfg.get("always_on_enabled", False),
@@ -463,6 +473,7 @@ def _web_secret() -> str:
 def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> web.Application:
     secret = _web_secret()
     net = net if net is not None else {}
+    vcam = camera.VirtualCam(IMAGES_DIR)   # the Chat tab's OBS-style overlay pipe
 
     @web.middleware
     async def security_mw(request, handler):
@@ -513,6 +524,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     # Minimum shape per key — a patch with the wrong container type is refused
     # (a malformed import/tab can't put a string where the engine expects a list).
     _TYPE_FLOOR = {"commands": list, "events": list, "modes": list, "prizes": list,
+                   "owner_commands": list, "chat_buttons": list, "overlay_buttons": list,
                    "capacity_events": list, "polls": list, "competitions": list,
                    "capacity_ranges": list, "listen_targets": list, "broadcasts": list,
                    "always_on_commands": list, "cooldown_exempt_user_ids": list,
@@ -539,7 +551,8 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                     "cooldown_embed", "cooldown_title", "pump_embed", "pump_title",
                     "pause_embed", "pause_title",
                     "system_buffer_seconds", "cooldown_message", "pumptimer_message", "pump_message",
-                    "roll", "prizes", "capacity_ranges", "commands", "modes", "events",
+                    "roll", "prizes", "owner_commands", "chat_buttons", "overlay_buttons",
+                    "capacity_ranges", "commands", "modes", "events",
                     "capacity_events", "polls", "competitions",
                     "allow", "pumpdirect_path", "cooldown_seconds",
                     "cooldown_exempt_user_ids", "cooldown_exempt_names", "operator_name", "auto_report",
@@ -1113,6 +1126,54 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         engine.session_reset()
         return web.json_response({"ok": True, "capacity": engine.capacity})
 
+    # ---- Chat tab (owner cockpit) -----------------------------------------
+    async def chat_channels(request):
+        await guard(request)
+        return web.json_response({"channels": botmgr.chat_channels()})
+
+    async def chat_log(request):
+        await guard(request)
+        b = await _json(request)
+        return web.json_response(await botmgr.chat_log(b.get("channel_id"),
+                                                       str(b.get("after") or "")))
+
+    async def chat_send(request):
+        await guard(request)
+        b = await _json(request)
+        return web.json_response(await botmgr.owner_chat(b.get("channel_id"), b.get("text")))
+
+    # ---- virtual camera + overlays (Chat tab, video channels) -------------
+    async def camera_status(request):
+        await guard(request)
+        return web.json_response(vcam.status())
+
+    async def camera_start(request):
+        await guard(request)
+        b = await _json(request)
+        res = vcam.start(b.get("device") or 0, b.get("width") or 1280,
+                         b.get("height") or 720, b.get("fps") or 30)
+        if not res.get("ok"):
+            return web.json_response(res)
+        await asyncio.sleep(0.8)   # let the pipeline surface open errors
+        st = vcam.status()
+        return web.json_response({"ok": st["running"], **st})
+
+    async def camera_stop(request):
+        await guard(request)
+        await asyncio.get_event_loop().run_in_executor(None, vcam.stop)
+        return web.json_response(vcam.status())
+
+    async def overlay_fire(request):
+        await guard(request)
+        b = await _json(request)
+        return web.json_response(vcam.fire_overlay(b.get("image"), b.get("seconds"),
+                                                   b.get("pos") or "center",
+                                                   b.get("scale")))
+
+    async def overlay_clear(request):
+        await guard(request)
+        return web.json_response(vcam.clear_overlays())
+
     async def upload(request):
         await guard(request)
         os.makedirs(IMAGES_DIR, exist_ok=True)
@@ -1265,6 +1326,14 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/gameplay/export", export_gameplay),
         web.post("/api/gameplay/import", import_gameplay),
         web.post("/api/gameplay/preset", gameplay_preset),
+        web.post("/api/chat/channels", chat_channels),
+        web.post("/api/chat/log", chat_log),
+        web.post("/api/chat/send", chat_send),
+        web.post("/api/camera/status", camera_status),
+        web.post("/api/camera/start", camera_start),
+        web.post("/api/camera/stop", camera_stop),
+        web.post("/api/overlay/fire", overlay_fire),
+        web.post("/api/overlay/clear", overlay_clear),
         web.post("/api/check-updates", check_updates),
         web.post("/api/pull-updates", pull_updates),
     ])
