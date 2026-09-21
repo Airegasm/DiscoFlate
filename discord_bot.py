@@ -484,16 +484,21 @@ class BotManager:
 
     def _targets(self, cfg: dict) -> list[dict]:
         """Every channel the bot listens/broadcasts in. Uses listen_targets if
-        set, else falls back to the single legacy listen_guild/channel."""
+        set, else falls back to the single legacy listen_guild/channel. With
+        the Chat tab's ISOLATE on, broadcasts narrow to just its active channel
+        (commands typed elsewhere still get their direct replies there)."""
         targets = [t for t in (cfg.get("listen_targets") or [])
                    if str(t.get("guild_id") or "").strip() and str(t.get("channel_id") or "").strip()]
-        if targets:
-            return targets
-        gid = str(cfg.get("listen_guild_id") or "").strip()
-        cid = str(cfg.get("listen_channel_id") or "").strip()
-        if gid and cid:
-            return [{"guild_id": gid, "channel_id": cid}]
-        return []
+        if not targets:
+            gid = str(cfg.get("listen_guild_id") or "").strip()
+            cid = str(cfg.get("listen_channel_id") or "").strip()
+            targets = [{"guild_id": gid, "channel_id": cid}] if gid and cid else []
+        iso = str(cfg.get("chat_isolate_channel") or "").strip()
+        if cfg.get("chat_isolate") and iso:
+            hit = [t for t in targets if str(t.get("channel_id")) == iso]
+            if hit:   # unknown isolate channel → fail open to all targets
+                return hit
+        return targets
 
     def _allowed(self, cfg: dict, message: discord.Message) -> bool:
         uids = (cfg.get("allow", {}) or {}).get("user_ids") or []

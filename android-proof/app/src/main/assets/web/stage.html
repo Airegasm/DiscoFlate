@@ -8,10 +8,21 @@
   html,body{margin:0;height:100%;background:#000;overflow:hidden;
             font-family:system-ui,-apple-system,sans-serif;
             -webkit-user-select:none;user-select:none}
-  #cam{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+  body{display:flex;align-items:center;justify-content:center}
+  #frame{position:relative;width:100vw;height:100vh;overflow:hidden;background:#000}
+  #cam{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
   #cam.mir{transform:scaleX(-1)}
-  #layers{position:fixed;inset:0;pointer-events:none;z-index:10}
+  #layers{position:absolute;inset:0;pointer-events:none;z-index:10}
   .ov{position:absolute;pointer-events:none}
+  .wgauge{position:absolute;pointer-events:none;height:4.5%;min-height:16px;
+          background:rgba(20,20,20,.75);border:2px solid #eee;border-radius:999px;overflow:hidden}
+  .wgauge>i{display:block;height:100%;background:linear-gradient(90deg,#2ecc71,#e74c3c);width:0}
+  .wgauge>b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+            color:#fff;font-size:min(3.2vh,16px);font-style:normal;text-shadow:0 1px 3px #000}
+  .wtimer{position:absolute;pointer-events:none;padding:.5em .9em;border-radius:12px;
+          background:rgba(20,20,20,.8);border:2px solid #666;color:#fff;font-weight:800;
+          font-size:min(3.6vh,20px);text-shadow:0 1px 3px #000;white-space:nowrap}
+  .wtimer.on{border-color:#2ecc71}
   #brb{position:fixed;inset:0;background:#0a0d12;display:none;align-items:center;
        justify-content:center;color:#9fd6a5;font-size:10vw;font-weight:800;
        letter-spacing:.12em;z-index:40}
@@ -32,8 +43,10 @@
 </style>
 </head>
 <body>
-<video id="cam" autoplay muted playsinline></video>
-<div id="layers"></div>
+<div id="frame">
+  <video id="cam" autoplay muted playsinline></video>
+  <div id="layers"></div>
+</div>
 <div id="brb">⏸ BRB</div>
 <div id="msg"></div>
 <div id="lockhint">🔒 locked — hold anywhere for 1.5s to unlock</div>
@@ -111,12 +124,68 @@ document.addEventListener('pointerdown', e=>{
   showBar();
 });
 
+// ---- linked Stage design (?stage=Name): frame aspect, always-on items ----
+const STAGE_NAME = new URLSearchParams(location.search).get('stage') || '';
+let designWidgets = [];
+async function loadDesign(){
+  if(!STAGE_NAME) return;
+  try{
+    const r = await fetch('/api/stage-design', {method:'POST', headers:HDRS,
+      body: JSON.stringify({name: STAGE_NAME})});
+    const j = await r.json();
+    if(!j.ok || !j.stage) return;
+    const W = +j.stage.width || 1280, H = +j.stage.height || 720;
+    const fr = $('#frame');
+    fr.style.width  = `min(100vw, calc(100vh * ${W/H}))`;
+    fr.style.height = `min(100vh, calc(100vw * ${H/W}))`;
+    (j.stage.overlays||[]).forEach(o=>{
+      if(!o.visible) return;   // callable items arrive via the registry poll
+      if(o.kind==='capacity_gauge' || o.kind==='pump_timer'){
+        const el = document.createElement('div');
+        el.className = o.kind==='capacity_gauge' ? 'wgauge' : 'wtimer';
+        el.innerHTML = o.kind==='capacity_gauge' ? '<i></i><b>0%</b>' : 'PUMP idle';
+        el.style.left = ((o.x??0.05)*100)+'%'; el.style.top = ((o.y??0.05)*100)+'%';
+        el.style.width = o.kind==='capacity_gauge' ? (Math.max(8,(o.w||0.35)*100))+'%' : 'auto';
+        $('#layers').appendChild(el);
+        designWidgets.push({kind:o.kind, el});
+      } else if(o.media){
+        const el = mediaEl({kind: /\.(mp4|webm|mov|mkv|avi|m4v)$/i.test(o.media)?'video':'image',
+                            media:o.media, mode:'hold'}, null);
+        place(el, {x:o.x, y:o.y, scale:o.w||0.3, pos:'center'});
+        $('#layers').appendChild(el);
+      }
+    });
+    if(designWidgets.length){ widgetTick(); setInterval(widgetTick, 1500); }
+  }catch(e){ /* design unavailable — plain camera stage */ }
+}
+async function widgetTick(){
+  try{
+    const st = await (await fetch('/api/state', {headers:HDRS})).json();
+    designWidgets.forEach(w=>{
+      if(w.kind==='capacity_gauge'){
+        const pct = Math.max(0, +st.capacity||0);
+        w.el.querySelector('i').style.width = Math.min(100, pct)+'%';
+        w.el.querySelector('b').textContent = pct.toFixed(0)+'%';
+      } else {
+        const on = !!st.firing, rem = +st.remaining||0;
+        w.el.textContent = on ? ('PUMP '+rem.toFixed(0)+'s') : 'PUMP idle';
+        w.el.classList.toggle('on', on);
+      }
+    });
+  }catch(e){}
+}
+
 // ---- overlay layers: poll the registry, reconcile the DOM ---------------
 const live = {};   // overlay id -> element
 function place(el, o){
-  const p = o.pos || 'center', M = '3vw';
-  el.style.width = Math.max(5, Math.min(100, (o.scale||0.5)*100)) + 'vw';
   el.style.left = el.style.right = el.style.top = el.style.bottom = 'auto';
+  el.style.width = Math.max(5, Math.min(100, (o.scale||0.5)*100)) + '%';
+  if(o.x != null && o.y != null){   // stage-designed spot: exact fractions
+    el.style.left = (o.x*100)+'%'; el.style.top = (o.y*100)+'%';
+    el.style.transform = 'none';
+    return;
+  }
+  const p = o.pos || 'center', M = '3%';
   if(p.includes('left')) el.style.left = M;
   else if(p.includes('right')) el.style.right = M;
   else el.style.left = '50%';
@@ -127,6 +196,23 @@ function place(el, o){
   const ty = (p.includes('top')||p.includes('bottom')) ? '0' : '-50%';
   el.style.transform = `translate(${tx},${ty})`;
 }
+function mediaEl(o, onEnded){
+  const url = '/images/' + encodeURIComponent(o.media);
+  let el;
+  if(o.kind === 'video'){
+    el = document.createElement('video');
+    el.autoplay = true; el.muted = true; el.playsInline = true;
+    el.setAttribute('playsinline','');
+    el.loop = o.mode !== 'once';
+    if(o.mode === 'once' && onEnded) el.addEventListener('ended', onEnded);
+    el.src = url;
+  } else {
+    el = document.createElement('img');
+    el.src = url;
+  }
+  el.className = 'ov';
+  return el;
+}
 async function pollOverlays(){
   try{
     const r = await fetch('/api/stage/active', {method:'POST', headers:HDRS, body:'{}'});
@@ -136,24 +222,11 @@ async function pollOverlays(){
     (j.overlays||[]).forEach(o=>{
       want[o.id] = 1;
       if(live[o.id]) return;
-      const url = '/api/stage/media/' + encodeURIComponent(o.media);
-      let el;
-      if(o.kind === 'video'){
-        el = document.createElement('video');
-        el.autoplay = true; el.muted = true; el.playsInline = true;
-        el.setAttribute('playsinline','');
-        el.loop = o.mode !== 'once';
-        if(o.mode === 'once') el.addEventListener('ended', ()=>{
-          el.remove(); delete live[o.id];
-          fetch('/api/stage/done', {method:'POST', headers:HDRS,
-            body:JSON.stringify({id:o.id})}).catch(()=>{});
-        });
-        el.src = url;
-      } else {
-        el = document.createElement('img');
-        el.src = url;
-      }
-      el.className = 'ov';
+      const el = mediaEl(o, ()=>{
+        el.remove(); delete live[o.id];
+        fetch('/api/stage/done', {method:'POST', headers:HDRS,
+          body:JSON.stringify({id:o.id})}).catch(()=>{});
+      });
       place(el, o);
       $('#layers').appendChild(el);   // fire order = z-order (later on top)
       live[o.id] = el;
@@ -165,6 +238,7 @@ async function pollOverlays(){
 }
 
 startCam();
+loadDesign();
 pollOverlays();
 setInterval(pollOverlays, 500);
 showBar();

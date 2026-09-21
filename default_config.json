@@ -2583,5 +2583,10 @@
   "pumpdirect_path": "/home/saintorphan/Projects/PumpDirect/data/devices.json",
   "owner_commands": [],
   "chat_buttons": [],
-  "overlay_buttons": []
+  "overlay_buttons": [],
+  "stages": [],
+  "stage_globals": [],
+  "chat_stage": "",
+  "chat_isolate": false,
+  "chat_isolate_channel": ""
 }

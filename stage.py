@@ -33,7 +33,8 @@ class Stage:
         return (time.time() - self._last_poll) <= within
 
     def fire(self, media, seconds=5.0, pos: str = "center", scale=0.5,
-             mode: str = "timed", layer: str | None = None) -> dict:
+             mode: str = "timed", layer: str | None = None,
+             x=None, y=None) -> dict:
         """Register an overlay; semantics mirror VirtualCam.fire_overlay."""
         mode = str(mode or "timed").lower()
         key = (str(layer or "").strip().lower()) or None
@@ -56,7 +57,7 @@ class Stage:
             mode = "timed"
         ent = {"id": next(self._ids), "media": name, "kind": kind, "mode": mode,
                "seconds": secs, "pos": str(pos or "center").lower(),
-               "scale": sc, "layer": key,
+               "scale": sc, "layer": key, "x": x, "y": y,
                "until": (time.time() + secs) if mode == "timed" else None}
         with self._lock:
             if key:   # named slot: replace the previous holder

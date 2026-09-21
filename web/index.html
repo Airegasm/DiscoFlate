@@ -77,6 +77,22 @@
   /* overlay-editor rows: one line on desktop, wrapping stack on phones */
   .ovedit{gap:10px;align-items:flex-end;flex-wrap:nowrap;margin-bottom:6px}
   .ovedit .grow{flex:1}
+  /* Stages tab: the design canvas + draggable overlay items */
+  #stgCanvas{position:relative;background:#05070b;border:1px solid var(--line);
+             border-radius:8px;overflow:hidden;touch-action:none;width:100%;max-width:900px}
+  .stgItem{position:absolute;cursor:grab;outline:1px dashed rgba(255,255,255,.28);border-radius:4px}
+  .stgItem img,.stgItem video{width:100%;display:block;pointer-events:none;border-radius:4px}
+  .stgItem.sel{outline:2px solid var(--accent);z-index:5}
+  .stgItem .wmock{pointer-events:none}
+  .stgGrip{position:absolute;right:-8px;bottom:-8px;width:16px;height:16px;
+           background:var(--accent);border-radius:4px;cursor:nwse-resize;z-index:6}
+  .mediaTile{width:120px;cursor:pointer;border:1px solid var(--line);border-radius:8px;
+             overflow:hidden;background:var(--panel2);position:relative}
+  .mediaTile img{width:100%;height:80px;object-fit:cover;display:block}
+  .mediaTile .vid{width:100%;height:80px;display:flex;align-items:center;justify-content:center;font-size:28px}
+  .mediaTile .nm{font-size:10px;color:var(--dim);padding:3px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mediaTile .del{position:absolute;top:2px;right:2px;background:rgba(10,10,14,.75);
+                  border:1px solid var(--line);border-radius:6px;padding:1px 6px;cursor:pointer}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--off)}
   .dot.on{background:var(--on);box-shadow:0 0 8px var(--on)}
   .dot.bad{background:var(--bad)}
@@ -190,6 +206,7 @@
   <nav class="tabs" id="tabbar">
     <button class="tab-btn" data-go="dashboard">Dashboard</button>
     <button class="tab-btn" data-go="chat">Chat</button>
+    <button class="tab-btn" data-go="stages">Stages</button>
     <button class="tab-btn" data-go="discord">Discord</button>
     <button class="tab-btn" data-go="devices">Devices</button>
     <button class="tab-btn" data-go="snapshot">Camera</button>
@@ -265,6 +282,7 @@
       <h2>💬 Chat</h2>
       <div class="row" style="gap:10px;align-items:flex-end">
         <label class="field">Channel <select id="chatChan" style="width:280px" onchange="chatSwitch()"></select></label>
+        <label class="row" style="gap:6px" title="while checked, ALL broadcasts (events, announcements, timers) go ONLY to this channel — other live channels still get their direct command replies"><input type="checkbox" id="chatIso" style="width:auto" onchange="chatIsoChanged()"> <b>Isolate</b></label>
         <div style="flex:1"></div>
         <button onclick="controlRoll()">🎲 Roll</button>
         <button onclick="controlPump()">💨 Pump</button>
@@ -274,15 +292,18 @@
       <div id="overlaySec" style="display:none;border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
         <div class="row" id="vcamCtrls" style="gap:12px;align-items:flex-end">
           <b style="white-space:nowrap">🎥 Video channel</b>
+          <label class="field">Stage <select id="chatStageSel" style="width:160px" onchange="chatStageChanged()"></select></label>
           <label class="field">Camera <select id="vcamDev" style="width:150px" onchange="vcamDevPick()"><option value="0">0</option></select></label>
           <label class="field">Size <select id="vcamRes" style="width:130px">
             <option>1280x720</option><option>1920x1080</option><option>640x480</option>
             <option>720x1280</option><option>1080x1920</option></select></label>
           <button class="ghost" onclick="vcamDetect()">🔍 Detect</button>
+          <button class="ghost" onclick="vcamDriver()" title="check the virtual-camera driver; offers a one-click install when it's missing">🩺 Driver</button>
           <button onclick="vcamStart()">▶ Start virtual cam</button>
           <button class="ghost" onclick="vcamStop()">⏹ Stop</button>
           <span class="muted" id="vcamMsg" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
         </div>
+        <div class="hint" id="vcamDrvHint" style="display:none"></div>
         <!-- phone: video runs on the PC — this links straight into its panel -->
         <div id="vcRemote" style="display:none">
           <div class="row" style="gap:8px;align-items:flex-end">
@@ -295,10 +316,11 @@
         <!-- desktop: the composited virtual-cam output, above the chat (what viewers see) -->
         <img id="vcamPrev" alt="" style="display:none;width:100%;max-width:480px;border-radius:12px;margin-top:8px;border:1px solid var(--line)">
         <video id="vcamSelf" autoplay muted playsinline style="display:none;width:100%;max-width:480px;border-radius:12px;margin-top:8px;border:1px solid var(--line)"></video>
-        <div class="hint">Start it, then pick the <b>virtual camera</b> as your webcam in Discord's voice &amp; video settings — overlays play on top of your live feed, OBS-style; the preview above shows exactly what viewers see. <b>🔍 Detect</b> lists the sizes each attached camera really supports (portrait included). Windows needs OBS installed once (its virtual-cam driver); Linux needs <code>v4l2loopback</code>. The virtual cam is <b>desktop-only</b>: Android apps can't register a camera device for Discord mobile — on the phone this section becomes <b>🖥 VC Remote</b> instead (or use the 🎭 Stage + screen share for phone-only sessions).</div>
+        <div class="hint">Start it, then pick the <b>virtual camera</b> as your webcam in Discord's voice &amp; video settings — overlays play on top of your live feed, OBS-style; the preview above shows exactly what viewers see. <b>🔍 Detect</b> lists the sizes each attached camera really supports (portrait included). The system driver (OBS's on Windows / <code>v4l2loopback</code> on Linux) is a one-time setup — <b>🩺 Driver</b> checks for it and installs it for you. The virtual cam is <b>desktop-only</b>: Android apps can't register a camera device for Discord mobile — on the phone this section becomes <b>🖥 VC Remote</b> instead (or use the 🎭 Stage + screen share for phone-only sessions).</div>
+        <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap" id="stageBtns"></div>
         <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap" id="overlayBtns"></div>
         <div class="row" style="gap:8px;margin-top:6px">
-          <button onclick="location.href='/stage'">🎭 Stage</button>
+          <button onclick="openStagePage()">🎭 Stage</button>
           <button class="ghost" onclick="openOverlay('ovbOverlay')">🔧 Overlay actions</button>
           <button class="ghost" onclick="api('/api/overlay/clear',{})">🧹 Clear overlays</button>
         </div>
@@ -315,6 +337,55 @@
         <button class="ghost" onclick="openOverlay('ocOverlay')">🔧 Custom Owner Commands</button>
       </div>
       <div class="hint">A live mirror of the selected watched channel — everything the bot sees there, its own posts included. Plain text posts <b>AS YOU</b> — your Owner name + Discord avatar via a webhook (the bot needs <b>Manage Webhooks</b> there; without it, it falls back to a <b>Owner:</b>-prefixed bot post). A <code>!command</code> executes <b>as the Owner</b> (cooldown-exempt, owner-only allowed); <code>#name</code> speaks an Owner Command. Control buttons share the Dashboard's dice/seconds settings.</div>
+    </div>
+
+    <!-- stages: OBS-style overlay designer -->
+    <div class="card span" data-tab="stages">
+      <h2>🎭 Stages</h2>
+      <div class="hint">Design overlay <b>scenes</b> for video calls, OBS-style: pick a resolution, drag overlays onto the canvas, mark each one <b>always-on</b> or <b>callable</b>. Link a Gameplay Preset so the whole bundle travels together. The Chat tab's 🎥 section links a chat to a stage — its callable overlays become one-tap buttons there, and ▶ Start virtual cam (or the phone's 🎭 Stage view) puts the always-on items live. Everything autosaves.</div>
+      <div class="row" style="gap:8px;align-items:flex-end;margin-top:8px">
+        <label class="field">Stage <select id="stgSel" style="width:200px" onchange="stgPick(+this.value)"></select></label>
+        <button class="ghost" onclick="stgAdd()">➕ New</button>
+        <button class="ghost" onclick="stgRename()">✏️ Rename</button>
+        <button class="ghost" onclick="stgDelete()">🗑 Delete</button>
+        <button class="ghost" onclick="mediaBrowse(null)">🗂 Media browser</button>
+        <div style="flex:1"></div>
+        <button class="ghost" onclick="stgExport()">⬇ Export Stage</button>
+        <label class="ghost" style="padding:8px 12px;border:1px solid var(--line);border-radius:8px;cursor:pointer">⬆ Import Stage<input type="file" accept=".zip,.dfstage.zip" style="display:none" onchange="stgImport(this)"></label>
+      </div>
+      <div id="stgEditor" style="display:none;margin-top:10px">
+        <div class="row" style="gap:12px;align-items:flex-end">
+          <label class="field">Linked Gameplay Preset <select id="stgPreset" style="width:220px" onchange="stgProp('preset', this.value)"></select></label>
+          <label class="field">Resolution <select id="stgRes" style="width:130px" onchange="stgResPick()">
+            <option>1280x720</option><option>1920x1080</option><option>640x480</option>
+            <option>720x1280</option><option>1080x1920</option></select></label>
+          <button class="ghost" onclick="mediaBrowse(n=>stgAddMedia(n))">➕ Media overlay</button>
+          <button class="ghost" onclick="stgAddWidget('capacity_gauge')">➕ Capacity Gauge</button>
+          <button class="ghost" onclick="stgAddWidget('pump_timer')">➕ Pump Timer</button>
+        </div>
+        <div class="hint" style="margin:8px 0 0">Drag to place · drag the <b>◢ corner</b> to resize · click an overlay to edit it below.</div>
+        <div id="stgCanvas" style="margin-top:8px"></div>
+        <div id="stgProps" style="margin-top:8px"></div>
+      </div>
+      <details class="help" style="margin-top:14px"><summary><b>🌐 Global overlays</b> <span class="muted">(callable from every stage)</span></summary>
+        <div id="stgGlobalRows" style="margin-top:8px"></div>
+        <button class="ghost" style="margin-top:6px" onclick="mediaBrowse(n=>{stageGlobals.push(stgNewItem('media',n,false));renderStgGlobals();stageButtonsRefresh();scheduleSave()})">➕ Add global overlay</button>
+      </details>
+    </div>
+
+    <!-- overlay media browser (Stages tab + pickers) -->
+    <div class="overlay" id="mediaOverlay">
+      <div class="page">
+        <div class="row" style="gap:10px;flex-wrap:nowrap">
+          <h2 style="margin:0">🗂 Overlay Media</h2>
+          <label class="ghost" style="padding:8px 12px;border:1px solid var(--line);border-radius:8px;cursor:pointer">⬆ Upload<input type="file" accept="image/*,video/*" style="display:none" onchange="mediaUpload(this)"></label>
+          <span class="muted" id="mediaMsg"></span>
+          <div style="flex:1"></div>
+          <button class="ghost" onclick="closeOverlay('mediaOverlay')">✕</button>
+        </div>
+        <div class="hint" style="margin-top:6px">The universal overlay library — every file lives in <code>data/images</code>, so 🔁 Device Sync and ⬇ Export Stage bundle them automatically. Images up to 8MB, videos up to 96MB. Click a tile to pick it (when you got here from a picker).</div>
+        <div id="mediaGrid" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px"></div>
+      </div>
     </div>
 
     <!-- overlay editors (Chat tab) -->
@@ -979,6 +1050,9 @@
         <li><b>The virtual camera is desktop-only.</b> Android has no way for an app to register a fake camera — that needs a system driver (root) — and Discord mobile only ever lists the real front/back cameras. On desktop, run DiscoFlate on the PC you join the call from and pick the virtual cam in Discord desktop's video settings.</li>
         <li><b>🎭 The Stage — overlays from the phone.</b> The Stage (button in the 🎥 section, or <code>/stage</code>) is a fullscreen camera view with the overlay layers composited on top — every <b>overlay action</b> (events, commands, Overlay-action buttons) plays there too, same modes and layers as the virtual cam. Share it into a Discord call with <b>screen share → Share one app → DiscoFlate</b>: viewers see only the Stage (Android 14+ app-share never captures notifications or other apps). Controls on the Stage: 🔄 front/back camera · 🪞 mirror · 🔒 touch-lock (hold 1.5s to unlock) · the buttons auto-hide off-stream; the screen stays awake, and if you switch away mid-call viewers see a frozen frame/⏸ BRB until you're back.</li>
         <li><b>Stage + Chat side by side:</b> a screen share can't be cropped (the OS captures the whole app), so to keep your buttons: put the phone in <b>split screen</b> — DiscoFlate (on the Stage) in one half, <b>Chrome at</b> <code>http://127.0.0.1:8765</code> (this same panel!) with the Chat tab in the other. App-share captures only the DiscoFlate half, both halves stay live (split screen never pauses the camera), and you press Custom Buttons in Chrome. Any other device on your Wi-Fi works too.</li>
+        <li><b>Isolate</b> (next to the channel picker) — while ticked, <b>every broadcast</b> (events, announcements, auto-reports, timers) goes <b>only to the channel selected here</b>, even when other servers/channels are live. Commands typed in those other channels still get their direct replies there, so nobody is left hanging. Switching channels while Isolate is on re-aims it at the new one.</li>
+        <li><b>🎭 Stages tab</b> — design overlay scenes OBS-style: create a Stage, link a Gameplay Preset, pick a resolution, then drag overlays onto the canvas (drag the ◢ corner to resize). Each overlay is either <b>always-on</b> (part of the scene whenever the stage is live) or <b>callable</b> (becomes a one-tap button on the Chat tab). Two <b>system overlays</b> ship in: a live <b>Capacity Gauge</b> and a <b>Pump Timer</b>. The <b>🗂 Media browser</b> is the universal library — uploads land in <code>data/images</code>, so <b>⬇ Export Stage</b> bundles the design plus its media into one <code>.dfstage.zip</code> that <b>⬆ Import Stage</b> unpacks anywhere. <b>Global overlays</b> are callable from every stage.</li>
+        <li><b>Linking a chat to a stage:</b> on a video channel pick the <b>Stage</b> dropdown in the 🎥 section — its callable overlays appear as buttons, ▶ Start virtual cam puts the always-on items (and live gauges) on the feed, and 🎭 Stage opens the phone view with that design loaded.</li>
         <li><b>🔁 Device Sync (System tab)</b> keeps both installs matching: it pulls the whole gameplay setup — commands, events, buttons, saved Gameplay Presets — <b>and the overlay images/videos</b> from your other DiscoFlate over Wi-Fi, so overlays fired on the PC have their files where they play. Enable Remote access + whitelist on the source device first; same-name-same-size files are skipped, and tokens/devices never sync.</li>
         <li><b>The permission line</b> (under the send box) shows the bot's rights in the scoped channel live: 🚫 = it can't post there (Send disables, the missing permissions are listed) · ⚠ no Manage Webhooks = owner posts fall back to the bot-prefixed style · ⚠ no Read Message History = the mirror starts from now (no backfill).</li>
       </ul>
@@ -1507,7 +1581,9 @@ function chatActive(){
   const card=document.querySelector('.card[data-tab="chat"]');
   return card && card.classList.contains('show') && document.visibilityState==='visible';
 }
-function chatSwitch(){ chatLast=''; const el=$('#chatLog'); if(el) el.innerHTML='<div class="muted">loading…</div>'; chatVideoUi(); chatPoll(true); }
+function chatSwitch(){ chatLast=''; const el=$('#chatLog'); if(el) el.innerHTML='<div class="muted">loading…</div>'; chatVideoUi(); chatPoll(true);
+  // Isolate follows the active channel: switching while checked re-aims it
+  if($('#chatIso')&&$('#chatIso').checked){ chatIsoChan=$('#chatChan').value||''; scheduleSave(); } }
 function chatRender(entries, replaceAll){
   const el=$('#chatLog'); if(!el) return;
   const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 40;
@@ -1694,11 +1770,33 @@ function vcamDevPick(){
   res.innerHTML = modes.map(m=>`<option>${m}</option>`).join('');
   if(modes.includes(cur)) res.value=cur;
 }
+// 🩺 Driver: probe whether a virtual cam can actually open; one-click fix.
+// The driver can't be bundled (kernel module on Linux / admin-registered
+// system filter on Windows) — but we can install it FOR the user.
+async function vcamDriver(){
+  const m=$('#vcamMsg'), h=$('#vcamDrvHint'); h.style.display='none';
+  m.textContent='🩺 checking the virtual-camera driver…';
+  try{
+    let r = await api('/api/camera/driver', {action:'status'});
+    if(r.ok){ m.textContent='✅ driver ready — press ▶ Start, then pick the virtual camera in Discord'; return; }
+    if(r.manual){
+      m.textContent='⚠ one manual step needed — see below';
+      h.textContent='Run this in a terminal, then press ▶ Start:  '+r.manual;
+      h.style.display=''; return;
+    }
+    if(!confirm('Virtual-camera driver missing:\n'+(r.error||'')+'\n\nFix it now? DiscoFlate will '+(r.plan||'attempt an install')+'.')){ m.textContent=''; return; }
+    m.textContent='⏳ installing the driver… (can take a few minutes — watch for a permission prompt)';
+    r = await api('/api/camera/driver', {action:'install'});
+    if(r.ok){ m.textContent='✅ driver installed — press ▶ Start, then pick the virtual camera in Discord'; return; }
+    m.textContent='⚠ '+(r.error||'install failed');
+    if(r.manual){ h.textContent='Run this in a terminal, then press ▶ Start:  '+r.manual; h.style.display=''; }
+  }catch(e){ m.textContent='⚠ '+(e.message||e); }
+}
 async function vcamStart(){
   const [w,h]=($('#vcamRes').value||'1280x720').split('x').map(Number);
   $('#vcamMsg').textContent='starting…';
   try{
-    const r = await api('/api/camera/start', {device:+$('#vcamDev').value||0, width:w, height:h, fps:30});
+    const r = await api('/api/camera/start', {device:+$('#vcamDev').value||0, width:w, height:h, fps:30, stage:chatStageName});
     $('#vcamMsg').textContent = r.ok ? ('🟢 ' + (r.info||'running') + ' — pick the virtual camera in Discord') : ('⚠ ' + (r.error||'failed'));
     if(r.ok) vcamPreviewStart();
   }catch(e){ $('#vcamMsg').textContent='⚠ '+(e.message||e); }
@@ -1805,6 +1903,228 @@ function renderOvbEditor(){
         [[0.25,'25%'],[0.5,'50%'],[0.75,'75%'],[1,'100%']].map(([v,l])=>`<option value="${v}" ${(+b.scale||0.5)===v?'selected':''}>${l}</option>`).join('')+`</select></label>`+
       `<button class="ghost" onclick="overlayButtons.splice(${i},1);renderOvbEditor();renderOverlayButtons();scheduleSave()">✕</button>`+
     `</div>`).join('') || '<div class="muted">no overlay actions yet</div>';
+}
+// ================= Stages: OBS-style overlay designer =================
+let stagesData=[], stageGlobals=[], stgCur=-1, stgSelId=null, mediaPickCb=null;
+let chatStageName='', chatIsoChan='', gpPresetNames=[];
+function metaAuth(){ return (document.querySelector('meta[name="df-auth"]')||{}).content||''; }
+function stgNewItem(kind, media, visible){
+  return {id:'o'+Date.now().toString(36)+Math.floor(Math.random()*46656).toString(36),
+          label:'', kind:kind, media:media||'', x:0.35, y:0.35,
+          w:kind==='media'?0.3:0.35, mode:'timed', seconds:5, layer:'',
+          visible: visible!==undefined ? visible : kind!=='media'};
+}
+function stgStage(){ return stagesData[stgCur]||null; }
+function renderStages(){
+  const sel=$('#stgSel'); if(!sel) return;
+  sel.innerHTML = stagesData.map((s,i)=>`<option value="${i}" ${i===stgCur?'selected':''}>${esc(s.name||('Stage '+(i+1)))}</option>`).join('')
+    || '<option value="-1">— none yet —</option>';
+  const s = stgStage();
+  $('#stgEditor').style.display = s ? '' : 'none';
+  if(s){
+    $('#stgPreset').innerHTML = '<option value="">(live settings)</option>'+
+      gpPresetNames.map(n=>`<option ${s.preset===n?'selected':''}>${esc(n)}</option>`).join('');
+    $('#stgRes').value = `${s.width||1280}x${s.height||720}`;
+    renderStgCanvas(); renderStgProps();
+  }
+  renderChatStageSel(); stageButtonsRefresh();
+}
+function renderStgCanvas(){
+  const s=stgStage(), cv=$('#stgCanvas'); if(!cv) return;
+  if(!s){ cv.innerHTML=''; return; }
+  cv.style.aspectRatio = `${s.width||1280} / ${s.height||720}`;
+  cv.innerHTML = (s.overlays||[]).map(o=>{
+    let inner='';
+    if(o.kind==='capacity_gauge')
+      inner = `<div class="wmock" style="height:20px;background:#222;border:2px solid #eee;border-radius:999px;overflow:hidden"><div style="width:55%;height:100%;background:linear-gradient(90deg,#2ecc71,#e74c3c)"></div></div>`;
+    else if(o.kind==='pump_timer')
+      inner = `<div class="wmock" style="padding:3px 10px;border:2px solid #2ecc71;border-radius:10px;color:#fff;background:#151515;font-weight:700;text-align:center;font-size:13px;white-space:nowrap">PUMP 12s</div>`;
+    else if(/\.(mp4|webm|mov|mkv|avi|m4v)$/i.test(o.media||''))
+      inner = `<video src="/images/${encodeURIComponent(o.media)}" muted preload="metadata"></video>`;
+    else
+      inner = `<img src="/images/${encodeURIComponent(o.media||'')}" alt="">`;
+    return `<div class="stgItem${o.id===stgSelId?' sel':''}" data-id="${esc(o.id)}" style="left:${(o.x*100).toFixed(2)}%;top:${(o.y*100).toFixed(2)}%;width:${(o.w*100).toFixed(2)}%">${inner}${o.id===stgSelId?'<span class="stgGrip"></span>':''}</div>`;
+  }).join('');
+}
+let stgDrag=null;
+(function(){
+  const cv=document.getElementById('stgCanvas'); if(!cv) return;
+  cv.addEventListener('pointerdown', e=>{
+    const it = e.target.closest('.stgItem');
+    if(!it){ if(stgSelId){ stgSelId=null; renderStgCanvas(); renderStgProps(); } return; }
+    const s=stgStage(); if(!s) return;
+    const o=(s.overlays||[]).find(x=>x.id===it.dataset.id); if(!o) return;
+    if(stgSelId!==o.id){ stgSelId=o.id; renderStgCanvas(); renderStgProps(); }
+    const R=cv.getBoundingClientRect();
+    const el=cv.querySelector(`.stgItem[data-id="${CSS.escape(o.id)}"]`);
+    stgDrag={o, el, R, grip: !!e.target.closest('.stgGrip'),
+             dx:(e.clientX-R.left)/R.width - o.x, dy:(e.clientY-R.top)/R.height - o.y};
+    cv.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  cv.addEventListener('pointermove', e=>{
+    if(!stgDrag) return;
+    const {o,el,R,grip}=stgDrag;
+    const fx=(e.clientX-R.left)/R.width, fy=(e.clientY-R.top)/R.height;
+    if(grip) o.w=Math.max(0.04, Math.min(1, fx-o.x));
+    else { o.x=Math.max(0,Math.min(0.98,fx-stgDrag.dx)); o.y=Math.max(0,Math.min(0.98,fy-stgDrag.dy)); }
+    if(el){ el.style.left=(o.x*100)+'%'; el.style.top=(o.y*100)+'%'; el.style.width=(o.w*100)+'%'; }
+  });
+  const up=()=>{ if(stgDrag){ stgDrag=null; renderStgProps(); scheduleSave(); } };
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+})();
+function renderStgProps(){
+  const s=stgStage(), box=$('#stgProps'); if(!box) return;
+  const o = s && (s.overlays||[]).find(x=>x.id===stgSelId);
+  if(!o){ box.innerHTML='<span class="muted">no overlay selected — click one on the canvas</span>'; return; }
+  const isW = o.kind!=='media';
+  box.innerHTML =
+    `<div class="row ovedit">`+
+    `<label class="field">Label <input value="${esc(o.label||'')}" placeholder="${esc(o.kind)}" style="width:140px" onchange="stgItemSet('label',this.value)"></label>`+
+    (isW? `<span class="pill">${o.kind==='capacity_gauge'?'📊 Capacity Gauge':'⏱ Pump Timer'}</span>`
+        : `<span class="pill" style="max-width:180px;overflow:hidden;text-overflow:ellipsis">${esc(o.media||'—')}</span>`+
+          `<button class="ghost" onclick="mediaBrowse(n=>stgItemSet('media',n))">🗂</button>`)+
+    `<label class="row" style="gap:5px" title="always-on = part of the scene whenever the stage is live; unticked = a callable button"><input type="checkbox" ${o.visible?'checked':''} ${isW?'disabled':''} style="width:auto" onchange="stgItemSet('visible',this.checked)"> always-on</label>`+
+    (!isW && !o.visible ?
+      `<label class="field">Mode <select style="width:100px" onchange="stgItemSet('mode',this.value)">${['timed','hold','once'].map(m=>`<option ${o.mode===m?'selected':''}>${m}</option>`).join('')}</select></label>`+
+      `<label class="field">Secs <input type="number" min="0.5" step="0.5" value="${o.seconds??5}" style="width:70px" onchange="stgItemSet('seconds',+this.value)"></label>` : '')+
+    `<label class="field">Layer <input value="${esc(o.layer||'')}" placeholder="(own)" style="width:90px" onchange="stgItemSet('layer',this.value)"></label>`+
+    `<span class="muted">x ${(o.x*100).toFixed(0)}% · y ${(o.y*100).toFixed(0)}% · w ${(o.w*100).toFixed(0)}%</span>`+
+    `<div style="flex:1"></div>`+
+    `<button class="ghost" title="duplicate" onclick="stgItemDup()">📋</button>`+
+    `<button class="ghost" title="remove from stage" onclick="stgItemDel()">✕</button>`+
+    `</div>`;
+}
+function stgItemSet(k,v){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===stgSelId); if(!o) return;
+  o[k]=v; renderStgCanvas(); renderStgProps(); stageButtonsRefresh(); scheduleSave(); }
+function stgItemDup(){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===stgSelId); if(!o) return;
+  const c=JSON.parse(JSON.stringify(o)); c.id=stgNewItem('x').id;
+  c.x=Math.min(0.95,o.x+0.04); c.y=Math.min(0.95,o.y+0.04);
+  s.overlays.push(c); stgSelId=c.id; renderStgCanvas(); renderStgProps(); stageButtonsRefresh(); scheduleSave(); }
+function stgItemDel(){ const s=stgStage(); if(!s) return;
+  s.overlays=(s.overlays||[]).filter(x=>x.id!==stgSelId); stgSelId=null;
+  renderStgCanvas(); renderStgProps(); stageButtonsRefresh(); scheduleSave(); }
+function stgPick(i){ stgCur=i; stgSelId=null; renderStages(); }
+function stgAdd(){ const name=prompt('Stage name:','My Stage'); if(!name) return;
+  stagesData.push({name:name.trim(), preset:'', width:1280, height:720, overlays:[]});
+  stgCur=stagesData.length-1; stgSelId=null; renderStages(); scheduleSave(); }
+function stgRename(){ const s=stgStage(); if(!s) return; const n=prompt('New name:', s.name||''); if(!n) return;
+  if(chatStageName===s.name) chatStageName=n.trim();
+  s.name=n.trim(); renderStages(); scheduleSave(); }
+function stgDelete(){ const s=stgStage(); if(!s) return;
+  if(!confirm(`Delete stage "${s.name}"? Its media stays in the library.`)) return;
+  if(chatStageName===s.name) chatStageName='';
+  stagesData.splice(stgCur,1); stgCur=stagesData.length?0:-1; stgSelId=null;
+  renderStages(); scheduleSave(); }
+function stgProp(k,v){ const s=stgStage(); if(s){ s[k]=v; scheduleSave(); } }
+function stgResPick(){ const s=stgStage(); if(!s) return;
+  const [w,h]=$('#stgRes').value.split('x').map(Number); s.width=w; s.height=h;
+  renderStgCanvas(); scheduleSave(); }
+function stgAddMedia(n){ const s=stgStage(); if(!s){ toastMsg('create a stage first'); return; }
+  const o=stgNewItem('media',n); (s.overlays=s.overlays||[]).push(o);
+  stgSelId=o.id; renderStgCanvas(); renderStgProps(); stageButtonsRefresh(); scheduleSave(); }
+function stgAddWidget(kind){ const s=stgStage(); if(!s){ toastMsg('create a stage first'); return; }
+  const o=stgNewItem(kind,''); (s.overlays=s.overlays||[]).push(o);
+  stgSelId=o.id; renderStgCanvas(); renderStgProps(); scheduleSave(); }
+function renderStgGlobals(){
+  const box=$('#stgGlobalRows'); if(!box) return;
+  box.innerHTML = stageGlobals.map((o,i)=>
+    `<div class="row ovedit">`+
+    `<label class="field">Label <input value="${esc(o.label||'')}" style="width:130px" onchange="stageGlobals[${i}].label=this.value;stageButtonsRefresh();scheduleSave()"></label>`+
+    `<span class="pill" style="max-width:170px;overflow:hidden;text-overflow:ellipsis">${esc(o.media||'—')}</span>`+
+    `<button class="ghost" onclick="mediaBrowse(n=>{stageGlobals[${i}].media=n;renderStgGlobals();scheduleSave()})">🗂</button>`+
+    `<label class="field">Mode <select style="width:96px" onchange="stageGlobals[${i}].mode=this.value;scheduleSave()">${['timed','hold','once'].map(m=>`<option ${o.mode===m?'selected':''}>${m}</option>`).join('')}</select></label>`+
+    `<label class="field">Secs <input type="number" min="0.5" step="0.5" value="${o.seconds??5}" style="width:66px" onchange="stageGlobals[${i}].seconds=+this.value;scheduleSave()"></label>`+
+    `<label class="field">X% <input type="number" min="0" max="100" value="${Math.round((o.x??0.35)*100)}" style="width:60px" onchange="stageGlobals[${i}].x=(+this.value||0)/100;scheduleSave()"></label>`+
+    `<label class="field">Y% <input type="number" min="0" max="100" value="${Math.round((o.y??0.35)*100)}" style="width:60px" onchange="stageGlobals[${i}].y=(+this.value||0)/100;scheduleSave()"></label>`+
+    `<label class="field">W% <input type="number" min="4" max="100" value="${Math.round((o.w??0.3)*100)}" style="width:60px" onchange="stageGlobals[${i}].w=Math.max(0.04,(+this.value||30)/100);scheduleSave()"></label>`+
+    `<label class="field">Layer <input value="${esc(o.layer||'')}" style="width:76px" onchange="stageGlobals[${i}].layer=this.value;scheduleSave()"></label>`+
+    `<button class="ghost" onclick="stageGlobals.splice(${i},1);renderStgGlobals();stageButtonsRefresh();scheduleSave()">✕</button>`+
+    `</div>`).join('') || '<span class="muted">no global overlays yet</span>';
+}
+// ---- universal media browser -------------------------------------------
+function mediaBrowse(cb){ mediaPickCb=cb||null; openOverlay('mediaOverlay'); mediaLoad(); }
+async function mediaLoad(){
+  const g=$('#mediaGrid'); g.innerHTML='<span class="muted">loading…</span>';
+  try{
+    const r=await api('/api/media/list',{});
+    g.innerHTML=(r.media||[]).map(m=>{
+      const kb = m.size>1048576 ? (m.size/1048576).toFixed(1)+'MB' : Math.max(1,Math.round(m.size/1024))+'KB';
+      return `<div class="mediaTile" onclick="mediaPicked('${esc(m.name)}')">`+
+        (m.video?`<div class="vid">🎬</div>`:`<img src="/images/${encodeURIComponent(m.name)}" loading="lazy">`)+
+        `<div class="nm">${esc(m.name)} · ${kb}</div>`+
+        `<span class="del" onclick="event.stopPropagation();mediaDel('${esc(m.name)}')">✕</span></div>`;
+    }).join('') || '<span class="muted">library is empty — upload something</span>';
+  }catch(e){ g.innerHTML='<span class="muted">⚠ '+(e.message||e)+'</span>'; }
+}
+function mediaPicked(n){ if(mediaPickCb){ const cb=mediaPickCb; mediaPickCb=null; closeOverlay('mediaOverlay'); cb(n); } }
+async function mediaDel(n){
+  if(!confirm(`Delete ${n} from the library? Stages using it will show a broken tile.`)) return;
+  await api('/api/media/delete',{name:n}); mediaLoad();
+}
+async function mediaUpload(inp){
+  const f=inp.files[0]; if(!f) return; $('#mediaMsg').textContent='uploading…';
+  const fd=new FormData(); fd.append('file', f);
+  try{
+    const resp=await fetch('/api/upload',{method:'POST',body:fd});
+    $('#mediaMsg').textContent = resp.ok?'':'⚠ upload failed';
+    if(resp.ok) mediaLoad();
+  }catch(e){ $('#mediaMsg').textContent='⚠ '+(e.message||e); }
+  inp.value='';
+}
+// ---- export / import a stage bundle (zip: stage.json + its media) --------
+async function stgExport(){
+  const s=stgStage(); if(!s){ toastMsg('pick a stage first'); return; }
+  try{
+    const r=await fetch('/api/stage-design/export?name='+encodeURIComponent(s.name),
+                        {headers:{'X-DiscoFlate-Auth':metaAuth()}});
+    if(!r.ok){ toastMsg('⚠ export failed'); return; }
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(await r.blob());
+    a.download=((s.name||'stage').replace(/[^\w\- ]+/g,'')||'stage')+'.dfstage.zip';
+    a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 8000);
+  }catch(e){ toastMsg('⚠ '+(e.message||e)); }
+}
+async function stgImport(inp){
+  const f=inp.files[0]; if(!f) return;
+  const fd=new FormData(); fd.append('file', f);
+  try{
+    const r=await fetch('/api/stage-design/import',{method:'POST',body:fd,
+                        headers:{'X-DiscoFlate-Auth':metaAuth()}});
+    const j=await r.json();
+    if(!j.ok){ toastMsg('⚠ '+(j.error||'import failed')); return; }
+    applyState(j, true);
+    stgCur = stagesData.findIndex(s=>s.name===j.name); stgSelId=null; renderStages();
+    toastMsg('✅ imported "'+j.name+'"');
+  }catch(e){ toastMsg('⚠ '+(e.message||e)); }
+  inp.value='';
+}
+// ---- Chat tab: stage link + one-tap bundle buttons + isolate --------------
+function renderChatStageSel(){
+  const sel=$('#chatStageSel'); if(!sel) return;
+  sel.innerHTML = '<option value="">(no stage)</option>'+
+    stagesData.map(s=>`<option ${s.name===chatStageName?'selected':''}>${esc(s.name)}</option>`).join('');
+}
+function chatStageChanged(){ chatStageName=$('#chatStageSel').value; stageButtonsRefresh(); scheduleSave(); }
+function stageButtonsRefresh(){
+  const box=$('#stageBtns'); if(!box) return;
+  const s = stagesData.find(x=>x.name===chatStageName);
+  const items = [...(s?(s.overlays||[]).filter(o=>o.kind==='media'&&!o.visible):[]),
+                 ...stageGlobals.filter(o=>(o.media||'').trim())];
+  box.innerHTML = items.map(o=>`<button onclick="stageFire('${esc(o.id)}')">${esc(o.label||o.media||'overlay')}</button>`).join('');
+}
+async function stageFire(id){
+  try{
+    const r=await api('/api/overlay/fire',{stage:chatStageName, id:id});
+    $('#vcamMsg').textContent = r.ok?'':('⚠ '+(r.error||'overlay failed'));
+  }catch(e){ $('#vcamMsg').textContent='⚠ '+(e.message||e); }
+}
+function openStagePage(){
+  location.href='/stage'+(chatStageName?('?stage='+encodeURIComponent(chatStageName)):'');
+}
+function chatIsoChanged(){
+  if($('#chatIso').checked) chatIsoChan = $('#chatChan').value || chatIsoChan;
+  scheduleSave();
 }
 setInterval(()=>chatPoll(false), 2000);
 document.addEventListener('click', e=>{
@@ -4240,6 +4560,15 @@ function applyState(st, full){
     ownerCommands = JSON.parse(JSON.stringify(st.owner_commands||[]));
     overlayButtons = JSON.parse(JSON.stringify(st.overlay_buttons||[]));
     renderChatButtons(); renderOverlayButtons();
+    stagesData = JSON.parse(JSON.stringify(st.stages||[]));
+    stageGlobals = JSON.parse(JSON.stringify(st.stage_globals||[]));
+    chatStageName = st.chat_stage||'';
+    chatIsoChan = st.chat_isolate_channel||'';
+    if($('#chatIso') && document.activeElement!==$('#chatIso')) $('#chatIso').checked = !!st.chat_isolate;
+    gpPresetNames = (st.gameplay_presets||[]).map(p=>p.name).filter(Boolean);
+    if(stgCur >= stagesData.length) stgCur = stagesData.length-1;
+    if(stgCur < 0 && stagesData.length) stgCur = 0;
+    renderStages(); renderStgGlobals();
     renderCommands();
     renderAlwaysOn();
     renderEvents();
@@ -4331,6 +4660,8 @@ function gatherConfig(){
     pump_embed:$('#pumpEmbed')?$('#pumpEmbed').checked:false, pump_title:$('#pumpTitle')?$('#pumpTitle').value:'',
     pump_message: $('#pumpMsg') ? $('#pumpMsg').value : '',
     listen_targets:listenTargets, announce_channel_id: announceChanId,
+    stages: stagesData, stage_globals: stageGlobals, chat_stage: chatStageName,
+    chat_isolate: $('#chatIso')?$('#chatIso').checked:false, chat_isolate_channel: chatIsoChan,
     anon_user_label:$('#anonLabel').value,
     allow_dms:$('#allowDms').checked,
     allow:{user_ids:idList($('#allowUsers').value)},

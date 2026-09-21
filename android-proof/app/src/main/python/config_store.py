@@ -361,6 +361,22 @@ DEFAULTS = {
     # and hit "Broadcast Custom" to post it to the channel. Each: {name, message}.
     "broadcasts": [],
 
+    # Stages (Stages tab) — OBS-style overlay designs. Each:
+    #   {name, preset, width, height, overlays: [{id, label, kind, media,
+    #    x, y, w, mode, seconds, layer, visible}]}
+    # kind: media | capacity_gauge | pump_timer. x/y/w are FRACTIONS of the
+    # stage frame (0..1). visible=true → always on the stage; false → callable.
+    # Stages live OUTSIDE gameplay presets (a stage LINKS a preset by name) but
+    # ride along in Device Sync together with their media files.
+    "stages": [],
+    "stage_globals": [],   # overlay items callable from every stage
+    "chat_stage": "",      # the Stage linked to the Chat tab's video section
+
+    # Chat tab Isolate: broadcasts go ONLY to the chat tab's active channel
+    # while enabled (other live channels still hear direct command replies).
+    "chat_isolate": False,
+    "chat_isolate_channel": "",
+
     # Max Roll Prize — hitting a "perfect" roll (max possible total) `goal`
     # times unlocks a limited-use bonus command for that person. Progress and
     # per-user unlock/uses are tracked in memory and reset on session reset /

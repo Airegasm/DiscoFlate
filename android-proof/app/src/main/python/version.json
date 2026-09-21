@@ -1,6 +1,6 @@
 {
-  "version": "3.48.1",
-  "versionCode": 123,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.48.1/discoflate-v3.48.1.apk",
-  "notes": "DiscoFlate v3.48.1 — the revealed bot token is actually copyable now: 👁 auto-selects it and a new 📋 button copies it to the clipboard in one tap (with fallbacks for older WebViews). Tip: you can also copy it from another device — enable Remote access on this install, whitelist the other device's IP, open this panel from its browser and hit 👁 there."
+  "version": "3.48.2",
+  "versionCode": 124,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.48.2/discoflate-v3.48.2.apk",
+  "notes": "DiscoFlate v3.48.2 — 🎭 STAGES TAB: design overlay scenes OBS-style. Create a Stage, link a Gameplay Preset, pick a resolution, then drag overlays onto the canvas (drag the ◢ corner to resize). Each overlay is always-on (part of the scene) or callable (a one-tap button on the Chat tab). Two system overlays included: a live Capacity Gauge and a Pump Timer. The 🗂 Media browser is the universal library — uploads land in data/images, so ⬇ Export Stage bundles the design plus its media into one .dfstage.zip that ⬆ Import Stage unpacks anywhere. Global overlays are callable from every stage. On a video channel, pick a Stage in the 🎥 section: its callable overlays become buttons, ▶ Start virtual cam puts the always-on items and live gauges on the feed, and 🎭 Stage opens the phone view with that design. ISOLATE: a checkbox on the Chat tab that sends every broadcast ONLY to the active channel, even when other channels are live (direct command replies still land where they were typed)."
 }

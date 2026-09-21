@@ -13,12 +13,16 @@ from __future__ import annotations
 
 import asyncio
 import fnmatch
+import io
 import ipaddress
 import json
 import os
+import zipfile
+import shutil
 import signal
 import socket
 import subprocess
+import sys
 import time
 import urllib.parse
 import uuid
@@ -314,6 +318,11 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "version": VERSION,
         # preset NAMES only (the full data would bloat the 1s state poll). The
         # immutable built-in "Defaults" preset is always listed first.
+        "stages": cfg.get("stages") or [],
+        "stage_globals": cfg.get("stage_globals") or [],
+        "chat_stage": cfg.get("chat_stage", ""),
+        "chat_isolate": bool(cfg.get("chat_isolate")),
+        "chat_isolate_channel": cfg.get("chat_isolate_channel", ""),
         "gameplay_presets": ([{"name": BUILTIN_PRESET_NAME, "builtin": True}]
                              + [{"name": p.get("name", "")} for p in (cfg.get("gameplay_presets") or [])]),
         "remote_access": cfg.get("remote_access", {"enabled": False, "allowed_ips": []}),
@@ -480,6 +489,13 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     net = net if net is not None else {}
     vcam = camera.VirtualCam(IMAGES_DIR)   # the Chat tab's OBS-style overlay pipe
     net["vcam"] = vcam
+    # live game state for stage widgets (capacity gauge / pump timer);
+    # camera.py throttles how often it calls this
+    def _vcam_state():
+        s = engine.snapshot()
+        return {"capacity": s.get("capacity"), "firing": s.get("firing"),
+                "remaining": s.get("remaining")}
+    vcam.state_cb = _vcam_state
     stg = stage.Stage(IMAGES_DIR)   # /stage overlay registry (phone screen-share path)
     net["stage"] = stg
 
@@ -494,12 +510,14 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             try:
                 vres = vcam.fire_overlay(spec.get("media"), spec.get("seconds"),
                                          spec.get("pos") or "center", spec.get("scale"),
-                                         mode=mode, layer=spec.get("layer"))
+                                         mode=mode, layer=spec.get("layer"),
+                                         x=spec.get("x"), y=spec.get("y"))
             except Exception as ex:  # noqa: BLE001
                 vres = {"ok": False, "error": str(ex)}
         sres = stg.fire(spec.get("media"), spec.get("seconds"),
                         spec.get("pos") or "center", spec.get("scale"),
-                        mode=mode, layer=spec.get("layer"))
+                        mode=mode, layer=spec.get("layer"),
+                        x=spec.get("x"), y=spec.get("y"))
         if mode == "clear" or vres.get("ok") or (sres.get("ok") and stg.watching()):
             return {"ok": True}
         return {"ok": False, "error": sres.get("error") if not sres.get("ok")
@@ -556,6 +574,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     # (a malformed import/tab can't put a string where the engine expects a list).
     _TYPE_FLOOR = {"commands": list, "events": list, "modes": list, "prizes": list,
                    "owner_commands": list, "chat_buttons": list, "overlay_buttons": list,
+                   "stages": list, "stage_globals": list,
                    "capacity_events": list, "polls": list, "competitions": list,
                    "capacity_ranges": list, "listen_targets": list, "broadcasts": list,
                    "always_on_commands": list, "cooldown_exempt_user_ids": list,
@@ -583,6 +602,8 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                     "pause_embed", "pause_title",
                     "system_buffer_seconds", "cooldown_message", "pumptimer_message", "pump_message",
                     "roll", "prizes", "owner_commands", "chat_buttons", "overlay_buttons",
+                    "stages", "stage_globals", "chat_stage",
+                    "chat_isolate", "chat_isolate_channel",
                     "capacity_ranges", "commands", "modes", "events",
                     "capacity_events", "polls", "competitions",
                     "allow", "pumpdirect_path", "cooldown_seconds",
@@ -1211,6 +1232,20 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             return web.json_response(res)
         await asyncio.sleep(0.8)   # let the pipeline surface open errors
         st = vcam.status()
+        # linked Stage design: put its always-on items on the compositor
+        stage_name = (b.get("stage") or "").strip()
+        if st["running"] and stage_name:
+            stg_ = _find_stage(config_store.load(), stage_name)
+            for o in ((stg_ or {}).get("overlays") or []):
+                if not o.get("visible"):
+                    continue
+                lay = o.get("layer") or f"itm-{o.get('id')}"
+                if (o.get("kind") or "media") in ("capacity_gauge", "pump_timer"):
+                    vcam.add_widget(o["kind"], x=o.get("x"), y=o.get("y"),
+                                    w=o.get("w"), layer=lay)
+                elif o.get("media"):
+                    vcam.fire_overlay(o["media"], mode="hold", layer=lay,
+                                      scale=o.get("w"), x=o.get("x"), y=o.get("y"))
         return web.json_response({"ok": st["running"], **st})
 
     async def camera_detect(request):
@@ -1219,6 +1254,98 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             return web.json_response({"ok": False, "error": _VCAM_ANDROID})
         res = await asyncio.get_event_loop().run_in_executor(None, vcam.detect)
         return web.json_response(res)
+
+    # ---- virtual-cam DRIVER: probe + assisted install ---------------------
+    # The driver itself can't be bundled: Linux's v4l2loopback is a kernel
+    # module built against the running kernel, and Windows' filter needs an
+    # admin-registered system install either way. What we CAN do: definitively
+    # probe (actually open a pyvirtualcam device) and run the fix ourselves.
+    def _driver_probe() -> dict:
+        if camera.pyvirtualcam is None:
+            return {"ok": False,
+                    "error": "pyvirtualcam isn't installed — rerun start.bat/start.sh "
+                             "(it installs requirements), then restart DiscoFlate"}
+        try:
+            with camera.pyvirtualcam.Camera(width=160, height=120, fps=20,
+                                            print_fps=False):
+                pass
+            return {"ok": True}
+        except Exception as e:  # noqa: BLE001 — "no backend" = driver missing
+            return {"ok": False, "error": str(e)}
+
+    def _linux_manual() -> str:
+        pm = next((cmd for exe, cmd in (
+            ("apt", "sudo apt install v4l2loopback-dkms"),
+            ("dnf", "sudo dnf install v4l2loopback"),
+            ("pacman", "sudo pacman -S v4l2loopback-dkms"),
+        ) if shutil.which(exe)), "install the v4l2loopback package for your distro")
+        return (pm + '  &&  sudo modprobe v4l2loopback exclusive_caps=1 '
+                     'card_label="DiscoFlate Cam"')
+
+    def _linux_module_installed() -> bool:
+        try:
+            return subprocess.run(["modinfo", "v4l2loopback"], capture_output=True,
+                                  timeout=10).returncode == 0
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            return False
+
+    async def camera_driver(request):
+        await guard(request)
+        if _IS_ANDROID:
+            return web.json_response({"ok": False, "error": _VCAM_ANDROID})
+        b = await _json(request)
+        act = (b.get("action") or "status").lower()
+        loop = asyncio.get_event_loop()
+        if vcam.status()["running"]:
+            return web.json_response({"ok": True})
+        probe = await loop.run_in_executor(None, _driver_probe)
+        if probe["ok"]:
+            return web.json_response({"ok": True})
+        if act == "status":
+            if sys.platform == "win32":
+                return web.json_response({"ok": False, "error": probe["error"],
+                    "plan": "install OBS Studio via winget — its installer registers the "
+                            "virtual-camera driver (~a few minutes; a UAC prompt may appear)"})
+            if _linux_module_installed():
+                return web.json_response({"ok": False, "error": probe["error"],
+                    "plan": "load the v4l2loopback kernel module (your system password "
+                            "prompt will appear)"})
+            return web.json_response({"ok": False, "error": probe["error"],
+                                      "manual": _linux_manual()})
+        # ---- action: install -------------------------------------------------
+        def _run(cmd, timeout):
+            return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        try:
+            if sys.platform == "win32":
+                out = await loop.run_in_executor(None, lambda: _run(
+                    ["winget", "install", "-e", "OBSProject.OBSStudio",
+                     "--accept-package-agreements", "--accept-source-agreements"], 900))
+            elif _linux_module_installed():
+                out = await loop.run_in_executor(None, lambda: _run(
+                    ["pkexec", "modprobe", "v4l2loopback", "exclusive_caps=1",
+                     'card_label=DiscoFlate Cam'], 120))
+            else:
+                return web.json_response({"ok": False,
+                    "error": "the v4l2loopback package isn't installed",
+                    "manual": _linux_manual()})
+        except FileNotFoundError as e:
+            hint = ("winget isn't available — install OBS Studio from obsproject.com, "
+                    "then press Start again") if sys.platform == "win32" else \
+                   f"couldn't run the installer ({e}) — do it manually: {_linux_manual()}"
+            return web.json_response({"ok": False, "error": hint})
+        except subprocess.TimeoutExpired:
+            return web.json_response({"ok": False,
+                "error": "the install is taking too long — finish it in its own window, "
+                         "then press ▶ Start again"})
+        probe = await loop.run_in_executor(None, _driver_probe)
+        if probe["ok"]:
+            return web.json_response({"ok": True})
+        tail = ((out.stdout or "") + "\n" + (out.stderr or "")).strip()[-400:]
+        extra = (" Installed, but the driver didn't register — open OBS once, click "
+                 "'Start Virtual Camera', close it, and retry.") if sys.platform == "win32" else ""
+        return web.json_response({"ok": False,
+                                  "error": (probe["error"] + "." + extra).strip(),
+                                  "detail": tail})
 
     async def camera_preview(request):
         await guard(request)
@@ -1237,11 +1364,25 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     async def overlay_fire(request):
         await guard(request)
         b = await _json(request)
+        if b.get("stage") is not None and b.get("id") is not None:
+            # fire a designed overlay from a Stage bundle (or the globals)
+            item = _stage_item(config_store.load(), b.get("stage"), b.get("id"))
+            if item is None:
+                return web.json_response({"ok": False, "error": "no such stage overlay"})
+            if (item.get("kind") or "media") != "media":
+                return web.json_response({"ok": False,
+                                          "error": "gauges/timers are always-on stage widgets, not callable"})
+            return web.json_response(_overlay_action({
+                "media": item.get("media"), "seconds": item.get("seconds"),
+                "scale": item.get("w"), "mode": item.get("mode") or "timed",
+                "layer": (item.get("layer") or f"itm-{item.get('id')}"),
+                "x": item.get("x"), "y": item.get("y")}))
         # same router as `overlay` action rows: vcam when running + the Stage
         return web.json_response(_overlay_action({
             "media": b.get("media") or b.get("image"), "seconds": b.get("seconds"),
             "pos": b.get("pos"), "scale": b.get("scale"),
-            "mode": b.get("mode") or "timed", "layer": b.get("layer")}))
+            "mode": b.get("mode") or "timed", "layer": b.get("layer"),
+            "x": b.get("x"), "y": b.get("y")}))
 
     async def overlay_clear(request):
         await guard(request)
@@ -1276,6 +1417,126 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             raise web.HTTPNotFound()
         return web.FileResponse(path)
 
+    # ---- Stages: media browser + stage designs (Stages tab) -----------------
+    _VIDEO_EXTS = (".mp4", ".webm", ".mov", ".mkv", ".avi", ".m4v")
+
+    async def media_list(request):
+        await guard(request)
+        out = []
+        try:
+            for n in sorted(os.listdir(IMAGES_DIR)):
+                p = os.path.join(IMAGES_DIR, n)
+                if os.path.isfile(p):
+                    out.append({"name": n, "size": os.path.getsize(p),
+                                "video": os.path.splitext(n)[1].lower() in _VIDEO_EXTS})
+        except FileNotFoundError:
+            pass
+        return web.json_response({"ok": True, "media": out})
+
+    async def media_delete(request):
+        await guard(request)
+        b = await _json(request)
+        name = os.path.basename(str(b.get("name") or ""))
+        p = os.path.join(IMAGES_DIR, name)
+        if name and os.path.isfile(p):
+            os.remove(p)
+        return web.json_response({"ok": True})
+
+    def _find_stage(cfg, name):
+        name = (name or "").strip()
+        return next((s for s in (cfg.get("stages") or [])
+                     if (s.get("name") or "").strip() == name), None)
+
+    def _stage_item(cfg, stage_name, item_id):
+        """An overlay item by id — searched in the stage, then the globals."""
+        stg_ = _find_stage(cfg, stage_name)
+        pool = (list(stg_.get("overlays") or []) if stg_ else []) \
+            + list(cfg.get("stage_globals") or [])
+        return next((o for o in pool if str(o.get("id")) == str(item_id)), None)
+
+    async def stage_design(request):
+        """The /stage page (and Chat tab) fetch a design + the globals here."""
+        await guard(request)
+        b = await _json(request)
+        cfg0 = config_store.load()
+        stg_ = _find_stage(cfg0, b.get("name"))
+        return web.json_response({"ok": stg_ is not None, "stage": stg_,
+                                  "globals": cfg0.get("stage_globals") or []})
+
+    async def stage_export(request):
+        """Download one stage as a .zip bundle: stage.json + its media files."""
+        await guard(request)
+        name = (request.query.get("name") or "").strip()
+        stg_ = _find_stage(config_store.load(), name)
+        if stg_ is None:
+            raise web.HTTPNotFound(text="no such stage")
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+            z.writestr("stage.json",
+                       json.dumps({"discoflate_stage": 1, "stage": stg_}, indent=2))
+            for o in (stg_.get("overlays") or []):
+                n = os.path.basename(str(o.get("media") or ""))
+                p = os.path.join(IMAGES_DIR, n)
+                if n and os.path.isfile(p):
+                    z.write(p, "media/" + n)
+        buf.seek(0)
+        safe = "".join(c for c in name if c.isalnum() or c in "-_ ").strip() or "stage"
+        return web.Response(body=buf.read(), content_type="application/zip",
+                            headers={"Content-Disposition":
+                                     f'attachment; filename="{safe}.dfstage.zip"'})
+
+    async def stage_import(request):
+        """Upload a .dfstage.zip: media lands in data/images, the stage is
+        added (renamed with a suffix when the name is already taken)."""
+        await guard(request)
+        reader = await request.multipart()
+        field = await reader.next()
+        if field is None or field.name != "file":
+            raise web.HTTPBadRequest(text="expected a 'file' field")
+        raw = io.BytesIO()
+        size = 0
+        while True:
+            chunk = await field.read_chunk()
+            if not chunk:
+                break
+            size += len(chunk)
+            if size > 512 * 1024 * 1024:
+                raise web.HTTPRequestEntityTooLarge(max_size=512 << 20, actual_size=size)
+            raw.write(chunk)
+        raw.seek(0)
+        try:
+            with zipfile.ZipFile(raw) as z:
+                meta = json.loads(z.read("stage.json").decode("utf-8"))
+                stg_ = (meta.get("stage") or {}) if isinstance(meta, dict) else {}
+                if not (stg_.get("name") or "").strip():
+                    raise KeyError("stage name")
+                os.makedirs(IMAGES_DIR, exist_ok=True)
+                for zi in z.infolist():
+                    if zi.is_dir() or not zi.filename.startswith("media/"):
+                        continue
+                    n = os.path.basename(zi.filename)   # traversal-proof
+                    if n:
+                        with z.open(zi) as src, \
+                                open(os.path.join(IMAGES_DIR, n), "wb") as dst:
+                            shutil.copyfileobj(src, dst)
+        except (zipfile.BadZipFile, KeyError, ValueError) as e:
+            return web.json_response({"ok": False,
+                                      "error": f"not a valid stage bundle: {e}"})
+        cfg0 = config_store.load()
+        stages = list(cfg0.get("stages") or [])
+        base = (stg_.get("name") or "Imported").strip()
+        name, n = base, 2
+        while any((s.get("name") or "").strip() == name for s in stages):
+            name = f"{base} ({n})"
+            n += 1
+        stg_["name"] = name
+        stages.append(stg_)
+        cfg = config_store.save(config_store._coerce_numbers(
+            {**cfg0, "stages": stages}))
+        engine.set_config(cfg)
+        return web.json_response({"ok": True, "name": name,
+                                  **_public_state(engine, botmgr)})
+
     # ---- Device Sync: pull gameplay + media from another DiscoFlate ----------
     # Both sides speak this. The SOURCE just answers export (and serves files
     # via /api/stage/media); the TARGET's server does the pulling, so the
@@ -1295,6 +1556,8 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         return web.json_response({"ok": True, "version": VERSION,
                                   "gameplay": _gameplay_export(cfg),
                                   "gameplay_presets": cfg.get("gameplay_presets") or [],
+                                  "stages": cfg.get("stages") or [],
+                                  "stage_globals": cfg.get("stage_globals") or [],
                                   "media": media})
 
     async def sync_pull(request):
@@ -1351,6 +1614,9 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             merged["gameplay_presets"] = inc_p + [
                 p for p in (merged.get("gameplay_presets") or [])
                 if (p.get("name") or "").strip().lower() not in names]
+        for k in ("stages", "stage_globals"):   # stage designs ride along too
+            if isinstance(data.get(k), list):
+                merged[k] = data[k]
         cfg = config_store.save(config_store._coerce_numbers(merged))
         engine.set_config(cfg)
         return web.json_response({"ok": True, "from_version": data.get("version"),
@@ -1519,6 +1785,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/camera/start", camera_start),
         web.post("/api/camera/stop", camera_stop),
         web.post("/api/camera/detect", camera_detect),
+        web.post("/api/camera/driver", camera_driver),
         web.get("/api/camera/preview", camera_preview),
         web.post("/api/overlay/fire", overlay_fire),
         web.post("/api/overlay/clear", overlay_clear),
@@ -1528,6 +1795,11 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.get("/api/stage/media/{name}", stage_media),
         web.post("/api/sync/export", sync_export),
         web.post("/api/sync/pull", sync_pull),
+        web.post("/api/media/list", media_list),
+        web.post("/api/media/delete", media_delete),
+        web.post("/api/stage-design", stage_design),
+        web.get("/api/stage-design/export", stage_export),
+        web.post("/api/stage-design/import", stage_import),
         web.post("/api/check-updates", check_updates),
         web.post("/api/pull-updates", pull_updates),
     ])

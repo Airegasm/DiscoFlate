@@ -16,6 +16,7 @@ piece is missing, status() says exactly why instead of crashing the app.
 from __future__ import annotations
 
 import os
+import sys
 import threading
 import time
 
@@ -50,6 +51,9 @@ class VirtualCam:
         self._size = (1280, 720)
         self._fps = 30
         self._last = None   # latest composited frame (BGR) for the panel preview
+        self.state_cb = None       # () -> {"capacity","firing","remaining"} for widgets
+        self._state = {}
+        self._state_at = 0.0
 
     # -- lifecycle ------------------------------------------------------------ #
     def available(self) -> str | None:
@@ -151,8 +155,26 @@ class VirtualCam:
                     o["dead"] = True
         return {"ok": True}
 
+    def add_widget(self, widget: str, x=None, y=None, w=None,
+                   layer: str | None = None) -> dict:
+        """A live game widget layer (capacity_gauge / pump_timer), drawn each
+        frame from state_cb. Named layers replace like media overlays."""
+        key = (str(layer or "").strip().lower()) or None
+        ent = {"kind": "widget", "widget": str(widget or ""), "layer": key,
+               "dead": False, "until": None, "pos": "center",
+               "scale": max(0.05, min(1.0, float(w or 0.35))),
+               "x": x, "y": y}
+        with self._lock:
+            if key:
+                for o in self._overlays:
+                    if o.get("layer") == key:
+                        o["dead"] = True
+            self._overlays.append(ent)
+        return {"ok": True}
+
     def fire_overlay(self, media: str, seconds=5.0, pos: str = "center",
-                     scale=0.5, mode: str = "timed", layer: str | None = None) -> dict:
+                     scale=0.5, mode: str = "timed", layer: str | None = None,
+                     x=None, y=None) -> dict:
         """Show a MEDIA layer over the camera. `media` = an image (PNG alpha
         welcome) or a video file from data/images (or an absolute path).
         mode: "timed"  = shown/looping for `seconds`
@@ -179,7 +201,7 @@ class VirtualCam:
         except (TypeError, ValueError):
             secs, sc = 5.0, 0.5
         entry = {"layer": key, "pos": str(pos or "center").lower(), "scale": sc,
-                 "dead": False,
+                 "dead": False, "x": x, "y": y,   # fractional coords beat `pos`
                  "until": (time.monotonic() + secs) if mode == "timed" else None}
         if os.path.splitext(path)[1].lower() in self._VIDEO_EXTS:
             cap = cv2.VideoCapture(path)
@@ -224,6 +246,67 @@ class VirtualCam:
             y = H - h - int(H * 0.03)
         return max(0, x), max(0, y)
 
+    def _get_state(self) -> dict:
+        """Cached game state for widgets — refreshed at most twice a second."""
+        now = time.monotonic()
+        if self.state_cb is not None and now - self._state_at > 0.5:
+            try:
+                self._state = self.state_cb() or {}
+            except Exception:  # noqa: BLE001
+                pass
+            self._state_at = now
+        return self._state
+
+    def _draw_widget(self, frame, o, W: int, H: int) -> None:
+        st = self._get_state()
+        bw = max(60, int(W * float(o.get("scale") or 0.35)))
+        if o.get("x") is not None and o.get("y") is not None:
+            x, y = int(W * float(o["x"])), int(H * float(o["y"]))
+        else:
+            x, y = self._place(W, H, bw, int(bw * 0.14) + 4, o.get("pos") or "center")
+        x = max(0, min(W - 20, x))
+        y = max(0, min(H - 20, y))
+        if o.get("widget") == "capacity_gauge":
+            try:
+                pct = float(st.get("capacity") or 0)
+            except (TypeError, ValueError):
+                pct = 0.0
+            bh = min(max(16, int(bw * 0.11)), H - y - 2)
+            bw = min(bw, W - x - 2)
+            if bh <= 4 or bw <= 20:
+                return
+            frac = max(0.0, min(1.0, pct / 100.0))
+            color = (60, int(200 - 150 * frac), int(70 + 170 * frac))   # green→red
+            cv2.rectangle(frame, (x, y), (x + bw, y + bh), (30, 30, 30), -1)
+            if frac > 0:
+                cv2.rectangle(frame, (x, y), (x + int(bw * frac), y + bh), color, -1)
+            cv2.rectangle(frame, (x, y), (x + bw, y + bh), (240, 240, 240), 2)
+            fs = max(0.5, bh / 32.0)
+            org = (x + 8, y + bh - max(4, int(bh * 0.25)))
+            cv2.putText(frame, f"{pct:.0f}%", org, cv2.FONT_HERSHEY_SIMPLEX,
+                        fs, (0, 0, 0), int(fs * 4) + 2, cv2.LINE_AA)
+            cv2.putText(frame, f"{pct:.0f}%", org, cv2.FONT_HERSHEY_SIMPLEX,
+                        fs, (255, 255, 255), max(1, int(fs * 2)), cv2.LINE_AA)
+        else:   # pump_timer
+            try:
+                rem = float(st.get("remaining") or 0)
+            except (TypeError, ValueError):
+                rem = 0.0
+            firing = bool(st.get("firing"))
+            label = f"PUMP {rem:.0f}s" if firing else "PUMP idle"
+            fs = max(0.6, bw / 260.0)
+            (tw_, th_), _b = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX,
+                                             fs, max(1, int(fs * 2)))
+            pad = max(6, int(th_ * 0.5))
+            x2 = min(W - 1, x + tw_ + pad * 2)
+            y2 = min(H - 1, y + th_ + pad * 2)
+            cv2.rectangle(frame, (x, y), (x2, y2), (25, 25, 25), -1)
+            cv2.rectangle(frame, (x, y), (x2, y2),
+                          (70, 200, 70) if firing else (110, 110, 110), 2)
+            cv2.putText(frame, label, (x + pad, y + pad + th_),
+                        cv2.FONT_HERSHEY_SIMPLEX, fs, (255, 255, 255),
+                        max(1, int(fs * 2)), cv2.LINE_AA)
+
     def _composite(self, frame):
         now = time.monotonic()
         with self._lock:
@@ -242,6 +325,12 @@ class VirtualCam:
             return frame
         H, W = frame.shape[:2]
         for o in ovs:
+            if o.get("kind") == "widget":
+                try:
+                    self._draw_widget(frame, o, W, H)
+                except Exception:  # noqa: BLE001 — a bad widget never kills the pipe
+                    o["dead"] = True
+                continue
             if o.get("kind") == "video":
                 ok, vf = o["cap"].read()
                 if not ok and o.get("loop"):
@@ -259,7 +348,14 @@ class VirtualCam:
                 th = H
                 tw = max(8, int(img.shape[1] * th / max(1, img.shape[0])))
             ov = cv2.resize(img, (tw, th), interpolation=cv2.INTER_AREA)
-            x, y = self._place(W, H, tw, th, o["pos"])
+            if o.get("x") is not None and o.get("y") is not None:
+                try:   # stage-designed spot: exact fractional coordinates
+                    x = max(0, min(W - 8, int(W * float(o["x"]))))
+                    y = max(0, min(H - 8, int(H * float(o["y"]))))
+                except (TypeError, ValueError):
+                    x, y = self._place(W, H, tw, th, o["pos"])
+            else:
+                x, y = self._place(W, H, tw, th, o["pos"])
             th = min(th, H - y)
             tw = min(tw, W - x)
             if th <= 0 or tw <= 0:
@@ -282,17 +378,26 @@ class VirtualCam:
                 self._err = f"couldn't open camera #{self._device}"
                 return
             H, W = frame.shape[:2]
+            H -= H % 2   # I420 needs even dimensions
+            W -= W % 2
+            # Browsers reject RGB from v4l2loopback (Chrome/Discord-web hang
+            # then error 2014) — on Linux feed I420 like OBS does. Windows'
+            # OBS driver takes RGB and serves NV12 to apps itself.
+            i420 = sys.platform.startswith("linux")
+            fmt = (pyvirtualcam.PixelFormat.I420 if i420
+                   else pyvirtualcam.PixelFormat.RGB)
             with pyvirtualcam.Camera(width=W, height=H, fps=self._fps,
-                                     print_fps=False) as cam:
+                                     fmt=fmt, print_fps=False) as cam:
                 self._info = f"{cam.device} · {W}x{H} @ {self._fps}fps"
                 while not self._stop.is_set():
                     ok, frame = cap.read()
                     if not ok or frame is None:
                         self._err = "camera read failed (unplugged / in use?)"
                         break
-                    frame = self._composite(frame)
+                    frame = self._composite(frame[:H, :W])
                     self._last = frame   # cap.read() hands out fresh arrays
-                    cam.send(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                    cam.send(cv2.cvtColor(frame, cv2.COLOR_BGR2YUV_I420) if i420
+                             else cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
                     cam.sleep_until_next_frame()
         except Exception as e:  # noqa: BLE001 — surfaced via status()
             self._err = str(e)
