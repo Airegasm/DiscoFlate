@@ -1,6 +1,6 @@
 {
-  "version": "3.53.0",
-  "versionCode": 130,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.53.0/discoflate-v3.53.0.apk",
-  "notes": "DiscoFlate v3.53.0 — the Scenes tab works like OBS now. The row of ➕ buttons is gone: there's a scrollable palette of overlay types on the left, and on the right the scene's stack, front first, where each row has 👁 (always-on vs callable), ▲▼ to move it in front of or behind the others, ⚙ for its options and − to remove it. Every overlay also gets an OPACITY slider, which scales properly with fades — a 50% overlay halfway through a fade-in renders at 25%. Scene groups are no longer invisible: every group in the scene is listed under the canvas with its overlay count (click one to jump to it), and the Scene group box autocompletes names you already use so a typo can't silently orphan an overlay."
+  "version": "3.53.1",
+  "versionCode": 131,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.53.1/discoflate-v3.53.1.apk",
+  "notes": "DiscoFlate v3.53.1 — the overlay options panel on the Scenes tab was a ragged mess: long labels wrapped onto two lines which made rows different heights, and buttons placed inside those labels stacked underneath the inputs instead of beside them (the ▲▼, the rotation reset, the background ✕). It's now four labelled sections — Content, Style, Placement & motion, Firing — with short single-line labels, the detail moved to hover tooltips, and every control the same height so rows line up. Controls that moved into the overlay list in 3.53.0 (👁 always-on, ▲▼ reorder) are no longer duplicated here."
 }

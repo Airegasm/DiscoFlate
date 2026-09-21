@@ -77,6 +77,39 @@
   /* overlay-editor rows: one line on desktop, wrapping stack on phones */
   .ovedit{gap:10px;align-items:flex-end;flex-wrap:nowrap;margin-bottom:6px}
   .ovedit .grow{flex:1}
+  /* Scenes tab: the selected overlay's options.
+     Rows only line up if every label stays on ONE line — a wrapped label makes
+     its field taller than its neighbours and the whole row goes ragged. So
+     labels are short and the explanation lives in a title tooltip. */
+  .pbox{border:1px solid var(--line);border-radius:10px;background:var(--panel2);padding:10px 12px}
+  .psect{border-top:1px solid var(--line);margin-top:10px;padding-top:9px}
+  .phead{font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;
+         letter-spacing:.05em;margin-bottom:7px}
+  .prow{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end}
+  .pfield{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--dim)}
+  .pfield>span{white-space:nowrap;line-height:1.1}
+  /* controls sit side by side under the label, never stacked */
+  .pfield{--h:34px}
+  .pfield input,.pfield select,.pfield textarea,.pfield .pmedia,.pfield .pval{margin:0}
+  .pfield>input,.pfield>select,.pfield>textarea{height:var(--h);box-sizing:border-box}
+  .pfield>input[type=color]{padding:2px;width:46px}
+  .pfield.grow{flex:1;min-width:240px}
+  .pfield.grow textarea{width:100%;height:auto;min-height:52px;resize:vertical}
+  /* a label containing more than one control lays them out in a row */
+  .pfield.inline{flex-direction:row;align-items:center;gap:5px;flex-wrap:nowrap}
+  .pfield.inline>span{align-self:center}
+  .pmini{padding:0 8px;height:var(--h);line-height:var(--h)}
+  .pcol{width:46px;height:var(--h);padding:2px}
+  .prange{width:120px;height:var(--h);padding:0;accent-color:var(--accent)}
+  .pval{font-size:12px;color:var(--dim);min-width:38px}
+  .pmedia{display:inline-block;max-width:170px;overflow:hidden;text-overflow:ellipsis;
+          white-space:nowrap;font-size:12px;color:var(--text);
+          background:var(--panel);border:1px solid var(--line);border-radius:7px;
+          padding:0 9px;height:var(--h);line-height:var(--h)}
+  .pchk{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);
+        height:var(--h);white-space:nowrap}
+  .pchk input{width:16px;height:16px}
+  .pspacer{flex:1 1 20px}
   /* Scenes tab: a palette to add from, and the scene's contents — both scroll */
   .stglists{display:grid;grid-template-columns:1fr 1.4fr;gap:10px;margin-top:8px}
   .stgpane{border:1px solid var(--line);border-radius:10px;background:var(--panel2);padding:8px}
@@ -2474,117 +2507,113 @@ function stgPickGroup(name){
 function renderStgProps(){
   const s=stgStage(), box=$('#stgProps'); if(!box) return;
   const o = s && (s.overlays||[]).find(x=>x.id===scnSelId);
-  if(!o){ box.innerHTML='<span class="muted">no overlay selected — click one on the canvas</span>'; return; }
-  const kind = o.kind||'media', isMedia = kind==='media', isGauge = kind==='capacity_gauge';
-  const F = (label, inner) => `<label class="field">${label} ${inner}</label>`;
-  const num = (k, v, min, max, step, w) =>
-    `<input type="number" min="${min}" max="${max}" step="${step}" value="${v}" style="width:${w||70}px" onchange="stgItemSet('${k}',+this.value)">`;
-  let rows =
-    `<div class="row ovedit">`+
-    F('Label', `<input value="${esc(o.label||'')}" placeholder="${esc(kind)}" style="width:130px" onchange="stgItemSet('label',this.value)">`)+
-    (isMedia
-      ? `<span class="pill" style="max-width:170px;overflow:hidden;text-overflow:ellipsis">${esc(o.media||'—')}</span>`+
-        `<button class="ghost" title="pick media" onclick="mediaBrowse(n=>stgItemSet('media',n))">🗂</button>`
-      : `<span class="pill">${isGauge?'📊 Capacity Gauge':kind==='device_timers'?'⏱ Device Timers':kind==='poll_viewer'?'🗳 Poll Viewer':kind==='timer'?'⏳ Timer':kind==='pump_timer'?'⏱ Pump Timer':'🅣 Text'}</span>`)+
-    `<label class="row" style="gap:5px" title="always-on = part of the scene whenever the stage is live; unticked = a callable button"><input type="checkbox" ${o.visible?'checked':''} style="width:auto" onchange="stgItemSet('visible',this.checked)"> always-on</label>`+
-    (!o.visible ?
-      F('Mode', `<select style="width:96px" onchange="stgItemSet('mode',this.value)">${['timed','hold','once'].map(m=>`<option ${o.mode===m?'selected':''}>${m}</option>`).join('')}</select>`)+
-      F('Secs', num('seconds', o.seconds??5, 0.5, 600, 0.5)) : '')+
-    F('Layer', `<input value="${esc(o.layer||'')}" placeholder="(own)" style="width:84px" onchange="stgItemSet('layer',this.value)">`)+
-    F('Scene group <span class="muted">(batch)</span>',
-      `<input list="stgGroupList" value="${esc(o.group||'')}" placeholder="intro" style="width:130px" title="type a name to make a group, or pick one you already use — everything sharing it fires together" onchange="stgItemSet('group',this.value.trim())">`+
-      `<datalist id="stgGroupList">${sceneGroupNames().map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`)+
-    F('Layer order', `<input type="number" step="1" value="${o.z??0}" style="width:70px" title="higher draws on top; equal values keep fire order" onchange="stgItemSet('z',+this.value)">`+
-      `<button class="ghost" style="padding:6px 8px;margin-left:3px" title="bring forward" onclick="stgLayer(1)">⬆</button>`+
-      `<button class="ghost" style="padding:6px 8px" title="send back" onclick="stgLayer(-1)">⬇</button>`)+
-    `<div style="flex:1"></div>`+
-    `<button class="ghost" title="duplicate" onclick="stgItemDup()">📋</button>`+
-    `<button class="ghost" title="remove from stage" onclick="stgItemDel()">✕</button>`+
-    `</div>`;
-  // ---- per-kind options ----
-  if(kind==='text')
-    rows += `<div class="row ovedit">`+
-      F('Text <span class="muted">([capacity] · [secs] stay live)</span>',
-        `<input value="${esc(o.text||'')}" style="width:260px" onchange="stgItemSet('text',this.value)">`)+
-      `</div>`;
-  rows += `<div class="row ovedit">`+
-    F('Fade in <span class="muted">(secs)</span>', num('fade_in', o.fade_in??0, 0, 10, 0.1, 80))+
-    F('Fade out <span class="muted">(secs)</span>', num('fade_out', o.fade_out??0, 0, 10, 0.1, 80))+
-    `<span class="muted">fades double as the slide timing when <b>animate</b> is on</span>`+
-    `</div>`;
+  if(!o){ box.innerHTML='<div class="muted">no overlay selected — pick one from the list or the canvas</div>'; return; }
+  const kind=o.kind||'media', isMedia=kind==='media', isGauge=kind==='capacity_gauge',
+        isText=kind==='text', isPoll=kind==='poll_viewer', isTimer=kind==='timer',
+        isDev=kind==='device_timers'||kind==='pump_timer';
+  // Keep labels SHORT and on one line — a wrapping label makes its field taller
+  // than its neighbours and the whole row goes ragged. Detail lives in `title`.
+  // two or more controls under one label go side by side, not stacked
+  const F=(lab,inner,tip)=>{
+    const multi=/<(input|select|button|span|textarea)[\s>]/gi, n=(inner.match(multi)||[]).length;
+    return `<label class="pfield${n>1?' inline':''}"${tip?` title="${esc(tip)}"`:''}>`+
+           `<span>${lab}</span>${inner}</label>`;
+  };
+  const num=(k,v,min,max,step,w)=>`<input type="number" min="${min}" max="${max}" step="${step}" value="${v}" style="width:${w||68}px" onchange="stgItemSet('${k}',+this.value)">`;
+  const sel=(k,list,cur,w)=>`<select style="width:${w||110}px" onchange="stgItemSet('${k}',this.value)">`+
+    list.map(v=>Array.isArray(v)?`<option value="${v[0]}" ${cur===v[0]?'selected':''}>${esc(v[1])}</option>`
+                                :`<option ${cur===v?'selected':''}>${esc(v)}</option>`).join('')+`</select>`;
+  const chk=(k,on,lab,tip)=>`<label class="pchk" title="${esc(tip||'')}"><input type="checkbox" ${on?'checked':''} onchange="stgItemSet('${k}',this.checked)"> ${lab}</label>`;
+  const sect=(t,body)=>body?`<div class="psect"><div class="phead">${t}</div><div class="prow">${body}</div></div>`:'';
+  const TYPE={media:'🖼 Media',text:'🅣 Text',timer:'⏳ Timer',capacity_gauge:'📊 Capacity Gauge',
+              device_timers:'⏱ Device Timers',pump_timer:'⏱ Pump Timer',poll_viewer:'🗳 Poll Viewer'}[kind]||kind;
+
+  // ---- identity ------------------------------------------------------- //
+  let head = `<div class="prow">`+
+    `<span class="pill">${TYPE}</span>`+
+    F('Label', `<input value="${esc(o.label||'')}" placeholder="${esc(kind)}" style="width:150px" onchange="stgItemSet('label',this.value)">`,
+      'a friendly name — shown in the list and on Chat buttons')+
+    (isMedia?F('File', `<span class="pmedia">${esc(o.media||'—')}</span>`+
+      `<button class="ghost" title="pick from the media library" onclick="mediaBrowse(n=>stgItemSet('media',n))">🗂</button>`):'')+
+    `<div class="pspacer"></div>`+
+    `<button class="ghost" title="duplicate this overlay" onclick="stgItemDup()">📋 Duplicate</button>`+
+    `<button class="ghost" title="remove it from the scene" onclick="stgItemDel()">✕ Remove</button>`+
+  `</div>`;
+
+  // ---- content (type-specific) ---------------------------------------- //
+  let content='';
+  if(isText)
+    content = `<label class="pfield grow"><span>Text</span>`+
+      `<textarea rows="2" onchange="stgItemSet('text',this.value)">${esc(o.text||'')}</textarea></label>`+
+      F('Align', sel('align',['left','center','right'],o.align||'left',96));
+  if(isTimer)
+    content = F('Label text', `<input value="${esc(o.text||'[secs]')}" style="width:210px" onchange="stgItemSet('text',this.value)">`,
+                '[secs] or [mmss] becomes the countdown')+
+      F('Seconds', num('seconds',o.seconds??60,1,86400,1,84))+
+      chk('autostart',o.autostart,'auto start','begin counting when the scene goes live')+
+      chk('autovanish',o.autovanish,'auto vanish','remove itself at zero');
+  if(isDev)
+    content = F('Running', `<input value="${esc(o.fmt_on||'[name] [secs]s')}" style="width:190px" onchange="stgItemSet('fmt_on',this.value)">`,'[name] and [secs] per device')+
+      F('Idle', `<input value="${esc(o.fmt_off||'[name] idle')}" style="width:160px" onchange="stgItemSet('fmt_off',this.value)">`)+
+      (kind==='device_timers'?chk('show_idle',o.show_idle!==false,'show idle','list devices that are not running'):'');
+  if(isGauge)
+    content = F('Orientation', sel('orient',[['h','horizontal'],['v','vertical']],String(o.orient||'h')[0]==='v'?'v':'h',118))+
+      F('Length %', num('w',Math.round((o.w??0.35)*100),4,100,1))+
+      F('Thickness %', num('size',Math.round((o.size??0.05)*100),1,90,1))+
+      chk('show_pct',o.show_pct!==false,'show %');
+  if(isPoll)
+    content = chk('auto_show',o.auto_show!==false,'show while a poll runs')+
+      F('Hold results', num('results_secs',o.results_secs??8,0,600,1,84),'seconds the results stay up before fading')+
+      F('Width %', num('w',Math.round((o.w??0.34)*100),8,100,1))+
+      F('Height %', num('h',Math.round((o.h??0.3)*100),8,100,1))+
+      F('Card bg', `<input type="range" min="0" max="255" step="5" value="${o.bg_opacity??220}" class="prange" oninput="this.nextElementSibling.textContent=Math.round(this.value/2.55)+'%'" onchange="stgItemSet('bg_opacity',+this.value)"><span class="pval">${Math.round((o.bg_opacity??220)/2.55)}%</span>`,
+        'how solid the card background is');
   if(isMedia)
-    rows += `<div class="row ovedit">`+
-      `<label class="row" style="gap:5px" title="knock a background colour out of the video so a plain .mp4 works as a transparent overlay — no alpha codec needed"><input type="checkbox" ${o.chroma_on?'checked':''} style="width:auto" onchange="stgItemSet('chroma_on',this.checked)"> 🟩 chroma key</label>`+
-      (o.chroma_on
-        ? F('Key colour', `<input type="color" value="${esc(o.chroma||'#00ff00')}" style="width:52px;padding:2px" onchange="stgItemSet('chroma',this.value)">`)+
-          F('Tolerance <span class="muted">(how much of that hue goes)</span>',
-            `<input type="number" min="1" max="120" value="${o.chroma_tol??35}" style="width:80px" onchange="stgItemSet('chroma_tol',+this.value)">`)+
-          F('Edge softness', `<input type="number" min="0" max="80" value="${o.chroma_soft??12}" style="width:80px" onchange="stgItemSet('chroma_soft',+this.value)">`)+
-          `<span class="muted">greens out; greys and skin are protected</span>`
-        : `<span class="muted">turn on to use a green-screen video over the camera</span>`)+
-      `</div>`;
-  if(kind==='poll_viewer')
-    rows += `<div class="row ovedit">`+
-      F('Card background', `<input type="range" min="0" max="255" step="5" value="${o.bg_opacity??220}" style="width:110px;padding:0" oninput="this.nextElementSibling.textContent=Math.round(this.value/2.55)+'%'" onchange="stgItemSet('bg_opacity',+this.value)">`+
-        `<span class="muted" style="min-width:38px;display:inline-block">${Math.round((o.bg_opacity??220)/2.55)}%</span>`)+
-      `<label class="row" style="gap:5px" title="appear by itself whenever a poll is running"><input type="checkbox" ${o.auto_show!==false?'checked':''} style="width:auto" onchange="stgItemSet('auto_show',this.checked)"> show while a poll runs</label>`+
-      F('Hold results <span class="muted">(secs, then it fades)</span>',
-        `<input type="number" min="0" step="1" value="${o.results_secs??8}" style="width:80px" onchange="stgItemSet('results_secs',+this.value)">`)+
-      F('Width %', `<input type="number" min="8" max="100" value="${Math.round((o.w??0.34)*100)}" style="width:76px" onchange="stgItemSet('w',+this.value)">`)+
-      F('Height %', `<input type="number" min="8" max="100" value="${Math.round((o.h??0.3)*100)}" style="width:76px" onchange="stgItemSet('h',+this.value)">`)+
-      `<span class="muted">invisible until a poll starts · drag its corners to resize</span>`+
-      `</div>`;
-  if(kind==='timer')
-    rows += `<div class="row ovedit">`+
-      F('Label <span class="muted">([secs] or [mmss] = the countdown)</span>',
-        `<input value="${esc(o.text||'[secs]')}" style="width:230px" onchange="stgItemSet('text',this.value)">`)+
-      F('Seconds', `<input type="number" min="1" step="1" value="${o.seconds??60}" style="width:80px" onchange="stgItemSet('seconds',+this.value)">`)+
-      `<label class="row" style="gap:5px" title="start counting the moment this stage goes live"><input type="checkbox" ${o.autostart?'checked':''} style="width:auto" onchange="stgItemSet('autostart',this.checked)"> auto start on load</label>`+
-      `<label class="row" style="gap:5px" title="remove itself when it reaches zero"><input type="checkbox" ${o.autovanish?'checked':''} style="width:auto" onchange="stgItemSet('autovanish',this.checked)"> auto vanish on complete</label>`+
-      `<span class="muted">otherwise use the <b>start_timer</b> / <b>stop_timer</b> actions</span>`+
-      `</div>`;
-  if(kind==='pump_timer' || kind==='device_timers'){
-    const dt = kind==='device_timers';
-    rows += `<div class="row ovedit">`+
-      F(dt?'Running row <span class="muted">([name] · [secs])</span>':'While pumping',
-        `<input value="${esc(o.fmt_on||(dt?'[name] [secs]s':'PUMP [secs]s'))}" style="width:190px" onchange="stgItemSet('fmt_on',this.value)">`)+
-      F(dt?'Idle row':'While idle',
-        `<input value="${esc(o.fmt_off||(dt?'[name] idle':'PUMP idle'))}" style="width:170px" onchange="stgItemSet('fmt_off',this.value)">`)+
-      (dt?`<label class="row" style="gap:5px" title="untick to list only devices that are actually running"><input type="checkbox" ${o.show_idle!==false?'checked':''} style="width:auto" onchange="stgItemSet('show_idle',this.checked)"> show idle devices</label>`
-         +`<span class="muted">one row per device · primary pump on top · grows as you add devices</span>`:'')+
-      `</div>`;
+    content = F('Width %', num('w',Math.round((o.w??0.3)*100),4,100,1))+
+      F('Height %', `<input type="number" min="2" max="100" step="1" value="${o.h?Math.round(o.h*100):''}" placeholder="auto" style="width:84px" onchange="stgItemSet('h', this.value===''?null:+this.value)">`,'blank keeps the aspect ratio')+
+      chk('chroma_on',o.chroma_on,'🟩 chroma key','knock a background colour out so a green-screen clip plays transparent')+
+      (o.chroma_on?F('Key', `<input type="color" value="${esc(o.chroma||'#00ff00')}" class="pcol" onchange="stgItemSet('chroma',this.value)">`)+
+        F('Tolerance', num('chroma_tol',o.chroma_tol??35,1,120,1))+
+        F('Softness', num('chroma_soft',o.chroma_soft??12,0,80,1)):'');
+
+  // ---- style (drawn overlays) ------------------------------------------ //
+  let style='';
+  if(!isMedia && !isPoll){
+    const bgOn=(o.bg||'').trim();
+    style = F(isGauge?'Fill':'Colour', `<input type="color" value="${esc(o.color||(isGauge?'#2ecc71':'#ffffff'))}" class="pcol" onchange="stgItemSet('color',this.value)">`)+
+      (isGauge?'':F('Font', sel('font',['sans','bold','serif','mono','script'],o.font||'bold',104))+
+                 F('Size %', num('size',Math.round((o.size??0.06)*100),1,90,1)))+
+      F('Background', `<input type="color" value="${esc(o.bg||'#000000')}" class="pcol" onchange="stgItemSet('bg',this.value)">`+
+        `<button class="ghost pmini" title="${bgOn?'make transparent':'currently transparent'}" onclick="stgItemSet('bg','')">${bgOn?'✕':'—'}</button>`,
+        'blank = transparent');
   }
-  if(!isMedia)
-    rows += `<div class="row ovedit">`+
-      F(isGauge?'Fill colour':'Colour',
-        `<input type="color" value="${esc(o.color||(isGauge?'#2ecc71':'#ffffff'))}" style="width:52px;padding:2px" onchange="stgItemSet('color',this.value)">`)+
-      (isGauge?'':F('Font', `<select style="width:100px" onchange="stgItemSet('font',this.value)">${['sans','bold','serif','mono','script'].map(f=>`<option ${(o.font||'bold')===f?'selected':''}>${f}</option>`).join('')}</select>`))+
-      F(isGauge?'Thickness %':'Size %', num('size', Math.round((o.size??0.06)*100), 1, 90, 1))+
-      F('Background', `<input type="color" value="${esc(o.bg||'#000000')}" style="width:52px;padding:2px" onchange="stgItemSet('bg',this.value)">`+
-        `<button class="ghost" title="${o.bg?'make transparent':'transparent'}" style="padding:6px 8px" onclick="stgItemSet('bg','')">${o.bg?'✕':'—'}</button>`)+
-      (isGauge?
-        F('Orientation', `<select style="width:110px" onchange="stgItemSet('orient',this.value)"><option value="h" ${String(o.orient||'h')[0]!=='v'?'selected':''}>horizontal</option><option value="v" ${String(o.orient||'h')[0]==='v'?'selected':''}>vertical</option></select>`)+
-        `<label class="row" style="gap:5px"><input type="checkbox" ${o.show_pct!==false?'checked':''} style="width:auto" onchange="stgItemSet('show_pct',this.checked)"> show %</label>`
-        : '')+
-      `</div>`;
-  rows += `<div class="row ovedit">`+
-    F('Opacity', `<input type="range" min="0" max="100" step="1" value="${o.opacity??100}" style="width:130px;padding:0" oninput="this.nextElementSibling.textContent=this.value+'%'" onchange="stgItemSet('opacity',+this.value)">`+
-      `<span class="muted" style="min-width:38px;display:inline-block">${o.opacity??100}%</span>`)+
-    `<label class="row" style="gap:5px" title="slide in and out instead of just appearing — keeps a burst of notifications from landing on top of each other"><input type="checkbox" ${o.anim?'checked':''} style="width:auto" onchange="stgItemSet('anim',this.checked)"> animate &amp; fade</label>`+
-    (o.anim?F('Direction', `<select style="width:96px" onchange="stgItemSet('anim_dir',this.value)">`+
-      ['up','down','left','right'].map(d=>`<option ${(o.anim_dir||'up')===d?'selected':''}>${d}</option>`).join('')+`</select>`):'')+
-    `<label class="row" style="gap:5px" title="when this overlay is already on screen, wait your turn instead of replacing it — alerts then play one after another"><input type="checkbox" ${o.queue?'checked':''} style="width:auto" onchange="stgItemSet('queue',this.checked)"> queue if busy</label>`+
-    `</div>`+
-    `<div class="row ovedit">`+
-    F('Rotation °', num('rot', Math.round(o.rot||0), -360, 360, 1, 80)+
-      `<button class="ghost" title="reset rotation to 0°" style="padding:6px 9px;margin-left:4px" onclick="stgItemSet('rot',0)">↺</button>`)+
-    F('Flash <span class="muted">(secs on = secs off · 0 = steady)</span>', num('flash', o.flash??0, 0, 10, 0.5))+
-    ((isMedia||isGauge)?F(isGauge?'Length %':'Width %', num('w', Math.round((o.w??0.3)*100), 4, 100, 1)):'')+
-    (isMedia?F('Height % <span class="muted">(blank = auto)</span>',
-      `<input type="number" min="2" max="100" step="1" value="${o.h?Math.round(o.h*100):''}" placeholder="auto" style="width:80px" onchange="stgItemSet('h', this.value===''?null:+this.value)">`):'')+
-    `<span class="muted">x ${((o.x||0)*100).toFixed(0)}% · y ${((o.y||0)*100).toFixed(0)}%</span>`+
-    `</div>`;
-  box.innerHTML = rows;
+
+  // ---- placement & motion ---------------------------------------------- //
+  const place = F('Opacity', `<input type="range" min="0" max="100" step="1" value="${o.opacity??100}" class="prange" oninput="this.nextElementSibling.textContent=this.value+'%'" onchange="stgItemSet('opacity',+this.value)"><span class="pval">${o.opacity??100}%</span>`)+
+    F('Rotation °', num('rot',Math.round(o.rot||0),-360,360,1)+
+      `<button class="ghost pmini" title="reset to 0°" onclick="stgItemSet('rot',0)">↺</button>`)+
+    F('Flash', num('flash',o.flash??0,0,10,0.5),'seconds visible = seconds hidden · 0 = steady')+
+    F('Fade in', num('fade_in',o.fade_in??0,0,10,0.1))+
+    F('Fade out', num('fade_out',o.fade_out??0,0,10,0.1))+
+    chk('anim',o.anim,'animate','slide in and out instead of just appearing')+
+    (o.anim?F('Direction', sel('anim_dir',['up','down','left','right'],o.anim_dir||'up',92)):'')+
+    chk('queue',o.queue,'queue if busy','wait your turn instead of replacing what is on screen')+
+    `<span class="muted">at x ${((o.x||0)*100).toFixed(0)}% · y ${((o.y||0)*100).toFixed(0)}%</span>`;
+
+  // ---- firing ----------------------------------------------------------- //
+  const fire = `<span class="muted">${o.visible?'Always on — part of the scene while it is live.':'Callable — plays when an action or button fires it.'}</span>`+
+    (o.visible?'':F('Mode', sel('mode',['timed','hold','once'],o.mode||'timed',92))+
+      ((o.mode||'timed')==='timed'?F('Secs', num('seconds',o.seconds??5,0.5,600,0.5)):''))+
+    F('Layer slot', `<input value="${esc(o.layer||'')}" placeholder="(own)" style="width:92px" onchange="stgItemSet('layer',this.value)">`,
+      'firing the same slot replaces what is there')+
+    F('Scene group', `<input list="stgGroupList" value="${esc(o.group||'')}" placeholder="intro" style="width:130px" onchange="stgItemSet('group',this.value.trim())">`+
+      `<datalist id="stgGroupList">${sceneGroupNames().map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`,
+      'overlays sharing a group fire together')+
+    F('Layer order', num('z',Math.round(+o.z||0),-99,99,1),'higher draws in front — or use ▲▼ in the list');
+
+  box.innerHTML = `<div class="pbox">`+head+
+    sect('Content', content)+ sect('Style', style)+
+    sect('Placement &amp; motion', place)+ sect('Firing', fire)+`</div>`;
 }
 function stgLayer(dir){
   const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===scnSelId); if(!o) return;
