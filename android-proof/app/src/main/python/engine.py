@@ -62,6 +62,12 @@ class Engine:
         self._vars: dict[str, str] = {}
         self._uvars: dict[str, dict] = {}
         self._once_fired: set = set()    # action rows flagged "only once"
+        # INTRO phase: LIVE is on, the pre-show is playing, but the game hasn't
+        # started — commands are held and timed events stay parked.
+        self._intro_until: float | None = None
+        self._intro_open: bool = False
+        self._intro_task = None
+        self.intro_done_cb = None       # app.py: finish activation for real
         self._runs: list = []            # live action-block cancel flags
 
         self._tick_task: asyncio.Task | None = None
@@ -520,12 +526,26 @@ class Engine:
             "uptime": self._fmt_duration(self.session_uptime()),
             "uptime_seconds": int(self.session_uptime()),
             "capacity_bar": self._capacity_bar(),
+            "intro_timer": f"{self.intro_remaining():.0f}",
             "prefix": prefix,
             "capacity_cmd": f"{prefix}{bn['capacity']}",
             "help_cmd": f"{prefix}{bn['help']}",
             "leaderboard_cmd": f"{prefix}{bn['leaderboard']}",
             "pumptimer_cmd": f"{prefix}{bn['pumptimer']}",
         }
+        # [timer] = the PRIMARY pump. [timer:<device>] = that device's own
+        # countdown — by friendly name, vendor label or id, case-insensitive,
+        # so a Device Timer row and a message can name the same pump.
+        for dev in (self.cfg.get("devices") or []):
+            did = dev.get("id")
+            if not did:
+                continue
+            secs = f"{self._remaining(did):.1f}"
+            for key in (dev.get("name"), dev.get("label"), did):
+                k = str(key or "").strip()
+                if k:
+                    ctx[f"timer:{k}"] = secs
+                    ctx[f"timer:{k.lower()}"] = secs
         for k, v in (self._vars or {}).items():
             ctx[f"var:{k}"] = v
         uid_ = str((extra or {}).get("uid") or (extra or {}).get("_uid") or "")
@@ -825,6 +845,12 @@ class Engine:
         """Activation OFF: stop every running device fire and kill any live
         minigame views (the bot layer disables + refunds them)."""
         await self.abort(reason="activation off")
+        if self._intro_open:            # LIVE off mid-pre-show: drop it cleanly
+            self._intro_open = False
+            self._intro_until = None
+            if self._intro_task and not self._intro_task.done():
+                self._intro_task.cancel()
+            self._intro_task = None
         # Wipe the overlay stage too: anything on screen, and anything still
         # QUEUED behind it — a burst of alerts must not keep playing into a
         # session that's been switched off.
@@ -1176,6 +1202,109 @@ class Engine:
             if ev.get("stop_devices"):   # legacy pre-v10 flag (now a stop_devices action)
                 await self.abort(reason=f"capacity event {name}")
             self._capev_tasks[key] = asyncio.create_task(self._run_capev(ev, key, name))
+
+    async def start_intro(self, announce_cb=None) -> bool:
+        """Open the pre-show: hold commands + events, play the intro scene
+        group, and (optionally) count down. Returns False when Go Live is set
+        to begin immediately, in which case the caller starts the game."""
+        g = self.cfg.get("golive") or {}
+        if not g.get("intro_enabled"):
+            return False
+        try:
+            secs = max(0.0, float(g.get("seconds") or 0))
+        except (TypeError, ValueError):
+            secs = 0.0
+        self._intro_open = True
+        self._intro_until = (time.monotonic() + secs) if secs else None
+        self._log("bot", "INTRO started"
+                  + (f" — {secs:g}s" if secs else " — until you press Start now"))
+        grp = (g.get("scene_group") or "").strip()
+        if grp and self.overlay_cb is not None:
+            try:
+                self.overlay_cb({"group": grp, "mode": ""})
+            except Exception as e:  # noqa: BLE001
+                self._log("error", f"intro scene group failed: {e}")
+        self._intro_task = asyncio.create_task(self._intro_loop(announce_cb))
+        return True
+
+    async def _intro_loop(self, announce_cb) -> None:
+        """Post/refresh the standby announcement and end the intro on time."""
+        g = self.cfg.get("golive") or {}
+        msg = (g.get("announce") or "").strip()
+        try:
+            every = max(0.0, float(g.get("announce_every") or 0))
+        except (TypeError, ValueError):
+            every = 0.0
+        img = (g.get("announce_image") or "").strip() or None
+        try:
+            # the image rides the FIRST post only — repeating it would spam
+            if (msg or img) and announce_cb:
+                await announce_cb(self.render(msg), img)
+            while self._intro_open:
+                if self._intro_until is None:
+                    await asyncio.sleep(0.5)      # open-ended: wait for the button
+                    continue
+                left = self.intro_remaining()
+                if left <= 0:
+                    break
+                nap = min(left, every) if every else left
+                await asyncio.sleep(max(0.2, nap))
+                if msg and announce_cb and every and self._intro_open and self.intro_remaining() > 0:
+                    await announce_cb(self.render(msg), None)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:  # noqa: BLE001
+            self._log("error", f"intro loop: {e}")
+        if self._intro_open:
+            await self.end_intro(reason="timer")
+
+    async def end_intro(self, reason: str = "manual") -> bool:
+        """Close the pre-show and start the real session: clear the intro
+        scene group, release commands, and let the timed events go."""
+        if not self._intro_open:
+            return False
+        self._intro_open = False
+        self._intro_until = None
+        t, self._intro_task = self._intro_task, None
+        if t and not t.done():
+            t.cancel()
+        g = self.cfg.get("golive") or {}
+        grp = (g.get("scene_group") or "").strip()
+        if grp and self.overlay_cb is not None:
+            try:
+                self.overlay_cb({"group": grp, "mode": "clear",
+                                 "fade_out": g.get("fade_out") or 0.6})
+            except Exception as e:  # noqa: BLE001
+                self._log("error", f"clearing the intro failed: {e}")
+        self._log("bot", f"INTRO ended ({reason}) — the session is live")
+        if self.intro_done_cb:
+            try:
+                await self.intro_done_cb()
+            except Exception as e:  # noqa: BLE001
+                self._log("error", f"go-live after intro failed: {e}")
+        return True
+
+    def intro_active(self) -> bool:
+        return bool(self._intro_open)
+
+    def intro_remaining(self) -> float:
+        if not self._intro_open or self._intro_until is None:
+            return 0.0
+        return max(0.0, self._intro_until - time.monotonic())
+
+    def intro_allows(self, cmd_name: str) -> bool:
+        """During the intro only the explicitly-allowed commands run."""
+        g = self.cfg.get("golive") or {}
+        if not g.get("hold_commands", True):
+            return True
+        ok = {str(c).strip().lower() for c in (g.get("commands") or []) if str(c).strip()}
+        return str(cmd_name or "").strip().lower() in ok
+
+    def _intro_result(self, who: str, uid) -> dict:
+        tmpl = (self.cfg.get("golive") or {}).get("holding_message") or \
+            "🎬 [mention], the show hasn't started yet — standing by ([intro_timer]s)."
+        return {"ok": False, "reply": self.render(tmpl, {"user": who, "mention": who,
+                                                         "uid": uid})}
 
     _MAX_LOOP = 500      # runaway guard: a block can't loop the bot to death
     _MAX_GOTO = 2000     # ditto for label/goto jumps within one block
@@ -3515,6 +3644,9 @@ class Engine:
 
         if self._paused:
             return self._paused_result(who, uid)
+        # Pre-show: the session is LIVE but the game hasn't begun.
+        if self._intro_open and uid is not None and not self.intro_allows(name):
+            return self._intro_result(who, uid)
 
         cmdkey0 = name.lower()
         # Competition entry: while a competition is live, its entry command
@@ -4613,6 +4745,9 @@ class Engine:
             "fires": fires,
             "device_timers": self.device_timers(),
             "poll": self.poll_view(),
+            "intro": ({"active": True, "remaining": round(self.intro_remaining(), 1),
+                       "open_ended": self._intro_until is None}
+                      if self._intro_open else None),
             "active_device": self._active_device_dict(),
             "current_range": self.range_for(self.capacity),
             "bot_connected": self.bot_connected,

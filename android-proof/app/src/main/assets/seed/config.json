@@ -1,6 +1,6 @@
 {
   "discord_token": "",
-  "config_version": 11,
+  "config_version": 12,
   "config_rev": 0,
   "command_prefix": "!",
   "listener_enabled": false,
@@ -2584,10 +2584,20 @@
   "owner_commands": [],
   "chat_buttons": [],
   "overlay_buttons": [],
-  "stages": [],
-  "stage_globals": [],
-  "chat_stage": "",
   "chat_isolate": false,
   "chat_isolate_channel": "",
-  "vcam_mirror": false
+  "vcam_mirror": false,
+  "scenes": [],
+  "scene_globals": [],
+  "chat_scene": "",
+  "golive": {
+    "intro_enabled": false,
+    "seconds": 60,
+    "scene_group": "",
+    "announce": "",
+    "announce_image": "",
+    "announce_every": 0,
+    "hold_commands": true,
+    "commands": []
+  }
 }

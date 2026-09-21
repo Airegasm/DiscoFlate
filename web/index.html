@@ -240,7 +240,7 @@
   <nav class="tabs" id="tabbar">
     <button class="tab-btn" data-go="dashboard">Dashboard</button>
     <button class="tab-btn" data-go="chat">Chat</button>
-    <button class="tab-btn" data-go="stages">Stages</button>
+    <button class="tab-btn" data-go="stages">Scenes</button>
     <button class="tab-btn" data-go="discord">Discord</button>
     <button class="tab-btn" data-go="devices">Devices</button>
     <button class="tab-btn" data-go="snapshot">Camera</button>
@@ -273,6 +273,34 @@
         <input type="number" id="capInput" min="0" max="100" step="0.5" style="width:78px" onchange="setCapacity(this.value)">
         <span class="muted">set %</span>
       </div>
+      <details class="help" style="margin-top:12px"><summary><b style="font-size:1.02rem">🎬 Go Live Options</b> <span class="muted" id="golivePill"></span></summary>
+        <div class="hint" style="margin-top:8px;max-width:860px">What happens when you flip <b>LIVE</b> on. Leave this off to <b>begin immediately</b>. Turn it on to open with an <b>intro</b>: a scene group plays, an announcement posts, and <b>commands stay held</b> until the intro ends — so nobody can play during the pre-show. Timed events wait too. <code>[intro_timer]</code> counts down in messages <i>and</i> in Text overlays.</div>
+        <label class="row" style="gap:8px;margin:10px 0"><input type="checkbox" id="glEnabled" onchange="scheduleSave();goliveUi()" style="width:auto"> <b>Open with an intro</b></label>
+        <div id="glBody" style="display:none">
+          <div class="row" style="gap:12px;align-items:flex-end">
+            <label class="field">Length <span class="muted">(secs · 0 = until you say)</span>
+              <input type="number" id="glSecs" min="0" step="5" value="60" style="width:100px" onchange="scheduleSave()"></label>
+            <label class="field">Intro scene group <select id="glGroup" style="width:180px" onchange="scheduleSave()"></select></label>
+            <label class="row" style="gap:6px"><input type="checkbox" id="glHold" checked onchange="scheduleSave()" style="width:auto"> hold commands</label>
+          </div>
+          <div class="row" style="gap:12px;align-items:flex-end;margin-top:8px">
+            <label class="field" style="flex:1;min-width:240px">Announcement <span class="muted">(blank = none · [intro_timer])</span>
+              <input id="glAnnounce" placeholder="🎬 Starting in [intro_timer] seconds!" style="width:100%" onchange="scheduleSave()"></label>
+            <label class="field">Repeat every <span class="muted">(secs · 0 = once)</span>
+              <input type="number" id="glEvery" min="0" step="5" value="0" style="width:100px" onchange="scheduleSave()"></label>
+          </div>
+          <div class="row" style="gap:8px;align-items:flex-end;margin-top:8px">
+            <label class="field" style="flex:1;min-width:220px;max-width:420px">Image <span class="muted">(optional · posts with the first announcement)</span>
+              <div class="row" style="gap:6px;flex-wrap:nowrap">
+                <input id="glImage" placeholder="pick or type a filename from data/images" style="flex:1;min-width:0" onchange="scheduleSave()">
+                <button class="ghost" title="pick from the media library" onclick="mediaBrowse(n=>{$('#glImage').value=n;scheduleSave();})">🗂</button>
+                <button class="ghost" title="clear" onclick="$('#glImage').value='';scheduleSave()">✕</button>
+              </div></label>
+          </div>
+          <label class="field" style="margin-top:8px">Commands allowed during the intro <span class="muted">(comma-separated · everything else is held)</span>
+            <input id="glCmds" placeholder="signup, rules" style="width:100%;max-width:520px" onchange="scheduleSave()"></label>
+        </div>
+      </details>
       <div class="row" style="align-items:center">
         <div style="flex:1"><span class="muted">⏱ Session uptime:</span> <b id="uptimeVal">0s</b></div>
         <button class="warn" onclick="if(confirm('Reset the session? Capacity → 0%, all cooldowns cleared, timed events re-armed, command-started events reverted.')) act('/api/session-reset')">↺ Session reset</button>
@@ -316,6 +344,7 @@
       <h2>💬 Chat</h2>
       <div class="row" style="gap:10px;align-items:flex-end">
         <label class="field">Channel <select id="chatChan" style="width:280px" onchange="chatSwitch()"></select></label>
+        <button id="introNow" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700" onclick="endIntroNow()" title="end the pre-show and start the session right now">🎬 Start now</button>
         <label class="row" style="gap:6px" title="while checked, ALL broadcasts (events, announcements, timers) go ONLY to this channel — other live channels still get their direct command replies"><input type="checkbox" id="chatIso" style="width:auto" onchange="chatIsoChanged()"> <b>Isolate</b></label>
         <div style="flex:1"></div>
         <button onclick="controlRoll()">🎲 Roll</button>
@@ -326,7 +355,7 @@
       <div id="overlaySec" style="display:none;border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
         <div class="row" id="vcamCtrls" style="gap:12px;align-items:flex-end">
           <b style="white-space:nowrap">🎥 Video channel</b>
-          <label class="field">Stage <select id="chatStageSel" style="width:160px" onchange="chatStageChanged()"></select></label>
+          <label class="field">Scene <select id="chatSceneSel" style="width:160px" onchange="chatSceneChanged()"></select></label>
           <label class="field">Camera <select id="vcamDev" style="width:150px" onchange="vcamDevPick()"><option value="0">0</option></select></label>
           <label class="field">Size <select id="vcamRes" style="width:130px">
             <option>1280x720</option><option>1920x1080</option><option>640x480</option>
@@ -388,18 +417,18 @@
 
     <!-- stages: OBS-style overlay designer -->
     <div class="card span" data-tab="stages">
-      <h2>🎭 Stages</h2>
+      <h2>🎭 Scenes</h2>
       <div class="hint">Design overlay <b>scenes</b> for video calls, OBS-style: pick a resolution, drag overlays onto the canvas, mark each one <b>always-on</b> or <b>callable</b>. Link a Gameplay Preset so the whole bundle travels together. The Chat tab's 🎥 section links a chat to a stage — its callable overlays become one-tap buttons there, and ▶ Start virtual cam (or the phone's 🎭 Stage view) puts the always-on items live. Everything autosaves.</div>
       <div class="row" style="gap:8px;align-items:flex-end;margin-top:8px">
-        <label class="field">Stage <select id="stgSel" style="width:200px" onchange="stgPick(+this.value)"></select></label>
+        <label class="field">Scene <select id="scnSel" style="width:200px" onchange="stgPick(+this.value)"></select></label>
         <button class="ghost" onclick="stgAdd()">➕ New</button>
         <button class="ghost" onclick="stgRename()">✏️ Rename</button>
         <button class="ghost" onclick="stgDelete()">🗑 Delete</button>
         <button class="ghost" onclick="mediaBrowse(null)">🗂 Media browser</button>
         <div style="flex:1"></div>
-        <button class="ghost" onclick="stgSend()" title="send every stage + its media to your other DiscoFlate over Wi-Fi (no file juggling)">📡 Send to device</button>
-        <button class="ghost" onclick="stgExport()">⬇ Export Stage</button>
-        <label class="ghost" style="padding:8px 12px;border:1px solid var(--line);border-radius:8px;cursor:pointer">⬆ Import Stage<input type="file" accept=".zip,.dfstage.zip" style="display:none" onchange="stgImport(this)"></label>
+        <button class="ghost" onclick="stgSend()" title="send every scene + its media to your other DiscoFlate over Wi-Fi (no file juggling)">📡 Send to device</button>
+        <button class="ghost" onclick="stgExport()">⬇ Export Scene</button>
+        <label class="ghost" style="padding:8px 12px;border:1px solid var(--line);border-radius:8px;cursor:pointer">⬆ Import Scene<input type="file" accept=".zip,.dfscene.zip" style="display:none" onchange="stgImport(this)"></label>
       </div>
       <div id="stgEditor" style="display:none;margin-top:10px">
         <div class="row" style="gap:12px;align-items:flex-end">
@@ -420,7 +449,7 @@
       </div>
       <details class="help" style="margin-top:14px"><summary><b>🌐 Global overlays</b> <span class="muted">(callable from every stage)</span></summary>
         <div id="stgGlobalRows" style="margin-top:8px"></div>
-        <button class="ghost" style="margin-top:6px" onclick="mediaBrowse(n=>{stageGlobals.push(stgNewItem('media',n,false));renderStgGlobals();stageButtonsRefresh();scheduleSave()})">➕ Add global overlay</button>
+        <button class="ghost" style="margin-top:6px" onclick="mediaBrowse(n=>{sceneGlobals.push(stgNewItem('media',n,false));renderStgGlobals();sceneButtonsRefresh();scheduleSave()})">➕ Add global overlay</button>
       </details>
     </div>
 
@@ -434,7 +463,7 @@
           <div style="flex:1"></div>
           <button class="ghost" onclick="closeOverlay('mediaOverlay')">✕</button>
         </div>
-        <div class="hint" style="margin-top:6px">The universal overlay library — every file lives in <code>data/images</code>, so 🔁 Device Sync and ⬇ Export Stage bundle them automatically. Images up to 8MB, videos up to 96MB. Click a tile to pick it (when you got here from a picker).</div>
+        <div class="hint" style="margin-top:6px">The universal overlay library — every file lives in <code>data/images</code>, so 🔁 Device Sync and ⬇ Export Scene bundle them automatically. Images up to 8MB, videos up to 96MB. Click a tile to pick it (when you got here from a picker).</div>
         <div id="mediaGrid" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px"></div>
       </div>
     </div>
@@ -1112,7 +1141,7 @@
         <li><b>Overlays live on the PC.</b> The virtual camera is the camera home base — design scenes on the <b>Stages</b> tab and they play into your Discord call from the PC. (A phone-hosted Stage view exists at <code>/stage</code> for screen-share setups, but it's parked for now and not linked from the UI.)</li>
         <li><b>Active tickbox</b> (Discord tab, on each listen channel) — untick one to <b>mute that channel completely</b>: the bot stops listening there <i>and</i> stops posting there, while keeping it registered so you can flip it back on. Unlike Isolate this is <b>per channel and persistent</b>, and it composes with Isolate. Untick every channel and the bot goes fully silent. A muted channel stays muted even if it's also your announce channel.</li>
         <li><b>Isolate</b> (next to the channel picker) — while ticked, <b>every broadcast</b> (events, milestones, auto-reports, timers, cross-server echoes, owner-voice posts) goes <b>only to the channel selected here</b>, across every server. The <b>announce channel is suppressed too</b> while pinned, so it can't leak output into another server. The bot keeps <b>listening everywhere</b> — commands typed in other channels still run and reply there — and if the pinned channel isn't live it fails open rather than going silent. Switching channels while Isolate is on re-aims it.</li>
-        <li><b>🎭 Stages tab</b> — design overlay scenes OBS-style: create a Stage, link a Gameplay Preset, pick a resolution, then drag overlays onto the canvas (drag the ◢ corner to resize). Each overlay is either <b>always-on</b> (part of the scene whenever the stage is live) or <b>callable</b> (becomes a one-tap button on the Chat tab). Overlay types: <b>Media</b> (image/video), <b>🅣 Text</b>, and two live system widgets — <b>📊 Capacity Gauge</b> and <b>⏱ Pump Timer</b>. Every overlay carries <b>its own options, saved per stage</b>: Text and the Pump Timer get colour, size, font and an optional background (blank = transparent); the Gauge gets fill colour, thickness, <b>horizontal or vertical</b> orientation and a show-% toggle; and everything supports <b>rotation</b> (⟳ handle, hold Shift to snap to 15°) and <b>flash</b> (N seconds visible, N hidden). Text and the timer accept <code>[capacity]</code> and <code>[secs]</code>, which stay live on the feed. With no stages yet, a <b>Default</b> stage is created so your overlays always have a home. The <b>🗂 Media browser</b> is the universal library — uploads land in <code>data/images</code>, so <b>⬇ Export Stage</b> bundles the design plus its media into one <code>.dfstage.zip</code> that <b>⬆ Import Stage</b> unpacks anywhere. <b>Global overlays</b> are callable from every stage.</li>
+        <li><b>🎭 Stages tab</b> — design overlay scenes OBS-style: create a Stage, link a Gameplay Preset, pick a resolution, then drag overlays onto the canvas (drag the ◢ corner to resize). Each overlay is either <b>always-on</b> (part of the scene whenever the stage is live) or <b>callable</b> (becomes a one-tap button on the Chat tab). Text overlays are <b>multi-line</b> with left/centre/right alignment, and <b>their placeholders keep updating while they're on screen</b> — so <code>Starting in [intro_timer]s</code> or <code>[var:score]</code> ticks live without re-firing the overlay. Overlay types: <b>Media</b> (image/video), <b>🅣 Text</b>, and two live system widgets — <b>📊 Capacity Gauge</b> and <b>⏱ Pump Timer</b>. Every overlay carries <b>its own options, saved per stage</b>: Text and the Pump Timer get colour, size, font and an optional background (blank = transparent); the Gauge gets fill colour, thickness, <b>horizontal or vertical</b> orientation and a show-% toggle; and everything supports <b>rotation</b> (⟳ handle, hold Shift to snap to 15°) and <b>flash</b> (N seconds visible, N hidden). Text and the timer accept <code>[capacity]</code> and <code>[secs]</code>, which stay live on the feed. With no stages yet, a <b>Default</b> stage is created so your overlays always have a home. The <b>🗂 Media browser</b> is the universal library — uploads land in <code>data/images</code>, so <b>⬇ Export Scene</b> bundles the design plus its media into one <code>.dfscene.zip</code> that <b>⬆ Import Scene</b> unpacks anywhere. <b>Global overlays</b> are callable from every stage.</li>
         <li><b>Linking a chat to a stage:</b> on a video channel pick the <b>Stage</b> dropdown in the 🎥 section — its callable overlays appear as buttons, ▶ Start virtual cam puts the always-on items (and live gauges) on the feed, and 🎭 Stage opens the phone view with that design loaded.</li>
         <li><b>⏱ Device Timers overlay</b> — one row per configured device, <b>primary pump always on top</b>, each with its own countdown; rows appear as you add devices. Secondary pumps feed the <b>same capacity gauge</b> on their own calibration (rates add up — two pumps fill twice as fast). Row text uses <code>[name]</code> and <code>[secs]</code>, and you can hide idle devices.</li>
         <li><b>🟩 Green-screen clips.</b> Tick <b>chroma key</b> on any media overlay to knock its background colour out, so an ordinary <code>.mp4</code> shot against a green screen plays over your camera with a transparent background — no alpha codec or WebM conversion needed. Pick the <b>key colour</b> (green by default, blue screens work too), <b>tolerance</b> for how much of that hue goes, and <b>edge softness</b> so hair and motion blur don't get a hard jagged cut. Greys and skin tones are protected, so shadows don't punch holes.</li>
@@ -1123,6 +1152,7 @@
         <li><b>🏷 label / goto / goto_if / group</b> — jump around inside a block instead of nesting deeper. Drop a <b>label</b> (or name a <b>group</b>), then <b>goto</b> it; <b>goto_if</b> jumps only when its conditions pass, which is how you build retry loops and skip-aheads. Jumping to a <b>label</b> resumes after it; jumping to a named <b>group</b> runs that group and then carries on. Jumps are capped at 2000 per block, and an unknown label is a quiet no-op.</li>
         <li><b>🛑 cancel</b> — stops every <i>other</i> running action block (events mid-loop, waits, overlapping commands) while this one carries on. The panic button when things overlap.</li>
         <li><b>"once" tickbox</b> — on any action row. That row fires a <b>single time per session</b> and is skipped afterwards, resetting on session reset. Each command keeps its own memory, so the same row in two places doesn't share a count.</li>
+        <li><b>🎬 Go Live Options (Dashboard)</b> — flipping <b>LIVE</b> on can open with an <b>intro</b> instead of starting the game. A scene group plays, an optional announcement posts (repeating and refreshing if you want), and <b>commands stay held</b> the whole time — anyone who tries gets a polite standby reply instead of pumping during your pre-show. Timed events wait too. You can allow specific commands through (a signup, say). Set a length, or set it to <b>0</b> and the intro waits until you press <b>🎬 Start now</b> in the Chat tab — that button appears only while an intro is running and shows the countdown. Flipping LIVE off mid-intro cancels it cleanly. <code>[intro_timer]</code> counts down in messages <i>and</i> in Text overlays. The announcement can carry an <b>image</b> (picked from the media library), posted with the first message.</li>
         <li><b>🎬 Scene groups</b> — tag any overlays on the Stages tab with a <b>scene group</b> name (say <code>intro</code>), then <b>scene_group</b> plays the whole set at once and <b>scene_group_kill</b> clears it. Each overlay keeps its own mode, position and fades. Firing a group that has no overlays does nothing at all.</li>
         <li><b>🗂 Layer order</b> — every overlay has a <b>layer order</b> number (with ⬆/⬇ buttons): higher draws on top. Equal numbers keep fire order, so the newest still lands above. The designer canvas stacks the same way it will on the feed.</li>
         <li><b>🔁 repeat</b> — run a nested block <b>a fixed number of times</b> (the count can be a placeholder) or <b>until conditions pass</b>. <code>[loop_i]</code> is the round number. Loops are hard-capped at 500 rounds so a mistake can't wedge the bot.</li>
@@ -1281,6 +1311,7 @@ esphome dashboard config/</code></pre>
             <tr><td><code>[capacity]</code></td><td>current capacity %, e.g. 47.5</td></tr>
             <tr><td><code>[capacity_bar]</code></td><td>emoji bar 🟩🟩🟩⬛⬛</td></tr>
             <tr><td><code>[timer]</code> / <code>[total_secs]</code></td><td>seconds left on the active pump</td></tr>
+        <tr><td><code>[timer:&lt;device&gt;]</code></td><td>That <b>specific</b> device's remaining seconds — by its name, its vendor label, or its id (case-insensitive). <code>[timer]</code> on its own still means the <b>primary pump</b>. Unknown names stay literal, so a typo is visible rather than silently blank. Added/renamed devices register immediately.</td></tr>
             <tr><td><code>[uptime]</code> / <code>[uptime_seconds]</code></td><td>how long this session has run (e.g. <code>2h 5m 30s</code>) / that as raw seconds. Resets on session reset.</td></tr>
             <tr><td><code>[announce]</code></td><td>the current range's Announce text</td></tr>
             <tr><td><code>[commands]</code></td><td>all commands usable right now — <b>Capacity Range Commands</b> (this range's customs) on top, <b>System Commands</b> below</td></tr>
@@ -1878,7 +1909,7 @@ async function vcamStart(){
   $('#vcamMsg').textContent='starting…';
   try{
     const r = await api('/api/camera/start', {device:+$('#vcamDev').value||0, width:w, height:h, fps:30,
-      stage:chatStageName, mirror:$('#vcamMirror')?$('#vcamMirror').checked:false});
+      stage:chatSceneName, mirror:$('#vcamMirror')?$('#vcamMirror').checked:false});
     $('#vcamMsg').textContent = r.ok ? ('🟢 ' + (r.info||'running') + ' — pick the virtual camera in Discord') : ('⚠ ' + (r.error||'failed'));
     if(r.ok) vcamPreviewStart();
   }catch(e){ $('#vcamMsg').textContent='⚠ '+(e.message||e); }
@@ -1954,10 +1985,10 @@ async function syncPush(){
 async function stgSend(){
   let a='';
   try{ a = localStorage.getItem('df_sync')||''; }catch(e){}
-  a = (prompt('Send all stages + media to which device?\n(its address, e.g. 192.168.1.50:8765)', a)||'').trim();
+  a = (prompt('Send all scenes + media to which device?\n(its address, e.g. 192.168.1.50:8765)', a)||'').trim();
   if(!a) return;
   try{ localStorage.setItem('df_sync', a); }catch(e){}
-  toastMsg('⏳ sending stages + media…');
+  toastMsg('⏳ sending scenes + media…');
   try{
     const r = await api('/api/sync/push', {addr:a});
     toastMsg(r.ok ? `✅ sent to ${r.to} (${r.media_new} new file${r.media_new===1?'':'s'})`
@@ -2054,25 +2085,35 @@ function renderOvbEditor(){
     `</div>`).join('') || '<div class="muted">no overlay actions yet</div>';
 }
 // ================= Stages: OBS-style overlay designer =================
-let stagesData=[], stageGlobals=[], stgCur=-1, stgSelId=null, mediaPickCb=null;
-let chatStageName='', chatIsoChan='', gpPresetNames=[];
+let scenesData=[], sceneGlobals=[], stgCur=-1, scnSelId=null, mediaPickCb=null;
+let chatSceneName='', chatIsoChan='', gpPresetNames=[];
 function metaAuth(){ return (document.querySelector('meta[name="df-auth"]')||{}).content||''; }
 // Overlays an action can call: the Chat-linked stage first, then the rest,
 // then globals — grouped so it's obvious where each one lives.
 function overlayLabelById(id){
   if(!id) return '';
-  for(const s of stagesData.concat([{overlays:stageGlobals}]))
+  for(const s of scenesData.concat([{overlays:sceneGlobals}]))
     for(const o of (s.overlays||[]))
       if(o.id===id) return o.label || o.text || o.media || o.kind || id;
   return '(missing)';
 }
 // Labels/named groups reachable from a goto row — the SAME sibling list the
 // interpreter searches, so the dropdown can't offer an unreachable target.
-function stageGroupNames(){
-  const out=new Set();
-  stagesData.forEach(s=>(s.overlays||[]).forEach(o=>{ if((o.group||'').trim()) out.add(o.group.trim()); }));
-  stageGlobals.forEach(o=>{ if((o.group||'').trim()) out.add(o.group.trim()); });
-  return [...out].sort();
+// Scene groups live on ONE stage. At runtime an action resolves against the
+// stage linked to Chat, so that's the scope we offer — falling back to the
+// stage you're editing when nothing is linked yet. Globals are listed apart.
+function sceneGroupScope(){
+  const linked = scenesData.find(s=>s.name===chatSceneName);
+  const scene = linked || scenesData[stgCur] || null;
+  const names = s => [...new Set((s?.overlays||[])
+    .map(o=>(o.group||'').trim()).filter(Boolean))].sort();
+  return {scene, sceneName: scene?scene.name:'',
+          linked: !!linked, groups: names(scene),
+          globals: [...new Set(sceneGlobals.map(o=>(o.group||'').trim()).filter(Boolean))].sort()};
+}
+function sceneGroupNames(){
+  const sc = sceneGroupScope();
+  return [...new Set([...sc.groups, ...sc.globals])];
 }
 function blockLabelNames(base){
   try{
@@ -2082,7 +2123,7 @@ function blockLabelNames(base){
       .map(r=>r.name.trim());
   }catch(e){ return []; }
 }
-function stageOverlayOptions(sel, onlyKind){
+function sceneOverlayOptions(sel, onlyKind){
   const ico = {media:'🖼', text:'🅣', capacity_gauge:'📊', pump_timer:'⏱',
                device_timers:'⏱', timer:'⏳'};
   const label = o => (ico[o.kind||'media']||'•')+' '+(o.label || o.text || o.media || o.kind || o.id);
@@ -2096,10 +2137,10 @@ function stageOverlayOptions(sel, onlyKind){
       return `<option value="${esc(o.id)}" ${o.id===sel?'selected':''}>${esc(label(o))}</option>`;
     }).join('')+`</optgroup>`;
   };
-  const linked = stagesData.find(s=>s.name===chatStageName);
+  const linked = scenesData.find(s=>s.name===chatSceneName);
   if(linked) html += group(`${linked.name} (linked)`, linked.overlays);
-  stagesData.forEach(s=>{ if(s!==linked) html += group(s.name, s.overlays); });
-  html += group('Global overlays', stageGlobals);
+  scenesData.forEach(s=>{ if(s!==linked) html += group(s.name, s.overlays); });
+  html += group('Global overlays', sceneGlobals);
   if(sel && !seen) html += `<option value="${esc(sel)}" selected>(missing overlay ${esc(sel)})</option>`;
   return html;
 }
@@ -2139,10 +2180,10 @@ function stgNewItem(kind, media, visible){
 const STG_FONTS={sans:'system-ui,-apple-system,sans-serif',bold:'system-ui,sans-serif',
   serif:'Georgia,serif',mono:'ui-monospace,Menlo,monospace',
   script:'"Segoe Script","Brush Script MT",cursive'};
-function stgStage(){ return stagesData[stgCur]||null; }
+function stgStage(){ return scenesData[stgCur]||null; }
 function renderStages(){
-  const sel=$('#stgSel'); if(!sel) return;
-  sel.innerHTML = stagesData.map((s,i)=>`<option value="${i}" ${i===stgCur?'selected':''}>${esc(s.name||('Stage '+(i+1)))}</option>`).join('')
+  const sel=$('#scnSel'); if(!sel) return;
+  sel.innerHTML = scenesData.map((s,i)=>`<option value="${i}" ${i===stgCur?'selected':''}>${esc(s.name||('Stage '+(i+1)))}</option>`).join('')
     || '<option value="-1">— none yet —</option>';
   const s = stgStage();
   $('#stgEditor').style.display = s ? '' : 'none';
@@ -2152,7 +2193,7 @@ function renderStages(){
     $('#stgRes').value = `${s.width||1280}x${s.height||720}`;
     renderStgCanvas(); renderStgProps();
   }
-  renderChatStageSel(); stageButtonsRefresh();
+  renderChatSceneSel(); sceneButtonsRefresh();
 }
 function renderStgCanvas(){
   const s=stgStage(), cv=$('#stgCanvas'); if(!cv) return;
@@ -2215,8 +2256,9 @@ function renderStgCanvas(){
         txt = (o.fmt_on||'PUMP [secs]s').replace('[secs]','12');
       } else { txt = (o.text||''); }
       inner = `<div class="txt${(o.bg||'').trim()?' boxed':''}" style="color:${esc(o.color||'#fff')};`+
-              `font-family:${fam};font-size:${fs}px;`+
-              `${(o.bg||'').trim()?`background:${esc(o.bg)}`:'text-shadow:0 1px 3px #000,0 0 2px #000'}">${esc(txt)||'&nbsp;'}</div>`;
+              `font-family:${fam};font-size:${fs}px;text-align:${esc(o.align||'left')};`+
+              `${(o.bg||'').trim()?`background:${esc(o.bg)}`:'text-shadow:0 1px 3px #000,0 0 2px #000'}">`+
+              `${esc(txt).replace(/\\n|\n/g,'<br>')||'&nbsp;'}</div>`;
       box = 'width:auto';   // text sizes itself
     } else {
       const hbox = o.h ? `;height:${(o.h*100).toFixed(2)}%` : '';
@@ -2228,11 +2270,11 @@ function renderStgCanvas(){
     }
     const rot = o.rot ? `transform:rotate(${o.rot}deg);transform-origin:center center;` : '';
     const fl  = o.flash ? `animation:dfflash ${(+o.flash||1)*2}s steps(1,end) infinite;` : '';
-    const handles = o.id===stgSelId
+    const handles = o.id===scnSelId
       ? '<span class="stgRot">⟳</span>' +
         ['nw','n','ne','w','e','sw','s','se'].map(h=>`<span class="stgH" data-h="${h}"></span>`).join('')
       : '';
-    return `<div class="stgItem${o.id===stgSelId?' sel':''}" data-id="${esc(o.id)}" `+
+    return `<div class="stgItem${o.id===scnSelId?' sel':''}" data-id="${esc(o.id)}" `+
            `style="left:${(o.x*100).toFixed(2)}%;top:${(o.y*100).toFixed(2)}%;${box};${rot}${fl}`+
            `z-index:${Math.round(+o.z||0)+10}">`+
            `${inner}${handles}</div>`;
@@ -2243,10 +2285,10 @@ let stgDrag=null;
   const cv=document.getElementById('stgCanvas'); if(!cv) return;
   cv.addEventListener('pointerdown', e=>{
     const it = e.target.closest('.stgItem');
-    if(!it){ if(stgSelId){ stgSelId=null; renderStgCanvas(); renderStgProps(); } return; }
+    if(!it){ if(scnSelId){ scnSelId=null; renderStgCanvas(); renderStgProps(); } return; }
     const s=stgStage(); if(!s) return;
     const o=(s.overlays||[]).find(x=>x.id===it.dataset.id); if(!o) return;
-    if(stgSelId!==o.id){ stgSelId=o.id; renderStgCanvas(); renderStgProps(); }
+    if(scnSelId!==o.id){ scnSelId=o.id; renderStgCanvas(); renderStgProps(); }
     const R=cv.getBoundingClientRect();
     const el=cv.querySelector(`.stgItem[data-id="${CSS.escape(o.id)}"]`);
     const hEl=e.target.closest('.stgH');
@@ -2312,7 +2354,7 @@ let stgDrag=null;
 })();
 function renderStgProps(){
   const s=stgStage(), box=$('#stgProps'); if(!box) return;
-  const o = s && (s.overlays||[]).find(x=>x.id===stgSelId);
+  const o = s && (s.overlays||[]).find(x=>x.id===scnSelId);
   if(!o){ box.innerHTML='<span class="muted">no overlay selected — click one on the canvas</span>'; return; }
   const kind = o.kind||'media', isMedia = kind==='media', isGauge = kind==='capacity_gauge';
   const F = (label, inner) => `<label class="field">${label} ${inner}</label>`;
@@ -2421,64 +2463,64 @@ function renderStgProps(){
   box.innerHTML = rows;
 }
 function stgLayer(dir){
-  const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===stgSelId); if(!o) return;
+  const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===scnSelId); if(!o) return;
   o.z=(+o.z||0)+dir; renderStgCanvas(); renderStgProps(); scheduleSave();
 }
-function stgItemSet(k,v){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===stgSelId); if(!o) return;
+function stgItemSet(k,v){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===scnSelId); if(!o) return;
   if(k==='size'||k==='w') v = Math.max(0.01, (+v||0)/100);   // panel shows %
   if(k==='fade_in'||k==='fade_out') v = Math.max(0, +v||0);  // plain seconds
   if(k==='h') v = (v===null||v==='') ? null : Math.max(0.02, (+v||0)/100);
-  o[k]=v; renderStgCanvas(); renderStgProps(); stageButtonsRefresh(); scheduleSave(); }
-function stgItemDup(){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===stgSelId); if(!o) return;
+  o[k]=v; renderStgCanvas(); renderStgProps(); sceneButtonsRefresh(); scheduleSave(); }
+function stgItemDup(){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===scnSelId); if(!o) return;
   const c=JSON.parse(JSON.stringify(o)); c.id=stgNewItem('x').id;
   c.x=Math.min(0.95,o.x+0.04); c.y=Math.min(0.95,o.y+0.04);
-  s.overlays.push(c); stgSelId=c.id; renderStgCanvas(); renderStgProps(); stageButtonsRefresh(); scheduleSave(); }
+  s.overlays.push(c); scnSelId=c.id; renderStgCanvas(); renderStgProps(); sceneButtonsRefresh(); scheduleSave(); }
 function stgItemDel(){ const s=stgStage(); if(!s) return;
-  s.overlays=(s.overlays||[]).filter(x=>x.id!==stgSelId); stgSelId=null;
-  renderStgCanvas(); renderStgProps(); stageButtonsRefresh(); scheduleSave(); }
-function stgPick(i){ stgCur=i; stgSelId=null; renderStages(); }
+  s.overlays=(s.overlays||[]).filter(x=>x.id!==scnSelId); scnSelId=null;
+  renderStgCanvas(); renderStgProps(); sceneButtonsRefresh(); scheduleSave(); }
+function stgPick(i){ stgCur=i; scnSelId=null; renderStages(); }
 // "or default if no scenes": overlay options always have a stage to live in
 function stgEnsureDefault(){
-  if(stagesData.length) return false;
-  stagesData.push({name:'Default', preset:'', width:1280, height:720, overlays:[]});
-  stgCur=0; stgSelId=null; renderStages(); scheduleSave();
+  if(scenesData.length) return false;
+  scenesData.push({name:'Default', preset:'', width:1280, height:720, overlays:[]});
+  stgCur=0; scnSelId=null; renderStages(); scheduleSave();
   return true;
 }
-function stgAdd(){ const name=prompt('Stage name:','My Stage'); if(!name) return;
-  stagesData.push({name:name.trim(), preset:'', width:1280, height:720, overlays:[]});
-  stgCur=stagesData.length-1; stgSelId=null; renderStages(); scheduleSave(); }
+function stgAdd(){ const name=prompt('Scene name:','My Scene'); if(!name) return;
+  scenesData.push({name:name.trim(), preset:'', width:1280, height:720, overlays:[]});
+  stgCur=scenesData.length-1; scnSelId=null; renderStages(); scheduleSave(); }
 function stgRename(){ const s=stgStage(); if(!s) return; const n=prompt('New name:', s.name||''); if(!n) return;
-  if(chatStageName===s.name) chatStageName=n.trim();
+  if(chatSceneName===s.name) chatSceneName=n.trim();
   s.name=n.trim(); renderStages(); scheduleSave(); }
 function stgDelete(){ const s=stgStage(); if(!s) return;
-  if(!confirm(`Delete stage "${s.name}"? Its media stays in the library.`)) return;
-  if(chatStageName===s.name) chatStageName='';
-  stagesData.splice(stgCur,1); stgCur=stagesData.length?0:-1; stgSelId=null;
+  if(!confirm(`Delete scene "${s.name}"? Its media stays in the library.`)) return;
+  if(chatSceneName===s.name) chatSceneName='';
+  scenesData.splice(stgCur,1); stgCur=scenesData.length?0:-1; scnSelId=null;
   renderStages(); scheduleSave(); }
 function stgProp(k,v){ const s=stgStage(); if(s){ s[k]=v; scheduleSave(); } }
 function stgResPick(){ const s=stgStage(); if(!s) return;
   const [w,h]=$('#stgRes').value.split('x').map(Number); s.width=w; s.height=h;
   renderStgCanvas(); scheduleSave(); }
-function stgAddMedia(n){ const s=stgStage(); if(!s){ toastMsg('create a stage first'); return; }
+function stgAddMedia(n){ const s=stgStage(); if(!s){ toastMsg('create a scene first'); return; }
   const o=stgNewItem('media',n); (s.overlays=s.overlays||[]).push(o);
-  stgSelId=o.id; renderStgCanvas(); renderStgProps(); stageButtonsRefresh(); scheduleSave(); }
-function stgAddWidget(kind){ const s=stgStage(); if(!s){ toastMsg('create a stage first'); return; }
+  scnSelId=o.id; renderStgCanvas(); renderStgProps(); sceneButtonsRefresh(); scheduleSave(); }
+function stgAddWidget(kind){ const s=stgStage(); if(!s){ toastMsg('create a scene first'); return; }
   const o=stgNewItem(kind,''); (s.overlays=s.overlays||[]).push(o);
-  stgSelId=o.id; renderStgCanvas(); renderStgProps(); scheduleSave(); }
+  scnSelId=o.id; renderStgCanvas(); renderStgProps(); scheduleSave(); }
 function renderStgGlobals(){
   const box=$('#stgGlobalRows'); if(!box) return;
-  box.innerHTML = stageGlobals.map((o,i)=>
+  box.innerHTML = sceneGlobals.map((o,i)=>
     `<div class="row ovedit">`+
-    `<label class="field">Label <input value="${esc(o.label||'')}" style="width:130px" onchange="stageGlobals[${i}].label=this.value;stageButtonsRefresh();scheduleSave()"></label>`+
+    `<label class="field">Label <input value="${esc(o.label||'')}" style="width:130px" onchange="sceneGlobals[${i}].label=this.value;sceneButtonsRefresh();scheduleSave()"></label>`+
     `<span class="pill" style="max-width:170px;overflow:hidden;text-overflow:ellipsis">${esc(o.media||'—')}</span>`+
-    `<button class="ghost" onclick="mediaBrowse(n=>{stageGlobals[${i}].media=n;renderStgGlobals();scheduleSave()})">🗂</button>`+
-    `<label class="field">Mode <select style="width:96px" onchange="stageGlobals[${i}].mode=this.value;scheduleSave()">${['timed','hold','once'].map(m=>`<option ${o.mode===m?'selected':''}>${m}</option>`).join('')}</select></label>`+
-    `<label class="field">Secs <input type="number" min="0.5" step="0.5" value="${o.seconds??5}" style="width:66px" onchange="stageGlobals[${i}].seconds=+this.value;scheduleSave()"></label>`+
-    `<label class="field">X% <input type="number" min="0" max="100" value="${Math.round((o.x??0.35)*100)}" style="width:60px" onchange="stageGlobals[${i}].x=(+this.value||0)/100;scheduleSave()"></label>`+
-    `<label class="field">Y% <input type="number" min="0" max="100" value="${Math.round((o.y??0.35)*100)}" style="width:60px" onchange="stageGlobals[${i}].y=(+this.value||0)/100;scheduleSave()"></label>`+
-    `<label class="field">W% <input type="number" min="4" max="100" value="${Math.round((o.w??0.3)*100)}" style="width:60px" onchange="stageGlobals[${i}].w=Math.max(0.04,(+this.value||30)/100);scheduleSave()"></label>`+
-    `<label class="field">Layer <input value="${esc(o.layer||'')}" style="width:76px" onchange="stageGlobals[${i}].layer=this.value;scheduleSave()"></label>`+
-    `<button class="ghost" onclick="stageGlobals.splice(${i},1);renderStgGlobals();stageButtonsRefresh();scheduleSave()">✕</button>`+
+    `<button class="ghost" onclick="mediaBrowse(n=>{sceneGlobals[${i}].media=n;renderStgGlobals();scheduleSave()})">🗂</button>`+
+    `<label class="field">Mode <select style="width:96px" onchange="sceneGlobals[${i}].mode=this.value;scheduleSave()">${['timed','hold','once'].map(m=>`<option ${o.mode===m?'selected':''}>${m}</option>`).join('')}</select></label>`+
+    `<label class="field">Secs <input type="number" min="0.5" step="0.5" value="${o.seconds??5}" style="width:66px" onchange="sceneGlobals[${i}].seconds=+this.value;scheduleSave()"></label>`+
+    `<label class="field">X% <input type="number" min="0" max="100" value="${Math.round((o.x??0.35)*100)}" style="width:60px" onchange="sceneGlobals[${i}].x=(+this.value||0)/100;scheduleSave()"></label>`+
+    `<label class="field">Y% <input type="number" min="0" max="100" value="${Math.round((o.y??0.35)*100)}" style="width:60px" onchange="sceneGlobals[${i}].y=(+this.value||0)/100;scheduleSave()"></label>`+
+    `<label class="field">W% <input type="number" min="4" max="100" value="${Math.round((o.w??0.3)*100)}" style="width:60px" onchange="sceneGlobals[${i}].w=Math.max(0.04,(+this.value||30)/100);scheduleSave()"></label>`+
+    `<label class="field">Layer <input value="${esc(o.layer||'')}" style="width:76px" onchange="sceneGlobals[${i}].layer=this.value;scheduleSave()"></label>`+
+    `<button class="ghost" onclick="sceneGlobals.splice(${i},1);renderStgGlobals();sceneButtonsRefresh();scheduleSave()">✕</button>`+
     `</div>`).join('') || '<span class="muted">no global overlays yet</span>';
 }
 // ---- universal media browser -------------------------------------------
@@ -2513,14 +2555,14 @@ async function mediaUpload(inp){
 }
 // ---- export / import a stage bundle (zip: stage.json + its media) --------
 async function stgExport(){
-  const s=stgStage(); if(!s){ toastMsg('pick a stage first'); return; }
+  const s=stgStage(); if(!s){ toastMsg('pick a scene first'); return; }
   try{
-    const r=await fetch('/api/stage-design/export?name='+encodeURIComponent(s.name),
+    const r=await fetch('/api/scene-design/export?name='+encodeURIComponent(s.name),
                         {headers:{'X-DiscoFlate-Auth':metaAuth()}});
     if(!r.ok){ toastMsg('⚠ export failed'); return; }
     const a=document.createElement('a');
     a.href=URL.createObjectURL(await r.blob());
-    a.download=((s.name||'stage').replace(/[^\w\- ]+/g,'')||'stage')+'.dfstage.zip';
+    a.download=((s.name||'stage').replace(/[^\w\- ]+/g,'')||'stage')+'.dfscene.zip';
     a.click(); setTimeout(()=>URL.revokeObjectURL(a.href), 8000);
   }catch(e){ toastMsg('⚠ '+(e.message||e)); }
 }
@@ -2528,42 +2570,59 @@ async function stgImport(inp){
   const f=inp.files[0]; if(!f) return;
   const fd=new FormData(); fd.append('file', f);
   try{
-    const r=await fetch('/api/stage-design/import',{method:'POST',body:fd,
+    const r=await fetch('/api/scene-design/import',{method:'POST',body:fd,
                         headers:{'X-DiscoFlate-Auth':metaAuth()}});
     const j=await r.json();
     if(!j.ok){ toastMsg('⚠ '+(j.error||'import failed')); return; }
     applyState(j, true);
-    stgCur = stagesData.findIndex(s=>s.name===j.name); stgSelId=null; renderStages();
+    stgCur = scenesData.findIndex(s=>s.name===j.name); scnSelId=null; renderStages();
     toastMsg('✅ imported "'+j.name+'"');
   }catch(e){ toastMsg('⚠ '+(e.message||e)); }
   inp.value='';
 }
 // ---- Chat tab: stage link + one-tap bundle buttons + isolate --------------
-function renderChatStageSel(){
-  const sel=$('#chatStageSel'); if(!sel) return;
+function renderChatSceneSel(){
+  const sel=$('#chatSceneSel'); if(!sel) return;
   sel.innerHTML = '<option value="">(no stage)</option>'+
-    stagesData.map(s=>`<option ${s.name===chatStageName?'selected':''}>${esc(s.name)}</option>`).join('');
+    scenesData.map(s=>`<option ${s.name===chatSceneName?'selected':''}>${esc(s.name)}</option>`).join('');
 }
-function chatStageChanged(){ chatStageName=$('#chatStageSel').value; stageButtonsRefresh(); scheduleSave(); }
-function stageButtonsRefresh(){
+function chatSceneChanged(){ chatSceneName=$('#chatSceneSel').value; sceneButtonsRefresh(); scheduleSave(); }
+function sceneButtonsRefresh(){
   const box=$('#stageBtns'); if(!box) return;
-  const s = stagesData.find(x=>x.name===chatStageName);
+  const s = scenesData.find(x=>x.name===chatSceneName);
   const items = [...(s?(s.overlays||[]).filter(o=>!o.visible):[]),
-                 ...stageGlobals.filter(o=>(o.media||'').trim()||o.kind==='text')];
+                 ...sceneGlobals.filter(o=>(o.media||'').trim()||o.kind==='text')];
   const ico = {text:'🅣', capacity_gauge:'📊', pump_timer:'⏱'};
   box.innerHTML = items.map(o=>{
     const nm = o.label || o.text || o.media || o.kind || 'overlay';
-    return `<button onclick="stageFire('${esc(o.id)}')">${esc((ico[o.kind]?ico[o.kind]+' ':'')+nm)}</button>`;
+    return `<button onclick="sceneFire('${esc(o.id)}')">${esc((ico[o.kind]?ico[o.kind]+' ':'')+nm)}</button>`;
   }).join('');
 }
-async function stageFire(id){
+async function sceneFire(id){
   try{
-    const r=await api('/api/overlay/fire',{stage:chatStageName, id:id});
+    const r=await api('/api/overlay/fire',{stage:chatSceneName, id:id});
     $('#vcamMsg').textContent = r.ok?'':('⚠ '+(r.error||'overlay failed'));
   }catch(e){ $('#vcamMsg').textContent='⚠ '+(e.message||e); }
 }
 function openStagePage(){
-  location.href='/stage'+(chatStageName?('?stage='+encodeURIComponent(chatStageName)):'');
+  location.href='/stage'+(chatSceneName?('?stage='+encodeURIComponent(chatSceneName)):'');
+}
+function goliveUi(){
+  const on=$('#glEnabled')&&$('#glEnabled').checked;
+  const b=$('#glBody'); if(b) b.style.display = on?'':'none';
+  const sel=$('#glGroup');
+  if(sel){                          // groups come from the Chat-linked scene
+    const sc=sceneGroupScope(), cur=sel.value||'';
+    const all=[...new Set([...sc.groups, ...sc.globals])];
+    sel.innerHTML='<option value="">— none —</option>'+
+      all.map(n=>`<option ${n===cur?'selected':''}>${esc(n)}</option>`).join('')+
+      ((cur&&!all.includes(cur))?`<option selected>${esc(cur)}</option>`:'');
+  }
+}
+async function endIntroNow(){
+  try{ const r=await api('/api/control/end-intro',{}); applyState(r,false);
+       toastMsg('🎬 intro ended — the session is live'); }
+  catch(e){ toastMsg('⚠ '+(e.message||e)); }
 }
 function chatIsoChanged(){
   if($('#chatIso').checked) chatIsoChan = $('#chatChan').value || chatIsoChan;
@@ -4146,24 +4205,27 @@ function actionRow(base, rr, j, a, condLabels){
     if(typ==='repeat') fields += `<span class="muted" style="align-self:center"><code>[loop_i]</code> = the round number</span>`;
   }
   if(typ==='scene_group' || typ==='scene_group_kill'){
-    const names = stageGroupNames();
+    const sc = sceneGroupScope(), names = sceneGroupNames();
+    const og = (lab,list)=>list.length?`<optgroup label="${esc(lab)}">`+
+      list.map(n=>`<option ${((a.group||'')===n)?'selected':''}>${esc(n)}</option>`).join('')+`</optgroup>`:'';
     fields += `<label class="field" style="min-width:180px">Scene group <select style="width:100%" onchange="${T('group')}=this.value;scheduleSave()">`+
       `<option value="">— pick a group —</option>`+
-      names.map(n=>`<option ${((a.group||'')===n)?'selected':''}>${esc(n)}</option>`).join('')+
-      ((a.group && !names.includes(a.group))?`<option selected>${esc(a.group)}</option>`:'')+
+      og(sc.sceneName ? `${sc.sceneName}${sc.linked?' (linked to Chat)':''}` : 'this scene', sc.groups)+
+      og('Global overlays', sc.globals)+
+      ((a.group && !names.includes(a.group))?`<option selected>${esc(a.group)} (not in this scene)</option>`:'')+
       `</select></label>`+
       `<label class="field">Fade ${typ==='scene_group'?'in':'out'} <input value="${esc(String(typ==='scene_group'?(a.fade_in??0):(a.fade_out??0)))}" style="width:70px" onchange="${T(typ==='scene_group'?'fade_in':'fade_out')}=this.value;scheduleSave()"></label>`+
-      `<span class="muted" style="align-self:center">${typ==='scene_group'?'plays every overlay tagged with that group':'clears the whole group · quiet if none are up'}</span>`;
+      `<span class="muted" style="align-self:center">${typ==='scene_group'?'plays every overlay tagged with that group':'clears the whole group · quiet if none are up'} · scoped to <b>${esc(sc.sceneName||'—')}</b></span>`;
   }
   if(typ==='update_overlay_text'){
     fields += `<label class="field" style="min-width:200px">Overlay <select style="width:100%" onchange="${T('overlay')}=this.value;scheduleSave()">`+
-      stageOverlayOptions(a.overlay)+`</select></label>`+
+      sceneOverlayOptions(a.overlay)+`</select></label>`+
       `<label class="field" style="flex:1;min-width:220px">New text <input value="${esc(a.text||'')}" placeholder="[user] is up next!" style="width:100%" onchange="${T('text')}=this.value;scheduleSave()"></label>`+
       `<span class="muted" style="align-self:center">changes it in place · quiet if it isn't showing</span>`;
   }
   if(typ==='start_timer' || typ==='stop_timer'){
     fields += `<label class="field" style="min-width:210px">Timer overlay <select style="width:100%" onchange="${T('overlay')}=this.value;scheduleSave()">`+
-      stageOverlayOptions(a.overlay, 'timer')+`</select></label>`;
+      sceneOverlayOptions(a.overlay, 'timer')+`</select></label>`;
     if(typ==='start_timer')
       fields += `<label class="field">Seconds <span class="muted">(blank = its own)</span> <input value="${esc(String(a.seconds??''))}" placeholder="—" style="width:80px" onchange="${T('seconds')}=this.value;scheduleSave()"></label>`;
     fields += `<span class="muted" style="align-self:center">${typ==='stop_timer'?'freezes it where it is':'restarts, or resumes a stopped one'}</span>`;
@@ -4172,7 +4234,7 @@ function actionRow(base, rr, j, a, condLabels){
     // Overlays are DESIGNED on the Stages tab — actions just CALL one.
     const kill = typ==='overlay_kill';
     fields += `<label class="field" style="min-width:210px">Overlay <select style="width:100%" onchange="${T('overlay')}=this.value;scheduleSave()">`+
-      stageOverlayOptions(a.overlay)+`</select></label>`;
+      sceneOverlayOptions(a.overlay)+`</select></label>`;
     if(!kill){
       const om=(a.mode||'timed');
       fields += `<label class="field">Mode <select style="width:150px" onchange="${T('mode')}=this.value;${rr}();scheduleSave()">`+
@@ -5214,15 +5276,42 @@ function applyState(st, full){
     ownerCommands = JSON.parse(JSON.stringify(st.owner_commands||[]));
     overlayButtons = JSON.parse(JSON.stringify(st.overlay_buttons||[]));
     renderChatButtons(); renderOverlayButtons();
-    stagesData = JSON.parse(JSON.stringify(st.stages||[]));
-    stageGlobals = JSON.parse(JSON.stringify(st.stage_globals||[]));
-    chatStageName = st.chat_stage||'';
+    scenesData = JSON.parse(JSON.stringify(st.scenes||[]));
+    sceneGlobals = JSON.parse(JSON.stringify(st.scene_globals||[]));
+    chatSceneName = st.chat_scene||'';
+    { const g=st.golive||{};
+      const set=(id,v)=>{ const el=$(id); if(el && document.activeElement!==el){
+        if(el.type==='checkbox') el.checked=!!v; else el.value=(v??''); } };
+      set('#glEnabled', g.intro_enabled); set('#glSecs', g.seconds??60);
+      set('#glHold', g.hold_commands!==false); set('#glAnnounce', g.announce||'');
+      set('#glEvery', g.announce_every??0); set('#glImage', g.announce_image||'');
+      set('#glCmds', (g.commands||[]).join(', '));
+      const gs=$('#glGroup'); if(gs && document.activeElement!==gs) gs.dataset.want=g.scene_group||'';
+      goliveUi();
+      if(gs && gs.dataset.want!==undefined && document.activeElement!==gs) gs.value=gs.dataset.want;
+      const p=$('#golivePill');
+      if(p) p.textContent = g.intro_enabled
+        ? `intro · ${(+g.seconds||0)?(+g.seconds+'s'):'manual'}${g.scene_group?' · '+g.scene_group:''}`
+        : 'begins immediately';
+    }
+    // the pre-show banner + Start-now button
+    { const intro=st.intro, b=$('#introNow');
+      if(b) b.style.display = intro ? '' : 'none';
+      if(b && intro) b.textContent = intro.open_ended
+        ? '🎬 Start now' : `🎬 Start now (${Math.round(intro.remaining)}s)`;
+      const pp=$('#pausedPill');
+      if(pp && intro && !sessionPaused){ pp.style.display='inline-flex';
+        pp.style.background='var(--accent)'; pp.style.color='#04202a';
+        pp.textContent='🎬 INTRO'+(intro.open_ended?'':` · ${Math.round(intro.remaining)}s`); }
+      else if(pp && !intro && !sessionPaused){ pp.style.background='var(--warn)';
+        pp.style.color='#3a2a00'; }
+    }
     if($('#vcamMirror') && document.activeElement!==$('#vcamMirror')) $('#vcamMirror').checked = !!st.vcam_mirror;
     chatIsoChan = st.chat_isolate_channel||'';
     if($('#chatIso') && document.activeElement!==$('#chatIso')) $('#chatIso').checked = !!st.chat_isolate;
     gpPresetNames = (st.gameplay_presets||[]).map(p=>p.name).filter(Boolean);
-    if(stgCur >= stagesData.length) stgCur = stagesData.length-1;
-    if(stgCur < 0 && stagesData.length) stgCur = 0;
+    if(stgCur >= scenesData.length) stgCur = scenesData.length-1;
+    if(stgCur < 0 && scenesData.length) stgCur = 0;
     renderStages(); renderStgGlobals();
     renderCommands();
     renderAlwaysOn();
@@ -5315,8 +5404,18 @@ function gatherConfig(){
     pump_embed:$('#pumpEmbed')?$('#pumpEmbed').checked:false, pump_title:$('#pumpTitle')?$('#pumpTitle').value:'',
     pump_message: $('#pumpMsg') ? $('#pumpMsg').value : '',
     listen_targets:listenTargets, announce_channel_id: announceChanId,
-    stages: stagesData, stage_globals: stageGlobals, chat_stage: chatStageName,
+    scenes: scenesData, scene_globals: sceneGlobals, chat_scene: chatSceneName,
     chat_isolate: $('#chatIso')?$('#chatIso').checked:false, chat_isolate_channel: chatIsoChan,
+    golive: {
+      intro_enabled: $('#glEnabled')?$('#glEnabled').checked:false,
+      seconds: Math.max(0, parseInt(($('#glSecs')||{}).value,10)||0),
+      scene_group: ($('#glGroup')||{}).value||'',
+      announce: ($('#glAnnounce')||{}).value||'',
+      announce_every: Math.max(0, parseInt(($('#glEvery')||{}).value,10)||0),
+      announce_image: ($('#glImage')||{}).value||'',
+      hold_commands: $('#glHold')?$('#glHold').checked:true,
+      commands: idList(($('#glCmds')||{}).value||''),
+    },
     anon_user_label:$('#anonLabel').value,
     allow_dms:$('#allowDms').checked,
     allow:{user_ids:idList($('#allowUsers').value)},

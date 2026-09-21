@@ -143,7 +143,7 @@ let designWidgets = [];
 async function loadDesign(){
   if(!STAGE_NAME) return;
   try{
-    const r = await fetch('/api/stage-design', {method:'POST', headers:HDRS,
+    const r = await fetch('/api/scene-design', {method:'POST', headers:HDRS,
       body: JSON.stringify({name: STAGE_NAME})});
     const j = await r.json();
     if(!j.ok || !j.stage) return;
@@ -165,6 +165,7 @@ const FONTS = {sans:'system-ui,-apple-system,sans-serif', bold:'system-ui,sans-s
                serif:'Georgia,serif', mono:'ui-monospace,Menlo,monospace',
                script:'"Segoe Script","Brush Script MT",cursive'};
 function styleText(el, o){
+  el.style.textAlign = o.align || 'left';
   el.style.color = o.color || '#ffffff';
   el.style.fontFamily = FONTS[o.font||'sans'] || FONTS.sans;
   el.style.fontSize = Math.max(1, (o.size||0.06)*100) + 'cqh';
@@ -236,7 +237,7 @@ function itemEl(o){
                  : (kind==='device_timers'||kind==='timer') ? '' : (o.text||'');
   applyBox(el, o);
   if(kind==='pump_timer' || kind==='device_timers' || kind==='timer'
-     || /\[(capacity|secs)\]/.test(o.text||''))
+     || /\[[^\]]+\]/.test(o.text||''))
     designWidgets.push({kind, el, o});
   return el;
 }
@@ -292,8 +293,12 @@ async function widgetTick(){
         w.el.textContent = on ? String(w.o.fmt_on||'PUMP [secs]s').replace('[secs]', rem.toFixed(0))
                               : String(w.o.fmt_off||'PUMP idle');
       } else {
-        w.el.textContent = String(w.o.text||'')
-          .replace('[capacity]', pct.toFixed(0)).replace('[secs]', rem.toFixed(0));
+        let t = String(w.o.text||'')
+          .replace(/\[capacity\]/g, pct.toFixed(0)).replace(/\[secs\]/g, rem.toFixed(0))
+          .replace(/\[timer\]/g, rem.toFixed(0));
+        // [var:x] stays live too, so a countdown label keeps ticking
+        t = t.replace(/\[var:([^\]]+)\]/g, (m,k)=> (st.vars&&st.vars[k]!=null)?st.vars[k]:m);
+        w.el.textContent = t.replace(/\\n/g,'\n');
       }
     });
   }catch(e){}

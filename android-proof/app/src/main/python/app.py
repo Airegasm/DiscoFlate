@@ -318,10 +318,11 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "version": VERSION,
         # preset NAMES only (the full data would bloat the 1s state poll). The
         # immutable built-in "Defaults" preset is always listed first.
-        "stages": cfg.get("stages") or [],
-        "stage_globals": cfg.get("stage_globals") or [],
-        "chat_stage": cfg.get("chat_stage", ""),
+        "scenes": cfg.get("scenes") or [],
+        "scene_globals": cfg.get("scene_globals") or [],
+        "chat_scene": cfg.get("chat_scene", ""),
         "vcam_mirror": bool(cfg.get("vcam_mirror", True)),
+        "golive": cfg.get("golive") or {},
         "chat_isolate": bool(cfg.get("chat_isolate")),
         "chat_isolate_channel": cfg.get("chat_isolate_channel", ""),
         "gameplay_presets": ([{"name": BUILTIN_PRESET_NAME, "builtin": True}]
@@ -490,6 +491,8 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     net = net if net is not None else {}
     vcam = camera.VirtualCam(IMAGES_DIR)   # the Chat tab's OBS-style overlay pipe
     vcam.set_mirror(config_store.load().get("vcam_mirror", False))
+    # overlay text keeps re-rendering its placeholders while it's on screen
+    vcam.render_cb = lambda t: engine.render(t)
     net["vcam"] = vcam
     # live game state for stage widgets (capacity gauge / pump timer);
     # camera.py throttles how often it calls this
@@ -579,15 +582,15 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     # virtual camera when it's running (desktop) AND the /stage registry
     # (always recorded, so a Stage page shows the current scene the moment it
     # opens). Ok when either surface is actually watched; quiet skip otherwise.
-    def _stage_group(cfg0, stage_name, group):
-        """Every overlay tagged with this group name, in the linked stage then
+    def _scene_group(cfg0, scene_name, group):
+        """Every overlay tagged with this group name, in the linked SCENE then
         the globals — the batch a scene_group action fires or kills."""
         g = str(group or "").strip().lower()
         if not g:
             return []
-        stg_ = _find_stage(cfg0, stage_name)
-        pool = (list((stg_ or {}).get("overlays") or [])
-                + list(cfg0.get("stage_globals") or []))
+        scn = _find_scene(cfg0, scene_name)
+        pool = (list((scn or {}).get("overlays") or [])
+                + list(cfg0.get("scene_globals") or []))
         return [o for o in pool if str(o.get("group") or "").strip().lower() == g]
 
     def _overlay_action(spec: dict) -> dict:
@@ -596,19 +599,17 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         # quiet no-op, same rule as a missing overlay id.
         if spec.get("group"):
             cfg0 = config_store.load()
-            stage_name = (spec.get("stage") or "").strip() or cfg0.get("chat_stage", "")
-            items = _stage_group(cfg0, stage_name, spec.get("group"))
-            if not items and not stage_name:
-                for s_ in (cfg0.get("stages") or []):
-                    items = _stage_group(cfg0, s_.get("name"), spec.get("group"))
-                    if items:
-                        break
+            scene_name = (spec.get("stage") or "").strip() or cfg0.get("chat_scene", "")
+            # Scene groups are SCOPED TO THE LOADED SCENE (plus the globals).
+            # We deliberately do NOT hunt other scenes for a matching name —
+            # two scenes may reuse "intro" for completely different looks.
+            items = _scene_group(cfg0, scene_name, spec.get("group"))
             if not items:
                 return {"ok": True, "skipped": f"scene group '{spec.get('group')}' is empty"}
             for it in items:
                 sub = {k: v for k, v in spec.items() if k != "group"}
                 sub["id"] = it.get("id")
-                sub["stage"] = stage_name
+                sub["stage"] = scene_name
                 if mode != "clear" and not spec.get("mode"):
                     sub.pop("mode", None)      # let each item keep its own mode
                 try:
@@ -622,11 +623,11 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         oid = spec.get("id")
         if oid:
             cfg0 = config_store.load()
-            stage_name = (spec.get("stage") or "").strip() or cfg0.get("chat_stage", "")
-            found = _stage_item(cfg0, stage_name, oid)
-            if found is None and not stage_name:   # not linked? search every stage
-                for s_ in (cfg0.get("stages") or []):
-                    found = _stage_item(cfg0, s_.get("name"), oid)
+            scene_name = (spec.get("stage") or "").strip() or cfg0.get("chat_scene", "")
+            found = _scene_item(cfg0, scene_name, oid)
+            if found is None and not scene_name:   # not linked? search every stage
+                for s_ in (cfg0.get("scenes") or []):
+                    found = _scene_item(cfg0, s_.get("name"), oid)
                     if found is not None:
                         break
             if found is None:
@@ -757,6 +758,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     async def get_state(request):
         st = _public_state(engine, botmgr)
         st["timers"] = _timer_map()      # live Timer-overlay countdowns
+        st["vars"] = dict(engine._vars)  # so /stage can substitute [var:x] live
         return web.json_response(st)
 
     async def get_guilds(request):
@@ -771,7 +773,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     # (a malformed import/tab can't put a string where the engine expects a list).
     _TYPE_FLOOR = {"commands": list, "events": list, "modes": list, "prizes": list,
                    "owner_commands": list, "chat_buttons": list, "overlay_buttons": list,
-                   "stages": list, "stage_globals": list,
+                   "scenes": list, "scene_globals": list,
                    "capacity_events": list, "polls": list, "competitions": list,
                    "capacity_ranges": list, "listen_targets": list, "broadcasts": list,
                    "always_on_commands": list, "cooldown_exempt_user_ids": list,
@@ -799,7 +801,8 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                     "pause_embed", "pause_title",
                     "system_buffer_seconds", "cooldown_message", "pumptimer_message", "pump_message",
                     "roll", "prizes", "owner_commands", "chat_buttons", "overlay_buttons",
-                    "stages", "stage_globals", "chat_stage",
+                    "scenes", "scene_globals", "chat_scene",
+                    "golive",
                     "chat_isolate", "chat_isolate_channel",
                     "capacity_ranges", "commands", "modes", "events",
                     "capacity_events", "polls", "competitions",
@@ -909,7 +912,15 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                     else:
                         await botmgr.announce(f"{text}\n{footer}", None)
                 await engine.fire_inline(msg)
-            engine.finish_activation()
+            # Go Live: an intro HOLDS the game (commands + events) until it
+            # ends; otherwise the session starts right now.
+            async def _go_live():
+                engine.finish_activation()
+            engine.intro_done_cb = _go_live
+            started = await engine.start_intro(
+                announce_cb=lambda t, img=None: botmgr.announce(t, img))
+            if not started:
+                engine.finish_activation()
         elif msg:
             # OFF message renders text only — no fires, the session is closing.
             text = engine.render(msg)
@@ -1185,6 +1196,13 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         b = await _json(request)
         return web.json_response(await botmgr.operator_stop((b.get("who") or "").strip()))
 
+    async def end_intro(request):
+        """The Chat tab's 'Start now' — close the pre-show early and begin."""
+        await guard(request)
+        ended = await engine.end_intro(reason="operator")
+        return web.json_response({"ok": True, "ended": ended,
+                                  **_public_state(engine, botmgr)})
+
     async def control_resume(request):
         await guard(request)
         b = await _json(request)
@@ -1450,10 +1468,10 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         await asyncio.sleep(0.8)   # let the pipeline surface open errors
         st = vcam.status()
         # linked Stage design: put its always-on items on the compositor
-        stage_name = (b.get("stage") or "").strip()
-        if st["running"] and stage_name:
-            stg_ = _find_stage(config_store.load(), stage_name)
-            for o in ((stg_ or {}).get("overlays") or []):
+        scene_name = (b.get("stage") or "").strip()
+        if st["running"] and scene_name:
+            scn = _find_scene(config_store.load(), scene_name)
+            for o in ((scn or {}).get("overlays") or []):
                 if not o.get("visible"):
                     continue
                 lay = o.get("layer") or f"itm-{o.get('id')}"
@@ -1668,39 +1686,40 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             os.remove(p)
         return web.json_response({"ok": True})
 
-    def _find_stage(cfg, name):
+    def _find_scene(cfg, name):
         name = (name or "").strip()
-        return next((s for s in (cfg.get("stages") or [])
+        return next((s for s in (cfg.get("scenes") or [])
                      if (s.get("name") or "").strip() == name), None)
 
-    def _stage_item(cfg, stage_name, item_id):
-        """An overlay item by id — searched in the stage, then the globals."""
-        stg_ = _find_stage(cfg, stage_name)
-        pool = (list(stg_.get("overlays") or []) if stg_ else []) \
-            + list(cfg.get("stage_globals") or [])
+    def _scene_item(cfg, scene_name, item_id):
+        """An overlay item by id — searched in the scene, then the globals."""
+        scn = _find_scene(cfg, scene_name)
+        pool = (list(scn.get("overlays") or []) if scn else []) \
+            + list(cfg.get("scene_globals") or [])
         return next((o for o in pool if str(o.get("id")) == str(item_id)), None)
 
-    async def stage_design(request):
+    async def scene_design(request):
         """The /stage page (and Chat tab) fetch a design + the globals here."""
         await guard(request)
         b = await _json(request)
         cfg0 = config_store.load()
-        stg_ = _find_stage(cfg0, b.get("name"))
-        return web.json_response({"ok": stg_ is not None, "stage": stg_,
-                                  "globals": cfg0.get("stage_globals") or []})
+        scn = _find_scene(cfg0, b.get("name"))
+        return web.json_response({"ok": scn is not None, "stage": scn,
+                                  "globals": cfg0.get("scene_globals") or []})
 
-    async def stage_export(request):
-        """Download one stage as a .zip bundle: stage.json + its media files."""
+    async def scene_export(request):
+        """Download one scene as a .zip bundle: scene.json plus EVERY image and
+        video it references, so it can be imported anywhere with its media."""
         await guard(request)
         name = (request.query.get("name") or "").strip()
-        stg_ = _find_stage(config_store.load(), name)
-        if stg_ is None:
+        scn = _find_scene(config_store.load(), name)
+        if scn is None:
             raise web.HTTPNotFound(text="no such stage")
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-            z.writestr("stage.json",
-                       json.dumps({"discoflate_stage": 1, "stage": stg_}, indent=2))
-            for o in (stg_.get("overlays") or []):
+            z.writestr("scene.json",
+                       json.dumps({"discoflate_scene": 2, "scene": scn}, indent=2))
+            for o in (scn.get("overlays") or []):
                 n = os.path.basename(str(o.get("media") or ""))
                 p = os.path.join(IMAGES_DIR, n)
                 if n and os.path.isfile(p):
@@ -1709,11 +1728,12 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         safe = "".join(c for c in name if c.isalnum() or c in "-_ ").strip() or "stage"
         return web.Response(body=buf.read(), content_type="application/zip",
                             headers={"Content-Disposition":
-                                     f'attachment; filename="{safe}.dfstage.zip"'})
+                                     f'attachment; filename="{safe}.dfscene.zip"'})
 
-    async def stage_import(request):
-        """Upload a .dfstage.zip: media lands in data/images, the stage is
-        added (renamed with a suffix when the name is already taken)."""
+    async def scene_import(request):
+        """Upload a .dfscene.zip (or an older .dfstage.zip): every bundled
+        image/video lands in data/images and the scene is added, renamed with a
+        suffix when that name is already taken."""
         await guard(request)
         reader = await request.multipart()
         field = await reader.next()
@@ -1732,9 +1752,12 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         raw.seek(0)
         try:
             with zipfile.ZipFile(raw) as z:
-                meta = json.loads(z.read("stage.json").decode("utf-8"))
-                stg_ = (meta.get("stage") or {}) if isinstance(meta, dict) else {}
-                if not (stg_.get("name") or "").strip():
+                inner = ("scene.json" if "scene.json" in z.namelist()
+                         else "stage.json")          # pre-3.52 bundles
+                meta = json.loads(z.read(inner).decode("utf-8"))
+                scn = (meta.get("stage") or meta.get("scene") or {}) \
+                    if isinstance(meta, dict) else {}
+                if not (scn.get("name") or "").strip():
                     raise KeyError("stage name")
                 os.makedirs(IMAGES_DIR, exist_ok=True)
                 for zi in z.infolist():
@@ -1749,16 +1772,16 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             return web.json_response({"ok": False,
                                       "error": f"not a valid stage bundle: {e}"})
         cfg0 = config_store.load()
-        stages = list(cfg0.get("stages") or [])
-        base = (stg_.get("name") or "Imported").strip()
+        scenes = list(cfg0.get("scenes") or [])
+        base = (scn.get("name") or "Imported").strip()
         name, n = base, 2
-        while any((s.get("name") or "").strip() == name for s in stages):
+        while any((s.get("name") or "").strip() == name for s in scenes):
             name = f"{base} ({n})"
             n += 1
-        stg_["name"] = name
-        stages.append(stg_)
+        scn["name"] = name
+        scenes.append(scn)
         cfg = config_store.save(config_store._coerce_numbers(
-            {**cfg0, "stages": stages}))
+            {**cfg0, "scenes": scenes}))
         engine.set_config(cfg)
         return web.json_response({"ok": True, "name": name,
                                   **_public_state(engine, botmgr)})
@@ -1782,8 +1805,8 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         return web.json_response({"ok": True, "version": VERSION,
                                   "gameplay": _gameplay_export(cfg),
                                   "gameplay_presets": cfg.get("gameplay_presets") or [],
-                                  "stages": cfg.get("stages") or [],
-                                  "stage_globals": cfg.get("stage_globals") or [],
+                                  "scenes": cfg.get("scenes") or [],
+                                  "scene_globals": cfg.get("scene_globals") or [],
                                   "media": media})
 
     async def sync_push(request):
@@ -1888,7 +1911,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             merged["gameplay_presets"] = inc_p + [
                 p for p in (merged.get("gameplay_presets") or [])
                 if (p.get("name") or "").strip().lower() not in names]
-        for k in ("stages", "stage_globals"):   # stage designs ride along too
+        for k in ("scenes", "scene_globals"):   # stage designs ride along too
             if isinstance(data.get(k), list):
                 merged[k] = data[k]
         cfg = config_store.save(config_store._coerce_numbers(merged))
@@ -2043,6 +2066,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/control/pump", control_pump),
         web.post("/api/control/stop", control_stop),
         web.post("/api/control/resume", control_resume),
+        web.post("/api/control/end-intro", end_intro),
         web.post("/api/control/poll", control_poll),
         web.post("/api/control/capacity", control_capacity),
         web.post("/api/control/leaderboard", control_leaderboard),
@@ -2074,9 +2098,9 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/sync/push", sync_push),
         web.post("/api/media/list", media_list),
         web.post("/api/media/delete", media_delete),
-        web.post("/api/stage-design", stage_design),
-        web.get("/api/stage-design/export", stage_export),
-        web.post("/api/stage-design/import", stage_import),
+        web.post("/api/scene-design", scene_design),
+        web.get("/api/scene-design/export", scene_export),
+        web.post("/api/scene-design/import", scene_import),
         web.post("/api/check-updates", check_updates),
         web.post("/api/pull-updates", pull_updates),
     ])

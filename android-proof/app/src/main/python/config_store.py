@@ -41,7 +41,7 @@ DEFAULT_PUMPDIRECT_PATH = os.path.normpath(
 
 # Schema version of the stored config. Bump it + add a _migrate step whenever a
 # key is renamed/moved, so old configs upgrade instead of silently stranding data.
-CONFIG_VERSION = 11
+CONFIG_VERSION = 12
 
 # The dead "dice recharged" default that a remediation migration accidentally
 # promoted to the live cooldown-ready message. Migration v3 undoes that.
@@ -361,16 +361,35 @@ DEFAULTS = {
     # and hit "Broadcast Custom" to post it to the channel. Each: {name, message}.
     "broadcasts": [],
 
-    # Stages (Stages tab) — OBS-style overlay designs. Each:
+    # Scenes (Scenes tab) — OBS-style overlay designs. Each:
     #   {name, preset, width, height, overlays: [{id, label, kind, media,
-    #    x, y, w, mode, seconds, layer, visible}]}
-    # kind: media | capacity_gauge | pump_timer. x/y/w are FRACTIONS of the
-    # stage frame (0..1). visible=true → always on the stage; false → callable.
-    # Stages live OUTSIDE gameplay presets (a stage LINKS a preset by name) but
-    # ride along in Device Sync together with their media files.
-    "stages": [],
-    "stage_globals": [],   # overlay items callable from every stage
-    "chat_stage": "",      # the Stage linked to the Chat tab's video section
+    #    x, y, w, z, group, mode, seconds, layer, visible}]}
+    # kind: media | text | timer | capacity_gauge | device_timers | poll_viewer.
+    # x/y/w are FRACTIONS of the scene frame (0..1); z is draw order; `group`
+    # tags an overlay into a named set fired together (scoped to its scene).
+    # visible=true → always on; false → callable. Scenes live OUTSIDE gameplay
+    # presets (a scene LINKS a preset by name) but ride along in Device Sync
+    # with their media files.
+    "scenes": [],
+    "scene_globals": [],   # overlay items callable from every scene
+    "chat_scene": "",      # the Scene linked to the Chat tab's video section
+
+    # Go Live options (Dashboard). Switching LIVE on can open with an INTRO
+    # instead of starting the game immediately: an optional scene group plays,
+    # an optional announcement posts, and — crucially — commands stay held
+    # until the intro ends, so nobody can pump during the pre-show. `commands`
+    # lists command names that ARE allowed during the intro (e.g. a signup).
+    # Placeholders: [intro_timer] counts down in messages and overlay text.
+    "golive": {
+        "intro_enabled": False,
+        "seconds": 60,              # 0 = hold until you press Start now
+        "scene_group": "",
+        "announce": "",             # blank = say nothing
+        "announce_image": "",       # posted WITH the first announcement only
+        "announce_every": 0,        # repeat/edit interval, 0 = post once
+        "hold_commands": True,
+        "commands": [],             # allowed anyway during the intro
+    },
 
     # Virtual camera: mirror the OUTGOING feed. Default off — viewers get the
     # true image and overlay text reads correctly to them. (Discord mirrors
@@ -1167,6 +1186,17 @@ def _migrate(cfg: dict) -> dict:
         for p in (cfg.get("gameplay_presets") or []):
             if isinstance(p, dict):
                 _collapse_v11(p.get("data") or {})
+    if v < 12:
+        # v12: the overlay designer's "Stage" is renamed SCENE — it matches
+        # OBS (a Scene holds Sources; a Group holds some of them) and frees
+        # "Stage" to mean only the phone's fullscreen camera page.
+        for old_k, new_k in (("stages", "scenes"),
+                             ("stage_globals", "scene_globals"),
+                             ("chat_stage", "chat_scene")):
+            if old_k in cfg and new_k not in cfg:
+                cfg[new_k] = cfg.pop(old_k)
+            else:
+                cfg.pop(old_k, None)
     cfg["config_version"] = CONFIG_VERSION
     return cfg
 

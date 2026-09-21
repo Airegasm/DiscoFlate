@@ -61,6 +61,10 @@ class VirtualCam:
         self._mirror = False
         # () -> {"capacity","firing","remaining","device_timers":[...]} for widgets
         self.state_cb = None
+        # () -> rendered string. Set by app.py to engine.render, so ANY
+        # placeholder still in an overlay's text keeps updating on screen.
+        self.render_cb = None
+        self._rtxt: dict = {}      # cache: raw text -> (rendered, when)
         self._state = {}
         self._state_at = 0.0
 
@@ -388,9 +392,14 @@ class VirtualCam:
         return (int(b * 255), int(g * 255), int(r * 255))   # BGR
 
     def _text_sprite(self, txt: str, item: dict, H: int):
-        """An RGBA sprite of `txt` honouring color / size / font / bg."""
+        """An RGBA sprite of `txt` honouring color / size / font / bg.
+        MULTI-LINE: newlines split into stacked lines, aligned left / center /
+        right against the widest one."""
         txt = str(txt if txt is not None else "")
         if not txt:
+            return None
+        lines = txt.replace("\r\n", "\n").replace("\\n", "\n").split("\n")
+        if not any(l.strip() for l in lines):
             return None
         font = self._FONTS.get(str(item.get("font") or "sans").lower(), 0)
         try:
@@ -400,20 +409,38 @@ class VirtualCam:
         px = max(10, int(H * size))                 # target cap height in pixels
         scale = px / 22.0                           # Hershey units -> ~px
         thick = max(1, int(round(scale * 1.6)))
-        (tw, th), base = cv2.getTextSize(txt, font, scale, thick)
         pad = max(4, int(px * 0.28))
-        w, h = tw + pad * 2, th + base + pad * 2
+        gap = max(2, int(px * 0.22))                # leading between lines
+        metrics = []
+        for ln in lines:
+            (tw, th), base = cv2.getTextSize(ln or " ", font, scale, thick)
+            metrics.append((tw, th, base))
+        body_w = max(m[0] for m in metrics)
+        line_h = max(m[1] + m[2] for m in metrics)
+        w = body_w + pad * 2
+        h = line_h * len(lines) + gap * (len(lines) - 1) + pad * 2
         sp = np.zeros((h, w, 4), np.uint8)
         bg = str(item.get("bg") or "").strip()
         if bg:                                      # blank bg = transparent
             sp[:, :, :3] = self._bgr(bg, (0, 0, 0))
             sp[:, :, 3] = 255
-        org = (pad, pad + th)
+        align = str(item.get("align") or "left").lower()
         col = self._bgr(item.get("color"), (255, 255, 255))
-        if not bg:   # unbacked text gets a dark outline so it reads on any feed
-            cv2.putText(sp, txt, org, font, scale, (0, 0, 0, 255),
-                        thick + max(2, thick), cv2.LINE_AA)
-        cv2.putText(sp, txt, org, font, scale, (*col, 255), thick, cv2.LINE_AA)
+        y = pad
+        for ln, (tw, th, base) in zip(lines, metrics):
+            if align.startswith("c"):
+                x = (w - tw) // 2
+            elif align.startswith("r"):
+                x = w - pad - tw
+            else:
+                x = pad
+            org = (x, y + th)
+            if ln.strip():
+                if not bg:   # unbacked text gets an outline so it reads on any feed
+                    cv2.putText(sp, ln, org, font, scale, (0, 0, 0, 255),
+                                thick + max(2, thick), cv2.LINE_AA)
+                cv2.putText(sp, ln, org, font, scale, (*col, 255), thick, cv2.LINE_AA)
+            y += line_h + gap
         return sp
 
     def _gauge_sprite(self, item: dict, W: int, H: int, pct: float):
@@ -547,6 +574,35 @@ class VirtualCam:
                         0, fs * 0.8, (255, 255, 255, 255), max(1, int(fs * 2)), cv2.LINE_AA)
         return sp
 
+    def _live(self, txt: str, st: dict) -> str:
+        """Re-render the placeholders still in an overlay's text, so a label
+        keeps counting while it's on screen. Actor tokens ([user] etc.) were
+        already baked when it fired; what's left is global state — capacity,
+        the pump timer, uptime, variables. Cached ~4x/sec: a countdown needs
+        to tick, not to re-render 30 times a second."""
+        if "[" not in txt:
+            return txt
+        now = time.monotonic()
+        hit = self._rtxt.get(txt)
+        if hit and now - hit[1] < 0.25:
+            return hit[0]
+        out = txt
+        if self.render_cb is not None:
+            try:
+                out = self.render_cb(txt)
+            except Exception:  # noqa: BLE001 — a bad token never blanks a scene
+                out = txt
+        else:   # no engine attached (tests): the two tokens we can do locally
+            try:
+                out = (txt.replace("[capacity]", f"{float(st.get('capacity') or 0):.0f}")
+                          .replace("[secs]", f"{float(st.get('remaining') or 0):.0f}"))
+            except (TypeError, ValueError):
+                pass
+        if len(self._rtxt) > 64:
+            self._rtxt.clear()
+        self._rtxt[txt] = (out, now)
+        return out
+
     def _render_item(self, item: dict, W: int, H: int):
         """RGBA sprite for a non-media overlay, or None to draw nothing."""
         kind = str(item.get("kind") or "text")
@@ -589,15 +645,7 @@ class VirtualCam:
                                         .replace("[mmss]", f"{m}:{s:02d}"), item, H)
         if kind in ("pump_timer", "device_timers"):
             return self._timers_sprite(item, H, st, single=(kind == "pump_timer"))
-        # plain text — [capacity] / [secs] stay live so a label can count
-        txt = str(item.get("text") or "")
-        if "[" in txt:
-            try:
-                txt = txt.replace("[capacity]", f"{float(st.get('capacity') or 0):.0f}")
-                txt = txt.replace("[secs]", f"{float(st.get('remaining') or 0):.0f}")
-            except (TypeError, ValueError):
-                pass
-        return self._text_sprite(txt, item, H)
+        return self._text_sprite(self._live(str(item.get("text") or ""), st), item, H)
 
     @staticmethod
     def _rotate(sprite, deg):
