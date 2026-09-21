@@ -1586,6 +1586,54 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                                   "stage_globals": cfg.get("stage_globals") or [],
                                   "media": media})
 
+    async def sync_push(request):
+        """PUSH this device's gameplay + stages + media to the other one.
+
+        Implemented as "ask them to pull from me": our server calls THEIR
+        /api/sync/pull with our own LAN address. Server-to-server, so the
+        browser never hits CORS, and it reuses the one transfer path. Needs
+        remote access enabled on BOTH (they must accept our request, and we
+        must accept the fetch they make back)."""
+        await guard(request)
+        b = await _json(request)
+        addr = str(b.get("addr") or "").strip().rstrip("/")
+        if not addr:
+            return web.json_response({"ok": False, "error": "no address given"})
+        if not addr.lower().startswith(("http://", "https://")):
+            addr = "http://" + addr
+        if ":" not in addr.split("//", 1)[1]:
+            addr += ":8765"
+        me = _lan_ips()
+        if not me:
+            return web.json_response({"ok": False, "error":
+                "couldn't work out this device's LAN address — is Wi-Fi on?"})
+        cfg = config_store.load()
+        ra = cfg.get("remote_access") or {}
+        if not ra.get("enabled"):
+            return web.json_response({"ok": False, "error":
+                "turn on Remote access here first (System → Remote access) — the "
+                "other device has to be able to fetch from this one"})
+        back = f"{me[0]}:{PORT}"
+        try:
+            async with aiohttp.ClientSession() as s:
+                async with s.post(addr + "/api/sync/pull",
+                                  json={"addr": back, "mode": b.get("mode") or "replace"},
+                                  timeout=aiohttp.ClientTimeout(total=900)) as r:
+                    txt = await r.text()
+                    if r.status != 200:
+                        return web.json_response({"ok": False, "error":
+                            f"HTTP {r.status} from {addr} — whitelist THIS device "
+                            f"({me[0]}) in its Remote access list, and make sure it "
+                            "runs a version with Device Sync"})
+                    data = json.loads(txt)
+        except Exception as e:  # noqa: BLE001 — unreachable, timeout, bad JSON
+            return web.json_response({"ok": False, "error": f"couldn't reach {addr}: {e}"})
+        if not data.get("ok"):
+            return web.json_response({"ok": False, "error":
+                (data.get("error") or "the other device refused the pull") +
+                f" (it was told to fetch from {back})"})
+        return web.json_response({"ok": True, "to": addr, "from": back, **data})
+
     async def sync_pull(request):
         await guard(request)
         b = await _json(request)
@@ -1822,6 +1870,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.get("/api/stage/media/{name}", stage_media),
         web.post("/api/sync/export", sync_export),
         web.post("/api/sync/pull", sync_pull),
+        web.post("/api/sync/push", sync_push),
         web.post("/api/media/list", media_list),
         web.post("/api/media/delete", media_delete),
         web.post("/api/stage-design", stage_design),

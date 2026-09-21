@@ -487,15 +487,29 @@ class BotManager:
         falls back to the single legacy listen_guild/channel. NEVER narrowed by
         Isolate — the bot must keep hearing commands everywhere (and the Chat
         tab must keep listing every channel so you can switch/un-isolate)."""
-        targets = [t for t in (cfg.get("listen_targets") or [])
-                   if str(t.get("guild_id") or "").strip() and str(t.get("channel_id") or "").strip()]
-        if targets:
-            return targets
+        # `active` defaults to True so configs written before the tickbox
+        # existed keep working; unticking one mutes that channel entirely —
+        # no listening, no posting — without forgetting it.
+        configured = [t for t in (cfg.get("listen_targets") or [])
+                      if str(t.get("guild_id") or "").strip()
+                      and str(t.get("channel_id") or "").strip()]
+        if configured:
+            # unticking every channel means SILENT — never fall through to the
+            # legacy single channel, which would resurrect a surprise target
+            return [t for t in configured if t.get("active", True)]
         gid = str(cfg.get("listen_guild_id") or "").strip()
         cid = str(cfg.get("listen_channel_id") or "").strip()
         if gid and cid:
             return [{"guild_id": gid, "channel_id": cid}]
         return []
+
+    @staticmethod
+    def _muted(cfg: dict) -> set:
+        """Channel ids whose Active tickbox is OFF — silenced everywhere,
+        including when one of them is also the announce channel."""
+        return {str(t.get("channel_id"))
+                for t in (cfg.get("listen_targets") or [])
+                if not t.get("active", True)}
 
     def _isolated_to(self, cfg: dict) -> str | None:
         """The channel every broadcast is pinned to, or None. Fails open when
@@ -637,7 +651,7 @@ class BotManager:
         # milestones, events, pause/resume) — deduped if it's also a listen
         # target, and suppressed while Isolate pins output to one channel.
         ann = str(cfg.get("announce_channel_id") or "").strip()
-        if ann and self._isolated_to(cfg) is None:
+        if ann and self._isolated_to(cfg) is None and ann not in self._muted(cfg):
             chan_ids.add(ann)
         if exclude_channel_id is not None:
             chan_ids.discard(str(exclude_channel_id))
@@ -660,7 +674,7 @@ class BotManager:
             out[str(t["channel_id"])] = (f'{t.get("guild_name") or "?"} · '
                                          f'#{t.get("channel_name") or t["channel_id"]}')
         ann = str(cfg.get("announce_channel_id") or "").strip()
-        if ann and ann not in out:
+        if ann and ann not in out and ann not in self._muted(cfg):
             out[ann] = "announce channel"
         return out
 

@@ -1,6 +1,6 @@
 {
-  "version": "3.49.1",
-  "versionCode": 126,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.49.1/discoflate-v3.49.1.apk",
-  "notes": "DiscoFlate v3.49.1 — the Capacity Gauge's automatic colour now ramps green → TRUE YELLOW → red. It used to interpolate raw RGB, which made the midpoint a muddy olive; it now rotates the hue instead, so 50% is a real yellow. The virtual camera, the Stage page and the designer preview are byte-identical across the whole range. Setting an explicit Fill colour still overrides the ramp."
+  "version": "3.50.0",
+  "versionCode": 127,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.50.0/discoflate-v3.50.0.apk",
+  "notes": "DiscoFlate v3.50.0 — ⬆ PUSH: Device Sync works both ways now, so a Stage built on the phone lands on the PC without export/import or walking over (the Stages tab gets a 📡 Send to device shortcut for the same thing). 🖥 TAKE OVER: from the phone app, hand the whole panel to your PC's DiscoFlate and drive it as if you were sitting there — every tab, not just Chat — with a CONTROLLING THE PC chip in the header and ↩ Release to come back; it offers to stand this device's Activation down first so a shared token doesn't answer everything twice. That chip now also shows during VC Remote, so it's always obvious which machine your toggles are changing. ACTIVE TICKBOX on every listen channel (Discord tab): untick one to mute that channel completely — no listening, no posting — while keeping it registered; per-channel and persistent, composes with Isolate, and a muted channel stays muted even if it's also the announce channel."
 }

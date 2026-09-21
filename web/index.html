@@ -212,6 +212,7 @@
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="pausedPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">⏸ SESSION PAUSED</span>
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
+    <span class="pill" id="takeoverPill" style="display:none;background:var(--accent);color:#04202a;font-weight:700;cursor:pointer" onclick="takeoverRelease()" title="You are driving the OTHER device — Activation, Mock and every setting you change here belong to it. Tap to return to this device's own DiscoFlate.">🖥 CONTROLLING THE PC — changes apply THERE · ↩ Release</span>
     <span class="muted" id="saveStatus" style="transition:opacity .3s;opacity:0;color:var(--accent2)">saved ✓</span>
     <div class="toggles">
       <button class="bad" id="ctrlStopBtn" onclick="controlStop()" style="padding:7px 14px" title="Pause the whole session: pumps off, events + games cancelled, commands latched until Resume">🛑 Stop</button>
@@ -370,6 +371,7 @@
         <button class="ghost" onclick="stgDelete()">🗑 Delete</button>
         <button class="ghost" onclick="mediaBrowse(null)">🗂 Media browser</button>
         <div style="flex:1"></div>
+        <button class="ghost" onclick="stgSend()" title="send every stage + its media to your other DiscoFlate over Wi-Fi (no file juggling)">📡 Send to device</button>
         <button class="ghost" onclick="stgExport()">⬇ Export Stage</button>
         <label class="ghost" style="padding:8px 12px;border:1px solid var(--line);border-radius:8px;cursor:pointer">⬆ Import Stage<input type="file" accept=".zip,.dfstage.zip" style="display:none" onchange="stgImport(this)"></label>
       </div>
@@ -917,11 +919,21 @@
         <div class="hint" style="max-width:820px;margin-top:10px">⚠️ A whitelisted device gets the <b>full control panel</b> — pumps, config, everything — so only add devices you own. Find a phone's IP in its Wi-Fi settings. Changes apply <b>immediately</b> (no restart). Your local browser here always works regardless of the list.</div>
       </details>
 
+      <details class="help" style="margin-top:16px" id="takeoverSec"><summary><b style="font-size:1.02rem">🖥 Take over the PC session</b></summary>
+        <div class="hint" style="margin-top:8px;max-width:820px">Hand this app over to your <b>PC's</b> DiscoFlate and drive it as if you were sitting there — the whole panel, every tab, not just Chat. The PC keeps being the bot and the camera home base; your phone just becomes its screen. Press <b>↩ Release</b> in the header (or the phone's back button) to come back here. One-time setup on the PC: <b>System → Remote access</b> → enable + whitelist this phone's IP.</div>
+        <div class="row" style="gap:8px;margin-top:10px;align-items:flex-end">
+          <label class="field" style="flex:1;min-width:180px;max-width:320px">PC address <input id="takeoverAddr" placeholder="192.168.1.50:8765"></label>
+          <button onclick="takeoverGo()">🖥 Take over</button>
+        </div>
+        <div class="hint" style="margin-top:8px"><b>Heads-up:</b> if both installs run the <b>same bot token</b> with Activation on, every command gets answered twice. Takeover offers to switch <b>this</b> device's Activation off so only the PC drives the game.</div>
+      </details>
+
       <details class="help" style="margin-top:16px"><summary><b style="font-size:1.02rem">🔁 Device Sync</b></summary>
-        <div class="hint" style="margin-top:8px;max-width:820px">Pull the <b>gameplay setup + overlay media</b> from your other DiscoFlate install (phone ⇄ PC) so both have the same commands, events, buttons, saved Gameplay Presets and <code>data/images</code> files. On the <b>other</b> device: enable <b>Remote access</b> and whitelist <b>this</b> device's IP. Pulling <b>replaces</b> this device's live gameplay settings (token, devices and network settings are never touched — save a Gameplay Preset first if you want a way back). Files already here with the same name+size are skipped.</div>
+        <div class="hint" style="margin-top:8px;max-width:820px">Pull the <b>gameplay setup + overlay media</b> from your other DiscoFlate install (phone ⇄ PC) so both have the same commands, events, buttons, saved Gameplay Presets and <code>data/images</code> files. On the <b>other</b> device: enable <b>Remote access</b> and whitelist <b>this</b> device's IP. <b>⬇ Pull</b> brings their setup here; <b>⬆ Push</b> sends this device's setup to them — handy when you build a Stage on the phone and want it on the PC without walking over. Push works by asking the other device to fetch from this one, so <b>Remote access must be on at BOTH ends</b>, each whitelisting the other's IP. Either direction <b>replaces</b> the receiving device's live gameplay settings and stages (token, devices and network settings are never touched — save a Gameplay Preset first if you want a way back). Files already present with the same name+size are skipped.</div>
         <div class="row" style="gap:8px;margin-top:10px;align-items:flex-end">
           <label class="field" style="flex:1;min-width:180px;max-width:320px">Other device's address <input id="syncAddr" placeholder="192.168.1.50:8765"></label>
-          <button onclick="syncPull()">⬇ Pull gameplay + media</button>
+          <button onclick="syncPull()">⬇ Pull from there</button>
+          <button onclick="syncPush()">⬆ Push to there</button>
         </div>
         <div class="row" style="margin-top:6px"><span class="muted" id="syncMsg"></span></div>
       </details>
@@ -1070,10 +1082,12 @@
         <li><b>Video channels</b> — on desktop your feed shows <b>above the chat</b>: the live virtual-cam output (overlays included — exactly what viewers see), and <b>🔍 Detect</b> probes each attached camera for the sizes it really supports, portrait modes included. On the phone the video section becomes <b>🖥 VC Remote</b>: video calls run on your PC, and Connect links the app straight into the PC's panel (same Chat tab, buttons and camera controls, driving the PC) — enable <b>Remote access</b> + whitelist the phone's IP on the PC first; the phone's back button returns to the local app.</li>
         <li><b>The virtual camera is desktop-only.</b> Android has no way for an app to register a fake camera — that needs a system driver (root) — and Discord mobile only ever lists the real front/back cameras. On desktop, run DiscoFlate on the PC you join the call from and pick the virtual cam in Discord desktop's video settings.</li>
         <li><b>Overlays live on the PC.</b> The virtual camera is the camera home base — design scenes on the <b>Stages</b> tab and they play into your Discord call from the PC. (A phone-hosted Stage view exists at <code>/stage</code> for screen-share setups, but it's parked for now and not linked from the UI.)</li>
+        <li><b>Active tickbox</b> (Discord tab, on each listen channel) — untick one to <b>mute that channel completely</b>: the bot stops listening there <i>and</i> stops posting there, while keeping it registered so you can flip it back on. Unlike Isolate this is <b>per channel and persistent</b>, and it composes with Isolate. Untick every channel and the bot goes fully silent. A muted channel stays muted even if it's also your announce channel.</li>
         <li><b>Isolate</b> (next to the channel picker) — while ticked, <b>every broadcast</b> (events, milestones, auto-reports, timers, cross-server echoes, owner-voice posts) goes <b>only to the channel selected here</b>, across every server. The <b>announce channel is suppressed too</b> while pinned, so it can't leak output into another server. The bot keeps <b>listening everywhere</b> — commands typed in other channels still run and reply there — and if the pinned channel isn't live it fails open rather than going silent. Switching channels while Isolate is on re-aims it.</li>
         <li><b>🎭 Stages tab</b> — design overlay scenes OBS-style: create a Stage, link a Gameplay Preset, pick a resolution, then drag overlays onto the canvas (drag the ◢ corner to resize). Each overlay is either <b>always-on</b> (part of the scene whenever the stage is live) or <b>callable</b> (becomes a one-tap button on the Chat tab). Overlay types: <b>Media</b> (image/video), <b>🅣 Text</b>, and two live system widgets — <b>📊 Capacity Gauge</b> and <b>⏱ Pump Timer</b>. Every overlay carries <b>its own options, saved per stage</b>: Text and the Pump Timer get colour, size, font and an optional background (blank = transparent); the Gauge gets fill colour, thickness, <b>horizontal or vertical</b> orientation and a show-% toggle; and everything supports <b>rotation</b> (⟳ handle, hold Shift to snap to 15°) and <b>flash</b> (N seconds visible, N hidden). Text and the timer accept <code>[capacity]</code> and <code>[secs]</code>, which stay live on the feed. With no stages yet, a <b>Default</b> stage is created so your overlays always have a home. The <b>🗂 Media browser</b> is the universal library — uploads land in <code>data/images</code>, so <b>⬇ Export Stage</b> bundles the design plus its media into one <code>.dfstage.zip</code> that <b>⬆ Import Stage</b> unpacks anywhere. <b>Global overlays</b> are callable from every stage.</li>
         <li><b>Linking a chat to a stage:</b> on a video channel pick the <b>Stage</b> dropdown in the 🎥 section — its callable overlays appear as buttons, ▶ Start virtual cam puts the always-on items (and live gauges) on the feed, and 🎭 Stage opens the phone view with that design loaded.</li>
-        <li><b>🔁 Device Sync (System tab)</b> keeps both installs matching: it pulls the whole gameplay setup — commands, events, buttons, saved Gameplay Presets — <b>and the overlay images/videos</b> from your other DiscoFlate over Wi-Fi, so overlays fired on the PC have their files where they play. Enable Remote access + whitelist on the source device first; same-name-same-size files are skipped, and tokens/devices never sync.</li>
+        <li><b>🖥 Take over the PC session (System tab, phone app).</b> Hands the whole app over to your PC's DiscoFlate — every tab, not just Chat — so you drive the PC instance as if you were sitting at it, while the PC stays the bot and the camera home base. A <b>🖥 CONTROLLING PC · ↩ Release</b> chip sits in the header the whole time; tap it (or the back button) to return to this phone's own instance. Needs Remote access enabled + this phone whitelisted on the PC. If both installs share a bot token, takeover offers to switch <b>this</b> device's Activation off first, so commands don't get answered twice.</li>
+        <li><b>🔁 Device Sync (System tab)</b> keeps both installs matching over Wi-Fi — the whole gameplay setup (commands, events, buttons, saved Gameplay Presets), <b>all your Stages</b>, and <b>the overlay images/videos</b> they use. <b>⬇ Pull</b> brings the other device's setup here; <b>⬆ Push</b> sends this one's over — so a Stage built on the phone lands on the PC without export/import or walking over. The <b>Stages tab</b> has a <b>📡 Send to device</b> shortcut for the same thing. Push asks the other device to fetch from this one, so <b>Remote access must be on at both ends</b>, each whitelisting the other's IP. Same-name-same-size files are skipped; tokens, devices and network settings never sync.</li>
         <li><b>The permission line</b> (under the send box) shows the bot's rights in the scoped channel live: 🚫 = it can't post there (Send disables, the missing permissions are listed) · ⚠ no Manage Webhooks = owner posts fall back to the bot-prefixed style · ⚠ no Read Message History = the mirror starts from now (no backfill).</li>
       </ul>
       <h3 style="margin:14px 0 6px">Granting Manage Webhooks on a server the bot already joined</h3>
@@ -1877,8 +1891,69 @@ async function syncPull(){
     setTimeout(()=>location.reload(), 1600);
   }catch(e){ m.textContent='⚠ '+(e.message||e); }
 }
+async function syncPush(){
+  const a=($('#syncAddr').value||'').trim(), m=$('#syncMsg');
+  if(!a){ m.textContent='enter the other device\'s address first'; return; }
+  try{ localStorage.setItem('df_sync', a); }catch(e){}
+  m.textContent='⏳ pushing gameplay + stages + media… (videos can take a bit)';
+  try{
+    const r = await api('/api/sync/push', {addr:a});
+    m.textContent = r.ok
+      ? `✅ pushed to ${r.to} — it took ${r.media_new} new media file${r.media_new===1?'':'s'} (${r.media_kept} already there), ${r.presets} preset${r.presets===1?'':'s'}`
+      : '⚠ '+(r.error||'push failed');
+  }catch(e){ m.textContent='⚠ '+(e.message||e); }
+}
+// Stages tab shortcut: same push, reported inline
+async function stgSend(){
+  let a='';
+  try{ a = localStorage.getItem('df_sync')||''; }catch(e){}
+  a = (prompt('Send all stages + media to which device?\n(its address, e.g. 192.168.1.50:8765)', a)||'').trim();
+  if(!a) return;
+  try{ localStorage.setItem('df_sync', a); }catch(e){}
+  toastMsg('⏳ sending stages + media…');
+  try{
+    const r = await api('/api/sync/push', {addr:a});
+    toastMsg(r.ok ? `✅ sent to ${r.to} (${r.media_new} new file${r.media_new===1?'':'s'})`
+                  : '⚠ '+(r.error||'send failed'));
+  }catch(e){ toastMsg('⚠ '+(e.message||e)); }
+}
 try{ const _sa=document.getElementById('syncAddr');
      if(_sa && !_sa.value) _sa.value=localStorage.getItem('df_sync')||''; }catch(e){}
+// ---- Takeover: drive the PC's whole panel from this device ---------------
+// The panel loaded with ?takeover=1 knows it's a borrowed session and offers
+// Release, which returns to this device's own local instance.
+function takeoverNorm(a){
+  a = (a||'').trim();
+  if(!a) return '';
+  if(!/^https?:\/\//i.test(a)) a = 'http://'+a;
+  if(!/:\d+/.test(a.split('//')[1]||'')) a = a.replace(/\/+$/,'')+':8765';
+  return a;
+}
+async function takeoverGo(){
+  let a = takeoverNorm(($('#takeoverAddr')||{}).value);
+  if(!a){ toastMsg('enter your PC\'s address first'); return; }
+  try{ localStorage.setItem('df_takeover', a); }catch(e){}
+  // two instances on one token both answer every command — offer to stand down
+  if(listenerOn() && confirm('Turn OFF this device\'s Activation first?\n\nRecommended: if both installs share a bot token, every command gets answered twice.')){
+    try{ await api('/api/listener', {enabled:false}); }catch(e){}
+  }
+  location.href = a + '/?takeover=1';
+}
+function listenerOn(){ const el=$('#listener'); return !!(el && el.checked); }
+function takeoverRelease(){ location.href = 'http://127.0.0.1:8765/'; }
+(function(){
+  try{
+    if(new URLSearchParams(location.search).get('takeover')==='1'){
+      const p=document.getElementById('takeoverPill');
+      if(p) p.style.display='inline-flex';
+    }
+    const t=document.getElementById('takeoverAddr');
+    if(t && !t.value) t.value = localStorage.getItem('df_takeover') || localStorage.getItem('df_vcr') || '';
+    // the takeover control only makes sense from the phone app
+    const sec=document.getElementById('takeoverSec');
+    if(sec && !window.Android) sec.style.display='none';
+  }catch(e){}
+})();
 // VC Remote: hand the whole WebView to the PC's DiscoFlate panel
 function vcRemoteConnect(){
   let a=($('#vcrAddr').value||'').trim();
@@ -1886,7 +1961,9 @@ function vcRemoteConnect(){
   try{ localStorage.setItem('df_vcr', a); }catch(e){}
   if(!/^https?:\/\//i.test(a)) a='http://'+a;
   if(!/:\d+/.test(a.split('//')[1]||'')) a=a.replace(/\/+$/,'')+':8765';
-  location.href=a;
+  // mark it: the PC's panel is identical to this one, so without the header
+  // chip you can't tell whose Activation/Mock/config you're actually changing
+  location.href = a + '/?takeover=1';
 }
 function renderOverlayButtons(){
   const box=$('#overlayBtns'); if(!box) return;
@@ -2784,18 +2861,28 @@ function renderListenTargets(){
   const box=$('#listenTargets'); if(!box) return;
   if(!listenTargets.length){ box.innerHTML='<div class="muted">No channels yet — pick a server + channel below and Add.</div>'; return; }
   box.innerHTML = listenTargets.map((t,i)=>{
-    const n=targetName(t);
-    return `<div class="dev"><div class="grow"><div class="name">${esc(n.gname)}</div>`+
-      `<div class="tag">#${esc(n.cname)}${n.known?'':' <span style="color:var(--warn)">(connect the bot to resolve names)</span>'}</div></div>`+
+    const n=targetName(t), on = t.active!==false;
+    return `<div class="dev" style="${on?'':'opacity:.55'}">`+
+      `<label class="row" style="gap:6px;flex:0 0 auto" title="untick to mute this channel completely — no listening, no posting — without removing it">`+
+        `<input type="checkbox" ${on?'checked':''} style="width:auto" onchange="setListenActive(${i}, this.checked)"> `+
+        `<b style="font-size:12px;color:var(--dim)">Active</b></label>`+
+      `<div class="grow"><div class="name">${esc(n.gname)}</div>`+
+      `<div class="tag">#${esc(n.cname)}${n.known?'':' <span style="color:var(--warn)">(connect the bot to resolve names)</span>'}`+
+      `${on?'':' <span style="color:var(--warn)">· muted</span>'}</div></div>`+
       `<button class="ghost" onclick="removeListenTarget(${i})">Remove</button></div>`;
   }).join('');
+}
+function setListenActive(i, on){
+  if(!listenTargets[i]) return;
+  listenTargets[i].active = !!on;
+  renderListenTargets(); saveDiscord();
 }
 function addListenTarget(){
   const gid=$('#guildSel').value, cid=$('#chanSel').value;
   if(!gid||!cid){ $('#listenState').textContent='pick a server AND channel first'; return; }
   if(listenTargets.some(t=>t.guild_id===gid && t.channel_id===cid)) return;
   const g=guildsCache.find(x=>x.id===gid), c=g&&g.channels.find(x=>x.id===cid);
-  listenTargets.push({guild_id:gid, guild_name:g?g.name:'', channel_id:cid, channel_name:c?c.name:''});
+  listenTargets.push({guild_id:gid, guild_name:g?g.name:'', channel_id:cid, channel_name:c?c.name:'', active:true});
   renderListenTargets(); saveDiscord();
 }
 function removeListenTarget(i){
