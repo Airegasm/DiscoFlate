@@ -488,13 +488,17 @@
             <div class="stglist" id="stgPalette"></div>
           </div>
           <div class="stgpane">
-            <div class="sidehead">In this scene <span class="muted" id="stgCount"></span></div>
+            <div class="row" style="gap:6px;align-items:center;margin-bottom:7px;flex-wrap:nowrap">
+              <select id="stgGroupPick" style="flex:1;min-width:0" onchange="stgSetGroupFilter(this.value)"></select>
+              <button class="ghost pmini" title="new scene group" onclick="stgGroupNew()">➕</button>
+              <button class="ghost pmini" title="rename this group" onclick="stgGroupRename()">✏️</button>
+              <button class="ghost pmini" title="delete this group (its overlays stay, untagged)" onclick="stgGroupDelete()">🗑</button>
+            </div>
             <div class="stglist" id="stgContents"></div>
           </div>
         </div>
-        <div class="hint" style="margin:8px 0 0">Add from the left; the right list is the scene's <b>stack</b>, front first — <b>👁</b> switches an overlay between <b>always-on</b> and <b>callable</b>, <b>▲▼</b> move it in front of or behind the others, <b>⚙</b> opens its options, <b>−</b> removes it. On the canvas: drag to place, <b>◢</b> resizes, <b>⟳</b> rotates. Everything is saved <b>per scene</b>.</div>
+        <div class="hint" style="margin:8px 0 0">Add from the left. The right-hand list shows one <b>scene group</b> at a time — pick it in the dropdown, or <b>All overlays</b>; <b>➕✏️🗑</b> create, rename and delete groups (deleting a group keeps its overlays, just untagged). Anything you add while a group is selected <b>joins that group</b>, and a group fires as a batch from a <code>scene_group</code> action. Rows are the draw stack, front first: <b>👁</b> always-on vs callable, <b>▲▼</b> front/back, <b>⚙</b> options, <b>−</b> remove. On the canvas: drag to place, <b>◢</b> resize, <b>⟳</b> rotate.</div>
         <div id="stgCanvas" style="margin-top:8px"></div>
-        <div id="stgGroups" style="margin-top:8px"></div>
         <div id="stgProps" style="margin-top:8px"></div>
       </div>
       <details class="help" style="margin-top:14px"><summary><b>🌐 Global overlays</b> <span class="muted">(callable from every stage)</span></summary>
@@ -2426,12 +2430,72 @@ function stgAddKind(kind){
   if(kind==='media') return mediaBrowse(n=>stgAddMedia(n));
   stgAddWidget(kind);
 }
+// Which scene group the contents list is showing. '' = everything,
+// '\u0000none' = only the untagged ones. Overlays still STORE a group name
+// (flat data keeps export/import and the runtime scoping simple) — this is
+// the group-centric way to work with them.
+let stgGroupFilter='';
+const STG_UNGROUPED='\u0000none';
+// a new overlay lands in whichever group the list is showing
+function stgApplyGroup(o){
+  if(stgGroupFilter && stgGroupFilter!==STG_UNGROUPED) o.group=stgGroupFilter;
+}
+function stgSetGroupFilter(v){ stgGroupFilter=v; renderStgContents(); }
+function stgSceneGroups(){
+  const s=stgStage(); if(!s) return [];
+  return [...new Set((s.overlays||[]).map(o=>(o.group||'').trim()).filter(Boolean))].sort();
+}
+function renderStgGroupPick(){
+  const sel=$('#stgGroupPick'); if(!sel) return;
+  const s=stgStage(), all=(s&&s.overlays)||[];
+  const groups=stgSceneGroups();
+  if(stgGroupFilter && stgGroupFilter!==STG_UNGROUPED && !groups.includes(stgGroupFilter))
+    stgGroupFilter='';                       // the group went away
+  const un=all.filter(o=>!(o.group||'').trim()).length;
+  sel.innerHTML =
+    `<option value="">📋 All overlays (${all.length})</option>`+
+    groups.map(g=>`<option value="${esc(g)}" ${stgGroupFilter===g?'selected':''}>🎬 ${esc(g)} (${all.filter(o=>(o.group||'').trim()===g).length})</option>`).join('')+
+    `<option value="${STG_UNGROUPED}" ${stgGroupFilter===STG_UNGROUPED?'selected':''}>— ungrouped (${un}) —</option>`;
+  sel.value = stgGroupFilter;
+}
+function stgGroupNew(){
+  const s=stgStage(); if(!s){ toastMsg('create a scene first'); return; }
+  const n=(prompt('New scene group name:','')||'').trim(); if(!n) return;
+  stgGroupFilter=n;                          // anything added now joins it
+  renderStgGroupPick(); renderStgContents(); renderStgGroups();
+  toastMsg(`🎬 "${n}" — overlays you add now join this group`);
+}
+function stgGroupRename(){
+  const s=stgStage(); if(!s||!stgGroupFilter||stgGroupFilter===STG_UNGROUPED){
+    toastMsg('pick a group first'); return; }
+  const n=(prompt('Rename this scene group:', stgGroupFilter)||'').trim(); if(!n) return;
+  (s.overlays||[]).forEach(o=>{ if((o.group||'').trim()===stgGroupFilter) o.group=n; });
+  stgGroupFilter=n;
+  renderStgGroupPick(); renderStgContents(); renderStgGroups(); scheduleSave();
+}
+function stgGroupDelete(){
+  const s=stgStage(); if(!s||!stgGroupFilter||stgGroupFilter===STG_UNGROUPED){
+    toastMsg('pick a group first'); return; }
+  const n=(s.overlays||[]).filter(o=>(o.group||'').trim()===stgGroupFilter).length;
+  if(!confirm(`Delete the group "${stgGroupFilter}"?\n\nIts ${n} overlay(s) STAY in the scene — they just stop being grouped.`)) return;
+  (s.overlays||[]).forEach(o=>{ if((o.group||'').trim()===stgGroupFilter) o.group=''; });
+  stgGroupFilter='';
+  renderStgGroupPick(); renderStgContents(); renderStgGroups(); scheduleSave();
+}
 function renderStgContents(){
-  const box=$('#stgContents'), cnt=$('#stgCount'); if(!box) return;
+  const box=$('#stgContents'); if(!box) return;
+  renderStgGroupPick();
   const s=stgStage();
-  const list=(s&&s.overlays)||[];
-  if(cnt) cnt.textContent = list.length ? `· ${list.length}` : '';
-  if(!list.length){ box.innerHTML='<span class="muted">nothing here yet — add one from the left</span>'; return; }
+  const all=(s&&s.overlays)||[];
+  const list = !stgGroupFilter ? all
+    : stgGroupFilter===STG_UNGROUPED ? all.filter(o=>!(o.group||'').trim())
+    : all.filter(o=>(o.group||'').trim()===stgGroupFilter);
+  if(!list.length){
+    box.innerHTML = `<span class="muted">${stgGroupFilter && stgGroupFilter!==STG_UNGROUPED
+      ? `nothing in <b>${esc(stgGroupFilter)}</b> yet — anything you add from the left joins it`
+      : 'nothing here yet — add one from the left'}</span>`;
+    return;
+  }
   const ico=k=>(OV_KINDS.find(x=>x[0]===(k||'media'))||[,'🖼'])[1];
   // drawn last = on top, so show the stack top-first like a layer list
   box.innerHTML = list.map((o,i)=>({o,i}))
@@ -2604,12 +2668,9 @@ function renderStgProps(){
   const fire = `<span class="muted">${o.visible?'Always on — part of the scene while it is live.':'Callable — plays when an action or button fires it.'}</span>`+
     (o.visible?'':F('Mode', sel('mode',['timed','hold','once'],o.mode||'timed',92))+
       ((o.mode||'timed')==='timed'?F('Secs', num('seconds',o.seconds??5,0.5,600,0.5)):''))+
-    F('Layer slot', `<input value="${esc(o.layer||'')}" placeholder="(own)" style="width:92px" onchange="stgItemSet('layer',this.value)">`,
-      'firing the same slot replaces what is there')+
-    F('Scene group', `<input list="stgGroupList" value="${esc(o.group||'')}" placeholder="intro" style="width:130px" onchange="stgItemSet('group',this.value.trim())">`+
-      `<datalist id="stgGroupList">${sceneGroupNames().map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`,
-      'overlays sharing a group fire together')+
-    F('Layer order', num('z',Math.round(+o.z||0),-99,99,1),'higher draws in front — or use ▲▼ in the list');
+    F('Replaces', `<input value="${esc(o.layer||'')}" placeholder="(nothing)" style="width:110px" onchange="stgItemSet('layer',this.value)">`,
+      'a named slot: firing another overlay with this same name REPLACES this one. Nothing to do with draw order — use ▲▼ in the list for that.')+
+    `<span class="muted">draw order: ▲▼ in the list (currently ${Math.round(+o.z||0)})</span>`;
 
   box.innerHTML = `<div class="pbox">`+head+
     sect('Content', content)+ sect('Style', style)+
@@ -2632,7 +2693,7 @@ function stgItemDup(){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===
 function stgItemDel(){ const s=stgStage(); if(!s) return;
   s.overlays=(s.overlays||[]).filter(x=>x.id!==scnSelId); scnSelId=null;
   renderStgCanvas(); renderStgGroups(); renderStgContents(); renderStgProps(); sceneButtonsRefresh(); scheduleSave(); }
-function stgPick(i){ stgCur=i; scnSelId=null; renderStages(); }
+function stgPick(i){ stgCur=i; scnSelId=null; stgGroupFilter=''; renderStages(); }
 // "or default if no scenes": overlay options always have a stage to live in
 function stgEnsureDefault(){
   if(scenesData.length) return false;
@@ -2656,10 +2717,10 @@ function stgResPick(){ const s=stgStage(); if(!s) return;
   const [w,h]=$('#stgRes').value.split('x').map(Number); s.width=w; s.height=h;
   renderStgCanvas(); scheduleSave(); }
 function stgAddMedia(n){ const s=stgStage(); if(!s){ toastMsg('create a scene first'); return; }
-  const o=stgNewItem('media',n); (s.overlays=s.overlays||[]).push(o);
+  const o=stgNewItem('media',n); stgApplyGroup(o); (s.overlays=s.overlays||[]).push(o);
   scnSelId=o.id; renderStgCanvas(); renderStgGroups(); renderStgContents(); renderStgProps(); sceneButtonsRefresh(); scheduleSave(); }
 function stgAddWidget(kind){ const s=stgStage(); if(!s){ toastMsg('create a scene first'); return; }
-  const o=stgNewItem(kind,''); (s.overlays=s.overlays||[]).push(o);
+  const o=stgNewItem(kind,''); stgApplyGroup(o); (s.overlays=s.overlays||[]).push(o);
   scnSelId=o.id; renderStgCanvas(); renderStgGroups(); renderStgContents(); renderStgProps(); scheduleSave(); }
 function renderStgGlobals(){
   const box=$('#stgGlobalRows'); if(!box) return;
