@@ -1,6 +1,6 @@
 {
-  "version": "3.56.0",
-  "versionCode": 136,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.56.0/discoflate-v3.56.0.apk",
-  "notes": "DiscoFlate v3.56.0 — the Scenes canvas gets a GRID: a line every 5%, brighter every 25%, with centre lines, and dragging snaps to it. Hold SHIFT to place freely, or untick grid & snap. New 👁 button beside the group dropdown HIDES A WHOLE SCENE GROUP — it stops coming up with the scene, a scene_group action won't play it, and firing one of its overlays individually is ignored too; its overlays grey out on the canvas so you can still see the layout. The Scenes tab now REMEMBERS which scene and group you were working on across refreshes (by name, so it survives reordering), along with your grid preference. Fixes a newly-created scene group not appearing in the Go Live intro dropdown, which also now refreshes the moment groups change instead of waiting for the next poll."
+  "version": "3.56.1",
+  "versionCode": 137,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.56.1/discoflate-v3.56.1.apk",
+  "notes": "DiscoFlate v3.56.1 — an empty scene group now actually persists. Groups used to be inferred from the overlays carrying the name, so a group with nothing in it only existed in the browser until you refreshed — which is why a freshly-made 'Intro' kept vanishing from the Go Live dropdown. A scene now owns its group names properly, so an empty group is saved, survives a reload, and shows up everywhere immediately. Renaming and hiding follow it correctly, and scenes made before this still work."
 }

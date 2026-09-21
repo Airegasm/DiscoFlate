@@ -2173,8 +2173,8 @@ function sceneGroupScope(){
   const scene = linked || scenesData[stgCur] || null;
   // include groups you have created but not filled yet, or a brand-new
   // "Intro" is invisible to the Go Live picker until it has an overlay
-  const names = s => [...new Set([...(s?.overlays||[])
-    .map(o=>(o.group||'').trim()).filter(Boolean), ...stgPending])].sort();
+  const names = s => [...new Set([...(Array.isArray(s?.groups)?s.groups:[]),
+    ...(s?.overlays||[]).map(o=>(o.group||'').trim()).filter(Boolean)])].sort();
   return {scene, sceneName: scene?scene.name:'',
           linked: !!linked, groups: names(scene),
           globals: [...new Set(sceneGlobals.map(o=>(o.group||'').trim()).filter(Boolean))].sort()};
@@ -2259,7 +2259,8 @@ function stgRestore(){
   if(stgCur>=scenesData.length) stgCur=scenesData.length-1;
   // only restore a group that still exists in this scene
   const s=stgStage();
-  const has=(s?.overlays||[]).some(o=>(o.group||'').trim()===grp);
+  const has = (Array.isArray(s?.groups) && s.groups.some(g=>g===grp))
+           || (s?.overlays||[]).some(o=>(o.group||'').trim()===grp);
   stgGroupFilter = (grp && (has || grp===STG_UNGROUPED)) ? grp : '';
 }
 function renderStages(){
@@ -2474,14 +2475,20 @@ function stgApplyGroup(o){
   if(stgGroupFilter && stgGroupFilter!==STG_UNGROUPED) o.group=stgGroupFilter;
 }
 function stgSetGroupFilter(v){ stgGroupFilter=v; stgRemember(); renderStgContents(); }
-// Groups are normally DERIVED from the overlays that carry them — but a group
-// you have just created has none yet. `stgPending` keeps those alive so a new
-// empty group can be selected and filled, instead of vanishing on creation.
-let stgPending = new Set();
+// A scene OWNS its group names (scene.groups), so a group can exist while it's
+// still empty and survives a reload. Names found on overlays are folded in too,
+// so scenes saved before this still work.
+let stgPending = new Set();      // legacy shim; scene.groups is the real store
+function stgGroupList(){
+  const s=stgStage(); if(!s) return null;
+  if(!Array.isArray(s.groups)) s.groups=[];
+  return s.groups;
+}
 function stgSceneGroups(){
   const s=stgStage(); if(!s) return [];
-  const real=(s.overlays||[]).map(o=>(o.group||'').trim()).filter(Boolean);
-  return [...new Set([...real, ...stgPending])].sort();
+  const owned=stgGroupList()||[];
+  const onOverlays=(s.overlays||[]).map(o=>(o.group||'').trim()).filter(Boolean);
+  return [...new Set([...owned, ...onOverlays])].sort();
 }
 function renderStgGroupPick(){
   const sel=$('#stgGroupPick'); if(!sel) return;
@@ -2527,8 +2534,10 @@ function stgGroupHide(){
 function stgGroupNew(){
   const s=stgStage(); if(!s){ toastMsg('create a scene first'); return; }
   const n=(prompt('New scene group name:','')||'').trim(); if(!n) return;
-  stgPending.add(n);                         // empty for now — keep it listed
+  const list=stgGroupList();
+  if(list && !list.some(g=>g.toLowerCase()===n.toLowerCase())) list.push(n);
   stgGroupFilter=n;                          // anything added now joins it
+  stgRemember(); scheduleSave();             // an empty group is saved too
   renderStgGroupPick(); renderStgContents(); renderStgGroups(); goliveUi();
   toastMsg(`🎬 "${n}" — overlays you add now join this group`);
 }
@@ -2537,8 +2546,13 @@ function stgGroupRename(){
     toastMsg('pick a group first'); return; }
   const n=(prompt('Rename this scene group:', stgGroupFilter)||'').trim(); if(!n) return;
   (s.overlays||[]).forEach(o=>{ if((o.group||'').trim()===stgGroupFilter) o.group=n; });
-  if(stgPending.delete(stgGroupFilter)) stgPending.add(n);
-  stgGroupFilter=n;
+  const list=stgGroupList();
+  if(list){ const i=list.findIndex(g=>g.toLowerCase()===stgGroupFilter.toLowerCase());
+            if(i>=0) list[i]=n; else list.push(n); }
+  // a hidden group keeps its state through a rename
+  const hid=stgHiddenGroups(), hi=hid.findIndex(g=>String(g).toLowerCase()===stgGroupFilter.toLowerCase());
+  if(hi>=0) hid[hi]=n;
+  stgGroupFilter=n; stgRemember();
   renderStgGroupPick(); renderStgContents(); renderStgGroups(); goliveUi(); scheduleSave();
 }
 function stgGroupDelete(){
@@ -2547,8 +2561,12 @@ function stgGroupDelete(){
   const n=(s.overlays||[]).filter(o=>(o.group||'').trim()===stgGroupFilter).length;
   if(n && !confirm(`Delete the group "${stgGroupFilter}"?\n\nIts ${n} overlay(s) STAY in the scene — they just stop being grouped.`)) return;
   (s.overlays||[]).forEach(o=>{ if((o.group||'').trim()===stgGroupFilter) o.group=''; });
-  stgPending.delete(stgGroupFilter);
-  stgGroupFilter='';
+  const list=stgGroupList();
+  if(list){ const i=list.findIndex(g=>g.toLowerCase()===stgGroupFilter.toLowerCase());
+            if(i>=0) list.splice(i,1); }
+  const hid=stgHiddenGroups(), hi=hid.findIndex(g=>String(g).toLowerCase()===stgGroupFilter.toLowerCase());
+  if(hi>=0) hid.splice(hi,1);
+  stgGroupFilter=''; stgRemember();
   renderStgGroupPick(); renderStgContents(); renderStgGroups(); goliveUi(); scheduleSave();
 }
 function renderStgContents(){
@@ -2768,7 +2786,11 @@ function stgItemSet(k,v){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id
   if(k==='opacity') v = Math.max(0, Math.min(100, +v||0));   // percent, as stored
   if(k==='h') v = (v===null||v==='') ? null : Math.max(0.02, (+v||0)/100);
   o[k]=v; renderStgCanvas(); renderStgGroups(); renderStgContents(); renderStgProps();
-  if(k==='group') goliveUi();
+  if(k==='group'){
+    const list=stgGroupList(), nm=String(v||'').trim();
+    if(list && nm && !list.some(g=>g.toLowerCase()===nm.toLowerCase())) list.push(nm);
+    goliveUi();
+  }
   sceneButtonsRefresh(); scheduleSave(); }
 function stgItemDup(){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===scnSelId); if(!o) return;
   const c=JSON.parse(JSON.stringify(o)); c.id=stgNewItem('x').id;
