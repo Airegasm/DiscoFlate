@@ -1979,7 +1979,8 @@ function renderStgCanvas(){
     if(o.kind==='capacity_gauge'){
       const vert = String(o.orient||'h').toLowerCase().startsWith('v');
       const thick = Math.max(6, (o.size||0.05)*CH);
-      const fill = o.color || '#2ecc71';
+      // same ramp the live gauge uses, previewed at the mock 55% fill
+      const fill = o.color || `hsl(${Math.round(120-1.2*55)} 70% 45%)`;
       inner = `<div class="gauge" style="${vert?`width:${thick}px;height:100%`:`width:100%;height:${thick}px`};${o.bg?`background:${esc(o.bg)}`:''}">`+
               `<i style="${vert?'width:100%;height:55%;position:absolute;bottom:0':'width:55%;height:100%'};background:${esc(fill)}"></i></div>`;
       // vertical gauges take their LENGTH from w along the y axis

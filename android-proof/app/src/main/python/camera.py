@@ -15,6 +15,7 @@ piece is missing, status() says exactly why instead of crashing the app.
 
 from __future__ import annotations
 
+import colorsys
 import os
 import sys
 import threading
@@ -305,6 +306,15 @@ class VirtualCam:
         except ValueError:
             return default
 
+    @staticmethod
+    def _ramp(frac: float) -> tuple:
+        """Capacity colour: green → YELLOW → red. Interpolating the HUE (not
+        raw RGB) is what puts a real yellow at the midpoint; this matches the
+        `hsl(120-1.2*pct 70% 45%)` the Stage page uses, so both surfaces agree."""
+        h = (120.0 * (1.0 - max(0.0, min(1.0, frac)))) / 360.0
+        r, g, b = colorsys.hls_to_rgb(h, 0.45, 0.70)
+        return (int(b * 255), int(g * 255), int(r * 255))   # BGR
+
     def _text_sprite(self, txt: str, item: dict, H: int):
         """An RGBA sprite of `txt` honouring color / size / font / bg."""
         txt = str(txt if txt is not None else "")
@@ -347,8 +357,7 @@ class VirtualCam:
         w, h = (thick, length) if vert else (length, thick)
         sp = np.zeros((h, w, 4), np.uint8)
         frac = max(0.0, min(1.0, pct / 100.0))
-        fill = self._bgr(item.get("color"), None) or \
-            (60, int(200 - 150 * frac), int(70 + 170 * frac))   # green -> red
+        fill = self._bgr(item.get("color"), None) or self._ramp(frac)
         bg = self._bgr(item.get("bg"), (30, 30, 30))
         sp[:, :, :3] = bg
         sp[:, :, 3] = 255

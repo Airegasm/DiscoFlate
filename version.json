@@ -1,6 +1,6 @@
 {
-  "version": "3.49.0",
-  "versionCode": 125,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.49.0/discoflate-v3.49.0.apk",
-  "notes": "DiscoFlate v3.49.0 — overlays get a real editor. NEW 🅣 TEXT overlay (colour, size, font, optional background, live [capacity]/[secs]), and every overlay now carries its own options saved per stage: the Pump Timer gets the same text styling plus editable pumping/idle formats, and the Capacity Gauge gets fill colour, thickness, horizontal OR vertical orientation and a show-% toggle. All overlays support ROTATION (⟳ handle, Shift snaps to 15°, ↺ resets) and FLASH (N seconds visible, N hidden). Canvas now has proper 8-POINT RESIZE — four corners plus four edges, anchored to the opposite side, with media gaining an optional explicit height (blank = keep aspect). ISOLATE FIX: broadcasts now really do pin to one channel across all servers — the announce channel no longer leaks output into another server, and the bot keeps listening everywhere so commands still work. CAMERA FIXES: browsers rejected our RGB frames from v4l2loopback (the 'loading forever then error 2014' hang) — Linux now feeds I420 like OBS does; a 🪞 Mirror toggle cancels Discord's un-disableable self-view mirror (off by default so viewers get the true image); and 🩺 Driver checks for the virtual-camera driver and installs it for you. The phone Stage view is parked — the PC is the camera home base."
+  "version": "3.49.1",
+  "versionCode": 126,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.49.1/discoflate-v3.49.1.apk",
+  "notes": "DiscoFlate v3.49.1 — the Capacity Gauge's automatic colour now ramps green → TRUE YELLOW → red. It used to interpolate raw RGB, which made the midpoint a muddy olive; it now rotates the hue instead, so 50% is a real yellow. The virtual camera, the Stage page and the designer preview are byte-identical across the whole range. Setting an explicit Fill colour still overrides the ramp."
 }
