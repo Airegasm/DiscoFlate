@@ -1,6 +1,6 @@
 {
-  "version": "3.52.0",
-  "versionCode": 129,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.52.0/discoflate-v3.52.0.apk",
-  "notes": "DiscoFlate v3.52.0 — 🎬 GO LIVE OPTIONS: flipping LIVE on can open with an intro instead of starting the game. A scene group plays, an announcement posts (with an optional image, and repeating if you want), and COMMANDS STAY HELD the whole time so nobody can play during your pre-show — with an allow-list for the ones that should work anyway. Set a length or leave it open-ended and end it with the new 🎬 Start now button in Chat. [intro_timer] counts down in messages AND overlays. TEXT OVERLAYS are now multi-line with left/centre/right alignment, and their placeholders KEEP UPDATING while on screen — so a countdown or a score ticks live without re-firing. STAGES ARE NOW SCENES (matching OBS; config migrates itself), scene groups are scoped to their own scene so two scenes can both have an 'intro', and exporting a scene bundles every image and video it uses into one .dfscene.zip. New [timer:<device>] placeholder gives any device's own countdown while [timer] still means the primary pump. Plus the Chat tab's buttons moved into a panel beside the log."
+  "version": "3.53.0",
+  "versionCode": 130,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.53.0/discoflate-v3.53.0.apk",
+  "notes": "DiscoFlate v3.53.0 — the Scenes tab works like OBS now. The row of ➕ buttons is gone: there's a scrollable palette of overlay types on the left, and on the right the scene's stack, front first, where each row has 👁 (always-on vs callable), ▲▼ to move it in front of or behind the others, ⚙ for its options and − to remove it. Every overlay also gets an OPACITY slider, which scales properly with fades — a 50% overlay halfway through a fade-in renders at 25%. Scene groups are no longer invisible: every group in the scene is listed under the canvas with its overlay count (click one to jump to it), and the Scene group box autocompletes names you already use so a typo can't silently orphan an overlay."
 }

@@ -279,7 +279,7 @@ class VirtualCam:
                      x=None, y=None, rot=None, flash=None, h=None,
                      fade_in=None, fade_out=None, anim=None, anim_dir=None,
                      queue=None, chroma_on=None, chroma=None, chroma_tol=None,
-                     chroma_soft=None, z=None) -> dict:
+                     chroma_soft=None, z=None, opacity=None) -> dict:
         """Show a MEDIA layer over the camera. `media` = an image (PNG alpha
         welcome) or a video file from data/images (or an absolute path).
         mode: "timed"  = shown/looping for `seconds`
@@ -312,7 +312,7 @@ class VirtualCam:
                  "rot": rot, "flash": flash, "h": h,
                  "fade_in": fade_in, "fade_out": fade_out, "born": time.monotonic(),
                  "anim": anim, "anim_dir": anim_dir, "queue": queue,
-                 "z": z,
+                 "z": z, "opacity": opacity,
                  "chroma_on": chroma_on, "chroma": chroma,
                  "chroma_tol": chroma_tol, "chroma_soft": chroma_soft,
                  "until": (time.monotonic() + secs) if mode == "timed" else None}
@@ -530,7 +530,10 @@ class VirtualCam:
         sp = np.zeros((bh, bw, 4), np.uint8)
         bg = self._bgr(item.get("bg"), (18, 18, 22))
         sp[:, :, :3] = bg
-        sp[:, :, 3] = int(max(0, min(255, float(item.get("opacity", 220) or 220))))
+        bga = item.get("bg_opacity")
+        if bga is None:                 # pre-3.53 configs stored 0-255 here
+            bga = item.get("opacity") if (item.get("opacity") or 0) > 100 else 220
+        sp[:, :, 3] = int(max(0, min(255, float(bga or 220))))
         accent = self._bgr(item.get("color"), (244, 168, 40))
         cv2.rectangle(sp, (0, 0), (bw - 1, bh - 1), (*accent, 255), 2)
         cv2.rectangle(sp, (0, 0), (5, bh - 1), (*accent, 255), -1)   # embed spine
@@ -723,7 +726,8 @@ class VirtualCam:
 
     @staticmethod
     def _fade_alpha(o: dict, now: float) -> float:
-        """0..1 opacity for a layer from its fade_in / fade_out seconds."""
+        """0..1 opacity for a layer: its own opacity setting, further scaled by
+        any fade_in / fade_out in progress."""
         a = 1.0
         try:
             fin = float(o.get("fade_in") or 0)
@@ -733,7 +737,17 @@ class VirtualCam:
             if fout > 0 and o.get("until"):
                 a = min(a, (o["until"] - now) / fout)
         except (TypeError, ValueError, ZeroDivisionError):
-            return 1.0
+            a = 1.0
+        # the layer's own opacity SCALES the fade (a 50% layer halfway through
+        # a fade-in is 25%, not 50%) — min() here would swallow one of them
+        src = o.get("item") if o.get("kind") == "draw" else o
+        raw = (src or {}).get("opacity", o.get("opacity"))
+        if raw is not None:
+            try:                        # stored 0-100; higher = an old 0-255 value
+                op = float(raw)
+                a *= max(0.0, min(1.0, (op / 255.0) if op > 100 else (op / 100.0)))
+            except (TypeError, ValueError):
+                pass
         return max(0.0, min(1.0, a))
 
     @staticmethod

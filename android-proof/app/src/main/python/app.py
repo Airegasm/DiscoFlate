@@ -676,7 +676,8 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                         "anim_dir": found.get("anim_dir"), "queue": found.get("queue"),
                         "chroma_on": found.get("chroma_on"), "chroma": found.get("chroma"),
                         "chroma_tol": found.get("chroma_tol"),
-                        "chroma_soft": found.get("chroma_soft"), "z": found.get("z")}
+                        "chroma_soft": found.get("chroma_soft"), "z": found.get("z"),
+                        "opacity": found.get("opacity")}
         elif mode == "clear":
             vcam.clear_overlays(spec.get("layer"), fade_out=spec.get("fade_out"))
             stg.clear(spec.get("layer"))
@@ -707,7 +708,8 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                                              chroma=spec.get("chroma"),
                                              chroma_tol=spec.get("chroma_tol"),
                                              chroma_soft=spec.get("chroma_soft"),
-                                             z=spec.get("z"))
+                                             z=spec.get("z"),
+                                             opacity=spec.get("opacity"))
             except Exception as ex:  # noqa: BLE001
                 vres = {"ok": False, "error": str(ex)}
         sres = stg.fire(spec.get("media"), spec.get("seconds"),
@@ -1487,7 +1489,8 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                                       anim_dir=o.get("anim_dir"),
                                       chroma_on=o.get("chroma_on"), chroma=o.get("chroma"),
                                       chroma_tol=o.get("chroma_tol"),
-                                      chroma_soft=o.get("chroma_soft"))
+                                      chroma_soft=o.get("chroma_soft"),
+                                      opacity=o.get("opacity"))
         return web.json_response({"ok": st["running"], **st})
 
     async def camera_detect(request):

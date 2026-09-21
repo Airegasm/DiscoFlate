@@ -181,6 +181,8 @@ function applyAnim(el, o){
   requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.remove('in')));
 }
 function applyBox(el, o){
+  if(o.opacity!=null){ const v=+o.opacity;
+    el.style.opacity = String(Math.max(0, Math.min(1, v>100 ? v/255 : v/100))); }
   if(o.x != null && o.y != null){   // else keep whatever place() decided
     el.style.left = (o.x*100)+'%';
     el.style.top  = (o.y*100)+'%';
