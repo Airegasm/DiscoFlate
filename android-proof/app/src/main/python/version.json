@@ -1,6 +1,6 @@
 {
-  "version": "3.48.0",
-  "versionCode": 122,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.48.0/discoflate-v3.48.0.apk",
-  "notes": "DiscoFlate v3.48.0 — the phone/PC video story lands. 🎭 STAGE: a fullscreen camera view (/stage) that plays every overlay action as composited layers — share it into a Discord call with 'Share one app' for overlays with no PC (touch-lock, mirror, front/back flip, keep-awake, ⏸ BRB card). 🖥 VC REMOTE: on Android, video channels offer one-tap connect into your PC's DiscoFlate panel — chat, buttons and camera controls driving the PC that's actually in the call. 🔁 DEVICE SYNC (System tab): pull the whole gameplay setup + overlay images/videos from your other install over Wi-Fi. Cameras: 🔍 Detect probes real supported sizes (portrait included) per device; desktop shows a live preview of the virtual-cam output above the chat. Header: 🛑 Stop/▶ Resume moved up top next to Mock; ACTIVATION is now LIVE. Security: the bot token is AES-encrypted at rest in config.json (per-install key), and a 👁 next to the token field reveals it for copying between installs. Update checks now bypass GitHub's CDN cache."
+  "version": "3.48.1",
+  "versionCode": 123,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.48.1/discoflate-v3.48.1.apk",
+  "notes": "DiscoFlate v3.48.1 — the revealed bot token is actually copyable now: 👁 auto-selects it and a new 📋 button copies it to the clipboard in one tap (with fallbacks for older WebViews). Tip: you can also copy it from another device — enable Remote access on this install, whitelist the other device's IP, open this panel from its browser and hit 👁 there."
 }

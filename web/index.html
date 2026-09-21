@@ -368,6 +368,7 @@
             <div class="row" style="gap:6px;flex-wrap:nowrap">
               <input type="password" id="token" placeholder="paste bot token…" style="flex:1;min-width:0">
               <button class="ghost" id="tokenEye" title="show the saved token in copyable plaintext" style="padding:8px 10px" onclick="tokenEye()">👁</button>
+              <button class="ghost" id="tokenCopy" title="copy the token to the clipboard" style="padding:8px 10px;display:none" onclick="tokenCopy()">📋</button>
             </div>
           </label>
           <div class="row">
@@ -2147,17 +2148,34 @@ $('#mock').addEventListener('change', async e => {
 // plaintext; press again to hide (field re-masks and empties).
 let tokenShown=false;
 async function tokenEye(){
-  const inp=$('#token'), b=$('#tokenEye');
+  const inp=$('#token'), b=$('#tokenEye'), c=$('#tokenCopy');
   if(tokenShown){
     inp.type='password'; inp.value=''; inp.placeholder='paste bot token…';
-    b.style.background=''; tokenShown=false; return;
+    b.style.background=''; if(c) c.style.display='none'; tokenShown=false; return;
   }
   try{
     const r = await api('/api/token/reveal', {});
     inp.type='text'; inp.value=r.token||''; tokenShown=true;
     b.style.background='var(--warn)';
-    if(!r.token) inp.placeholder='no token saved yet';
+    if(!r.token){ inp.placeholder='no token saved yet'; return; }
+    if(c) c.style.display='';
+    inp.focus(); inp.select(); inp.setSelectionRange(0, inp.value.length);
   }catch(e){ toastMsg('⚠ '+(e.message||e)); }
+}
+async function tokenCopy(){
+  const inp=$('#token'), c=$('#tokenCopy');
+  if(!inp.value) return;
+  let ok=false;
+  try{ await navigator.clipboard.writeText(inp.value); ok=true; }catch(e){}
+  if(!ok){   // clipboard API blocked (http on LAN, old WebView) → execCommand
+    try{
+      inp.focus(); inp.select(); inp.setSelectionRange(0, inp.value.length);
+      ok = document.execCommand('copy');
+    }catch(e){}
+  }
+  if(c){ c.textContent = ok ? '✅' : '📋'; setTimeout(()=>{ c.textContent='📋'; }, 1800); }
+  if(!ok){ inp.focus(); inp.select(); inp.setSelectionRange(0, inp.value.length);
+           toastMsg('couldn\'t auto-copy — the token is selected, copy it manually'); }
 }
 async function saveToken(){
   try{
