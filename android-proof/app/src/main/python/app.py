@@ -612,6 +612,11 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         if spec.get("group"):
             cfg0 = config_store.load()
             scene_name = (spec.get("stage") or "").strip() or cfg0.get("chat_scene", "")
+            if not scene_name:      # nothing linked to Chat: search every scene
+                for s_ in (cfg0.get("scenes") or []):
+                    if _scene_group(cfg0, s_.get("name"), spec.get("group")):
+                        scene_name = s_.get("name")
+                        break
             # Scene groups are SCOPED TO THE LOADED SCENE (plus the globals).
             # We deliberately do NOT hunt other scenes for a matching name —
             # two scenes may reuse "intro" for completely different looks.

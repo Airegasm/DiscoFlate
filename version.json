@@ -1,6 +1,6 @@
 {
-  "version": "3.56.1",
-  "versionCode": 137,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.56.1/discoflate-v3.56.1.apk",
-  "notes": "DiscoFlate v3.56.1 — an empty scene group now actually persists. Groups used to be inferred from the overlays carrying the name, so a group with nothing in it only existed in the browser until you refreshed — which is why a freshly-made 'Intro' kept vanishing from the Go Live dropdown. A scene now owns its group names properly, so an empty group is saved, survives a reload, and shows up everywhere immediately. Renaming and hiding follow it correctly, and scenes made before this still work."
+  "version": "3.56.2",
+  "versionCode": 138,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.56.2/discoflate-v3.56.2.apk",
+  "notes": "DiscoFlate v3.56.2 — the Go Live intro dropdown was built before the page had decided which scene was current, so it came up empty or half-filled no matter how many groups you had. It now waits for that, and lists EVERY scene's groups labelled by scene rather than only the Chat-linked one. If no scene is linked to Chat, an intro group still plays — the server finds whichever scene owns it instead of quietly doing nothing."
 }

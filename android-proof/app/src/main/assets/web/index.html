@@ -2932,12 +2932,26 @@ function goliveUi(){
   const on=$('#glEnabled')&&$('#glEnabled').checked;
   const b=$('#glBody'); if(b) b.style.display = on?'':'none';
   const sel=$('#glGroup');
-  if(sel){                          // groups come from the Chat-linked scene
-    const sc=sceneGroupScope(), cur=sel.value||'';
-    const all=[...new Set([...sc.groups, ...sc.globals])];
-    sel.innerHTML='<option value="">— none —</option>'+
-      all.map(n=>`<option ${n===cur?'selected':''}>${esc(n)}</option>`).join('')+
-      ((cur&&!all.includes(cur))?`<option selected>${esc(cur)}</option>`:'');
+  if(sel){
+    // Offer EVERY scene's groups, labelled by scene — scoping this to one
+    // scene meant a group you could plainly see just wasn't in the list.
+    const cur=sel.dataset.want ?? sel.value ?? '';
+    const seen=new Set();
+    let html='<option value="">— none —</option>';
+    const groupsOf=sc=>[...new Set([...(Array.isArray(sc.groups)?sc.groups:[]),
+      ...(sc.overlays||[]).map(o=>(o.group||'').trim()).filter(Boolean)])].sort();
+    scenesData.forEach(sc=>{
+      const gs=groupsOf(sc); if(!gs.length) return;
+      html+=`<optgroup label="${esc(sc.name||'scene')}">`+
+        gs.map(n=>{ seen.add(n);
+          return `<option ${n===cur?'selected':''}>${esc(n)}</option>`; }).join('')+`</optgroup>`;
+    });
+    const gg=[...new Set(sceneGlobals.map(o=>(o.group||'').trim()).filter(Boolean))].sort();
+    if(gg.length) html+=`<optgroup label="Global overlays">`+
+      gg.map(n=>{ seen.add(n); return `<option ${n===cur?'selected':''}>${esc(n)}</option>`; }).join('')+`</optgroup>`;
+    if(cur && !seen.has(cur)) html+=`<option selected>${esc(cur)}</option>`;
+    sel.innerHTML=html;
+    if(cur) sel.value=cur;
   }
 }
 async function endIntroNow(){
@@ -5614,6 +5628,10 @@ function applyState(st, full){
     scenesData = JSON.parse(JSON.stringify(st.scenes||[]));
     sceneGlobals = JSON.parse(JSON.stringify(st.scene_globals||[]));
     chatSceneName = st.chat_scene||'';
+    // Decide which scene is current BEFORE anything reads its groups — the
+    // Go Live picker below asks for them, and with no scene selected it
+    // silently built an empty list.
+    stgRestore();
     { const g=st.golive||{};
       const set=(id,v)=>{ const el=$(id); if(el && document.activeElement!==el){
         if(el.type==='checkbox') el.checked=!!v; else el.value=(v??''); } };
@@ -5645,8 +5663,8 @@ function applyState(st, full){
     chatIsoChan = st.chat_isolate_channel||'';
     if($('#chatIso') && document.activeElement!==$('#chatIso')) $('#chatIso').checked = !!st.chat_isolate;
     gpPresetNames = (st.gameplay_presets||[]).map(p=>p.name).filter(Boolean);
-    stgRestore();
     renderStages(); renderStgGlobals();
+    goliveUi();          // groups are known now — refresh the intro picker
     renderCommands();
     renderAlwaysOn();
     renderEvents();
