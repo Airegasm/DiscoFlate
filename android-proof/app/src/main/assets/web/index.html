@@ -2441,9 +2441,14 @@ function stgApplyGroup(o){
   if(stgGroupFilter && stgGroupFilter!==STG_UNGROUPED) o.group=stgGroupFilter;
 }
 function stgSetGroupFilter(v){ stgGroupFilter=v; renderStgContents(); }
+// Groups are normally DERIVED from the overlays that carry them — but a group
+// you have just created has none yet. `stgPending` keeps those alive so a new
+// empty group can be selected and filled, instead of vanishing on creation.
+let stgPending = new Set();
 function stgSceneGroups(){
   const s=stgStage(); if(!s) return [];
-  return [...new Set((s.overlays||[]).map(o=>(o.group||'').trim()).filter(Boolean))].sort();
+  const real=(s.overlays||[]).map(o=>(o.group||'').trim()).filter(Boolean);
+  return [...new Set([...real, ...stgPending])].sort();
 }
 function renderStgGroupPick(){
   const sel=$('#stgGroupPick'); if(!sel) return;
@@ -2461,6 +2466,7 @@ function renderStgGroupPick(){
 function stgGroupNew(){
   const s=stgStage(); if(!s){ toastMsg('create a scene first'); return; }
   const n=(prompt('New scene group name:','')||'').trim(); if(!n) return;
+  stgPending.add(n);                         // empty for now — keep it listed
   stgGroupFilter=n;                          // anything added now joins it
   renderStgGroupPick(); renderStgContents(); renderStgGroups();
   toastMsg(`🎬 "${n}" — overlays you add now join this group`);
@@ -2470,6 +2476,7 @@ function stgGroupRename(){
     toastMsg('pick a group first'); return; }
   const n=(prompt('Rename this scene group:', stgGroupFilter)||'').trim(); if(!n) return;
   (s.overlays||[]).forEach(o=>{ if((o.group||'').trim()===stgGroupFilter) o.group=n; });
+  if(stgPending.delete(stgGroupFilter)) stgPending.add(n);
   stgGroupFilter=n;
   renderStgGroupPick(); renderStgContents(); renderStgGroups(); scheduleSave();
 }
@@ -2477,8 +2484,9 @@ function stgGroupDelete(){
   const s=stgStage(); if(!s||!stgGroupFilter||stgGroupFilter===STG_UNGROUPED){
     toastMsg('pick a group first'); return; }
   const n=(s.overlays||[]).filter(o=>(o.group||'').trim()===stgGroupFilter).length;
-  if(!confirm(`Delete the group "${stgGroupFilter}"?\n\nIts ${n} overlay(s) STAY in the scene — they just stop being grouped.`)) return;
+  if(n && !confirm(`Delete the group "${stgGroupFilter}"?\n\nIts ${n} overlay(s) STAY in the scene — they just stop being grouped.`)) return;
   (s.overlays||[]).forEach(o=>{ if((o.group||'').trim()===stgGroupFilter) o.group=''; });
+  stgPending.delete(stgGroupFilter);
   stgGroupFilter='';
   renderStgGroupPick(); renderStgContents(); renderStgGroups(); scheduleSave();
 }
@@ -2695,7 +2703,7 @@ function stgItemDup(){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===
 function stgItemDel(){ const s=stgStage(); if(!s) return;
   s.overlays=(s.overlays||[]).filter(x=>x.id!==scnSelId); scnSelId=null;
   renderStgCanvas(); renderStgGroups(); renderStgContents(); renderStgProps(); sceneButtonsRefresh(); scheduleSave(); }
-function stgPick(i){ stgCur=i; scnSelId=null; stgGroupFilter=''; renderStages(); }
+function stgPick(i){ stgCur=i; scnSelId=null; stgGroupFilter=''; stgPending.clear(); renderStages(); }
 // "or default if no scenes": overlay options always have a stage to live in
 function stgEnsureDefault(){
   if(scenesData.length) return false;
