@@ -84,6 +84,21 @@ class Stage:
                            if key else [])
         return {"ok": True}
 
+    def update_item(self, oid: str, fields: dict) -> dict:
+        """Change a live overlay's text in place (see VirtualCam.update_item)."""
+        oid = str(oid or "")
+        hit = 0
+        with self._lock:
+            for o in self._items:
+                it = o.get("item")
+                if not it or str(it.get("id")) != oid:
+                    continue
+                for k, v in (fields or {}).items():
+                    if v is not None:
+                        it[k] = v
+                hit += 1
+        return {"ok": True, "updated": hit}
+
     def done(self, oid) -> dict:
         """The page reports a play-once video finished — drop its entry."""
         try:

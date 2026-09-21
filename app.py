@@ -493,20 +493,195 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     net["vcam"] = vcam
     # live game state for stage widgets (capacity gauge / pump timer);
     # camera.py throttles how often it calls this
+    def _timer_map() -> dict:
+        return {oid: round(_timer_value(oid, t.get("seconds")), 1)
+                for oid, t in _timers.items()}
+
     def _vcam_state():
         s = engine.snapshot()
         return {"capacity": s.get("capacity"), "firing": s.get("firing"),
-                "remaining": s.get("remaining")}
+                "remaining": s.get("remaining"),
+                "device_timers": s.get("device_timers") or [],
+                "poll": s.get("poll"),
+                "timers": _timer_map()}
     vcam.state_cb = _vcam_state
     stg = stage.Stage(IMAGES_DIR)   # /stage overlay registry (phone screen-share path)
     net["stage"] = stg
+
+    # ---- Timer overlays: countdowns you start/stop from action blocks ------
+    # One registry, read by BOTH surfaces (virtual cam + /stage) so a timer
+    # reads the same everywhere. Keyed by overlay id.
+    _timers: dict = {}
+
+    def _timer_value(oid: str, configured) -> float:
+        """Seconds left on a timer overlay: counting down while running,
+        frozen when stopped, and its configured length before it ever ran."""
+        t = _timers.get(str(oid))
+        try:
+            base = float(configured or 0)
+        except (TypeError, ValueError):
+            base = 0.0
+        if not t:
+            return base
+        if t.get("running"):
+            return max(0.0, t["ends_at"] - time.monotonic())
+        return max(0.0, float(t.get("remaining", base)))
+
+    def _timer_op(oid: str, op: str, seconds=None, configured=None) -> dict:
+        oid = str(oid or "")
+        if not oid:
+            return {"ok": True}
+        try:
+            secs = float(seconds or 0) or float(configured or 0)
+        except (TypeError, ValueError):
+            secs = 0.0
+        t = _timers.get(oid)
+        if op == "start":
+            # restarting from a paused timer resumes; otherwise a fresh run
+            left = (float(t.get("remaining", 0)) if t and not t.get("running")
+                    and float(t.get("remaining", 0)) > 0 else secs)
+            if seconds:            # an explicit duration always wins
+                left = secs
+            _timers[oid] = {"running": True, "ends_at": time.monotonic() + max(0.0, left),
+                            "remaining": left, "seconds": secs}
+        elif op == "stop":
+            if t and t.get("running"):
+                t["remaining"] = max(0.0, t["ends_at"] - time.monotonic())
+                t["running"] = False
+            elif not t:
+                _timers[oid] = {"running": False, "remaining": secs, "seconds": secs}
+        elif op == "reset":
+            _timers.pop(oid, None)
+        return {"ok": True}
+
+    def _bake(text, ctx):
+        """Render [user]/[mention]/[result]… into overlay text ONCE, at fire
+        time, so a command's actor shows up on the overlay. [capacity] and
+        [secs] are left alone — those stay live, re-rendered every frame."""
+        text = str(text or "")
+        if "[" not in text:
+            return text
+        keep = {}
+        for i, tok in enumerate(("capacity", "secs")):
+            ph = f"\x00{i}\x00"
+            if f"[{tok}]" in text:
+                keep[ph] = f"[{tok}]"
+                text = text.replace(f"[{tok}]", ph)
+        try:
+            text = engine.render(text, dict(ctx or {}))
+        except Exception:  # noqa: BLE001 — bad token must never break an overlay
+            pass
+        for ph, orig in keep.items():
+            text = text.replace(ph, orig)
+        return text
 
     # `overlay` action rows + /api/overlay/fire → every live surface: the
     # virtual camera when it's running (desktop) AND the /stage registry
     # (always recorded, so a Stage page shows the current scene the moment it
     # opens). Ok when either surface is actually watched; quiet skip otherwise.
+    def _stage_group(cfg0, stage_name, group):
+        """Every overlay tagged with this group name, in the linked stage then
+        the globals — the batch a scene_group action fires or kills."""
+        g = str(group or "").strip().lower()
+        if not g:
+            return []
+        stg_ = _find_stage(cfg0, stage_name)
+        pool = (list((stg_ or {}).get("overlays") or [])
+                + list(cfg0.get("stage_globals") or []))
+        return [o for o in pool if str(o.get("group") or "").strip().lower() == g]
+
     def _overlay_action(spec: dict) -> dict:
         mode = (spec.get("mode") or "timed")
+        # A SCENE GROUP: fire or kill a whole named set at once. Empty group =
+        # quiet no-op, same rule as a missing overlay id.
+        if spec.get("group"):
+            cfg0 = config_store.load()
+            stage_name = (spec.get("stage") or "").strip() or cfg0.get("chat_stage", "")
+            items = _stage_group(cfg0, stage_name, spec.get("group"))
+            if not items and not stage_name:
+                for s_ in (cfg0.get("stages") or []):
+                    items = _stage_group(cfg0, s_.get("name"), spec.get("group"))
+                    if items:
+                        break
+            if not items:
+                return {"ok": True, "skipped": f"scene group '{spec.get('group')}' is empty"}
+            for it in items:
+                sub = {k: v for k, v in spec.items() if k != "group"}
+                sub["id"] = it.get("id")
+                sub["stage"] = stage_name
+                if mode != "clear" and not spec.get("mode"):
+                    sub.pop("mode", None)      # let each item keep its own mode
+                try:
+                    _overlay_action(sub)
+                except Exception:  # noqa: BLE001 — one bad item can't kill the batch
+                    pass
+            return {"ok": True, "group": spec.get("group"), "count": len(items)}
+        # Action rows CALL overlays designed on the Stages tab: resolve the id
+        # against the stage the Chat tab is linked to (or the named one), then
+        # the globals. An unknown id is a quiet no-op, by design.
+        oid = spec.get("id")
+        if oid:
+            cfg0 = config_store.load()
+            stage_name = (spec.get("stage") or "").strip() or cfg0.get("chat_stage", "")
+            found = _stage_item(cfg0, stage_name, oid)
+            if found is None and not stage_name:   # not linked? search every stage
+                for s_ in (cfg0.get("stages") or []):
+                    found = _stage_item(cfg0, s_.get("name"), oid)
+                    if found is not None:
+                        break
+            if found is None:
+                return {"ok": True, "skipped": f"overlay {oid} not in any stage"}
+            lay = found.get("layer") or f"itm-{found.get('id')}"
+            if spec.get("mode") == "update":      # update_overlay_text
+                txt = _bake(spec.get("text"), spec.get("ctx"))
+                fields = {"text": txt}
+                if (found.get("kind") or "") in ("pump_timer", "device_timers"):
+                    fields = {"fmt_on": txt, "fmt_off": txt}
+                vcam.update_item(found.get("id"), fields)
+                stg.update_item(found.get("id"), fields)
+                return {"ok": True}
+            if spec.get("mode") == "timer":       # start_timer / stop_timer
+                _timer_op(found.get("id"), spec.get("timer") or "start",
+                          seconds=spec.get("seconds"), configured=found.get("seconds"))
+                return {"ok": True}
+            # the design carries its own mode/duration; the action row may override
+            if not spec.get("mode"):
+                mode = found.get("mode") or "timed"
+            if spec.get("seconds") in (None, "", 0):
+                spec = {**spec, "seconds": found.get("seconds")}
+            spec = {**spec, "mode": mode, "layer": lay}
+            if mode == "clear":
+                vcam.clear_overlays(lay, fade_out=spec.get("fade_out"))
+                stg.clear(lay)
+                return {"ok": True}
+            if (found.get("kind") or "media") != "media":
+                item_ = {**found,
+                         "fade_in": spec.get("fade_in") or found.get("fade_in"),
+                         "fade_out": spec.get("fade_out") or found.get("fade_out")}
+                # bake [user]/[mention]/… from the firing command or event
+                ctx_ = spec.get("ctx")
+                if ctx_:
+                    for k_ in ("text", "label", "fmt_on", "fmt_off"):
+                        if item_.get(k_):
+                            item_[k_] = _bake(item_[k_], ctx_)
+                if item_.get("kind") == "timer" and item_.get("autostart"):
+                    _timer_op(item_.get("id"), "start", configured=item_.get("seconds"))
+                spec["item"] = item_
+            else:
+                spec = {**spec, "media": found.get("media"), "scale": found.get("w"),
+                        "x": found.get("x"), "y": found.get("y"),
+                        "rot": found.get("rot"), "flash": found.get("flash"),
+                        "h": found.get("h"), "anim": found.get("anim"),
+                        "anim_dir": found.get("anim_dir"), "queue": found.get("queue"),
+                        "chroma_on": found.get("chroma_on"), "chroma": found.get("chroma"),
+                        "chroma_tol": found.get("chroma_tol"),
+                        "chroma_soft": found.get("chroma_soft"), "z": found.get("z")}
+        elif mode == "clear":
+            vcam.clear_overlays(spec.get("layer"), fade_out=spec.get("fade_out"))
+            stg.clear(spec.get("layer"))
+            if spec.get("purge_queue"):
+                vcam.clear_queue(spec.get("layer"))
+            return {"ok": True}
         item = spec.get("item")   # a drawn overlay (text / gauge / timer)
         vres = {"ok": False}
         if mode == "clear" or vcam.status()["running"]:
@@ -521,7 +696,17 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                                              mode=mode, layer=spec.get("layer"),
                                              x=spec.get("x"), y=spec.get("y"),
                                              rot=spec.get("rot"), flash=spec.get("flash"),
-                                             h=spec.get("h"))
+                                             h=spec.get("h"),
+                                             fade_in=spec.get("fade_in"),
+                                             fade_out=spec.get("fade_out"),
+                                             anim=spec.get("anim"),
+                                             anim_dir=spec.get("anim_dir"),
+                                             queue=spec.get("queue"),
+                                             chroma_on=spec.get("chroma_on"),
+                                             chroma=spec.get("chroma"),
+                                             chroma_tol=spec.get("chroma_tol"),
+                                             chroma_soft=spec.get("chroma_soft"),
+                                             z=spec.get("z"))
             except Exception as ex:  # noqa: BLE001
                 vres = {"ok": False, "error": str(ex)}
         sres = stg.fire(spec.get("media"), spec.get("seconds"),
@@ -570,7 +755,9 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         return resp
 
     async def get_state(request):
-        return web.json_response(_public_state(engine, botmgr))
+        st = _public_state(engine, botmgr)
+        st["timers"] = _timer_map()      # live Timer-overlay countdowns
+        return web.json_response(st)
 
     async def get_guilds(request):
         return web.json_response(botmgr.list_guilds())
@@ -904,6 +1091,25 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         if dev is None:
             raise web.HTTPBadRequest(text="device not found")
         return web.json_response(await engine.test_device(dev, 2.0))
+
+    async def rename_device(request):
+        """The ✏️ next to a device: give it a friendly name. Devices are
+        referenced by id everywhere, so renaming is purely cosmetic and can't
+        break commands, ranges or the Device Timer List. Blank restores the
+        original vendor label."""
+        await guard(request)
+        b = await _json(request)
+        did, nm = b.get("id"), (b.get("name") or "").strip()[:60]
+        cfg = config_store.load()
+        for d in cfg.get("devices", []):
+            if d.get("id") == did:
+                if nm:
+                    d["name"] = nm
+                else:
+                    d.pop("name", None)
+        cfg = config_store.save(cfg)
+        engine.set_config(cfg)
+        return web.json_response(_public_state(engine, botmgr))
 
     async def set_device_type(request):
         await guard(request)
@@ -1252,12 +1458,18 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                     continue
                 lay = o.get("layer") or f"itm-{o.get('id')}"
                 if (o.get("kind") or "media") != "media":
-                    vcam.add_item(o, layer=lay)   # text / gauge / timer
+                    if o.get("kind") == "timer" and o.get("autostart"):
+                        _timer_op(o.get("id"), "start", configured=o.get("seconds"))
+                    vcam.add_item(o, layer=lay)   # text / gauge / timer(s)
                 elif o.get("media"):
                     vcam.fire_overlay(o["media"], mode="hold", layer=lay,
                                       scale=o.get("w"), x=o.get("x"), y=o.get("y"),
                                       rot=o.get("rot"), flash=o.get("flash"),
-                                      h=o.get("h"))
+                                      h=o.get("h"), anim=o.get("anim"),
+                                      anim_dir=o.get("anim_dir"),
+                                      chroma_on=o.get("chroma_on"), chroma=o.get("chroma"),
+                                      chroma_tol=o.get("chroma_tol"),
+                                      chroma_soft=o.get("chroma_soft"))
         return web.json_response({"ok": st["running"], **st})
 
     async def camera_detect(request):
@@ -1386,29 +1598,17 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     async def overlay_fire(request):
         await guard(request)
         b = await _json(request)
-        if b.get("stage") is not None and b.get("id") is not None:
-            # fire a designed overlay from a Stage bundle (or the globals)
-            item = _stage_item(config_store.load(), b.get("stage"), b.get("id"))
-            if item is None:
-                return web.json_response({"ok": False, "error": "no such stage overlay"})
-            lay = item.get("layer") or f"itm-{item.get('id')}"
-            if (item.get("kind") or "media") != "media":
-                # a drawn item (text / gauge / timer) fired as a timed layer
-                return web.json_response(_overlay_action({
-                    "item": item, "mode": item.get("mode") or "timed",
-                    "seconds": item.get("seconds"), "layer": lay}))
-            return web.json_response(_overlay_action({
-                "media": item.get("media"), "seconds": item.get("seconds"),
-                "scale": item.get("w"), "mode": item.get("mode") or "timed",
-                "layer": lay, "x": item.get("x"), "y": item.get("y"),
-                "rot": item.get("rot"), "flash": item.get("flash"),
-                "h": item.get("h")}))
-        # same router as `overlay` action rows: vcam when running + the Stage
+        # One router for everything: `id` calls a Stage-designed overlay (the
+        # design supplies geometry/style), `media` is the legacy direct path.
         return web.json_response(_overlay_action({
+            "id": b.get("id"), "stage": b.get("stage") or "",
             "media": b.get("media") or b.get("image"), "seconds": b.get("seconds"),
             "pos": b.get("pos"), "scale": b.get("scale"),
             "mode": b.get("mode") or "timed", "layer": b.get("layer"),
-            "x": b.get("x"), "y": b.get("y")}))
+            "x": b.get("x"), "y": b.get("y"),
+            "fade_in": b.get("fade_in"), "fade_out": b.get("fade_out"),
+            "timer": b.get("timer"), "ctx": b.get("ctx"), "group": b.get("group"),
+            "text": b.get("text"), "purge_queue": b.get("purge_queue")}))
 
     async def overlay_clear(request):
         await guard(request)
@@ -1827,6 +2027,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/devices/on", device_on),
         web.post("/api/devices/off", device_off),
         web.post("/api/devices/type", set_device_type),
+        web.post("/api/devices/rename", rename_device),
         web.post("/api/devices/calibration", set_calibration),
         web.post("/api/upload", upload),
         web.post("/api/snapshot", snapshot),

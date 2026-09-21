@@ -77,6 +77,22 @@
   /* overlay-editor rows: one line on desktop, wrapping stack on phones */
   .ovedit{gap:10px;align-items:flex-end;flex-wrap:nowrap;margin-bottom:6px}
   .ovedit .grow{flex:1}
+  /* Chat tab: log on the left, a stacked button panel on the right third */
+  .chatsplit{display:grid;grid-template-columns:2fr 1fr;gap:12px;align-items:start;margin-top:10px}
+  .chatmain{min-width:0}
+  .chatside{min-width:0;border:1px solid var(--line);border-radius:10px;
+            background:var(--panel2);padding:10px}
+  .chatside .sidehead{font-size:12px;font-weight:700;color:var(--dim);
+            text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
+  /* two columns of buttons; a third only if the panel is genuinely wide, and
+     the strip scrolls sideways rather than squashing labels to nothing */
+  .btnscroll{overflow-x:auto;overflow-y:auto;max-height:392px;padding-bottom:4px}
+  .btngrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));
+           gap:8px;min-width:264px}
+  .btngrid button{width:100%;text-align:center;white-space:nowrap;
+           overflow:hidden;text-overflow:ellipsis}
+  .btngrid .muted{grid-column:1/-1}
+  @media(max-width:900px){ .chatsplit{grid-template-columns:1fr} .btnscroll{max-height:none} }
   /* Stages tab: the design canvas + draggable overlay items */
   #stgCanvas{position:relative;background:#05070b;border:1px solid var(--line);
              border-radius:8px;overflow:hidden;touch-action:none;width:100%;max-width:900px}
@@ -336,28 +352,38 @@
         <img id="vcamPrev" alt="" style="display:none;width:100%;max-width:480px;border-radius:12px;margin-top:8px;border:1px solid var(--line)">
         <video id="vcamSelf" autoplay muted playsinline style="display:none;width:100%;max-width:480px;border-radius:12px;margin-top:8px;border:1px solid var(--line)"></video>
         <div class="hint">Start it, then pick the <b>virtual camera</b> as your webcam in Discord's voice &amp; video settings — overlays play on top of your live feed, OBS-style; the preview above shows exactly what viewers see — trust it over your own Discord tile, which Discord always mirrors (so your overlays look backwards <i>to you</i> there while viewers see them correctly; 🪞 <b>Mirror</b> cancels that at the cost of mirroring what viewers get). <b>🔍 Detect</b> lists the sizes each attached camera really supports (portrait included). The system driver (OBS's on Windows / <code>v4l2loopback</code> on Linux) is a one-time setup — <b>🩺 Driver</b> checks for it and installs it for you. The virtual cam is <b>desktop-only</b>: Android apps can't register a camera device for Discord mobile — on the phone this section becomes <b>🖥 VC Remote</b> instead (or use the 🎭 Stage + screen share for phone-only sessions).</div>
-        <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap" id="stageBtns"></div>
-        <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap" id="overlayBtns"></div>
-        <div class="row" style="gap:8px;margin-top:6px">
-          <!-- phone Stage parked: the PC is the camera home base. Delete the
-               style attr (and restore the Help bullets) to bring it back. -->
-          <button style="display:none" onclick="openStagePage()">🎭 Stage</button>
-          <button class="ghost" onclick="openOverlay('ovbOverlay')">🔧 Overlay actions</button>
-          <button class="ghost" onclick="api('/api/overlay/clear',{})">🧹 Clear overlays</button>
+        <!-- the overlay buttons live in the Chat tab's side panel now;
+             phone Stage parked (PC is the camera home base) -->
+        <button style="display:none" onclick="openStagePage()">🎭 Stage</button>
+      </div>
+      <div class="chatsplit">
+        <div class="chatmain">
+          <div class="log" id="chatLog" style="height:440px"></div>
+          <div class="row" style="gap:8px;margin-top:8px;flex-wrap:nowrap">
+            <input id="chatText" placeholder="speak as yourself · !command runs as the Owner · #name fires an Owner Command" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter'){event.preventDefault();chatSend();}">
+            <button id="chatSendBtn" onclick="chatSend()">Send</button>
+          </div>
+          <div class="row" style="margin-top:4px;flex-wrap:nowrap"><span class="muted" id="chatPerm" style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span><div style="flex:1"></div><span class="muted" id="chatMsg"></span></div>
+        </div>
+        <div class="chatside">
+          <div class="sidehead">Buttons</div>
+          <div class="btnscroll"><div class="btngrid" id="chatCustomBtns"></div></div>
+          <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">
+            <button class="ghost" style="flex:1" onclick="openOverlay('btnOverlay')">🔧 Buttons</button>
+            <button class="ghost" style="flex:1" onclick="openOverlay('ocOverlay')">🔧 #Commands</button>
+          </div>
+          <div id="sideOverlays" style="display:none;margin-top:12px;border-top:1px solid var(--line);padding-top:10px">
+            <div class="sidehead">Overlays</div>
+            <div class="btnscroll"><div class="btngrid" id="stageBtns"></div></div>
+            <div class="btnscroll" style="margin-top:6px"><div class="btngrid" id="overlayBtns"></div></div>
+            <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">
+              <button class="ghost" style="flex:1" onclick="openOverlay('ovbOverlay')">🔧 Overlays</button>
+              <button class="ghost" style="flex:1" onclick="api('/api/overlay/clear',{})">🧹 Clear</button>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="log" id="chatLog" style="height:440px;margin-top:10px"></div>
-      <div class="row" style="gap:8px;margin-top:8px;flex-wrap:nowrap">
-        <input id="chatText" placeholder="speak as yourself · !command runs as the Owner · #name fires an Owner Command" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();chatSend();}">
-        <button id="chatSendBtn" onclick="chatSend()">Send</button>
-      </div>
-      <div class="row" style="margin-top:4px;flex-wrap:nowrap"><span class="muted" id="chatPerm" style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span><div style="flex:1"></div><span class="muted" id="chatMsg"></span></div>
-      <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap" id="chatCustomBtns"></div>
-      <div class="row" style="gap:8px;margin-top:6px">
-        <button class="ghost" onclick="openOverlay('btnOverlay')">🔧 Custom Buttons</button>
-        <button class="ghost" onclick="openOverlay('ocOverlay')">🔧 Custom Owner Commands</button>
-      </div>
-      <div class="hint">A live mirror of the selected watched channel — everything the bot sees there, its own posts included. Plain text posts <b>AS YOU</b> — your Owner name + Discord avatar via a webhook (the bot needs <b>Manage Webhooks</b> there; without it, it falls back to a <b>Owner:</b>-prefixed bot post). A <code>!command</code> executes <b>as the Owner</b> (cooldown-exempt, owner-only allowed); <code>#name</code> speaks an Owner Command. Control buttons share the Dashboard's dice/seconds settings.</div>
+      <div class="hint">The chat sits on the left with your buttons stacked in the panel on the right (two columns, scrolling when there are lots). A live mirror of the selected watched channel — everything the bot sees there, its own posts included. Plain text posts <b>AS YOU</b> — your Owner name + Discord avatar via a webhook (the bot needs <b>Manage Webhooks</b> there; without it, it falls back to a <b>Owner:</b>-prefixed bot post). A <code>!command</code> executes <b>as the Owner</b> (cooldown-exempt, owner-only allowed); <code>#name</code> speaks an Owner Command. Control buttons share the Dashboard's dice/seconds settings.</div>
     </div>
 
     <!-- stages: OBS-style overlay designer -->
@@ -384,7 +410,9 @@
           <button class="ghost" onclick="mediaBrowse(n=>stgAddMedia(n))">➕ Media</button>
           <button class="ghost" onclick="stgAddWidget('text')">➕ Text</button>
           <button class="ghost" onclick="stgAddWidget('capacity_gauge')">➕ Capacity Gauge</button>
-          <button class="ghost" onclick="stgAddWidget('pump_timer')">➕ Pump Timer</button>
+          <button class="ghost" onclick="stgAddWidget('timer')">➕ Timer</button>
+          <button class="ghost" onclick="stgAddWidget('device_timers')">➕ Device Timers</button>
+          <button class="ghost" onclick="stgAddWidget('poll_viewer')">➕ Poll Viewer</button>
         </div>
         <div class="hint" style="margin:8px 0 0">Drag to place · <b>◢ corner</b> resizes · <b>⟳ handle</b> rotates · click an overlay to edit its own options below. Every option is saved <b>per stage</b>.</div>
         <div id="stgCanvas" style="margin-top:8px"></div>
@@ -1086,6 +1114,24 @@
         <li><b>Isolate</b> (next to the channel picker) — while ticked, <b>every broadcast</b> (events, milestones, auto-reports, timers, cross-server echoes, owner-voice posts) goes <b>only to the channel selected here</b>, across every server. The <b>announce channel is suppressed too</b> while pinned, so it can't leak output into another server. The bot keeps <b>listening everywhere</b> — commands typed in other channels still run and reply there — and if the pinned channel isn't live it fails open rather than going silent. Switching channels while Isolate is on re-aims it.</li>
         <li><b>🎭 Stages tab</b> — design overlay scenes OBS-style: create a Stage, link a Gameplay Preset, pick a resolution, then drag overlays onto the canvas (drag the ◢ corner to resize). Each overlay is either <b>always-on</b> (part of the scene whenever the stage is live) or <b>callable</b> (becomes a one-tap button on the Chat tab). Overlay types: <b>Media</b> (image/video), <b>🅣 Text</b>, and two live system widgets — <b>📊 Capacity Gauge</b> and <b>⏱ Pump Timer</b>. Every overlay carries <b>its own options, saved per stage</b>: Text and the Pump Timer get colour, size, font and an optional background (blank = transparent); the Gauge gets fill colour, thickness, <b>horizontal or vertical</b> orientation and a show-% toggle; and everything supports <b>rotation</b> (⟳ handle, hold Shift to snap to 15°) and <b>flash</b> (N seconds visible, N hidden). Text and the timer accept <code>[capacity]</code> and <code>[secs]</code>, which stay live on the feed. With no stages yet, a <b>Default</b> stage is created so your overlays always have a home. The <b>🗂 Media browser</b> is the universal library — uploads land in <code>data/images</code>, so <b>⬇ Export Stage</b> bundles the design plus its media into one <code>.dfstage.zip</code> that <b>⬆ Import Stage</b> unpacks anywhere. <b>Global overlays</b> are callable from every stage.</li>
         <li><b>Linking a chat to a stage:</b> on a video channel pick the <b>Stage</b> dropdown in the 🎥 section — its callable overlays appear as buttons, ▶ Start virtual cam puts the always-on items (and live gauges) on the feed, and 🎭 Stage opens the phone view with that design loaded.</li>
+        <li><b>⏱ Device Timers overlay</b> — one row per configured device, <b>primary pump always on top</b>, each with its own countdown; rows appear as you add devices. Secondary pumps feed the <b>same capacity gauge</b> on their own calibration (rates add up — two pumps fill twice as fast). Row text uses <code>[name]</code> and <code>[secs]</code>, and you can hide idle devices.</li>
+        <li><b>🟩 Green-screen clips.</b> Tick <b>chroma key</b> on any media overlay to knock its background colour out, so an ordinary <code>.mp4</code> shot against a green screen plays over your camera with a transparent background — no alpha codec or WebM conversion needed. Pick the <b>key colour</b> (green by default, blue screens work too), <b>tolerance</b> for how much of that hue goes, and <b>edge softness</b> so hair and motion blur don't get a hard jagged cut. Greys and skin tones are protected, so shadows don't punch holes.</li>
+        <li><b>🗳 Poll Viewer overlay</b> — a resizable embed-style card that <b>appears by itself while a poll is running</b> (tick <b>show while a poll runs</b>), listing every option with a live vote bar and its own countdown. When the poll ends it switches to the <b>results</b> — winner highlighted — holds them for the number of seconds you set, then fades out. Each Poll Viewer keeps its own hold time, so two can differ.</li>
+        <li><b>🔢 Variables</b> — the <b>var</b> action stores a value you can read back anywhere with <code>[var:name]</code>. Pick <b>session-wide</b> (shared by everyone) or <b>per player</b> (read back as <code>[uvar:name]</code>), and set / inc / dec / mult / div it. Values accept <b>arithmetic</b>, so <code>[var:pumps] * 50</code> works in any number field. Variables clear on session reset.</li>
+        <li><b>❓ if / otherwise</b> — branch on real data: each condition compares two sides (placeholders on either, numbers compared as numbers) with is / is not / &gt; / &lt; / ≥ / ≤ / contains / is empty, and you choose whether <b>ALL</b> or <b>ANY</b> must pass. Both arms are ordinary action blocks, so anything can go inside.</li>
+        <li><b>🎲 random</b> — pick ONE of several branches. Each branch takes an optional <b>weight</b> (leave them equal for an even split); <code>[picked]</code> and <code>[picked_label]</code> say which won.</li>
+        <li><b>🏷 label / goto / goto_if / group</b> — jump around inside a block instead of nesting deeper. Drop a <b>label</b> (or name a <b>group</b>), then <b>goto</b> it; <b>goto_if</b> jumps only when its conditions pass, which is how you build retry loops and skip-aheads. Jumping to a <b>label</b> resumes after it; jumping to a named <b>group</b> runs that group and then carries on. Jumps are capped at 2000 per block, and an unknown label is a quiet no-op.</li>
+        <li><b>🛑 cancel</b> — stops every <i>other</i> running action block (events mid-loop, waits, overlapping commands) while this one carries on. The panic button when things overlap.</li>
+        <li><b>"once" tickbox</b> — on any action row. That row fires a <b>single time per session</b> and is skipped afterwards, resetting on session reset. Each command keeps its own memory, so the same row in two places doesn't share a count.</li>
+        <li><b>🎬 Scene groups</b> — tag any overlays on the Stages tab with a <b>scene group</b> name (say <code>intro</code>), then <b>scene_group</b> plays the whole set at once and <b>scene_group_kill</b> clears it. Each overlay keeps its own mode, position and fades. Firing a group that has no overlays does nothing at all.</li>
+        <li><b>🗂 Layer order</b> — every overlay has a <b>layer order</b> number (with ⬆/⬇ buttons): higher draws on top. Equal numbers keep fire order, so the newest still lands above. The designer canvas stacks the same way it will on the feed.</li>
+        <li><b>🔁 repeat</b> — run a nested block <b>a fixed number of times</b> (the count can be a placeholder) or <b>until conditions pass</b>. <code>[loop_i]</code> is the round number. Loops are hard-capped at 500 rounds so a mistake can't wedge the bot.</li>
+        <li><b>Notification overlays that don't pile up.</b> Two tickboxes on every overlay: <b>animate &amp; fade</b> slides it in and out in a direction you pick (up/down/left/right, timed by its fade settings), and <b>queue if busy</b> makes a second fire <i>wait its turn</i> instead of replacing what's on screen. Together that's the OBS alert-box behaviour — if ten people trigger the same alert at once, they play one after another rather than landing on top of each other. Without <b>queue</b>, the newest simply replaces the current one (deep bursts past a dozen are dropped rather than queued forever).</li>
+        <li><b>⏳ Timer overlay</b> — a countdown with its own label. Idle it just shows its configured length; the <b>start_timer</b> / <b>stop_timer</b> actions run and freeze it (stop holds the remaining time, start resumes it, and start can override the duration). Tick <b>auto start on load</b> to begin the moment its stage goes live, and <b>auto vanish on complete</b> to have it remove itself at zero (with its fade-out). Use <code>[secs]</code> or <code>[mmss]</code> in the label for the number.</li>
+        <li><b>Placeholders in overlay text.</b> Text and Timer labels accept the same <code>[placeholders]</code> as messages, and they <b>carry over from whatever fired the overlay</b> — so an overlay played by a command can show <code>[user]</code>, <code>[mention]</code>, <code>[roll]</code>, <code>[result]</code> and the rest of that command's context. Those are filled in once, when the overlay appears. <code>[capacity]</code> and <code>[secs]</code> are the exception: they stay <b>live</b> and keep updating on screen.</li>
+        <li><b>Overlay actions call Stage overlays.</b> You design an overlay once on the <b>Stages</b> tab; a command or event action just picks it from a dropdown and plays it — position, size and styling all come from the design. Choose <b>timed</b> (N seconds), <b>static</b> (stays until killed) or <b>play once</b>, with optional <b>fade in / fade out</b>. The <b>overlay_kill</b> action removes one the same way (with a fade if you want); killing an overlay that isn't currently up does nothing at all, so it's safe to use defensively.</li>
+        <li><b>Command pacing.</b> Plug commands are paced per device — cloud vendors (Govee, Tuya, Wyze) at most one ON every 2s, LAN vendors every 0.5s — so a burst of events can't get you throttled or banned by a vendor's API. <b>Turning a device OFF is never delayed</b>, at any time: it's a safety operation and always goes straight through.</li>
+        <li><b>Renaming devices</b> — the ✏️ next to any device on the Devices tab. Purely cosmetic: everything references devices by id, so renaming can't break commands, ranges or overlays. Leave it blank to restore the original vendor label.</li>
         <li><b>🖥 Take over the PC session (System tab, phone app).</b> Hands the whole app over to your PC's DiscoFlate — every tab, not just Chat — so you drive the PC instance as if you were sitting at it, while the PC stays the bot and the camera home base. A <b>🖥 CONTROLLING PC · ↩ Release</b> chip sits in the header the whole time; tap it (or the back button) to return to this phone's own instance. Needs Remote access enabled + this phone whitelisted on the PC. If both installs share a bot token, takeover offers to switch <b>this</b> device's Activation off first, so commands don't get answered twice.</li>
         <li><b>🔁 Device Sync (System tab)</b> keeps both installs matching over Wi-Fi — the whole gameplay setup (commands, events, buttons, saved Gameplay Presets), <b>all your Stages</b>, and <b>the overlay images/videos</b> they use. <b>⬇ Pull</b> brings the other device's setup here; <b>⬆ Push</b> sends this one's over — so a Stage built on the phone lands on the PC without export/import or walking over. The <b>Stages tab</b> has a <b>📡 Send to device</b> shortcut for the same thing. Push asks the other device to fetch from this one, so <b>Remote access must be on at both ends</b>, each whitelisting the other's IP. Same-name-same-size files are skipped; tokens, devices and network settings never sync.</li>
         <li><b>The permission line</b> (under the send box) shows the bot's rights in the scoped channel live: 🚫 = it can't post there (Send disables, the missing permissions are listed) · ⚠ no Manage Webhooks = owner posts fall back to the bot-prefixed style · ⚠ no Read Message History = the mirror starts from now (no backfill).</li>
@@ -1759,6 +1805,7 @@ function chatIsVideo(){ const cid=$('#chatChan')&&$('#chatChan').value; return c
 function chatVideoUi(){
   const el=$('#overlaySec'), vid=chatIsVideo();
   if(el) el.style.display = vid ? '' : 'none';
+  const so=$('#sideOverlays'); if(so) so.style.display = vid ? '' : 'none';
   if(!vid){ vcamPreviewStop(); selfViewStop(); return; }
   vcamSectionInit();
 }
@@ -2010,12 +2057,59 @@ function renderOvbEditor(){
 let stagesData=[], stageGlobals=[], stgCur=-1, stgSelId=null, mediaPickCb=null;
 let chatStageName='', chatIsoChan='', gpPresetNames=[];
 function metaAuth(){ return (document.querySelector('meta[name="df-auth"]')||{}).content||''; }
+// Overlays an action can call: the Chat-linked stage first, then the rest,
+// then globals — grouped so it's obvious where each one lives.
+function overlayLabelById(id){
+  if(!id) return '';
+  for(const s of stagesData.concat([{overlays:stageGlobals}]))
+    for(const o of (s.overlays||[]))
+      if(o.id===id) return o.label || o.text || o.media || o.kind || id;
+  return '(missing)';
+}
+// Labels/named groups reachable from a goto row — the SAME sibling list the
+// interpreter searches, so the dropdown can't offer an unreachable target.
+function stageGroupNames(){
+  const out=new Set();
+  stagesData.forEach(s=>(s.overlays||[]).forEach(o=>{ if((o.group||'').trim()) out.add(o.group.trim()); }));
+  stageGlobals.forEach(o=>{ if((o.group||'').trim()) out.add(o.group.trim()); });
+  return [...out].sort();
+}
+function blockLabelNames(base){
+  try{
+    const list = eval(base);
+    return (Array.isArray(list)?list:[])
+      .filter(r=>r && (r.type==='label'||r.type==='group') && (r.name||'').trim())
+      .map(r=>r.name.trim());
+  }catch(e){ return []; }
+}
+function stageOverlayOptions(sel, onlyKind){
+  const ico = {media:'🖼', text:'🅣', capacity_gauge:'📊', pump_timer:'⏱',
+               device_timers:'⏱', timer:'⏳'};
+  const label = o => (ico[o.kind||'media']||'•')+' '+(o.label || o.text || o.media || o.kind || o.id);
+  let html = `<option value="">— pick an overlay —</option>`;
+  let seen = false;
+  const group = (nm, list) => {
+    const items = (list||[]).filter(o=>o && o.id && (!onlyKind || (o.kind||'media')===onlyKind));
+    if(!items.length) return '';
+    return `<optgroup label="${esc(nm)}">`+items.map(o=>{
+      if(o.id===sel) seen = true;
+      return `<option value="${esc(o.id)}" ${o.id===sel?'selected':''}>${esc(label(o))}</option>`;
+    }).join('')+`</optgroup>`;
+  };
+  const linked = stagesData.find(s=>s.name===chatStageName);
+  if(linked) html += group(`${linked.name} (linked)`, linked.overlays);
+  stagesData.forEach(s=>{ if(s!==linked) html += group(s.name, s.overlays); });
+  html += group('Global overlays', stageGlobals);
+  if(sel && !seen) html += `<option value="${esc(sel)}" selected>(missing overlay ${esc(sel)})</option>`;
+  return html;
+}
 function stgNewItem(kind, media, visible){
   const o = {id:'o'+Date.now().toString(36)+Math.floor(Math.random()*46656).toString(36),
              label:'', kind:kind, media:media||'', x:0.35, y:0.35,
              w:kind==='media'?0.3:0.35, mode:'timed', seconds:5, layer:'',
              rot:0, flash:0,
              visible: visible!==undefined ? visible : kind!=='media'};
+  o.group=''; o.z=0;            // scene group + layer order
   if(kind!=='media'){            // drawn overlays carry their own styling
     o.color = kind==='capacity_gauge' ? '' : '#ffffff';
     o.size = kind==='capacity_gauge' ? 0.05 : 0.06;
@@ -2024,6 +2118,22 @@ function stgNewItem(kind, media, visible){
   if(kind==='text') o.text = 'New text';
   if(kind==='capacity_gauge'){ o.orient='h'; o.show_pct=true; }
   if(kind==='pump_timer'){ o.fmt_on='PUMP [secs]s'; o.fmt_off='PUMP idle'; }
+  if(kind==='device_timers'){ o.fmt_on='[name] [secs]s'; o.fmt_off='[name] idle'; o.show_idle=true; }
+  if(kind==='timer'){ o.seconds=60; o.text='[secs]'; o.autostart=false; o.autovanish=false; }
+  if(isMedia)
+    rows += `<div class="row ovedit">`+
+      `<label class="row" style="gap:5px" title="knock a background colour out of the video so a plain .mp4 works as a transparent overlay — no alpha codec needed"><input type="checkbox" ${o.chroma_on?'checked':''} style="width:auto" onchange="stgItemSet('chroma_on',this.checked)"> 🟩 chroma key</label>`+
+      (o.chroma_on
+        ? F('Key colour', `<input type="color" value="${esc(o.chroma||'#00ff00')}" style="width:52px;padding:2px" onchange="stgItemSet('chroma',this.value)">`)+
+          F('Tolerance <span class="muted">(how much of that hue goes)</span>',
+            `<input type="number" min="1" max="120" value="${o.chroma_tol??35}" style="width:80px" onchange="stgItemSet('chroma_tol',+this.value)">`)+
+          F('Edge softness', `<input type="number" min="0" max="80" value="${o.chroma_soft??12}" style="width:80px" onchange="stgItemSet('chroma_soft',+this.value)">`)+
+          `<span class="muted">greens out; greys and skin are protected</span>`
+        : `<span class="muted">turn on to use a green-screen video over the camera</span>`)+
+      `</div>`;
+  if(kind==='poll_viewer'){ o.w=0.34; o.h=0.30; o.auto_show=true; o.results_secs=8;
+                            o.color='#f4a828'; o.bg='#12121a'; o.opacity=220;
+                            o.visible=true; o.fade_out=0.6; }
   return o;
 }
 const STG_FONTS={sans:'system-ui,-apple-system,sans-serif',bold:'system-ui,sans-serif',
@@ -2063,9 +2173,47 @@ function renderStgCanvas(){
       // vertical gauges take their LENGTH from w along the y axis
       box = vert ? `width:${thick}px;height:${(o.w*100).toFixed(2)}%`
                  : `width:${(o.w*100).toFixed(2)}%`;
-    } else if(o.kind==='pump_timer' || o.kind==='text'){
-      const txt = o.kind==='pump_timer' ? (o.fmt_on||'PUMP [secs]s').replace('[secs]','12')
-                                        : (o.text||'');
+    } else if(o.kind==='poll_viewer'){
+      const pv = lastState.poll;
+      const opts = pv ? (pv.options||[]) : [{label:'Yes',votes:2},{label:'No',votes:1}];
+      const tot = Math.max(1, pv? (pv.total||0) : 3);
+      const acc = esc(o.color||'#f4a828');
+      inner = `<div style="width:100%;height:100%;box-sizing:border-box;border:2px solid ${acc};`+
+        `border-left:6px solid ${acc};border-radius:6px;background:${esc(o.bg||'#12121a')};`+
+        `padding:6px 8px;overflow:hidden;font-size:${Math.max(8,fs*0.55)}px;color:#fff">`+
+        `<div style="display:flex;justify-content:space-between;font-weight:800">`+
+          `<span>${esc(pv? (pv.title||'Poll') : 'Poll title')}</span><span style="color:${acc}">`+
+          `${pv&&pv.remaining!=null?Math.round(pv.remaining):12}s</span></div>`+
+        opts.slice(0,6).map(op=>`<div style="margin-top:3px;background:#2e2e36;border-radius:3px;position:relative;height:1.5em">`+
+          `<div style="width:${Math.round(100*(op.votes||0)/tot)}%;height:100%;background:${acc};border-radius:3px"></div>`+
+          `<span style="position:absolute;left:5px;top:0;line-height:1.5em">${esc(op.label||'')} · ${op.votes||0}</span></div>`).join('')+
+        `</div>`;
+      box = `width:${(o.w*100).toFixed(2)}%;height:${((o.h||0.3)*100).toFixed(2)}%`;
+    } else if(o.kind==='timer'){
+      const live = (lastState.timers||{})[o.id];
+      const sec = live!=null ? live : (+o.seconds||0);
+      const m=Math.floor(sec/60), s=Math.round(sec%60);
+      let t = String(o.text||'[secs]');
+      if(!/\[(secs|mmss)\]/.test(t)) t += ' [secs]';
+      inner = `<div class="txt${(o.bg||'').trim()?' boxed':''}" style="color:${esc(o.color||'#fff')};`+
+        `font-family:${fam};font-size:${fs}px;`+
+        `${(o.bg||'').trim()?`background:${esc(o.bg)}`:'text-shadow:0 1px 3px #000,0 0 2px #000'}">`+
+        `${esc(t.replace('[secs]', Math.round(sec)).replace('[mmss]', m+':'+String(s).padStart(2,'0')))}</div>`;
+      box = 'width:auto';
+    } else if(o.kind==='pump_timer' || o.kind==='device_timers' || o.kind==='text'){
+      let txt;
+      if(o.kind==='device_timers'){
+        // preview the REAL device list (primary pump first) so you can size it
+        let rows = (lastState.device_timers||[]);
+        if(!rows.length) rows = [{name:'Main Pump',firing:true,remaining:12},
+                                 {name:'Second Pump',firing:false,remaining:0}];
+        if(o.show_idle===false) rows = rows.filter(r=>r.firing);
+        txt = rows.map(r=>(r.firing?(o.fmt_on||'[name] [secs]s'):(o.fmt_off||'[name] idle'))
+          .replace('[name]', r.name||'device')
+          .replace('[secs]', Math.round(r.remaining||0))).join('\n') || '(no devices firing)';
+      } else if(o.kind==='pump_timer'){
+        txt = (o.fmt_on||'PUMP [secs]s').replace('[secs]','12');
+      } else { txt = (o.text||''); }
       inner = `<div class="txt${(o.bg||'').trim()?' boxed':''}" style="color:${esc(o.color||'#fff')};`+
               `font-family:${fam};font-size:${fs}px;`+
               `${(o.bg||'').trim()?`background:${esc(o.bg)}`:'text-shadow:0 1px 3px #000,0 0 2px #000'}">${esc(txt)||'&nbsp;'}</div>`;
@@ -2085,7 +2233,8 @@ function renderStgCanvas(){
         ['nw','n','ne','w','e','sw','s','se'].map(h=>`<span class="stgH" data-h="${h}"></span>`).join('')
       : '';
     return `<div class="stgItem${o.id===stgSelId?' sel':''}" data-id="${esc(o.id)}" `+
-           `style="left:${(o.x*100).toFixed(2)}%;top:${(o.y*100).toFixed(2)}%;${box};${rot}${fl}">`+
+           `style="left:${(o.x*100).toFixed(2)}%;top:${(o.y*100).toFixed(2)}%;${box};${rot}${fl}`+
+           `z-index:${Math.round(+o.z||0)+10}">`+
            `${inner}${handles}</div>`;
   }).join('');
 }
@@ -2175,12 +2324,17 @@ function renderStgProps(){
     (isMedia
       ? `<span class="pill" style="max-width:170px;overflow:hidden;text-overflow:ellipsis">${esc(o.media||'—')}</span>`+
         `<button class="ghost" title="pick media" onclick="mediaBrowse(n=>stgItemSet('media',n))">🗂</button>`
-      : `<span class="pill">${isGauge?'📊 Capacity Gauge':kind==='pump_timer'?'⏱ Pump Timer':'🅣 Text'}</span>`)+
+      : `<span class="pill">${isGauge?'📊 Capacity Gauge':kind==='device_timers'?'⏱ Device Timers':kind==='poll_viewer'?'🗳 Poll Viewer':kind==='timer'?'⏳ Timer':kind==='pump_timer'?'⏱ Pump Timer':'🅣 Text'}</span>`)+
     `<label class="row" style="gap:5px" title="always-on = part of the scene whenever the stage is live; unticked = a callable button"><input type="checkbox" ${o.visible?'checked':''} style="width:auto" onchange="stgItemSet('visible',this.checked)"> always-on</label>`+
     (!o.visible ?
       F('Mode', `<select style="width:96px" onchange="stgItemSet('mode',this.value)">${['timed','hold','once'].map(m=>`<option ${o.mode===m?'selected':''}>${m}</option>`).join('')}</select>`)+
       F('Secs', num('seconds', o.seconds??5, 0.5, 600, 0.5)) : '')+
     F('Layer', `<input value="${esc(o.layer||'')}" placeholder="(own)" style="width:84px" onchange="stgItemSet('layer',this.value)">`)+
+    F('Scene group <span class="muted">(batch)</span>',
+      `<input value="${esc(o.group||'')}" placeholder="intro" style="width:110px" onchange="stgItemSet('group',this.value)">`)+
+    F('Layer order', `<input type="number" step="1" value="${o.z??0}" style="width:70px" title="higher draws on top; equal values keep fire order" onchange="stgItemSet('z',+this.value)">`+
+      `<button class="ghost" style="padding:6px 8px;margin-left:3px" title="bring forward" onclick="stgLayer(1)">⬆</button>`+
+      `<button class="ghost" style="padding:6px 8px" title="send back" onclick="stgLayer(-1)">⬇</button>`)+
     `<div style="flex:1"></div>`+
     `<button class="ghost" title="duplicate" onclick="stgItemDup()">📋</button>`+
     `<button class="ghost" title="remove from stage" onclick="stgItemDel()">✕</button>`+
@@ -2191,11 +2345,51 @@ function renderStgProps(){
       F('Text <span class="muted">([capacity] · [secs] stay live)</span>',
         `<input value="${esc(o.text||'')}" style="width:260px" onchange="stgItemSet('text',this.value)">`)+
       `</div>`;
-  if(kind==='pump_timer')
+  rows += `<div class="row ovedit">`+
+    F('Fade in <span class="muted">(secs)</span>', num('fade_in', o.fade_in??0, 0, 10, 0.1, 80))+
+    F('Fade out <span class="muted">(secs)</span>', num('fade_out', o.fade_out??0, 0, 10, 0.1, 80))+
+    `<span class="muted">fades double as the slide timing when <b>animate</b> is on</span>`+
+    `</div>`;
+  if(isMedia)
     rows += `<div class="row ovedit">`+
-      F('While pumping', `<input value="${esc(o.fmt_on||'PUMP [secs]s')}" style="width:170px" onchange="stgItemSet('fmt_on',this.value)">`)+
-      F('While idle', `<input value="${esc(o.fmt_off||'PUMP idle')}" style="width:150px" onchange="stgItemSet('fmt_off',this.value)">`)+
+      `<label class="row" style="gap:5px" title="knock a background colour out of the video so a plain .mp4 works as a transparent overlay — no alpha codec needed"><input type="checkbox" ${o.chroma_on?'checked':''} style="width:auto" onchange="stgItemSet('chroma_on',this.checked)"> 🟩 chroma key</label>`+
+      (o.chroma_on
+        ? F('Key colour', `<input type="color" value="${esc(o.chroma||'#00ff00')}" style="width:52px;padding:2px" onchange="stgItemSet('chroma',this.value)">`)+
+          F('Tolerance <span class="muted">(how much of that hue goes)</span>',
+            `<input type="number" min="1" max="120" value="${o.chroma_tol??35}" style="width:80px" onchange="stgItemSet('chroma_tol',+this.value)">`)+
+          F('Edge softness', `<input type="number" min="0" max="80" value="${o.chroma_soft??12}" style="width:80px" onchange="stgItemSet('chroma_soft',+this.value)">`)+
+          `<span class="muted">greens out; greys and skin are protected</span>`
+        : `<span class="muted">turn on to use a green-screen video over the camera</span>`)+
       `</div>`;
+  if(kind==='poll_viewer')
+    rows += `<div class="row ovedit">`+
+      `<label class="row" style="gap:5px" title="appear by itself whenever a poll is running"><input type="checkbox" ${o.auto_show!==false?'checked':''} style="width:auto" onchange="stgItemSet('auto_show',this.checked)"> show while a poll runs</label>`+
+      F('Hold results <span class="muted">(secs, then it fades)</span>',
+        `<input type="number" min="0" step="1" value="${o.results_secs??8}" style="width:80px" onchange="stgItemSet('results_secs',+this.value)">`)+
+      F('Width %', `<input type="number" min="8" max="100" value="${Math.round((o.w??0.34)*100)}" style="width:76px" onchange="stgItemSet('w',+this.value)">`)+
+      F('Height %', `<input type="number" min="8" max="100" value="${Math.round((o.h??0.3)*100)}" style="width:76px" onchange="stgItemSet('h',+this.value)">`)+
+      `<span class="muted">invisible until a poll starts · drag its corners to resize</span>`+
+      `</div>`;
+  if(kind==='timer')
+    rows += `<div class="row ovedit">`+
+      F('Label <span class="muted">([secs] or [mmss] = the countdown)</span>',
+        `<input value="${esc(o.text||'[secs]')}" style="width:230px" onchange="stgItemSet('text',this.value)">`)+
+      F('Seconds', `<input type="number" min="1" step="1" value="${o.seconds??60}" style="width:80px" onchange="stgItemSet('seconds',+this.value)">`)+
+      `<label class="row" style="gap:5px" title="start counting the moment this stage goes live"><input type="checkbox" ${o.autostart?'checked':''} style="width:auto" onchange="stgItemSet('autostart',this.checked)"> auto start on load</label>`+
+      `<label class="row" style="gap:5px" title="remove itself when it reaches zero"><input type="checkbox" ${o.autovanish?'checked':''} style="width:auto" onchange="stgItemSet('autovanish',this.checked)"> auto vanish on complete</label>`+
+      `<span class="muted">otherwise use the <b>start_timer</b> / <b>stop_timer</b> actions</span>`+
+      `</div>`;
+  if(kind==='pump_timer' || kind==='device_timers'){
+    const dt = kind==='device_timers';
+    rows += `<div class="row ovedit">`+
+      F(dt?'Running row <span class="muted">([name] · [secs])</span>':'While pumping',
+        `<input value="${esc(o.fmt_on||(dt?'[name] [secs]s':'PUMP [secs]s'))}" style="width:190px" onchange="stgItemSet('fmt_on',this.value)">`)+
+      F(dt?'Idle row':'While idle',
+        `<input value="${esc(o.fmt_off||(dt?'[name] idle':'PUMP idle'))}" style="width:170px" onchange="stgItemSet('fmt_off',this.value)">`)+
+      (dt?`<label class="row" style="gap:5px" title="untick to list only devices that are actually running"><input type="checkbox" ${o.show_idle!==false?'checked':''} style="width:auto" onchange="stgItemSet('show_idle',this.checked)"> show idle devices</label>`
+         +`<span class="muted">one row per device · primary pump on top · grows as you add devices</span>`:'')+
+      `</div>`;
+  }
   if(!isMedia)
     rows += `<div class="row ovedit">`+
       F(isGauge?'Fill colour':'Colour',
@@ -2210,6 +2404,12 @@ function renderStgProps(){
         : '')+
       `</div>`;
   rows += `<div class="row ovedit">`+
+    `<label class="row" style="gap:5px" title="slide in and out instead of just appearing — keeps a burst of notifications from landing on top of each other"><input type="checkbox" ${o.anim?'checked':''} style="width:auto" onchange="stgItemSet('anim',this.checked)"> animate &amp; fade</label>`+
+    (o.anim?F('Direction', `<select style="width:96px" onchange="stgItemSet('anim_dir',this.value)">`+
+      ['up','down','left','right'].map(d=>`<option ${(o.anim_dir||'up')===d?'selected':''}>${d}</option>`).join('')+`</select>`):'')+
+    `<label class="row" style="gap:5px" title="when this overlay is already on screen, wait your turn instead of replacing it — alerts then play one after another"><input type="checkbox" ${o.queue?'checked':''} style="width:auto" onchange="stgItemSet('queue',this.checked)"> queue if busy</label>`+
+    `</div>`+
+    `<div class="row ovedit">`+
     F('Rotation °', num('rot', Math.round(o.rot||0), -360, 360, 1, 80)+
       `<button class="ghost" title="reset rotation to 0°" style="padding:6px 9px;margin-left:4px" onclick="stgItemSet('rot',0)">↺</button>`)+
     F('Flash <span class="muted">(secs on = secs off · 0 = steady)</span>', num('flash', o.flash??0, 0, 10, 0.5))+
@@ -2220,8 +2420,13 @@ function renderStgProps(){
     `</div>`;
   box.innerHTML = rows;
 }
+function stgLayer(dir){
+  const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===stgSelId); if(!o) return;
+  o.z=(+o.z||0)+dir; renderStgCanvas(); renderStgProps(); scheduleSave();
+}
 function stgItemSet(k,v){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===stgSelId); if(!o) return;
   if(k==='size'||k==='w') v = Math.max(0.01, (+v||0)/100);   // panel shows %
+  if(k==='fade_in'||k==='fade_out') v = Math.max(0, +v||0);  // plain seconds
   if(k==='h') v = (v===null||v==='') ? null : Math.max(0.02, (+v||0)/100);
   o[k]=v; renderStgCanvas(); renderStgProps(); stageButtonsRefresh(); scheduleSave(); }
 function stgItemDup(){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===stgSelId); if(!o) return;
@@ -3301,7 +3506,7 @@ function _walkActs(arr, fn){
   (arr||[]).forEach(a=>{
     if(!a) return;
     fn(a);
-    ['actions','post_actions','win_actions','miss_actions'].forEach(k=>{
+    ['actions','post_actions','win_actions','miss_actions','else_actions'].forEach(k=>{
       if(Array.isArray(a[k])) _walkActs(a[k], fn);
     });
   });
@@ -3773,7 +3978,29 @@ function actGist(a){
   if(t==='wait') return `${s(a.seconds??10)}s`;
   if(t==='award') return (a.award_type==='secs'||a.award_type==='pct')?`${s(a.amount)} ${a.award_type} → ${s(a.target)||'[winner]'}`:`!${s(a.command)||'?'} → ${s(a.target)||'[winner]'}`;
   if(t==='command_gate') return `${(a.modifiers||[]).length} modifier${(a.modifiers||[]).length===1?'':'s'}`;
-  if(t==='overlay') return (a.mode==='clear')?`clear ${s(a.layer)||'ALL'}`:`${s(a.mode)||'timed'} · ${s(a.media).split('/').pop()}`;
+  if(t==='label') return `label "${s(a.name)||'—'}"`;
+  if(t==='group') return `group "${s(a.name)||'—'}" · ${(a.actions||[]).length} action(s)`;
+  if(t==='goto') return `→ ${s(a.name)||'—'}`;
+  if(t==='goto_if'){ const c=(a.conditions||[])[0];
+    return `→ ${s(a.name)||'—'} if ${c?`${s(c.left)} ${s(c.op)||'=='} ${s(c.right)}`:'…'}`; }
+  if(t==='cancel') return 'cancel other blocks';
+  if(t==='random') return `random 1 of ${(a.options||[]).length}`;
+  if(t==='var') return `${s(a.variable)||'?'} ${s(a.operation)||'set'} ${s(a.value)}`.trim();
+  if(t==='if'){ const c=(a.conditions||[])[0];
+    return c ? `if ${s(c.left)} ${s(c.op)||'=='} ${s(c.right)}` + ((a.conditions||[]).length>1?` +${a.conditions.length-1}`:'') : 'if …'; }
+  if(t==='repeat') return (a.mode==='until') ? `repeat until …` : `repeat ×${s(a.iterations)||'3'}`;
+  if(t==='scene_group') return `play group "${s(a.group)||'—'}"`;
+  if(t==='scene_group_kill') return `clear group "${s(a.group)||'—'}"`;
+  if(t==='update_overlay_text')
+    return `retext ${overlayLabelById(a.overlay)||'—'} → ${s(a.text).slice(0,24)}`;
+  if(t==='start_timer'||t==='stop_timer')
+    return `${t==='start_timer'?'start':'stop'} ${overlayLabelById(a.overlay)||'—'}`;
+  if(t==='overlay'||t==='overlay_kill'){
+    const nm = overlayLabelById(a.overlay) || s(a.media).split('/').pop() || '—';
+    if(t==='overlay_kill') return `kill ${nm}${+a.fade_out?` · fade ${a.fade_out}s`:''}`;
+    if(a.mode==='clear') return `clear ${s(a.layer)||'ALL'}`;
+    return `${s(a.mode)||'timed'} · ${nm}`;
+  }
   return s(a[t])||'';   // poll/competition/bonus_round/broadcast/command name
 }
 function actionRow(base, rr, j, a, condLabels){
@@ -3784,7 +4011,7 @@ function actionRow(base, rr, j, a, condLabels){
     const bA=esc(base), kA=esc(rowKey);
     return `<div class="dev" style="gap:8px" ondragover="actDragOver(event)" ondrop="actDrop(event,'${bA}',${j},'${rr}')">`+
       `<span class="draghandle" draggable="true" title="Drag to reorder" ondragstart="actDragStart(event,'${bA}',${j})" ondragend="actDragEnd(event)">⋮⋮</span>`+
-      `<b style="min-width:110px">${esc(typ)}</b>`+
+      `<b style="min-width:110px">${esc(typ)}${a.once?' <span class="muted" style="font-weight:400">·once</span>':''}</b>`+
       `<span class="muted" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(actGist(a))}</span>`+
       `<button class="ghost" title="Duplicate" onclick="actCopy('${bA}',${j},'${rr}')">📋</button>`+
       `<button class="ghost" title="Edit" onclick="actOpen.add('${kA}');${rr}()">✏️</button>`+
@@ -3792,6 +4019,7 @@ function actionRow(base, rr, j, a, condLabels){
     `</div>`;
   }
   const T = f=>`${base}[${j}].${f}`;
+  const onceBox = `<label class="row" style="gap:5px" title="run this row only ONCE per session (resets on session reset)"><input type="checkbox" ${a.once?'checked':''} style="width:auto" onchange="${T('once')}=this.checked;${rr}();scheduleSave()"> once</label>`;
   let cond='';
   if(condLabels){
     const cur=a.if_option||0;
@@ -3804,7 +4032,7 @@ function actionRow(base, rr, j, a, condLabels){
     cond=`<label class="field">Run <select onchange="${T('if_option')}=+this.value;scheduleSave()">${opts}</select></label>`;
   }
   const typeSel = `<select onchange="${T('type')}=this.value;${rr}();scheduleSave()">`+
-    ['message','broadcast','command','fire','roll','chance','capacity','wait','poll','competition','bonus_round','award','command_gate','overlay','stop_devices','end_session'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select>`;
+    ['message','broadcast','command','fire','roll','chance','var','if','repeat','random','group','label','goto','goto_if','cancel','capacity','wait','poll','competition','bonus_round','award','command_gate','overlay','overlay_kill','scene_group','scene_group_kill','update_overlay_text','start_timer','stop_timer','stop_devices','end_session'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select>`;
   let fields=cond;
   if(typ==='wait')
     fields += `<label class="field">Seconds <input value="${esc(String(a.seconds??10))}" placeholder="10" title="a number or a [placeholder] like [winner_score]" style="width:110px" onchange="${T('seconds')}=this.value;scheduleSave()"></label>`;
@@ -3874,24 +4102,90 @@ function actionRow(base, rr, j, a, condLabels){
       fields += `<label class="field">Amount <span class="muted">(${at==='pct'?'capacity %':'pump seconds'} · number or [placeholder])</span> <input value="${esc(String(a.amount??10))}" placeholder="10 or [winner_score]" style="width:150px" onchange="${T('amount')}=this.value;scheduleSave()"></label>`;
     }
   }
-  if(typ==='overlay'){
-    const om=(a.mode||'timed');
-    fields += `<label class="field">Mode <select style="width:150px" onchange="${T('mode')}=this.value;${rr}();scheduleSave()">`+
-      [['timed','timed (secs)'],['hold','hold until cleared'],['once','video: play once'],['clear','clear layer(s)']].map(([v,l])=>`<option value="${v}" ${om===v?'selected':''}>${l}</option>`).join('')+`</select></label>`;
-    if(om!=='clear'){
-      fields += `<label class="field" style="flex:1;min-width:180px">Media <div class="row" style="gap:6px;flex-wrap:nowrap">`+
-        `<input value="${esc(a.media||'')}" placeholder="image or video (upload ⇧)" style="flex:1" onchange="${T('media')}=this.value;scheduleSave()">`+
-        `<label class="ghost" style="padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid var(--line)">⇧<input type="file" accept="image/*,video/*" style="display:none" onchange="actMediaUpload('${esc(base)}',${j},this,'${rr}')"></label>`+
-      `</div></label>`;
+  if(typ==='label' || typ==='group'){
+    fields += `<label class="field" style="flex:1;min-width:180px">Name <span class="muted">(jump here with goto)</span> <input value="${esc(a.name||'')}" placeholder="${typ==='label'?'round-start':'intro'}" style="width:100%" onchange="${T('name')}=this.value;scheduleSave()"></label>`;
+  }
+  if(typ==='goto' || typ==='goto_if'){
+    const names = blockLabelNames(base);
+    fields += `<label class="field" style="min-width:180px">Jump to <select style="width:100%" onchange="${T('name')}=this.value;scheduleSave()">`+
+      `<option value="">— pick a label —</option>`+
+      names.map(n=>`<option ${((a.name||'')===n)?'selected':''}>${esc(n)}</option>`).join('')+
+      ((a.name && !names.includes(a.name))?`<option selected>${esc(a.name)}</option>`:'')+
+      `</select></label>`+
+      (names.length?'':`<span class="muted" style="align-self:center">⚠ no labels or named groups in this block yet</span>`);
+    if(typ==='goto_if')
+      fields += `<label class="field">Match <select style="width:96px" onchange="${T('match')}=this.value;scheduleSave()">`+
+        [['all','ALL of'],['any','ANY of']].map(([v,l])=>`<option value="${v}" ${(a.match||'all')===v?'selected':''}>${l}</option>`).join('')+`</select></label>`;
+  }
+  if(typ==='cancel')
+    fields += `<span class="muted" style="align-self:center">stops every OTHER running block — events, loops, waits. This one keeps going.</span>`;
+  if(typ==='random')
+    fields += `<span class="muted" style="align-self:center">picks ONE branch · weights are optional (blank = even) · <code>[picked]</code> / <code>[picked_label]</code></span>`;
+  if(typ==='var'){
+    fields += `<label class="field">Variable <input value="${esc(a.variable||'')}" placeholder="score" style="width:130px" onchange="${T('variable')}=this.value;scheduleSave()"></label>`+
+      `<label class="field">Scope <select style="width:130px" onchange="${T('scope')}=this.value;scheduleSave()">`+
+        [['session','session-wide'],['user','per player']].map(([v,l])=>`<option value="${v}" ${(a.scope||'session')===v?'selected':''}>${l}</option>`).join('')+`</select></label>`+
+      `<label class="field">Do <select style="width:110px" onchange="${T('operation')}=this.value;scheduleSave()">`+
+        ['set','inc','dec','mult','div'].map(o=>`<option ${(a.operation||'set')===o?'selected':''}>${o}</option>`).join('')+`</select></label>`+
+      `<label class="field" style="flex:1;min-width:160px">Value <input value="${esc(String(a.value??''))}" placeholder="1  ·  [var:x] * 50  ·  [user]" style="width:100%" onchange="${T('value')}=this.value;scheduleSave()"></label>`+
+      `<span class="muted" style="align-self:center">read it back as <code>[${(a.scope||'session')==='user'?'uvar':'var'}:${esc(a.variable||'name')}]</code></span>`;
+  }
+  if(typ==='if' || typ==='repeat'){
+    const until = typ==='repeat' && (a.mode||'fixed')==='until';
+    if(typ==='repeat'){
+      fields += `<label class="field">Loop <select style="width:150px" onchange="${T('mode')}=this.value;${rr}();scheduleSave()">`+
+        [['fixed','a fixed number'],['until','until conditions pass']].map(([v,l])=>`<option value="${v}" ${(a.mode||'fixed')===v?'selected':''}>${l}</option>`).join('')+`</select></label>`+
+        (until
+          ? `<label class="field">Give up after <input value="${esc(String(a.max_iterations??100))}" style="width:80px" onchange="${T('max_iterations')}=this.value;scheduleSave()"></label>`
+          : `<label class="field">Times <input value="${esc(String(a.iterations??3))}" placeholder="3" style="width:80px" onchange="${T('iterations')}=this.value;scheduleSave()"></label>`);
+    }
+    if(typ==='if' || until){
+      fields += `<label class="field">Match <select style="width:96px" onchange="${T('match')}=this.value;scheduleSave()">`+
+        [['all','ALL of'],['any','ANY of']].map(([v,l])=>`<option value="${v}" ${(a.match||'all')===v?'selected':''}>${l}</option>`).join('')+`</select></label>`;
+    }
+    if(typ==='repeat') fields += `<span class="muted" style="align-self:center"><code>[loop_i]</code> = the round number</span>`;
+  }
+  if(typ==='scene_group' || typ==='scene_group_kill'){
+    const names = stageGroupNames();
+    fields += `<label class="field" style="min-width:180px">Scene group <select style="width:100%" onchange="${T('group')}=this.value;scheduleSave()">`+
+      `<option value="">— pick a group —</option>`+
+      names.map(n=>`<option ${((a.group||'')===n)?'selected':''}>${esc(n)}</option>`).join('')+
+      ((a.group && !names.includes(a.group))?`<option selected>${esc(a.group)}</option>`:'')+
+      `</select></label>`+
+      `<label class="field">Fade ${typ==='scene_group'?'in':'out'} <input value="${esc(String(typ==='scene_group'?(a.fade_in??0):(a.fade_out??0)))}" style="width:70px" onchange="${T(typ==='scene_group'?'fade_in':'fade_out')}=this.value;scheduleSave()"></label>`+
+      `<span class="muted" style="align-self:center">${typ==='scene_group'?'plays every overlay tagged with that group':'clears the whole group · quiet if none are up'}</span>`;
+  }
+  if(typ==='update_overlay_text'){
+    fields += `<label class="field" style="min-width:200px">Overlay <select style="width:100%" onchange="${T('overlay')}=this.value;scheduleSave()">`+
+      stageOverlayOptions(a.overlay)+`</select></label>`+
+      `<label class="field" style="flex:1;min-width:220px">New text <input value="${esc(a.text||'')}" placeholder="[user] is up next!" style="width:100%" onchange="${T('text')}=this.value;scheduleSave()"></label>`+
+      `<span class="muted" style="align-self:center">changes it in place · quiet if it isn't showing</span>`;
+  }
+  if(typ==='start_timer' || typ==='stop_timer'){
+    fields += `<label class="field" style="min-width:210px">Timer overlay <select style="width:100%" onchange="${T('overlay')}=this.value;scheduleSave()">`+
+      stageOverlayOptions(a.overlay, 'timer')+`</select></label>`;
+    if(typ==='start_timer')
+      fields += `<label class="field">Seconds <span class="muted">(blank = its own)</span> <input value="${esc(String(a.seconds??''))}" placeholder="—" style="width:80px" onchange="${T('seconds')}=this.value;scheduleSave()"></label>`;
+    fields += `<span class="muted" style="align-self:center">${typ==='stop_timer'?'freezes it where it is':'restarts, or resumes a stopped one'}</span>`;
+  }
+  if(typ==='overlay' || typ==='overlay_kill'){
+    // Overlays are DESIGNED on the Stages tab — actions just CALL one.
+    const kill = typ==='overlay_kill';
+    fields += `<label class="field" style="min-width:210px">Overlay <select style="width:100%" onchange="${T('overlay')}=this.value;scheduleSave()">`+
+      stageOverlayOptions(a.overlay)+`</select></label>`;
+    if(!kill){
+      const om=(a.mode||'timed');
+      fields += `<label class="field">Mode <select style="width:150px" onchange="${T('mode')}=this.value;${rr}();scheduleSave()">`+
+        [['timed','timed (secs)'],['hold','static (until killed)'],['once','video: play once']]
+          .map(([v,l])=>`<option value="${v}" ${om===v?'selected':''}>${l}</option>`).join('')+`</select></label>`;
       if(om==='timed')
         fields += `<label class="field">Secs <input value="${esc(String(a.seconds??5))}" placeholder="5" style="width:70px" onchange="${T('seconds')}=this.value;scheduleSave()"></label>`;
-      fields += `<label class="field">Position <select style="width:120px" onchange="${T('pos')}=this.value;scheduleSave()">`+
-        ['center','top','bottom','left','right','top-left','top-right','bottom-left','bottom-right'].map(p=>`<option value="${p}" ${(a.pos||'center')===p?'selected':''}>${p}</option>`).join('')+`</select></label>`+
-        `<label class="field">Width <select style="width:85px" onchange="${T('scale')}=+this.value;scheduleSave()">`+
-        [[0.25,'25%'],[0.5,'50%'],[0.75,'75%'],[1,'100%']].map(([v,l])=>`<option value="${v}" ${(+a.scale||0.5)===v?'selected':''}>${l}</option>`).join('')+`</select></label>`;
+      fields += `<label class="field">Fade in <input value="${esc(String(a.fade_in??0))}" placeholder="0" style="width:70px" title="seconds to fade up (0 = instant)" onchange="${T('fade_in')}=this.value;scheduleSave()"></label>`;
     }
-    fields += `<label class="field">Layer <input value="${esc(a.layer||'')}" placeholder="${om==='clear'?'blank = ALL':'optional slot'}" style="width:110px" title="a named slot — firing the same layer replaces it; clear removes it" onchange="${T('layer')}=this.value;scheduleSave()"></label>`;
+    fields += `<label class="field">Fade out <input value="${esc(String(a.fade_out??0))}" placeholder="0" style="width:70px" title="seconds to fade away (0 = instant)" onchange="${T('fade_out')}=this.value;scheduleSave()"></label>`;
+    fields += `<span class="muted" style="align-self:center">${kill?'killing one that isn\'t up does nothing':'position &amp; size come from the Stage design'}</span>`;
   }
+
   // type notes: shrinkable so the row never wraps into multiple lines
   const NOTE={command_gate:'modifiers below ↓',
     overlay:'🎥 skips quietly if the virtual cam is off',
@@ -3930,6 +4224,64 @@ function actionRow(base, rr, j, a, condLabels){
       `<div class="muted">Post-Pump Actions <span class="muted">(run once this pump expires; the fire waits it out${a.block_during?', blocking others':''})</span></div>`+
       (has?(a.post_actions||[]).map((x,k)=>actionRow(nb,rr,k,x)).join(''):'')+
       `<button class="ghost" style="margin-top:4px;align-self:flex-start" onclick="${nb}=${nb}||[];${nb}.push({type:'message',message:''});actOpen.add('${nb}['+(${nb}.length-1)+']');${rr}();scheduleSave()">+ Add post-pump action</button>`+
+    `</div>`;
+  }
+  if(typ==='group'){
+    const gb=`${base}[${j}].actions`;
+    nested = `<div class="colsec" style="margin-left:12px;border-left:2px solid var(--line);padding-left:10px;margin-top:6px;gap:6px">`+
+      ((a.actions||[]).map((x,k)=>actionRow(gb,rr,k,x)).join('')||'<div class="muted">nothing in this group yet</div>')+
+      `<button class="ghost" style="align-self:flex-start" onclick="${gb}=${gb}||[];${gb}.push({type:'message',message:''});actOpen.add('${gb}['+(${gb}.length-1)+']');${rr}();scheduleSave()">+ Add action</button>`+
+    `</div>`;
+  }
+  if(typ==='random'){
+    const ob=`${base}[${j}].options`;
+    nested = `<div class="colsec" style="margin-left:12px;border-left:2px solid var(--line);padding-left:10px;margin-top:6px;gap:6px">`+
+      ((a.options||[]).map((op,k)=>{
+        const ab=`${ob}[${k}].actions`;
+        return `<div class="colsec" style="gap:4px">`+
+          `<div class="row ovedit">`+
+            `<label class="field">Label <input value="${esc(op.label||'')}" placeholder="option ${k+1}" style="width:150px" onchange="${ob}[${k}].label=this.value;${rr}();scheduleSave()"></label>`+
+            `<label class="field">Weight <input type="number" min="0" step="1" value="${op.weight??1}" style="width:74px" title="relative chance — leave them all equal for an even split" onchange="${ob}[${k}].weight=+this.value;scheduleSave()"></label>`+
+            `<div style="flex:1"></div>`+
+            `<button class="ghost" onclick="${ob}.splice(${k},1);${rr}();scheduleSave()">✕</button>`+
+          `</div>`+
+          ((op.actions||[]).map((x,q)=>actionRow(ab,rr,q,x)).join('')||'<div class="muted" style="margin-left:10px">nothing yet</div>')+
+          `<button class="ghost" style="align-self:flex-start;margin-left:10px" onclick="${ab}=${ab}||[];${ab}.push({type:'message',message:''});actOpen.add('${ab}['+(${ab}.length-1)+']');${rr}();scheduleSave()">+ Add action</button>`+
+        `</div>`;
+      }).join('')||'<div class="muted">no branches yet</div>')+
+      `<button class="ghost" style="align-self:flex-start" onclick="${ob}=${ob}||[];${ob}.push({label:'',weight:1,actions:[]});${rr}();scheduleSave()">+ Add branch</button>`+
+    `</div>`;
+  }
+  if(typ==='if' || typ==='repeat'){
+    const cb=`${base}[${j}].conditions`, ab=`${base}[${j}].actions`, eb=`${base}[${j}].else_actions`;
+    const showConds = typ==='if' || (a.mode||'fixed')==='until';
+    const OPS=[['==','is'],['!=','is not'],['>','>'],['<','<'],['>=','≥'],['<=','≤'],
+               ['contains','contains'],['empty','is empty'],['notEmpty','is not empty']];
+    const condRow=(c,k)=>{
+      const needsRight = !['empty','notEmpty'].includes(c.op||'==');
+      return `<div class="row ovedit">`+
+        `<input value="${esc(c.left||'')}" placeholder="[var:score]" style="width:170px" onchange="${cb}[${k}].left=this.value;scheduleSave()">`+
+        `<select style="width:120px" onchange="${cb}[${k}].op=this.value;${rr}();scheduleSave()">`+
+          OPS.map(([v,l])=>`<option value="${v}" ${(c.op||'==')===v?'selected':''}>${l}</option>`).join('')+`</select>`+
+        (needsRight?`<input value="${esc(c.right||'')}" placeholder="10" style="width:150px" onchange="${cb}[${k}].right=this.value;scheduleSave()">`:'')+
+        `<div style="flex:1"></div>`+
+        `<button class="ghost" onclick="${cb}.splice(${k},1);${rr}();scheduleSave()">✕</button>`+
+      `</div>`;
+    };
+    nested = `<div class="colsec" style="margin-left:12px;border-left:2px solid var(--line);padding-left:10px;margin-top:6px;gap:6px">`+
+      (showConds
+        ? `<div class="muted">❓ ${typ==='repeat'?'Stop when':'When'} <span class="muted">(each side takes placeholders · [var:x], [user], numbers)</span></div>`+
+          ((a.conditions||[]).map(condRow).join('')||'<div class="muted">no conditions — always passes</div>')+
+          `<button class="ghost" style="align-self:flex-start" onclick="${cb}=${cb}||[];${cb}.push({left:'',op:'==',right:''});${rr}();scheduleSave()">+ Add condition</button>`
+        : '')+
+      `<div class="muted" style="margin-top:6px">${typ==='repeat'?'🔁 Each round':'✅ Then'}</div>`+
+      ((a.actions||[]).map((x,k)=>actionRow(ab,rr,k,x)).join('')||'<div class="muted">nothing yet</div>')+
+      `<button class="ghost" style="align-self:flex-start" onclick="${ab}=${ab}||[];${ab}.push({type:'message',message:''});actOpen.add('${ab}['+(${ab}.length-1)+']');${rr}();scheduleSave()">+ Add action</button>`+
+      (typ==='if'
+        ? `<div class="muted" style="margin-top:6px">↩️ Otherwise</div>`+
+          ((a.else_actions||[]).map((x,k)=>actionRow(eb,rr,k,x)).join('')||'<div class="muted">nothing yet</div>')+
+          `<button class="ghost" style="align-self:flex-start" onclick="${eb}=${eb}||[];${eb}.push({type:'message',message:''});actOpen.add('${eb}['+(${eb}.length-1)+']');${rr}();scheduleSave()">+ Add otherwise action</button>`
+        : '')+
     `</div>`;
   }
   if(typ==='chance'){
@@ -3971,7 +4323,7 @@ function actionRow(base, rr, j, a, condLabels){
   return `<div class="dev" style="flex-direction:column;align-items:stretch;gap:6px" ondragover="actDragOver(event)" ondrop="actDrop(event,'${bAttr}',${j},'${rr}')">`+
     `<div class="row" style="gap:8px;flex-wrap:nowrap;align-items:center">`+
     `<span class="draghandle" draggable="true" title="Drag to reorder" ondragstart="actDragStart(event,'${bAttr}',${j})" ondragend="actDragEnd(event)">⋮⋮</span>`+
-    typeSel+
+    typeSel+ onceBox+
     `<div style="flex:1"></div>`+
     `<button class="ghost" title="Duplicate" onclick="actCopy('${bAttr}',${j},'${rr}')">📋</button>`+
     `<button class="ghost" title="Collapse" onclick="actOpen.delete('${kAttr}');${rr}()">▾</button>`+
@@ -4272,6 +4624,9 @@ function cleanActionRows(arr){
   return (arr||[]).map(a=>{
     const t=a.type||'message';
     const o={type:t,
+      // a stable id so "only once" memory survives reordering/editing
+      id:a.id||('a'+Date.now().toString(36)+Math.floor(Math.random()*46656).toString(36)),
+      once:!!a.once,
       seconds:secs(a.seconds), device_id:a.device_id||null,
       dice:(a.dice>0)?+a.dice:null, sides:(a.sides>0)?+a.sides:null,
       capacity_op:a.capacity_op==='set'?'set':'add', capacity_value:+a.capacity_value||0,
@@ -4281,7 +4636,48 @@ function cleanActionRows(arr){
       if_option:(a.if_option>0)?+a.if_option:null};
     if(t==='message'){ o.message=a.message||''; if((a.as||'')==='owner') o.as='owner'; }   // only message rows speak
     if(t==='roll') o.luck=(a.luck==null||a.luck==='')?null:+a.luck;
+    if(t==='label'||t==='group'){ o.name=s(a.name);
+      if(t==='group') o.actions=cleanActionRows(a.actions); return o; }
+    if(t==='goto'){ o.name=s(a.name); return o; }
+    if(t==='goto_if'){ o.name=s(a.name); o.match=(a.match==='any')?'any':'all';
+      o.conditions=(Array.isArray(a.conditions)?a.conditions:[])
+        .map(c=>({left:s(c&&c.left), op:s(c&&c.op)||'==', right:s(c&&c.right)})); return o; }
+    if(t==='cancel') return o;
+    if(t==='random'){ o.options=(Array.isArray(a.options)?a.options:[]).map(op=>({
+        label:s(op&&op.label), weight:(op&&op.weight!=null)?+op.weight:1,
+        actions:cleanActionRows(op&&op.actions)})); return o; }
+    if(t==='var'){ o.variable=s(a.variable); o.scope=(a.scope==='user')?'user':'session';
+      o.operation=['set','inc','dec','mult','div'].includes(a.operation)?a.operation:'set';
+      o.value=s(a.value); return o; }
+    if(t==='if'||t==='repeat'){
+      o.match=(a.match==='any')?'any':'all';
+      o.conditions=(Array.isArray(a.conditions)?a.conditions:[])
+        .map(c=>({left:s(c&&c.left), op:s(c&&c.op)||'==', right:s(c&&c.right)}));
+      o.actions=cleanActionRows(a.actions);
+      if(t==='if') o.else_actions=cleanActionRows(a.else_actions);
+      else { o.mode=(a.mode==='until')?'until':'fixed';
+             o.iterations=s(a.iterations)||'3'; o.max_iterations=s(a.max_iterations)||'100'; }
+      return o; }
+    if(t==='label') return `label "${s(a.name)||'—'}"`;
+  if(t==='group') return `group "${s(a.name)||'—'}" · ${(a.actions||[]).length} action(s)`;
+  if(t==='goto') return `→ ${s(a.name)||'—'}`;
+  if(t==='goto_if'){ const c=(a.conditions||[])[0];
+    return `→ ${s(a.name)||'—'} if ${c?`${s(c.left)} ${s(c.op)||'=='} ${s(c.right)}`:'…'}`; }
+  if(t==='cancel') return 'cancel other blocks';
+  if(t==='random') return `random 1 of ${(a.options||[]).length}`;
+  if(t==='var') return `${s(a.variable)||'?'} ${s(a.operation)||'set'} ${s(a.value)}`.trim();
+  if(t==='if'){ const c=(a.conditions||[])[0];
+    return c ? `if ${s(c.left)} ${s(c.op)||'=='} ${s(c.right)}` + ((a.conditions||[]).length>1?` +${a.conditions.length-1}`:'') : 'if …'; }
+  if(t==='repeat') return (a.mode==='until') ? `repeat until …` : `repeat ×${s(a.iterations)||'3'}`;
+  if(t==='scene_group'||t==='scene_group_kill'){ o.group=s(a.group);
+    if(t==='scene_group'){ o.fade_in=a.fade_in??0; } else { o.fade_out=a.fade_out??0; }
+    return o; }
+  if(t==='update_overlay_text'){ o.overlay=s(a.overlay); o.text=s(a.text); return o; }
+    if(t==='start_timer'||t==='stop_timer'){ o.overlay=s(a.overlay);
+      if(t==='start_timer') o.seconds=s(a.seconds); return o; }
+    if(t==='overlay_kill'){ o.overlay=s(a.overlay); o.fade_out=a.fade_out??0; o.layer=s(a.layer); return o; }
     if(t==='overlay'){ o.mode=['hold','once','clear'].includes(a.mode)?a.mode:'timed';
+      o.overlay=s(a.overlay); o.fade_in=a.fade_in??0; o.fade_out=a.fade_out??0;
       o.media=(a.media||'').trim(); o.pos=a.pos||'center'; o.scale=+a.scale||0.5;
       o.layer=(a.layer||'').trim()||null; }
     if(t==='chance'){ o.chance=(a.chance==null||a.chance==='')?50:Math.max(0,Math.min(100,+a.chance||0));
@@ -4551,7 +4947,9 @@ function renderDevices(st){
     el.className='dev'+(active?' active':''); el.style.flexWrap='wrap';
     el.innerHTML =
       `<input type="radio" name="active" ${active?'checked':''} onchange="setActive('${d.id}')" style="width:auto">`+
-      `<div class="grow"><div class="name">${esc(d.label)} <span class="pill" style="padding:2px 8px;font-size:11px">${esc(vendor)}</span></div>`+
+      `<div class="grow"><div class="name">${esc(d.name||d.label)} `+
+        `<button class="ghost" style="padding:1px 7px;font-size:12px;vertical-align:middle" title="rename this device" onclick="renameDev('${d.id}', ${JSON.stringify(d.name||d.label||'').replace(/"/g,'&quot;')})">✏️</button> `+
+        `<span class="pill" style="padding:2px 8px;font-size:11px">${esc(vendor)}</span></div>`+
       `<div class="tag">${esc(idf)}${d.child_id?(' · outlet '+esc(d.child_id)):''}${d.sku?(' · '+esc(d.sku)):''} · ${esc(d.source||'')}</div></div>`+
       `<select style="width:88px" onchange="setDevType('${d.id}', this.value)" title="Pump drives capacity; Other just fires">`+
         `<option value="pump" ${(d.type||'pump')==='pump'?'selected':''}>Pump</option>`+
@@ -4568,6 +4966,11 @@ function renderDevices(st){
   });
 }
 // device endpoints share one wrapper so failures surface instead of vanishing
+async function renameDev(id, cur){
+  const nm = prompt('Rename this device\n(blank restores the original label):', cur||'');
+  if(nm===null) return;
+  await devApi('/api/devices/rename', {id, name:nm.trim()});
+}
 async function devApi(path, body){
   pendingRev++;
   try{ applyState(await api(path, body), true); }
@@ -4680,7 +5083,9 @@ async function addDisc(btn){
 }
 
 // ---- state application ----
+let lastState = {};
 function applyState(st, full){
+  lastState = st || {};
   if(!st) return;
   // status (every poll)
   $('#capVal').textContent = st.capacity;

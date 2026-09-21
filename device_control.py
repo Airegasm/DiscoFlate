@@ -12,7 +12,9 @@ credentials (config["vendors"][vendor]).
 
 from __future__ import annotations
 
+import asyncio
 import importlib
+import time
 
 import kasa_legacy as kasa
 
@@ -64,9 +66,41 @@ def _kasa_outlet(device: dict) -> "kasa.Outlet":
     )
 
 
+# ---- command pacing ---------------------------------------------------- #
+# Cloud vendors bill/limit per API call and will throttle or ban a client that
+# hammers them; LAN vendors just don't like being spammed. One token bucket per
+# device paces ON commands.
+#
+# TURNING OFF IS NEVER PACED. An off command is a safety operation — it has to
+# go through the instant it's asked for, even mid-burst.
+_CLOUD_VENDORS = {"govee", "tuya", "wyze"}
+_PACE = {"cloud": 2.0, "lan": 0.5}      # min seconds between ON commands
+_last_cmd: dict[str, float] = {}
+
+
+def pace_seconds(device: dict) -> float:
+    v = normalize_vendor(device)
+    return _PACE["cloud" if v in _CLOUD_VENDORS else "lan"]
+
+
+async def _pace(device: dict, on: bool) -> None:
+    if not on:
+        _last_cmd.pop(_ident(device), None)   # OFF resets the bucket, never waits
+        return
+    key = _ident(device)
+    gap = pace_seconds(device)
+    now = time.monotonic()
+    wait = gap - (now - _last_cmd.get(key, 0.0))
+    if wait > 0:
+        _dbg(f"PACE {key} waiting {wait:.2f}s ({gap:.1f}s between ON commands)")
+        await asyncio.sleep(min(wait, gap))
+    _last_cmd[key] = time.monotonic()
+
+
 async def set_state(device: dict, on: bool, creds: dict) -> None:
     """Turn a device on/off, routed by vendor. Raises on failure."""
     vendor = normalize_vendor(device)
+    await _pace(device, on)
     _dbg(f"USE  set_state vendor={vendor} target={_ident(device)} on={on}")
     try:
         if vendor == "kasa":

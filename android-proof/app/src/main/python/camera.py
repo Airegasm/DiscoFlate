@@ -47,6 +47,8 @@ class VirtualCam:
         self._stop = threading.Event()
         self._lock = threading.Lock()
         self._overlays: list[dict] = []
+        # layer -> [entry, ...] waiting their turn (notification queueing)
+        self._queued: dict[str, list] = {}
         self._err: str | None = None
         self._info: str = ""
         self._device = 0
@@ -57,7 +59,8 @@ class VirtualCam:
         # overlay text) correctly. Discord mirrors your own self-view preview on
         # its end — that's cosmetic and local, not what viewers get.
         self._mirror = False
-        self.state_cb = None       # () -> {"capacity","firing","remaining"} for widgets
+        # () -> {"capacity","firing","remaining","device_timers":[...]} for widgets
+        self.state_cb = None
         self._state = {}
         self._state_at = 0.0
 
@@ -162,14 +165,82 @@ class VirtualCam:
     # -- overlays --------------------------------------------------------------#
     _VIDEO_EXTS = (".mp4", ".webm", ".mov", ".mkv", ".avi", ".m4v")
 
-    def clear_overlays(self, layer: str | None = None) -> dict:
-        """Remove all overlays, or just the named layer."""
+    def clear_overlays(self, layer: str | None = None, fade_out=0.0) -> dict:
+        """Remove all overlays, or just the named layer. With `fade_out` the
+        layer dies over N seconds instead of vanishing. Clearing a layer that
+        isn't up is a silent no-op — callers ask for 'gone', not 'was there'."""
         key = (layer or "").strip().lower()
+        try:
+            fade = max(0.0, float(fade_out or 0))
+        except (TypeError, ValueError):
+            fade = 0.0
+        now = time.monotonic()
+        hit = 0
         with self._lock:
             for o in self._overlays:
-                if not key or o.get("layer") == key:
+                if key and o.get("layer") != key:
+                    continue
+                hit += 1
+                if fade:
+                    o["fade_out"] = fade
+                    o["until"] = min(o["until"], now + fade) if o.get("until") else now + fade
+                else:
                     o["dead"] = True
-        return {"ok": True}
+        return {"ok": True, "cleared": hit}
+
+    _QUEUE_MAX = 12      # a burst deeper than this is noise; drop the overflow
+
+    def _admit(self, ent: dict, key: str | None) -> dict:
+        """Put an overlay on screen, or QUEUE it behind the one already on its
+        layer. Queueing is what stops a rush of notifications from landing on
+        top of each other — they play one after another instead."""
+        with self._lock:
+            live = [o for o in self._overlays
+                    if key and o.get("layer") == key and not o.get("dead")]
+            if key and live and ent.get("queue"):
+                q = self._queued.setdefault(key, [])
+                if len(q) >= self._QUEUE_MAX:
+                    return {"ok": True, "dropped": True}
+                q.append(ent)
+                return {"ok": True, "queued": len(q)}
+            for o in live:      # no queueing: the newest replaces
+                o["dead"] = True
+            ent["born"] = time.monotonic()
+            if ent.get("_dur"):     # timed entries date from when they appear
+                ent["until"] = ent["born"] + ent["_dur"]
+            self._overlays.append(ent)
+        return {"ok": True, "overlays": len(self._overlays)}
+
+    def update_item(self, oid: str, fields: dict) -> dict:
+        """Change a LIVE overlay's text without re-firing it — so a scoreboard
+        or status line can tick over in place. Queued copies get it too, so a
+        waiting alert shows the current value when its turn comes. Silent when
+        that overlay isn't on screen."""
+        oid = str(oid or "")
+        hit = 0
+        with self._lock:
+            pools = [self._overlays] + list(self._queued.values())
+            for pool in pools:
+                for o in pool:
+                    it = o.get("item")
+                    if not it or str(it.get("id")) != oid or o.get("dead"):
+                        continue
+                    for k, v in (fields or {}).items():
+                        if v is not None:
+                            it[k] = v
+                    hit += 1
+        return {"ok": True, "updated": hit}
+
+    def clear_queue(self, layer: str | None = None) -> dict:
+        """Drop overlays waiting their turn (all, or one layer's)."""
+        with self._lock:
+            n = sum(len(v) for v in self._queued.values()) if not layer \
+                else len(self._queued.get(str(layer).strip().lower(), []))
+            if layer:
+                self._queued.pop(str(layer).strip().lower(), None)
+            else:
+                self._queued.clear()
+        return {"ok": True, "dropped": n}
 
     def add_item(self, item: dict, seconds=None, layer: str | None = None) -> dict:
         """A DRAWN overlay layer — text / capacity_gauge / pump_timer — rendered
@@ -184,16 +255,14 @@ class VirtualCam:
             except (TypeError, ValueError):
                 until = None
         ent = {"kind": "draw", "item": item, "layer": key, "dead": False,
-               "until": until, "pos": str(item.get("pos") or "center").lower(),
+               "until": until, "_dur": (until - time.monotonic()) if until else None,
+               "pos": str(item.get("pos") or "center").lower(),
                "x": item.get("x"), "y": item.get("y"),
-               "rot": item.get("rot"), "flash": item.get("flash")}
-        with self._lock:
-            if key:
-                for o in self._overlays:
-                    if o.get("layer") == key:
-                        o["dead"] = True
-            self._overlays.append(ent)
-        return {"ok": True}
+               "rot": item.get("rot"), "flash": item.get("flash"),
+               "fade_in": item.get("fade_in"), "fade_out": item.get("fade_out"),
+               "anim": item.get("anim"), "anim_dir": item.get("anim_dir"),
+               "queue": item.get("queue"), "born": time.monotonic()}
+        return self._admit(ent, key)
 
     def add_widget(self, widget: str, x=None, y=None, w=None,
                    layer: str | None = None) -> dict:
@@ -203,7 +272,10 @@ class VirtualCam:
 
     def fire_overlay(self, media: str, seconds=5.0, pos: str = "center",
                      scale=0.5, mode: str = "timed", layer: str | None = None,
-                     x=None, y=None, rot=None, flash=None, h=None) -> dict:
+                     x=None, y=None, rot=None, flash=None, h=None,
+                     fade_in=None, fade_out=None, anim=None, anim_dir=None,
+                     queue=None, chroma_on=None, chroma=None, chroma_tol=None,
+                     chroma_soft=None, z=None) -> dict:
         """Show a MEDIA layer over the camera. `media` = an image (PNG alpha
         welcome) or a video file from data/images (or an absolute path).
         mode: "timed"  = shown/looping for `seconds`
@@ -234,6 +306,11 @@ class VirtualCam:
         entry = {"layer": key, "pos": str(pos or "center").lower(), "scale": sc,
                  "dead": False, "x": x, "y": y,   # fractional coords beat `pos`
                  "rot": rot, "flash": flash, "h": h,
+                 "fade_in": fade_in, "fade_out": fade_out, "born": time.monotonic(),
+                 "anim": anim, "anim_dir": anim_dir, "queue": queue,
+                 "z": z,
+                 "chroma_on": chroma_on, "chroma": chroma,
+                 "chroma_tol": chroma_tol, "chroma_soft": chroma_soft,
                  "until": (time.monotonic() + secs) if mode == "timed" else None}
         if os.path.splitext(path)[1].lower() in self._VIDEO_EXTS:
             cap = cv2.VideoCapture(path)
@@ -255,13 +332,8 @@ class VirtualCam:
             if mode == "once":   # a play-once image is just a short timed one
                 entry["until"] = time.monotonic() + secs
             entry.update({"kind": "image", "img": img})
-        with self._lock:
-            if key:   # named slot: replace the previous holder
-                for o in self._overlays:
-                    if o.get("layer") == key:
-                        o["dead"] = True
-            self._overlays.append(entry)
-        return {"ok": True, "overlays": len(self._overlays)}
+        entry["_dur"] = secs if mode == "timed" else None
+        return self._admit(entry, key)
 
     # -- the pipeline thread ---------------------------------------------------#
     @staticmethod
@@ -380,6 +452,101 @@ class VirtualCam:
                             max(1, int(fs * 2)), cv2.LINE_AA)
         return sp
 
+    def _timers_sprite(self, item: dict, H: int, st: dict, single: bool = False):
+        """The Device Timer List: one row per device, PRIMARY PUMP FIRST, each
+        with its own countdown. `single` renders just the primary row (what the
+        old Pump Timer overlay was). Rows appear/disappear as devices are added
+        in settings, so the list grows with the rig."""
+        rows = list(st.get("device_timers") or [])
+        if not rows:   # no devices configured yet — fall back to the bare timer
+            rem = float(st.get("remaining") or 0)
+            on = bool(st.get("firing"))
+            rows = [{"name": "PUMP", "primary": True, "firing": on, "remaining": rem}]
+        if single:
+            rows = rows[:1]
+        elif not item.get("show_idle", True):
+            rows = [r for r in rows if r.get("firing")] or []
+        if not rows:
+            return None
+        fmt_on = str(item.get("fmt_on") or "[name] [secs]s")
+        fmt_off = str(item.get("fmt_off") or "[name] idle")
+        lines = []
+        for r in rows:
+            f = fmt_on if r.get("firing") else fmt_off
+            lines.append(f.replace("[name]", str(r.get("name") or "device"))
+                          .replace("[secs]", f"{float(r.get('remaining') or 0):.0f}"))
+        sprites = [self._text_sprite(t, item, H) for t in lines]
+        sprites = [s for s in sprites if s is not None]
+        if not sprites:
+            return None
+        if len(sprites) == 1:
+            return sprites[0]
+        gap = max(2, int(H * 0.008))
+        w = max(s.shape[1] for s in sprites)
+        h = sum(s.shape[0] for s in sprites) + gap * (len(sprites) - 1)
+        out = np.zeros((h, w, 4), np.uint8)
+        y = 0
+        for s in sprites:
+            out[y:y + s.shape[0], :s.shape[1]] = s
+            y += s.shape[0] + gap
+        return out
+
+    def _poll_sprite(self, item: dict, W: int, H: int, pv: dict):
+        """The Poll Viewer: an embed-style card sized by w/h, listing each
+        option with a vote bar, plus its own countdown (time left while the
+        poll runs, then how long the results stay up)."""
+        try:
+            bw = max(120, int(W * float(item.get("w") or 0.34)))
+            bh = max(80, int(H * float(item.get("h") or 0.30)))
+        except (TypeError, ValueError):
+            bw, bh = int(W * 0.34), int(H * 0.30)
+        sp = np.zeros((bh, bw, 4), np.uint8)
+        bg = self._bgr(item.get("bg"), (18, 18, 22))
+        sp[:, :, :3] = bg
+        sp[:, :, 3] = int(max(0, min(255, float(item.get("opacity", 220) or 220))))
+        accent = self._bgr(item.get("color"), (244, 168, 40))
+        cv2.rectangle(sp, (0, 0), (bw - 1, bh - 1), (*accent, 255), 2)
+        cv2.rectangle(sp, (0, 0), (5, bh - 1), (*accent, 255), -1)   # embed spine
+        pad = max(8, int(bh * 0.07))
+        fs = max(0.4, bh / 300.0)
+        y = pad + int(fs * 26)
+        cv2.putText(sp, str(pv.get("title") or "Poll")[:42], (pad + 8, y),
+                    0, fs * 1.05, (255, 255, 255, 255), max(1, int(fs * 2)), cv2.LINE_AA)
+        # countdown, right-aligned on the title row
+        rem = pv.get("remaining")
+        if rem is None and pv.get("_hold") is not None:
+            rem = pv["_hold"]
+        if rem is not None:
+            lbl = f"{float(rem):.0f}s"
+            (tw_, _t), _b = cv2.getTextSize(lbl, 0, fs * 0.95, max(1, int(fs * 2)))
+            cv2.putText(sp, lbl, (bw - pad - tw_ - 4, y), 0, fs * 0.95,
+                        (*accent, 255), max(1, int(fs * 2)), cv2.LINE_AA)
+        opts = pv.get("options") or []
+        total = max(1, int(pv.get("total") or 0))
+        rows = opts[:8]
+        room = bh - y - pad
+        rh = max(14, int(room / max(1, len(rows))))
+        winner = pv.get("winner")
+        for i, o in enumerate(rows):
+            ry = y + int(rh * (i + 0.35)) + 4
+            if ry + 6 > bh - 2:
+                break
+            votes = int(o.get("votes") or 0)
+            frac = votes / total if pv.get("total") else 0.0
+            barw = int((bw - pad * 2 - 8) * max(0.0, min(1.0, frac)))
+            bar_y2 = min(bh - 2, ry + max(6, int(rh * 0.42)))
+            cv2.rectangle(sp, (pad + 4, ry), (bw - pad - 4, bar_y2), (46, 46, 54, 255), -1)
+            if barw > 1:
+                col = (*accent, 255) if (winner is None or i == winner) else (110, 110, 120, 255)
+                cv2.rectangle(sp, (pad + 4, ry), (pad + 4 + barw, bar_y2), col, -1)
+            txt = ("🏆 " if i == winner else "") + f"{o.get('label', '')[:26]} · {votes}"
+            txt = txt.replace("🏆 ", "> ")      # cv2 can't draw emoji
+            cv2.putText(sp, txt, (pad + 10, bar_y2 - max(2, int(rh * 0.12))),
+                        0, fs * 0.8, (0, 0, 0, 255), max(3, int(fs * 4)), cv2.LINE_AA)
+            cv2.putText(sp, txt, (pad + 10, bar_y2 - max(2, int(rh * 0.12))),
+                        0, fs * 0.8, (255, 255, 255, 255), max(1, int(fs * 2)), cv2.LINE_AA)
+        return sp
+
     def _render_item(self, item: dict, W: int, H: int):
         """RGBA sprite for a non-media overlay, or None to draw nothing."""
         kind = str(item.get("kind") or "text")
@@ -390,15 +557,38 @@ class VirtualCam:
             except (TypeError, ValueError):
                 pct = 0.0
             return self._gauge_sprite(item, W, H, pct)
-        if kind == "pump_timer":
-            try:
-                rem = float(st.get("remaining") or 0)
-            except (TypeError, ValueError):
-                rem = 0.0
-            firing = bool(st.get("firing"))
-            txt = (str(item.get("fmt_on") or "PUMP [secs]s").replace("[secs]", f"{rem:.0f}")
-                   if firing else str(item.get("fmt_off") or "PUMP idle"))
-            return self._text_sprite(txt, item, H)
+        if kind == "poll_viewer":
+            pv = st.get("poll")
+            if not pv:
+                return None                     # no poll → nothing on screen
+            if pv.get("phase") == "results":
+                try:
+                    hold = max(0.0, float(item.get("results_secs", 8) or 0))
+                except (TypeError, ValueError):
+                    hold = 8.0
+                age = float(pv.get("results_age") or 0)
+                if age > hold:
+                    return None                 # results window elapsed
+                pv = {**pv, "_hold": max(0.0, hold - age)}
+            return self._poll_sprite(item, W, H, pv)
+        if kind == "timer":
+            # a countdown the action blocks start/stop; before it ever runs it
+            # just shows its configured length, so the scene reads right idle
+            oid = str(item.get("id") or "")
+            secs = (st.get("timers") or {}).get(oid)
+            if secs is None:
+                try:
+                    secs = float(item.get("seconds") or 0)
+                except (TypeError, ValueError):
+                    secs = 0.0
+            txt = str(item.get("text") or item.get("label") or "[secs]")
+            if "[secs]" not in txt and "[mmss]" not in txt:
+                txt = (txt + " [secs]").strip()
+            m, s = divmod(max(0, int(round(float(secs)))), 60)
+            return self._text_sprite(txt.replace("[secs]", f"{float(secs):.0f}")
+                                        .replace("[mmss]", f"{m}:{s:02d}"), item, H)
+        if kind in ("pump_timer", "device_timers"):
+            return self._timers_sprite(item, H, st, single=(kind == "pump_timer"))
         # plain text — [capacity] / [secs] stay live so a label can count
         txt = str(item.get("text") or "")
         if "[" in txt:
@@ -429,7 +619,77 @@ class VirtualCam:
                               borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0, 0))
 
     @staticmethod
-    def _blend(frame, ov, x: int, y: int) -> None:
+    def _anim_offset(o: dict, now: float, w: int, h: int) -> tuple:
+        """Pixel offset for a sliding overlay: it flies IN from its direction
+        while fading up, sits still, then flies OUT that way while fading down.
+        Pure ease-out on a static direction — no keyframes to author."""
+        if not o.get("anim"):
+            return (0, 0)
+        d = str(o.get("anim_dir") or "up").lower()
+        dist = (h if d in ("up", "down") else w) * 0.9 + 12
+        t = 0.0                     # 0 = in place, 1 = fully off in `d`
+        try:
+            fin = float(o.get("fade_in") or 0)
+            if fin > 0 and o.get("born"):
+                p = (now - o["born"]) / fin
+                if p < 1.0:
+                    t = -(1.0 - max(0.0, p)) ** 2       # arrive FROM `d`
+            fout = float(o.get("fade_out") or 0)
+            if fout > 0 and o.get("until"):
+                p = (o["until"] - now) / fout
+                if p < 1.0:
+                    t = (1.0 - max(0.0, p)) ** 2        # leave TOWARD `d`
+        except (TypeError, ValueError, ZeroDivisionError):
+            return (0, 0)
+        off = int(dist * t)
+        if d == "up":
+            return (0, -off)
+        if d == "down":
+            return (0, off)
+        if d == "left":
+            return (-off, 0)
+        return (off, 0)
+
+    def _chroma(self, bgra, item: dict):
+        """Green-screen keying: knock the key colour out of an OPAQUE frame so
+        a plain .mp4 can be used as a transparent overlay (no alpha codec
+        needed). Distance in HSV hue/sat space, with a soft edge so hair and
+        motion blur don't get a hard jagged cut."""
+        try:
+            tol = max(1.0, min(120.0, float(item.get("chroma_tol") or 35)))
+            soft = max(0.0, min(80.0, float(item.get("chroma_soft") or 12)))
+        except (TypeError, ValueError):
+            tol, soft = 35.0, 12.0
+        key = self._bgr(item.get("chroma"), (0, 255, 0))     # default: green
+        kh = cv2.cvtColor(np.uint8([[list(key)]]), cv2.COLOR_BGR2HSV)[0][0]
+        hsv = cv2.cvtColor(bgra[:, :, :3], cv2.COLOR_BGR2HSV)
+        dh = np.abs(hsv[:, :, 0].astype("int16") - int(kh[0]))
+        dh = np.minimum(dh, 180 - dh).astype("float32")      # hue is a circle
+        sat = hsv[:, :, 1].astype("float32")
+        # fully transparent inside `tol`, fading to opaque across `soft`
+        a = np.clip((dh - tol) / max(1.0, soft), 0.0, 1.0)
+        a[sat < 40] = 1.0          # near-grey pixels are never the key colour
+        out = bgra.copy()
+        out[:, :, 3] = (out[:, :, 3].astype("float32") * a).astype("uint8")
+        return out
+
+    @staticmethod
+    def _fade_alpha(o: dict, now: float) -> float:
+        """0..1 opacity for a layer from its fade_in / fade_out seconds."""
+        a = 1.0
+        try:
+            fin = float(o.get("fade_in") or 0)
+            if fin > 0 and o.get("born"):
+                a = min(a, (now - o["born"]) / fin)
+            fout = float(o.get("fade_out") or 0)
+            if fout > 0 and o.get("until"):
+                a = min(a, (o["until"] - now) / fout)
+        except (TypeError, ValueError, ZeroDivisionError):
+            return 1.0
+        return max(0.0, min(1.0, a))
+
+    @staticmethod
+    def _blend(frame, ov, x: int, y: int, alpha: float = 1.0) -> None:
         """Alpha-composite an RGBA sprite onto the frame at x,y (clipped)."""
         H, W = frame.shape[:2]
         th, tw = ov.shape[:2]
@@ -442,6 +702,8 @@ class VirtualCam:
         ov = ov[sy:sy + th, sx:sx + tw]
         roi = frame[y:y + th, x:x + tw]
         a = ov[:, :, 3:4].astype("float32") / 255.0
+        if alpha < 1.0:
+            a = a * max(0.0, alpha)
         roi[:] = (ov[:, :, :3].astype("float32") * a
                   + roi.astype("float32") * (1.0 - a)).astype("uint8")
 
@@ -459,9 +721,31 @@ class VirtualCam:
                     cap.release()
                 except Exception:  # noqa: BLE001
                     pass
+        for o in dead:   # a freed layer pulls in whoever was waiting for it
+            key = o.get("layer")
+            if not key or not self._queued.get(key):
+                continue
+            with self._lock:
+                if any(x.get("layer") == key and not x.get("dead")
+                       for x in self._overlays):
+                    continue
+                nxt = self._queued[key].pop(0)
+                if not self._queued[key]:
+                    self._queued.pop(key, None)
+                nxt["born"] = now
+                if nxt.get("_dur"):
+                    nxt["until"] = now + nxt["_dur"]
+                self._overlays.append(nxt)
         if not ovs:
             return frame
         H, W = frame.shape[:2]
+        def _z(o):
+            src_ = o.get("item") if o.get("kind") == "draw" else o
+            try:
+                return float((src_ or {}).get("z") or o.get("z") or 0)
+            except (TypeError, ValueError):
+                return 0.0
+        ovs.sort(key=_z)        # stable: equal z keeps fire order (newest on top)
         for o in ovs:
             # flash: N seconds visible, N hidden (0/blank = always visible)
             fl = o.get("flash") or (o.get("item") or {}).get("flash")
@@ -474,13 +758,25 @@ class VirtualCam:
                     pass
             if o.get("kind") == "draw":
                 try:
-                    sp = self._render_item(o.get("item") or {}, W, H)
+                    it = o.get("item") or {}
+                    if it.get("kind") == "timer" and it.get("autovanish"):
+                        left = (self._get_state().get("timers") or {}).get(str(it.get("id")))
+                        if left is not None and float(left) <= 0:
+                            fo = it.get("fade_out")
+                            if fo and not o.get("until"):
+                                o["fade_out"] = fo
+                                o["until"] = now + float(fo)
+                            elif not fo:
+                                o["dead"] = True
+                                continue
+                    sp = self._render_item(it, W, H)
                     if sp is None:
                         continue
-                    sp = self._rotate(sp, (o.get("item") or {}).get("rot"))
+                    sp = self._rotate(sp, it.get("rot"))
                     ih, iw = sp.shape[:2]
                     x, y = self._spot(o, W, H, iw, ih)
-                    self._blend(frame, sp, x, y)
+                    ax, ay = self._anim_offset(o, now, iw, ih)
+                    self._blend(frame, sp, x + ax, y + ay, self._fade_alpha(o, now))
                 except Exception:  # noqa: BLE001 — a bad item never kills the pipe
                     o["dead"] = True
                 continue
@@ -493,8 +789,12 @@ class VirtualCam:
                     o["dead"] = True   # play-once finished (or file went bad)
                     continue
                 img = cv2.cvtColor(vf, cv2.COLOR_BGR2BGRA)   # opaque layer
+                if o.get("chroma_on"):
+                    img = self._chroma(img, o)
             else:
                 img = o["img"]
+                if o.get("chroma_on"):
+                    img = self._chroma(img, o)
             tw = max(8, int(W * o["scale"]))
             if o.get("h") is not None:      # stage-designer stretch (w x h)
                 try:
@@ -510,7 +810,8 @@ class VirtualCam:
             ov = self._rotate(ov, o.get("rot"))
             th, tw = ov.shape[:2]
             x, y = self._spot(o, W, H, tw, th)
-            self._blend(frame, ov, x, y)
+            ax, ay = self._anim_offset(o, now, tw, th)
+            self._blend(frame, ov, x + ax, y + ay, self._fade_alpha(o, now))
         return frame
 
     def _spot(self, o: dict, W: int, H: int, w: int, h: int) -> tuple[int, int]:

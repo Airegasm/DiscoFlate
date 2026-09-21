@@ -24,6 +24,16 @@
          text-shadow:0 1px 3px #000,0 0 2px #000}
   .wtext.boxed{padding:.25em .6em;border-radius:10px;text-shadow:none}
   @keyframes dfflash{0%,49%{opacity:1}50%,100%{opacity:0}}
+  .wpoll{position:absolute;pointer-events:none;box-sizing:border-box;overflow:hidden;
+         border:2px solid var(--acc);border-left:6px solid var(--acc);border-radius:6px;
+         padding:.5em .6em;color:#fff;font-size:min(2.6vh,15px);transition:opacity .5s}
+  .wpoll .ph{display:flex;justify-content:space-between;font-weight:800;margin-bottom:.3em}
+  .wpoll .pb{position:relative;height:1.6em;margin-top:.25em;background:#2e2e36;border-radius:3px}
+  .wpoll .pb>i{display:block;height:100%;border-radius:3px}
+  .wpoll .pb>b{position:absolute;left:6px;top:0;line-height:1.6em;font-weight:600}
+  /* notification slide: enters from its direction, leaves the same way */
+  .anim{transition:transform var(--dur,.3s) ease-out, opacity var(--dur,.3s) ease-out}
+  .anim.in{transform:translate(var(--dx,0),var(--dy,0));opacity:0}
   #brb{position:fixed;inset:0;background:#0a0d12;display:none;align-items:center;
        justify-content:center;color:#9fd6a5;font-size:10vw;font-weight:800;
        letter-spacing:.12em;z-index:40}
@@ -60,6 +70,8 @@
 <div id="shield"></div>
 <script>
 const $ = s => document.querySelector(s);
+const esc = s => String(s==null?'':s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const AUTH = (document.querySelector('meta[name="df-auth"]')||{}).content || '';
 const HDRS = {'Content-Type':'application/json','X-DiscoFlate-Auth':AUTH};
 
@@ -158,6 +170,15 @@ function styleText(el, o){
   el.style.fontSize = Math.max(1, (o.size||0.06)*100) + 'cqh';
   if((o.bg||'').trim()){ el.classList.add('boxed'); el.style.background = o.bg; }
 }
+const ANIM_OFF = {up:['0','60px'], down:['0','-60px'], left:['60px','0'], right:['-60px','0']};
+function applyAnim(el, o){
+  if(!o.anim) return;
+  const [dx,dy] = ANIM_OFF[o.anim_dir||'up'] || ANIM_OFF.up;
+  el.style.setProperty('--dx', dx); el.style.setProperty('--dy', dy);
+  el.style.setProperty('--dur', ((+o.fade_in||0.3))+'s');
+  el.classList.add('anim','in');
+  requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.remove('in')));
+}
 function applyBox(el, o){
   if(o.x != null && o.y != null){   // else keep whatever place() decided
     el.style.left = (o.x*100)+'%';
@@ -195,13 +216,27 @@ function itemEl(o){
     designWidgets.push({kind:'capacity_gauge', el, o, vert});
     return el;
   }
-  // text + pump_timer share the text renderer
+  if(kind === 'poll_viewer'){
+    const el = document.createElement('div');
+    el.className = 'wpoll';
+    el.style.left=((o.x??0.05)*100)+'%'; el.style.top=((o.y??0.05)*100)+'%';
+    el.style.width=((o.w||0.34)*100)+'%'; el.style.height=((o.h||0.3)*100)+'%';
+    el.style.setProperty('--acc', o.color||'#f4a828');
+    el.style.background = o.bg||'#12121a';
+    el.style.display='none';                 // invisible until a poll runs
+    applyBox(el, o);
+    designWidgets.push({kind, el, o});
+    return el;
+  }
+  // text + timers share the text renderer
   const el = document.createElement('div');
   el.className = 'wtext';
   styleText(el, o);
-  el.textContent = kind==='pump_timer' ? (o.fmt_off||'PUMP idle') : (o.text||'');
+  el.textContent = kind==='pump_timer' ? (o.fmt_off||'PUMP idle')
+                 : (kind==='device_timers'||kind==='timer') ? '' : (o.text||'');
   applyBox(el, o);
-  if(kind==='pump_timer' || /\[(capacity|secs)\]/.test(o.text||''))
+  if(kind==='pump_timer' || kind==='device_timers' || kind==='timer'
+     || /\[(capacity|secs)\]/.test(o.text||''))
     designWidgets.push({kind, el, o});
   return el;
 }
@@ -218,6 +253,41 @@ async function widgetTick(){
         if(!w.o.color) bar.style.background =
           `hsl(${Math.round(120-1.2*Math.min(100,pct))} 70% 45%)`;   // green -> red
         w.el.querySelector('b').textContent = (w.o.show_pct===false) ? '' : pct.toFixed(0)+'%';
+      } else if(w.kind==='poll_viewer'){
+        const pv = st.poll;
+        let show = !!pv;
+        if(pv && pv.phase==='results')
+          show = (+pv.results_age||0) <= (+w.o.results_secs||8);
+        w.el.style.display = show ? '' : 'none';
+        if(!show) return;
+        const tot=Math.max(1, pv.total||0), acc=w.o.color||'#f4a828';
+        const left = pv.phase==='results'
+          ? Math.max(0,(+w.o.results_secs||8)-(+pv.results_age||0)) : (pv.remaining||0);
+        w.el.innerHTML =
+          `<div class="ph"><span>${esc(pv.title||'Poll')}</span>`+
+          `<span style="color:${acc}">${Math.round(left)}s</span></div>`+
+          (pv.options||[]).slice(0,8).map((op,i)=>
+            `<div class="pb"><i style="width:${Math.round(100*(op.votes||0)/tot)}%;`+
+            `background:${(pv.winner==null||i===pv.winner)?acc:'#6e6e78'}"></i>`+
+            `<b>${(i===pv.winner?'🏆 ':'')}${esc(op.label||'')} · ${op.votes||0}</b></div>`).join('');
+      } else if(w.kind==='timer'){
+        const live=(st.timers||{})[w.o.id];
+        const sec = live!=null ? live : (+w.o.seconds||0);
+        const m=Math.floor(sec/60), s=Math.round(sec%60);
+        let t=String(w.o.text||'[secs]');
+        if(!/\[(secs|mmss)\]/.test(t)) t+=' [secs]';
+        w.el.textContent = t.replace('[secs]', Math.round(sec))
+                            .replace('[mmss]', m+':'+String(s).padStart(2,'0'));
+        if(w.o.autovanish && live!=null && live<=0) w.el.style.display='none';
+      } else if(w.kind==='device_timers'){
+        // one row per device, primary pump first — grows with the rig
+        let rows = st.device_timers || [];
+        if(w.o.show_idle===false) rows = rows.filter(r=>r.firing);
+        w.el.style.whiteSpace = 'pre';
+        w.el.textContent = rows.map(r =>
+          String(r.firing ? (w.o.fmt_on||'[name] [secs]s') : (w.o.fmt_off||'[name] idle'))
+            .replace('[name]', r.name||'device')
+            .replace('[secs]', Math.round(r.remaining||0))).join('\n');
       } else if(w.kind==='pump_timer'){
         w.el.textContent = on ? String(w.o.fmt_on||'PUMP [secs]s').replace('[secs]', rem.toFixed(0))
                               : String(w.o.fmt_off||'PUMP idle');
@@ -293,6 +363,7 @@ async function pollOverlays(){
         applyBox(el, {x:null, y:null, rot:o.rot, flash:o.flash});
       }
       $('#layers').appendChild(el);   // fire order = z-order (later on top)
+      applyAnim(el, (o.kind==='draw' ? (o.item||{}) : o));
       live[o.id] = el;
     });
     Object.keys(live).forEach(id=>{

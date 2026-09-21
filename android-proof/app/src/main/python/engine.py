@@ -24,6 +24,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import math
 import random
 import re
 import time
@@ -55,6 +56,13 @@ class Engine:
 
         # Per-device fire state: device_id -> {deadline, task, abort, extend, alias}
         self._fires: dict[str, dict] = {}
+        # Action-block variables. `_vars` is session-wide ([var:name]);
+        # `_uvars` is per-player ([uvar:name]), keyed by user id — DiscoFlate is
+        # multi-user, so a shared score and a personal score are both needed.
+        self._vars: dict[str, str] = {}
+        self._uvars: dict[str, dict] = {}
+        self._once_fired: set = set()    # action rows flagged "only once"
+        self._runs: list = []            # live action-block cancel flags
 
         self._tick_task: asyncio.Task | None = None
         self.events: deque = deque(maxlen=100)
@@ -92,6 +100,10 @@ class Engine:
         # action block BLOCKS that block, so the event counts as still running
         # for the poll's whole duration and resumes its remaining actions after.
         self._poll: dict | None = None                   # {def, opts, votes:{uid:idx}, voters:{uid:name}}
+        # Last finished poll, kept so the Poll Viewer overlay can show results
+        # after the poll itself is gone. Each overlay decides how long to hold
+        # them, from its own `results_secs`.
+        self._poll_results: dict | None = None
         self._poll_task: asyncio.Task | None = None      # command-started (background) polls
         # Winning option (0-based) of the most recent poll, or None. Lets a
         # post-event action be gated on which option won (if_option, 1-based).
@@ -241,6 +253,10 @@ class Engine:
             self._event_last.clear()
             self._events_done.clear()
             self._event_fires.clear()
+            self._vars.clear()
+            self._uvars.clear()
+            self._once_fired.clear()
+            self._poll_results = None
             self._event_cooldown_until.clear()
             self._event_activator.clear()
             self._current_range_key = None
@@ -414,13 +430,25 @@ class Engine:
         while True:
             try:
                 await asyncio.sleep(0.2)
-                pump_id = self._pump_id()
-                running = pump_id is not None and pump_id in self._fires
+                # EVERY firing pump feeds the same capacity, each at its own
+                # calibration — a secondary pump running alongside the primary
+                # simply adds its rate (rates sum; they don't take turns).
                 now = time.monotonic()
-                if running:
-                    sec = self._device(pump_id).get("calibration_seconds_to_100")
-                    if sec and self._cap_since is not None:
-                        self.capacity = min(self._capacity_cap(), self.capacity + (now - self._cap_since) / sec * 100.0)
+                rate = 0.0        # capacity-% per second, summed over pumps
+                for did in list(self._fires):
+                    dev = self._device(did)
+                    if not dev or (dev.get("type") or "pump") != "pump":
+                        continue
+                    sec = dev.get("calibration_seconds_to_100")
+                    if sec:
+                        try:
+                            rate += 100.0 / float(sec)
+                        except (TypeError, ValueError, ZeroDivisionError):
+                            pass
+                if rate > 0:
+                    if self._cap_since is not None:
+                        self.capacity = min(self._capacity_cap(),
+                                            self.capacity + (now - self._cap_since) * rate)
                     self._cap_since = now
                 else:
                     self._cap_since = None
@@ -498,6 +526,11 @@ class Engine:
             "leaderboard_cmd": f"{prefix}{bn['leaderboard']}",
             "pumptimer_cmd": f"{prefix}{bn['pumptimer']}",
         }
+        for k, v in (self._vars or {}).items():
+            ctx[f"var:{k}"] = v
+        uid_ = str((extra or {}).get("uid") or (extra or {}).get("_uid") or "")
+        for k, v in (self._uvars.get(uid_) or {}).items():
+            ctx[f"uvar:{k}"] = v
         ctx["commands"] = self._commands_str(prefix)
         ctx["custom_commands"] = self.custom_commands_str(prefix)
         # [operator] = the bot operator's name (falls back to the first owner name).
@@ -792,6 +825,14 @@ class Engine:
         """Activation OFF: stop every running device fire and kill any live
         minigame views (the bot layer disables + refunds them)."""
         await self.abort(reason="activation off")
+        # Wipe the overlay stage too: anything on screen, and anything still
+        # QUEUED behind it — a burst of alerts must not keep playing into a
+        # session that's been switched off.
+        if self.overlay_cb is not None:
+            try:
+                self.overlay_cb({"mode": "clear", "layer": None, "purge_queue": True})
+            except Exception as e:  # noqa: BLE001
+                self._log("error", f"clearing overlays failed: {e}")
         if self.cancel_games_cb:
             try:
                 await self.cancel_games_cb()
@@ -1136,6 +1177,54 @@ class Engine:
                 await self.abort(reason=f"capacity event {name}")
             self._capev_tasks[key] = asyncio.create_task(self._run_capev(ev, key, name))
 
+    _MAX_LOOP = 500      # runaway guard: a block can't loop the bot to death
+    _MAX_GOTO = 2000     # ditto for label/goto jumps within one block
+
+    def var_get(self, name: str, uid=None, user_scope: bool = False) -> str:
+        if user_scope:
+            return (self._uvars.get(str(uid or "")) or {}).get(name, "")
+        return self._vars.get(name, "")
+
+    def var_set(self, name: str, value, uid=None, user_scope: bool = False) -> None:
+        name = str(name or "").strip()
+        if not name:
+            return
+        if user_scope:
+            self._uvars.setdefault(str(uid or ""), {})[name] = str(value)
+        else:
+            self._vars[name] = str(value)
+
+    def _cmp(self, left, op: str, right) -> bool:
+        """One condition. Numeric when both sides look numeric, else string."""
+        op = (op or "==").strip()
+        ls, rs = str(left).strip(), str(right).strip()
+        if op == "empty":
+            return ls == ""
+        if op == "notEmpty":
+            return ls != ""
+        if op == "contains":
+            return rs.lower() in ls.lower()
+        try:
+            ln, rn = float(ls), float(rs)
+            l, r = ln, rn
+        except (TypeError, ValueError):
+            l, r = ls.lower(), rs.lower()
+        return {"==": l == r, "!=": l != r, ">": l > r,
+                "<": l < r, ">=": l >= r, "<=": l <= r}.get(op, False)
+
+    def _conds_pass(self, spec: dict, xc: dict) -> bool:
+        """A condition group: {match:'all'|'any', conditions:[{left,op,right}]}.
+        No conditions = passes (an `if` with nothing set shouldn't block)."""
+        conds = [c for c in (spec.get("conditions") or []) if c]
+        if not conds:
+            return True
+        results = []
+        for c in conds:
+            left = self.render(str(c.get("left") or ""), xc)
+            right = self.render(str(c.get("right") or ""), xc)
+            results.append(self._cmp(left, c.get("op") or "==", right))
+        return all(results) if (spec.get("match") or "all") == "all" else any(results)
+
     def _num_expr(self, val, xc: dict | None = None, default: float = 0.0) -> float:
         """A number, OR a placeholder expression that renders to one (so a fire/
         wait action can use 'seconds' = [winner_score], [range_leader_score], …).
@@ -1147,10 +1236,21 @@ class Engine:
         s = str(val)
         if "[" in s:
             s = self.render(s, xc or {})
+        s = str(s).strip()
         try:
-            return float(str(s).strip())
+            return float(s)
         except (TypeError, ValueError):
-            return default
+            pass
+        # arithmetic, e.g. "[var:pumps] * 5" — digits and operators ONLY, so
+        # a stray placeholder can never turn into executable code
+        if re.fullmatch(r"[\d\s+\-*/%().]+", s) and any(c.isdigit() for c in s):
+            try:
+                n = eval(compile(s, "<expr>", "eval"), {"__builtins__": {}}, {})
+                if isinstance(n, (int, float)) and math.isfinite(n):
+                    return round(float(n), 3)
+            except Exception:  # noqa: BLE001 — not valid arithmetic
+                pass
+        return default
 
     async def _run_action_block(self, actions, name: str, hdr: str | None = None,
                                 uid=None, who: str | None = None,
@@ -1175,6 +1275,14 @@ class Engine:
         if hdr is None:
             hdr = name
         xc = dict(extra_ctx or {})
+        # A nested block shares its parent's cancel flag (cancelling a run must
+        # stop the whole tree); a top-level block registers a fresh one.
+        run_flag = (extra_ctx or {}).get("_run_flag")
+        own_flag = run_flag is None
+        if own_flag:
+            run_flag = {"cancelled": False, "name": name}
+            self._runs.append(run_flag)
+        xc["_run_flag"] = run_flag
         if who and "user" not in xc:
             xc["user"] = who              # [user]/[mention] = the block's runner
         if uid is not None:
@@ -1189,9 +1297,23 @@ class Engine:
         def R(template, more=None):
             return self.render(template, {**xc, **(more or {})})
 
-        for a in (actions or []):
+        rows = list(actions or [])
+        idx, goto_budget = 0, 0
+        while idx < len(rows):
+            a = rows[idx]
+            idx += 1
             if self._paused or self._end_triggered:
                 break
+            if run_flag is not None and run_flag.get("cancelled"):
+                self._log("bot", f"{name}: cancelled")
+                break
+            # Per-row "only once per session" — keyed by the row's own id, so
+            # the same library block fired from two places keeps its own memory.
+            if (a or {}).get("once"):
+                rid = f"{cmdkey or name}::{a.get('id') or idx}"
+                if rid in self._once_fired:
+                    continue
+                self._once_fired.add(rid)
             # Optional poll-winner gate: an action tied to option N (if_option,
             # 1-based) runs only if the most recent poll's winner was option N.
             cond = (a or {}).get("if_option")
@@ -1205,6 +1327,127 @@ class Engine:
                     continue
             typ = ((a or {}).get("type") or "message").lower()
             try:
+                if typ == "label":
+                    continue                      # a jump target, nothing to do
+                if typ == "goto" or typ == "goto_if":
+                    if typ == "goto_if" and not self._conds_pass(a, xc):
+                        continue
+                    want = self.render(str(a.get("name") or ""), xc).strip().lower()
+                    if not want:
+                        continue
+                    tgt = next((i for i, r in enumerate(rows)
+                                if (r or {}).get("type") in ("label", "group")
+                                and str(r.get("name") or "").strip().lower() == want), -1)
+                    if tgt < 0:
+                        self._log("bot", f"{name}: goto '{want}' — no such label here")
+                        continue
+                    goto_budget += 1
+                    if goto_budget > self._MAX_GOTO:
+                        self._log("error", f"{name}: goto loop cap hit — stopping the block")
+                        break
+                    # a label is just a marker (resume AFTER it); a named
+                    # group is real work, so jumping to it RUNS it
+                    idx = tgt if (rows[tgt] or {}).get("type") == "group" else tgt + 1
+                    continue
+                if typ == "group":
+                    sub = await self._run_action_block(
+                        (a.get("actions") or []), name, hdr, uid, who,
+                        extra_ctx=xc, replace_key=replace_key, cmdkey=cmdkey)
+                    if isinstance(sub, dict):
+                        xc.update(sub)
+                    continue
+                if typ == "random":
+                    # Pick ONE branch. Weights are optional (blank = 1), so an
+                    # even split needs no configuration at all.
+                    opts = [o for o in (a.get("options") or []) if o]
+                    if not opts:
+                        continue
+                    ws = []
+                    for o in opts:
+                        try:
+                            ws.append(max(0.0, float(o.get("weight", 1) or 0)))
+                        except (TypeError, ValueError):
+                            ws.append(1.0)
+                    if sum(ws) <= 0:
+                        ws = [1.0] * len(opts)
+                    pick = random.choices(range(len(opts)), weights=ws, k=1)[0]
+                    xc["picked"] = pick + 1
+                    xc["picked_label"] = opts[pick].get("label") or str(pick + 1)
+                    self._log("roll", f"{name}: random picked {pick + 1}/{len(opts)}"
+                              + (f" ({xc['picked_label']})" if opts[pick].get("label") else ""))
+                    sub = await self._run_action_block(
+                        (opts[pick].get("actions") or []), name, hdr, uid, who,
+                        extra_ctx=xc, replace_key=replace_key, cmdkey=cmdkey)
+                    if isinstance(sub, dict):
+                        xc.update(sub)
+                    continue
+                if typ == "cancel":
+                    # Stop every OTHER running block (this one carries on) —
+                    # the panic button for overlapping events.
+                    n = 0
+                    for f in list(self._runs):
+                        if f is not run_flag and not f.get("cancelled"):
+                            f["cancelled"] = True
+                            n += 1
+                    self._log("bot", f"{name}: cancelled {n} other running block(s)")
+                    continue
+                if typ == "var":
+                    # Set/adjust a variable. Session-wide by default; "user"
+                    # scope keeps a separate value per player.
+                    us = (a.get("scope") or "session") == "user"
+                    nm = self.render(str(a.get("variable") or ""), xc).strip()
+                    if not nm:
+                        continue
+                    op = (a.get("operation") or "set").lower()
+                    if op == "set":
+                        val = self.render(str(a.get("value") or ""), xc)
+                        # a pure expression collapses to its number
+                        n = self._num_expr(val, xc, default=float("nan"))
+                        if n == n:   # not NaN
+                            val = f"{n:g}"
+                        self.var_set(nm, val, uid, us)
+                    else:
+                        cur = self._num_expr(self.var_get(nm, uid, us), xc, 0.0)
+                        amt = self._num_expr(a.get("value"), xc, 0.0)
+                        new = {"inc": cur + amt, "dec": cur - amt,
+                               "mult": cur * amt,
+                               "div": (cur / amt) if amt else cur}.get(op, cur)
+                        self.var_set(nm, f"{round(new, 3):g}", uid, us)
+                    xc[("uvar:" if us else "var:") + nm] = self.var_get(nm, uid, us)
+                    continue
+                if typ == "if":
+                    # Data-driven branch: run `actions` when the conditions pass,
+                    # else `else_actions`. Both are ordinary nested blocks.
+                    passed = self._conds_pass(a, xc)
+                    xc["if_result"] = passed
+                    branch = a.get("actions") if passed else a.get("else_actions")
+                    if branch:
+                        sub = await self._run_action_block(
+                            branch, name, hdr, uid, who,
+                            extra_ctx=xc, replace_key=replace_key, cmdkey=cmdkey)
+                        if isinstance(sub, dict):
+                            xc.update(sub)
+                    continue
+                if typ == "repeat":
+                    # Loop a nested block: a fixed count, or UNTIL conditions
+                    # pass. Always capped — a runaway loop must not wedge the bot.
+                    mode = (a.get("mode") or "fixed").lower()
+                    cap = int(max(0, min(self._MAX_LOOP,
+                                         self._num_expr(a.get("iterations"), xc, 1))))
+                    if mode == "until":
+                        cap = int(max(1, min(self._MAX_LOOP,
+                                             self._num_expr(a.get("max_iterations"), xc,
+                                                            self._MAX_LOOP))))
+                    for i in range(cap):
+                        if mode == "until" and self._conds_pass(a, xc):
+                            break
+                        xc["loop_i"] = i + 1
+                        sub = await self._run_action_block(
+                            (a.get("actions") or []), name, hdr, uid, who,
+                            extra_ctx=xc, replace_key=replace_key, cmdkey=cmdkey)
+                        if isinstance(sub, dict):
+                            xc.update(sub)
+                    continue
                 if typ == "wait":
                     await asyncio.sleep(max(0.0, self._num_expr(a.get("seconds"), xc)))
                     continue
@@ -1565,9 +1808,16 @@ class Engine:
                         self._log("bot", f"{name}: overlay skipped (no virtual camera)")
                         continue
                     try:
-                        r = self.overlay_cb({"media": a.get("media"),
+                        # Overlays are DESIGNED on the Stages tab — this action
+                        # just calls one by id (legacy rows still carry `media`).
+                        r = self.overlay_cb({"id": a.get("overlay"),
+                                             "stage": a.get("stage") or "",
+                                             "ctx": dict(xc),   # [user] & co. for overlay text
+                                             "media": a.get("media"),
                                              "mode": a.get("mode") or "timed",
                                              "seconds": self._num_expr(a.get("seconds"), xc, 5.0),
+                                             "fade_in": self._num_expr(a.get("fade_in"), xc, 0.0),
+                                             "fade_out": self._num_expr(a.get("fade_out"), xc, 0.0),
                                              "pos": a.get("pos") or "center",
                                              "scale": a.get("scale"),
                                              "layer": a.get("layer")})
@@ -1575,6 +1825,65 @@ class Engine:
                             self._log("bot", f"{name}: overlay skipped — {r.get('error')}")
                     except Exception as ex:  # noqa: BLE001
                         self._log("error", f"{name}: overlay failed: {ex}")
+                    continue
+                if typ == "update_overlay_text":
+                    # Retext a live overlay in place — no re-fire, no flicker.
+                    if self.overlay_cb is None:
+                        continue
+                    try:
+                        self.overlay_cb({"id": a.get("overlay"),
+                                         "stage": a.get("stage") or "",
+                                         "ctx": dict(xc),
+                                         "mode": "update",
+                                         "text": a.get("text") or ""})
+                    except Exception as ex:  # noqa: BLE001
+                        self._log("error", f"{name}: update_overlay_text failed: {ex}")
+                    continue
+                if typ in ("start_timer", "stop_timer"):
+                    # Timer overlays are placed on a Stage; these just run or
+                    # halt one. Unknown/absent timer = quiet no-op.
+                    if self.overlay_cb is None:
+                        continue
+                    try:
+                        self.overlay_cb({"id": a.get("overlay"),
+                                         "stage": a.get("stage") or "",
+                                         "ctx": dict(xc),
+                                         "mode": "timer",
+                                         "timer": ("start" if typ == "start_timer" else "stop"),
+                                         "seconds": self._num_expr(a.get("seconds"), xc, 0.0)})
+                    except Exception as ex:  # noqa: BLE001
+                        self._log("error", f"{name}: {typ} failed: {ex}")
+                    continue
+                if typ in ("scene_group", "scene_group_kill"):
+                    # Fire or clear a whole named set of overlays at once.
+                    if self.overlay_cb is None:
+                        continue
+                    try:
+                        self.overlay_cb({"group": a.get("group"),
+                                         "stage": a.get("stage") or "",
+                                         "ctx": dict(xc),
+                                         "mode": ("clear" if typ == "scene_group_kill"
+                                                  else (a.get("mode") or "")),
+                                         "seconds": self._num_expr(a.get("seconds"), xc, 0.0) or None,
+                                         "fade_in": self._num_expr(a.get("fade_in"), xc, 0.0),
+                                         "fade_out": self._num_expr(a.get("fade_out"), xc, 0.0)})
+                    except Exception as ex:  # noqa: BLE001
+                        self._log("error", f"{name}: {typ} failed: {ex}")
+                    continue
+                if typ == "overlay_kill":
+                    # Remove a playing overlay (fading it out when asked).
+                    # Killing one that isn't up is a NO-OP, quietly — the point
+                    # is "make sure it's gone", not "it must have been there".
+                    if self.overlay_cb is None:
+                        continue
+                    try:
+                        self.overlay_cb({"id": a.get("overlay"),
+                                         "stage": a.get("stage") or "",
+                                         "mode": "clear",
+                                         "layer": a.get("layer"),
+                                         "fade_out": self._num_expr(a.get("fade_out"), xc, 0.0)})
+                    except Exception as ex:  # noqa: BLE001
+                        self._log("error", f"{name}: overlay_kill failed: {ex}")
                     continue
                 if typ == "stop_devices":
                     # One-shot: kill any running fire on every device right now.
@@ -1710,6 +2019,12 @@ class Engine:
                 raise
             except Exception as e:  # noqa: BLE001 — one bad action shouldn't kill the block
                 self._log("error", f"{name} action failed: {e}")
+        if own_flag:
+            try:
+                self._runs.remove(run_flag)
+            except ValueError:
+                pass
+        xc.pop("_run_flag", None)
         return xc
 
     async def _run_capev(self, ev: dict, key: str, name: str) -> None:
@@ -1844,7 +2159,9 @@ class Engine:
             repeat = 0.0
         if repeat and repeat < 5:
             repeat = 5.0
-        self._poll = {"def": pd, "opts": opts, "votes": {}, "voters": {}}
+        self._poll = {"def": pd, "opts": opts, "votes": {}, "voters": {},
+                      "title": title, "ends_at": time.monotonic() + duration}
+        self._poll_results = None      # a new poll supersedes the old results
         self._log("bot", f"POLL '{name}' started ({duration:g}s, {len(opts)} options) [{source}]")
         winner_idx = None
         labels = [o.get("label", "") for o in opts]
@@ -1878,6 +2195,10 @@ class Engine:
             lines = [f"{'🏆 ' if i == winner_idx else ''}**{i + 1}.** {o.get('label', '')} — "
                      f"{counts[i]} vote{'s' if counts[i] != 1 else ''}"
                      for i, o in enumerate(opts)]
+            self._poll_results = {"title": title, "at": time.monotonic(),
+                                  "options": [{"label": o.get("label", ""), "votes": counts[i]}
+                                              for i, o in enumerate(opts)],
+                                  "winner": winner_idx, "note": note, "total": total}
             await self._announce_poll(title + " — RESULTS", "\n".join(lines) + f"\n\n{note}")
             self._log("bot", f"POLL '{name}' finished — " +
                       (f"winner: option {winner_idx + 1}" if winner_idx is not None else "no outcome"))
@@ -4235,6 +4556,51 @@ class Engine:
         out.sort(key=lambda u: u["ago"])
         return out
 
+    def poll_view(self) -> dict | None:
+        """What the Poll Viewer overlay should show right now, or None for
+        'nothing to show'. While a poll runs: live tallies + its countdown.
+        After it ends: the results, for `results_secs`, then nothing."""
+        p = self._poll
+        if p:
+            counts = self._poll_counts(p["opts"])
+            return {"phase": "live", "title": p.get("title") or "Poll",
+                    "options": [{"label": o.get("label", ""), "votes": counts[i]}
+                                for i, o in enumerate(p["opts"])],
+                    "total": sum(counts), "winner": None,
+                    "remaining": round(max(0.0, p.get("ends_at", 0) - time.monotonic()), 1)}
+        r = self._poll_results
+        if r:
+            # Ship the AGE, not a verdict: each overlay holds results for its
+            # own configured number of seconds, so two can differ.
+            age = time.monotonic() - r["at"]
+            if age <= 3600:
+                return {"phase": "results", "title": r["title"] + " — RESULTS",
+                        "options": r["options"], "total": r["total"],
+                        "winner": r["winner"], "note": r.get("note", ""),
+                        "results_age": round(age, 1)}
+        return None
+
+    def device_timers(self) -> list[dict]:
+        """Rows for the Device Timer List overlay: the PRIMARY pump first
+        (the active device, when it's a pump), then every other configured
+        device in order. Each row carries its own timer and calibration."""
+        primary = self._pump_id()
+        rows = []
+        for dev in (self.cfg.get("devices") or []):
+            did = dev.get("id")
+            if not did:
+                continue
+            rows.append({"id": did,
+                         "name": (dev.get("name") or dev.get("label")
+                                  or dev.get("host") or did),
+                         "pump": (dev.get("type") or "pump") == "pump",
+                         "primary": did == primary,
+                         "firing": did in self._fires,
+                         "remaining": round(self._remaining(did), 1),
+                         "calibration": dev.get("calibration_seconds_to_100")})
+        rows.sort(key=lambda r: (not r["primary"], not r["pump"]))
+        return rows
+
     def snapshot(self) -> dict:
         fires = {did: round(self._remaining(did), 1) for did in self._fires}
         return {
@@ -4245,6 +4611,8 @@ class Engine:
             "firing": bool(self._fires),
             "remaining": round(self._remaining(self._active_id()), 1),
             "fires": fires,
+            "device_timers": self.device_timers(),
+            "poll": self.poll_view(),
             "active_device": self._active_device_dict(),
             "current_range": self.range_for(self.capacity),
             "bot_connected": self.bot_connected,
