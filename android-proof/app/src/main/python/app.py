@@ -19,6 +19,8 @@ import os
 import signal
 import socket
 import subprocess
+import time
+import urllib.parse
 import uuid
 
 import aiohttp
@@ -26,6 +28,7 @@ from aiohttp import web
 
 import camera
 import config_store
+import stage
 import pumpdirect_import
 import kasa_legacy as kasa
 import device_control
@@ -446,7 +449,8 @@ def _origin_ok(request: web.Request) -> bool:
 
 # Endpoints that reveal or replace secrets: beyond the origin check they need
 # the per-install browser cookie, so another local OS user can't just curl them.
-SENSITIVE_PATHS = {"/api/config/export", "/api/token", "/api/config/import", "/api/pull-updates"}
+SENSITIVE_PATHS = {"/api/config/export", "/api/token", "/api/token/reveal",
+                   "/api/config/import", "/api/pull-updates"}
 
 
 def _web_secret() -> str:
@@ -476,6 +480,31 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     net = net if net is not None else {}
     vcam = camera.VirtualCam(IMAGES_DIR)   # the Chat tab's OBS-style overlay pipe
     net["vcam"] = vcam
+    stg = stage.Stage(IMAGES_DIR)   # /stage overlay registry (phone screen-share path)
+    net["stage"] = stg
+
+    # `overlay` action rows + /api/overlay/fire → every live surface: the
+    # virtual camera when it's running (desktop) AND the /stage registry
+    # (always recorded, so a Stage page shows the current scene the moment it
+    # opens). Ok when either surface is actually watched; quiet skip otherwise.
+    def _overlay_action(spec: dict) -> dict:
+        mode = (spec.get("mode") or "timed")
+        vres = {"ok": False}
+        if mode == "clear" or vcam.status()["running"]:
+            try:
+                vres = vcam.fire_overlay(spec.get("media"), spec.get("seconds"),
+                                         spec.get("pos") or "center", spec.get("scale"),
+                                         mode=mode, layer=spec.get("layer"))
+            except Exception as ex:  # noqa: BLE001
+                vres = {"ok": False, "error": str(ex)}
+        sres = stg.fire(spec.get("media"), spec.get("seconds"),
+                        spec.get("pos") or "center", spec.get("scale"),
+                        mode=mode, layer=spec.get("layer"))
+        if mode == "clear" or vres.get("ok") or (sres.get("ok") and stg.watching()):
+            return {"ok": True}
+        return {"ok": False, "error": sres.get("error") if not sres.get("ok")
+                else "no virtual camera running and no Stage open"}
+    engine.overlay_cb = _overlay_action
 
     @web.middleware
     async def security_mw(request, handler):
@@ -720,6 +749,13 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         cfg = config_store.update({"discord_token": (body.get("token") or "").strip()})
         await botmgr.ensure(cfg["discord_token"], force=True)
         return web.json_response(_public_state(engine, botmgr))
+
+    async def reveal_token(request):
+        """The 👁 next to the token field: hand the saved token back so it can
+        be copied to another install. SENSITIVE_PATHS-gated like token save."""
+        await guard(request)
+        return web.json_response({"ok": True,
+                                  "token": config_store.load().get("discord_token", "")})
 
     async def reconnect(request):
         await guard(request)
@@ -1083,7 +1119,10 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                   "android": os.environ.get("DISCOFLATE_DEFAULT_CONFIG") is not None}
         try:
             async with aiohttp.ClientSession() as s:
-                async with s.get(VERSION_URL, timeout=aiohttp.ClientTimeout(total=10)) as r:
+                # cache-buster: raw.githubusercontent's CDN caches for 5 min per
+                # edge — a unique query string skips it so checks are always live
+                async with s.get(f"{VERSION_URL}?cb={int(time.time())}",
+                                 timeout=aiohttp.ClientTimeout(total=10)) as r:
                     data = json.loads(await r.text())
             latest = int(data.get("versionCode", 0))
             result.update({"latest_version": data.get("version", "?"), "latest_code": latest,
@@ -1145,12 +1184,26 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         return web.json_response(await botmgr.owner_chat(b.get("channel_id"), b.get("text")))
 
     # ---- virtual camera + overlays (Chat tab, video channels) -------------
+    # Android can't host a virtual camera: registering a camera device needs a
+    # system driver (root), and Discord mobile only lists the real cameras.
+    _IS_ANDROID = os.environ.get("DISCOFLATE_DEFAULT_CONFIG") is not None
+    _VCAM_ANDROID = ("virtual camera is desktop-only — Android apps can't register "
+                     "a camera device (needs a system driver / root), so Discord "
+                     "mobile only ever sees the real front/back cameras. Run "
+                     "DiscoFlate on the PC you join video calls from and pick the "
+                     "virtual cam in Discord desktop.")
+
     async def camera_status(request):
         await guard(request)
-        return web.json_response(vcam.status())
+        st = vcam.status()
+        if _IS_ANDROID:
+            st.update({"android": True, "error": _VCAM_ANDROID})
+        return web.json_response(st)
 
     async def camera_start(request):
         await guard(request)
+        if _IS_ANDROID:
+            return web.json_response({"ok": False, "error": _VCAM_ANDROID})
         b = await _json(request)
         res = vcam.start(b.get("device") or 0, b.get("width") or 1280,
                          b.get("height") or 720, b.get("fps") or 30)
@@ -1160,6 +1213,22 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         st = vcam.status()
         return web.json_response({"ok": st["running"], **st})
 
+    async def camera_detect(request):
+        await guard(request)
+        if _IS_ANDROID:
+            return web.json_response({"ok": False, "error": _VCAM_ANDROID})
+        res = await asyncio.get_event_loop().run_in_executor(None, vcam.detect)
+        return web.json_response(res)
+
+    async def camera_preview(request):
+        await guard(request)
+        data = await asyncio.get_event_loop().run_in_executor(None, vcam.preview_jpeg)
+        if not data:
+            return web.json_response({"ok": False, "error": "virtual camera not running"},
+                                     status=404)
+        return web.Response(body=data, content_type="image/jpeg",
+                            headers={"Cache-Control": "no-store"})
+
     async def camera_stop(request):
         await guard(request)
         await asyncio.get_event_loop().run_in_executor(None, vcam.stop)
@@ -1168,15 +1237,125 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     async def overlay_fire(request):
         await guard(request)
         b = await _json(request)
-        return web.json_response(vcam.fire_overlay(
-            b.get("media") or b.get("image"), b.get("seconds"),
-            b.get("pos") or "center", b.get("scale"),
-            mode=b.get("mode") or "timed", layer=b.get("layer")))
+        # same router as `overlay` action rows: vcam when running + the Stage
+        return web.json_response(_overlay_action({
+            "media": b.get("media") or b.get("image"), "seconds": b.get("seconds"),
+            "pos": b.get("pos"), "scale": b.get("scale"),
+            "mode": b.get("mode") or "timed", "layer": b.get("layer")}))
 
     async def overlay_clear(request):
         await guard(request)
         b = await _json(request)
-        return web.json_response(vcam.clear_overlays(b.get("layer")))
+        vcam.clear_overlays(b.get("layer"))
+        stg.clear(b.get("layer"))
+        return web.json_response({"ok": True})
+
+    # ---- the Stage: fullscreen camera + overlays, screen-shared from a phone --
+    async def stage_page(request):
+        with open(os.path.join(WEB_DIR, "stage.html"), "r", encoding="utf-8") as fh:
+            html = fh.read()
+        html = html.replace("<head>", f'<head><meta name="df-auth" content="{secret}">', 1)
+        resp = web.Response(text=html, content_type="text/html")
+        resp.set_cookie("df_auth", secret, httponly=True, samesite="Strict", path="/")
+        return resp
+
+    async def stage_active(request):
+        await guard(request)
+        return web.json_response({"ok": True, "overlays": stg.active()})
+
+    async def stage_done(request):
+        await guard(request)
+        b = await _json(request)
+        return web.json_response(stg.done(b.get("id")))
+
+    async def stage_media(request):
+        await guard(request)
+        name = os.path.basename(request.match_info.get("name") or "")
+        path = os.path.join(IMAGES_DIR, name)
+        if not name or not os.path.isfile(path):
+            raise web.HTTPNotFound()
+        return web.FileResponse(path)
+
+    # ---- Device Sync: pull gameplay + media from another DiscoFlate ----------
+    # Both sides speak this. The SOURCE just answers export (and serves files
+    # via /api/stage/media); the TARGET's server does the pulling, so the
+    # browser never fights CORS. The source must have Remote access enabled
+    # with the target's IP whitelisted (same setup VC Remote uses).
+    async def sync_export(request):
+        await guard(request)
+        cfg = config_store.load()
+        media = []
+        try:
+            for n in sorted(os.listdir(IMAGES_DIR)):
+                p = os.path.join(IMAGES_DIR, n)
+                if os.path.isfile(p):
+                    media.append({"name": n, "size": os.path.getsize(p)})
+        except FileNotFoundError:
+            pass
+        return web.json_response({"ok": True, "version": VERSION,
+                                  "gameplay": _gameplay_export(cfg),
+                                  "gameplay_presets": cfg.get("gameplay_presets") or [],
+                                  "media": media})
+
+    async def sync_pull(request):
+        await guard(request)
+        b = await _json(request)
+        addr = str(b.get("addr") or "").strip().rstrip("/")
+        if not addr:
+            return web.json_response({"ok": False, "error": "no address given"})
+        if not addr.lower().startswith(("http://", "https://")):
+            addr = "http://" + addr
+        if ":" not in addr.split("//", 1)[1]:
+            addr += ":8765"
+        mode = (b.get("mode") or "replace").lower()
+        new = kept = 0
+        try:
+            async with aiohttp.ClientSession() as s:
+                async with s.post(addr + "/api/sync/export", json={},
+                                  timeout=aiohttp.ClientTimeout(total=20)) as r:
+                    if r.status != 200:
+                        return web.json_response({"ok": False, "error":
+                            f"HTTP {r.status} from {addr} — enable Remote access "
+                            "there and whitelist THIS device's IP (and make sure "
+                            "both run a Device-Sync-capable version)"})
+                    data = json.loads(await r.text())
+                if not data.get("ok"):
+                    return web.json_response({"ok": False,
+                                              "error": data.get("error") or "export failed on the other device"})
+                os.makedirs(IMAGES_DIR, exist_ok=True)
+                for m in (data.get("media") or []):
+                    name = os.path.basename(str(m.get("name") or ""))
+                    if not name:
+                        continue
+                    dst = os.path.join(IMAGES_DIR, name)
+                    if os.path.isfile(dst) and os.path.getsize(dst) == m.get("size"):
+                        kept += 1
+                        continue
+                    async with s.get(f"{addr}/api/stage/media/{urllib.parse.quote(name)}",
+                                     timeout=aiohttp.ClientTimeout(total=600)) as fr:
+                        if fr.status != 200:
+                            continue
+                        tmp = dst + ".part"
+                        with open(tmp, "wb") as fh:
+                            async for chunk in fr.content.iter_chunked(1 << 16):
+                                fh.write(chunk)
+                        os.replace(tmp, dst)
+                    new += 1
+        except Exception as e:  # noqa: BLE001 — unreachable host, timeout, bad JSON
+            return web.json_response({"ok": False, "error": f"couldn't sync from {addr}: {e}"})
+        merged = _gameplay_merge(config_store.load(), data.get("gameplay") or {}, mode)
+        inc_p = [p for p in (data.get("gameplay_presets") or [])
+                 if isinstance(p, dict) and (p.get("name") or "").strip()]
+        if inc_p:   # union by name — the other device's copy wins on a clash
+            names = {(p.get("name") or "").strip().lower() for p in inc_p}
+            merged["gameplay_presets"] = inc_p + [
+                p for p in (merged.get("gameplay_presets") or [])
+                if (p.get("name") or "").strip().lower() not in names]
+        cfg = config_store.save(config_store._coerce_numbers(merged))
+        engine.set_config(cfg)
+        return web.json_response({"ok": True, "from_version": data.get("version"),
+                                  "media_new": new, "media_kept": kept,
+                                  "presets": len(inc_p)})
 
     async def upload(request):
         await guard(request)
@@ -1298,6 +1477,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/command-toggle", command_toggle),
         web.post("/api/mode-toggle", mode_toggle),
         web.post("/api/token", set_token),
+        web.post("/api/token/reveal", reveal_token),
         web.post("/api/devices/import", import_pumpdirect),
         web.post("/api/devices/discover", discover),
         web.post("/api/devices/add", add_device),
@@ -1338,8 +1518,16 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/camera/status", camera_status),
         web.post("/api/camera/start", camera_start),
         web.post("/api/camera/stop", camera_stop),
+        web.post("/api/camera/detect", camera_detect),
+        web.get("/api/camera/preview", camera_preview),
         web.post("/api/overlay/fire", overlay_fire),
         web.post("/api/overlay/clear", overlay_clear),
+        web.get("/stage", stage_page),
+        web.post("/api/stage/active", stage_active),
+        web.post("/api/stage/done", stage_done),
+        web.get("/api/stage/media/{name}", stage_media),
+        web.post("/api/sync/export", sync_export),
+        web.post("/api/sync/pull", sync_pull),
         web.post("/api/check-updates", check_updates),
         web.post("/api/pull-updates", pull_updates),
     ])
@@ -1372,18 +1560,8 @@ async def main() -> None:
     engine.winner_button_cb = botmgr.post_winner_button       # Winner Button posts a one-press prize embed
     engine.bonus_round_cb = botmgr.post_bonus_round_embed      # Bonus Round posts a teamwork confirm embed
     engine.owner_say_cb = botmgr.owner_broadcast               # #owner-command rows speak with the owner's skin
-    # `overlay` action rows → the virtual camera; quiet skip when it's not running
-    def _overlay_action(spec: dict) -> dict:
-        if not net.get("vcam"):
-            return {"ok": False, "error": "virtual camera unavailable"}
-        vc = net["vcam"]
-        if (spec.get("mode") or "") != "clear" and not vc.status()["running"]:
-            return {"ok": False, "error": "virtual camera not running"}
-        return vc.fire_overlay(spec.get("media"), spec.get("seconds"),
-                               spec.get("pos") or "center", spec.get("scale"),
-                               mode=spec.get("mode") or "timed",
-                               layer=spec.get("layer"))
-    engine.overlay_cb = _overlay_action
+    # (engine.overlay_cb is wired inside build_app — the overlay router lives
+    # there so /api/overlay/fire and action rows share one path.)
 
     async def _end_session(post_off_message: bool = False):
         # Deactivate. End Sequence calls this WITHOUT the off-message;

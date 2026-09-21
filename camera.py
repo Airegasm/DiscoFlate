@@ -49,6 +49,7 @@ class VirtualCam:
         self._device = 0
         self._size = (1280, 720)
         self._fps = 30
+        self._last = None   # latest composited frame (BGR) for the panel preview
 
     # -- lifecycle ------------------------------------------------------------ #
     def available(self) -> str | None:
@@ -92,6 +93,51 @@ class VirtualCam:
         self._thread = None
         self._info = ""
         return {"ok": True}
+
+    # landscape first, then portrait — drivers snap each request to the nearest
+    # mode the sensor really has, so only genuinely supported sizes come back
+    _PROBE_RES = ((640, 480), (1280, 720), (1920, 1080), (2560, 1440),
+                  (480, 640), (720, 1280), (1080, 1920))
+
+    def detect(self, max_devices: int = 5) -> dict:
+        """Probe attached webcams (device 0..max_devices-1) and the resolutions
+        each one actually delivers. Portrait modes appear only when the
+        hardware truly provides them."""
+        if _CV_ERR:
+            return {"ok": False, "error": _CV_ERR}
+        if self._thread and self._thread.is_alive():
+            return {"ok": False, "error":
+                    "stop the virtual camera first — detecting needs the webcam"}
+        cams = []
+        for idx in range(max_devices):
+            cap = None
+            try:
+                cap = cv2.VideoCapture(idx)
+                ok, _f = cap.read()
+                if not ok:
+                    continue
+                modes = []
+                for w, h in self._PROBE_RES:
+                    cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
+                    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
+                    ok, f = cap.read()   # the frame itself is the ground truth
+                    if not ok or f is None:
+                        continue
+                    got = (int(f.shape[1]), int(f.shape[0]))
+                    if got not in modes:
+                        modes.append(got)
+                if modes:
+                    cams.append({"device": idx,
+                                 "modes": [f"{w}x{h}" for w, h in modes]})
+            except Exception:  # noqa: BLE001 — a broken driver shouldn't kill the scan
+                continue
+            finally:
+                if cap is not None:
+                    try:
+                        cap.release()
+                    except Exception:  # noqa: BLE001
+                        pass
+        return {"ok": True, "cameras": cams}
 
     # -- overlays --------------------------------------------------------------#
     _VIDEO_EXTS = (".mp4", ".webm", ".mov", ".mkv", ".avi", ".m4v")
@@ -245,6 +291,7 @@ class VirtualCam:
                         self._err = "camera read failed (unplugged / in use?)"
                         break
                     frame = self._composite(frame)
+                    self._last = frame   # cap.read() hands out fresh arrays
                     cam.send(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
                     cam.sleep_until_next_frame()
         except Exception as e:  # noqa: BLE001 — surfaced via status()
@@ -256,3 +303,16 @@ class VirtualCam:
                 except Exception:  # noqa: BLE001
                     pass
             self._info = ""
+            self._last = None
+
+    def preview_jpeg(self):
+        """The latest composited frame as JPEG bytes — None when not running.
+        What the panel's live preview polls; exactly what Discord viewers see."""
+        f = self._last
+        if f is None:
+            return None
+        try:
+            ok, buf = cv2.imencode(".jpg", f, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+            return buf.tobytes() if ok else None
+        except Exception:  # noqa: BLE001
+            return None

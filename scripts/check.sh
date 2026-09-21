@@ -7,8 +7,8 @@ PY=./.venv/bin/python
 [ -x "$PY" ] || PY=python3
 
 echo "→ compiling Python modules …"
-$PY -m py_compile app.py config_store.py discord_bot.py engine.py \
-    device_control.py kasa_legacy.py minigames.py pumpdirect_import.py vendors/*.py
+$PY -m py_compile app.py camera.py config_store.py discord_bot.py engine.py \
+    device_control.py kasa_legacy.py minigames.py pumpdirect_import.py stage.py vendors/*.py
 
 echo "→ default_config.json covers every DEFAULTS key …"
 $PY - <<'EOF'

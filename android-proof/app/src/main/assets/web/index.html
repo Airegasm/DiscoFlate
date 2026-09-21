@@ -181,8 +181,9 @@
     <span class="pill" id="mockPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">🧪 MOCK — devices won't fire</span>
     <span class="muted" id="saveStatus" style="transition:opacity .3s;opacity:0;color:var(--accent2)">saved ✓</span>
     <div class="toggles">
+      <button class="bad" id="ctrlStopBtn" onclick="controlStop()" style="padding:7px 14px" title="Pause the whole session: pumps off, events + games cancelled, commands latched until Resume">🛑 Stop</button>
       <span class="tgl"><span class="muted">Mock</span><label class="switch"><input type="checkbox" id="mock"><span class="slider"></span></label></span>
-      <span class="tgl"><span style="font-weight:700;color:var(--text)">ACTIVATION</span><label class="switch"><input type="checkbox" id="listener"><span class="slider"></span></label></span>
+      <span class="tgl"><span style="font-weight:700;color:var(--text)">LIVE</span><label class="switch"><input type="checkbox" id="listener"><span class="slider"></span></label></span>
     </div>
   </header>
 
@@ -224,7 +225,6 @@
       <div class="row" style="align-items:center">
         <div style="flex:1"><span class="muted">⏱ Session uptime:</span> <b id="uptimeVal">0s</b></div>
         <button class="warn" onclick="if(confirm('Reset the session? Capacity → 0%, all cooldowns cleared, timed events re-armed, command-started events reverted.')) act('/api/session-reset')">↺ Session reset</button>
-        <button class="bad" id="ctrlStopBtn" onclick="controlStop()" title="Pause the whole session: pumps off, events + games cancelled, commands latched until Resume">🛑 Stop</button>
       </div>
 
       <!-- operator controls: fire real in-channel actions as the owner -->
@@ -271,6 +271,38 @@
         <button class="ghost" onclick="controlCapacity()">📊 Capacity</button>
         <button class="ghost" onclick="controlCleanup()">🧹 Cleanup</button>
       </div>
+      <div id="overlaySec" style="display:none;border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
+        <div class="row" id="vcamCtrls" style="gap:12px;align-items:flex-end">
+          <b style="white-space:nowrap">🎥 Video channel</b>
+          <label class="field">Camera <select id="vcamDev" style="width:150px" onchange="vcamDevPick()"><option value="0">0</option></select></label>
+          <label class="field">Size <select id="vcamRes" style="width:130px">
+            <option>1280x720</option><option>1920x1080</option><option>640x480</option>
+            <option>720x1280</option><option>1080x1920</option></select></label>
+          <button class="ghost" onclick="vcamDetect()">🔍 Detect</button>
+          <button onclick="vcamStart()">▶ Start virtual cam</button>
+          <button class="ghost" onclick="vcamStop()">⏹ Stop</button>
+          <span class="muted" id="vcamMsg" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
+        </div>
+        <!-- phone: video runs on the PC — this links straight into its panel -->
+        <div id="vcRemote" style="display:none">
+          <div class="row" style="gap:8px;align-items:flex-end">
+            <b style="white-space:nowrap">🖥 VC Remote</b>
+            <label class="field" style="flex:1;min-width:160px">PC address <input id="vcrAddr" placeholder="192.168.1.50:8765"></label>
+            <button onclick="vcRemoteConnect()">🔗 Connect</button>
+          </div>
+          <div class="hint">Video calls run on your <b>PC</b> (virtual camera + Discord desktop). Connect links this app straight into your PC's DiscoFlate panel — its Chat tab is this same cockpit (chat, Custom Buttons, overlay buttons, camera controls), all driving the PC. One-time PC setup: <b>System → Remote access</b> → enable + whitelist this phone's IP. Your phone's <b>back button</b> returns here.</div>
+        </div>
+        <!-- desktop: the composited virtual-cam output, above the chat (what viewers see) -->
+        <img id="vcamPrev" alt="" style="display:none;width:100%;max-width:480px;border-radius:12px;margin-top:8px;border:1px solid var(--line)">
+        <video id="vcamSelf" autoplay muted playsinline style="display:none;width:100%;max-width:480px;border-radius:12px;margin-top:8px;border:1px solid var(--line)"></video>
+        <div class="hint">Start it, then pick the <b>virtual camera</b> as your webcam in Discord's voice &amp; video settings — overlays play on top of your live feed, OBS-style; the preview above shows exactly what viewers see. <b>🔍 Detect</b> lists the sizes each attached camera really supports (portrait included). Windows needs OBS installed once (its virtual-cam driver); Linux needs <code>v4l2loopback</code>. The virtual cam is <b>desktop-only</b>: Android apps can't register a camera device for Discord mobile — on the phone this section becomes <b>🖥 VC Remote</b> instead (or use the 🎭 Stage + screen share for phone-only sessions).</div>
+        <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap" id="overlayBtns"></div>
+        <div class="row" style="gap:8px;margin-top:6px">
+          <button onclick="location.href='/stage'">🎭 Stage</button>
+          <button class="ghost" onclick="openOverlay('ovbOverlay')">🔧 Overlay actions</button>
+          <button class="ghost" onclick="api('/api/overlay/clear',{})">🧹 Clear overlays</button>
+        </div>
+      </div>
       <div class="log" id="chatLog" style="height:440px;margin-top:10px"></div>
       <div class="row" style="gap:8px;margin-top:8px;flex-wrap:nowrap">
         <input id="chatText" placeholder="speak as yourself · !command runs as the Owner · #name fires an Owner Command" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();chatSend();}">
@@ -281,22 +313,6 @@
       <div class="row" style="gap:8px;margin-top:6px">
         <button class="ghost" onclick="openOverlay('btnOverlay')">🔧 Custom Buttons</button>
         <button class="ghost" onclick="openOverlay('ocOverlay')">🔧 Custom Owner Commands</button>
-      </div>
-      <div id="overlaySec" style="display:none;border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
-        <div class="row" style="gap:12px;align-items:flex-end;flex-wrap:nowrap">
-          <b style="white-space:nowrap">🎥 Video channel</b>
-          <label class="field">Camera # <input type="number" id="vcamDev" value="0" min="0" style="width:70px"></label>
-          <label class="field">Size <select id="vcamRes" style="width:130px"><option>1280x720</option><option>1920x1080</option><option>640x480</option></select></label>
-          <button onclick="vcamStart()">▶ Start virtual cam</button>
-          <button class="ghost" onclick="vcamStop()">⏹ Stop</button>
-          <span class="muted" id="vcamMsg" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
-        </div>
-        <div class="hint">Start it, then pick the <b>virtual camera</b> as your webcam in Discord's voice &amp; video settings — overlays play on top of your live feed, OBS-style. Windows needs OBS installed once (its virtual-cam driver); Linux needs <code>v4l2loopback</code>.</div>
-        <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap" id="overlayBtns"></div>
-        <div class="row" style="gap:8px;margin-top:6px">
-          <button class="ghost" onclick="openOverlay('ovbOverlay')">🔧 Overlay actions</button>
-          <button class="ghost" onclick="api('/api/overlay/clear',{})">🧹 Clear overlays</button>
-        </div>
       </div>
       <div class="hint">A live mirror of the selected watched channel — everything the bot sees there, its own posts included. Plain text posts <b>AS YOU</b> — your Owner name + Discord avatar via a webhook (the bot needs <b>Manage Webhooks</b> there; without it, it falls back to a <b>Owner:</b>-prefixed bot post). A <code>!command</code> executes <b>as the Owner</b> (cooldown-exempt, owner-only allowed); <code>#name</code> speaks an Owner Command. Control buttons share the Dashboard's dice/seconds settings.</div>
     </div>
@@ -349,7 +365,10 @@
         <div class="colsec">
           <h3>Connection</h3>
           <label class="field">Bot token
-            <input type="password" id="token" placeholder="paste bot token…">
+            <div class="row" style="gap:6px;flex-wrap:nowrap">
+              <input type="password" id="token" placeholder="paste bot token…" style="flex:1;min-width:0">
+              <button class="ghost" id="tokenEye" title="show the saved token in copyable plaintext" style="padding:8px 10px" onclick="tokenEye()">👁</button>
+            </div>
           </label>
           <div class="row">
             <button onclick="saveToken()">Save &amp; connect</button>
@@ -805,6 +824,15 @@
         <div class="hint" style="max-width:820px;margin-top:10px">⚠️ A whitelisted device gets the <b>full control panel</b> — pumps, config, everything — so only add devices you own. Find a phone's IP in its Wi-Fi settings. Changes apply <b>immediately</b> (no restart). Your local browser here always works regardless of the list.</div>
       </details>
 
+      <details class="help" style="margin-top:16px"><summary><b style="font-size:1.02rem">🔁 Device Sync</b></summary>
+        <div class="hint" style="margin-top:8px;max-width:820px">Pull the <b>gameplay setup + overlay media</b> from your other DiscoFlate install (phone ⇄ PC) so both have the same commands, events, buttons, saved Gameplay Presets and <code>data/images</code> files. On the <b>other</b> device: enable <b>Remote access</b> and whitelist <b>this</b> device's IP. Pulling <b>replaces</b> this device's live gameplay settings (token, devices and network settings are never touched — save a Gameplay Preset first if you want a way back). Files already here with the same name+size are skipped.</div>
+        <div class="row" style="gap:8px;margin-top:10px;align-items:flex-end">
+          <label class="field" style="flex:1;min-width:180px;max-width:320px">Other device's address <input id="syncAddr" placeholder="192.168.1.50:8765"></label>
+          <button onclick="syncPull()">⬇ Pull gameplay + media</button>
+        </div>
+        <div class="row" style="margin-top:6px"><span class="muted" id="syncMsg"></span></div>
+      </details>
+
       <details class="help" style="margin-top:16px"><summary><b style="font-size:1.02rem">🧩 Templates</b></summary>
         <div class="hint" style="margin-top:8px">Reusable snapshots saved from the <b>Commands</b>, <b>Events</b>, <b>Ranges</b> (incl. <b>End</b> / <b>End Sequence</b>), <b>Polls</b>, <b>Competitions</b>, and <b>Capacity Events</b> editors — hit the <b>💾</b> on any row to save it here. <b>＋ Add to Config</b> ports one back into your live setup, renaming to dodge clashes. Templates are stored with your config and included in backup/restore.</div>
         <details class="help" style="margin-top:12px"><summary><b>Commands</b> (<span id="tplCmdCount">0</span>)</summary>
@@ -946,6 +974,11 @@
         <li><b>Plain text posts AS YOU</b> — your Owner name + Discord avatar, via a webhook the bot manages. Without the <b>Manage Webhooks</b> permission it falls back to a <b>Owner:</b>-prefixed bot post (the status line under the send box tells you which mode you're in).</li>
         <li><b><code>!command</code></b> executes <b>as the Owner</b> — cooldown-exempt, owner-only commands allowed, reply lands in that channel. <b><code>#name</code></b> speaks a <b>Custom Owner Command</b> (same owner voice). Enter sends.</li>
         <li><b>Custom Buttons</b> — one-click launchers (fire a !command, start a poll, post a #owner command) managed via 🔧; <b>Overlay actions</b> appear on video channels and play image layers over the virtual camera. Both live in Gameplay Presets, so profiles swap them on the fly.</li>
+        <li><b>Video channels</b> — on desktop your feed shows <b>above the chat</b>: the live virtual-cam output (overlays included — exactly what viewers see), and <b>🔍 Detect</b> probes each attached camera for the sizes it really supports, portrait modes included. On the phone the video section becomes <b>🖥 VC Remote</b>: video calls run on your PC, and Connect links the app straight into the PC's panel (same Chat tab, buttons and camera controls, driving the PC) — enable <b>Remote access</b> + whitelist the phone's IP on the PC first; the phone's back button returns to the local app.</li>
+        <li><b>The virtual camera is desktop-only.</b> Android has no way for an app to register a fake camera — that needs a system driver (root) — and Discord mobile only ever lists the real front/back cameras. On desktop, run DiscoFlate on the PC you join the call from and pick the virtual cam in Discord desktop's video settings.</li>
+        <li><b>🎭 The Stage — overlays from the phone.</b> The Stage (button in the 🎥 section, or <code>/stage</code>) is a fullscreen camera view with the overlay layers composited on top — every <b>overlay action</b> (events, commands, Overlay-action buttons) plays there too, same modes and layers as the virtual cam. Share it into a Discord call with <b>screen share → Share one app → DiscoFlate</b>: viewers see only the Stage (Android 14+ app-share never captures notifications or other apps). Controls on the Stage: 🔄 front/back camera · 🪞 mirror · 🔒 touch-lock (hold 1.5s to unlock) · the buttons auto-hide off-stream; the screen stays awake, and if you switch away mid-call viewers see a frozen frame/⏸ BRB until you're back.</li>
+        <li><b>Stage + Chat side by side:</b> a screen share can't be cropped (the OS captures the whole app), so to keep your buttons: put the phone in <b>split screen</b> — DiscoFlate (on the Stage) in one half, <b>Chrome at</b> <code>http://127.0.0.1:8765</code> (this same panel!) with the Chat tab in the other. App-share captures only the DiscoFlate half, both halves stay live (split screen never pauses the camera), and you press Custom Buttons in Chrome. Any other device on your Wi-Fi works too.</li>
+        <li><b>🔁 Device Sync (System tab)</b> keeps both installs matching: it pulls the whole gameplay setup — commands, events, buttons, saved Gameplay Presets — <b>and the overlay images/videos</b> from your other DiscoFlate over Wi-Fi, so overlays fired on the PC have their files where they play. Enable Remote access + whitelist on the source device first; same-name-same-size files are skipped, and tokens/devices never sync.</li>
         <li><b>The permission line</b> (under the send box) shows the bot's rights in the scoped channel live: 🚫 = it can't post there (Send disables, the missing permissions are listed) · ⚠ no Manage Webhooks = owner posts fall back to the bot-prefixed style · ⚠ no Read Message History = the mirror starts from now (no backfill).</li>
       </ul>
       <h3 style="margin:14px 0 6px">Granting Manage Webhooks on a server the bot already joined</h3>
@@ -1612,18 +1645,124 @@ function renderOcEditor(){
 let overlayButtons = [];
 let chatChanKinds = {};
 function chatIsVideo(){ const cid=$('#chatChan')&&$('#chatChan').value; return chatChanKinds[cid]==='voice'; }
-function chatVideoUi(){ const el=$('#overlaySec'); if(el) el.style.display = chatIsVideo() ? '' : 'none'; }
+function chatVideoUi(){
+  const el=$('#overlaySec'), vid=chatIsVideo();
+  if(el) el.style.display = vid ? '' : 'none';
+  if(!vid){ vcamPreviewStop(); selfViewStop(); return; }
+  vcamSectionInit();
+}
+async function vcamSectionInit(){
+  try{
+    const st = await api('/api/camera/status', {});
+    if(st.android){
+      // phone: no virtual cam possible — video runs on the PC; offer VC Remote
+      const c=$('#vcamCtrls'); if(c) c.style.display='none';
+      const vr=$('#vcRemote');
+      if(vr){ vr.style.display='';
+        const a=$('#vcrAddr');
+        try{ if(a && !a.value) a.value=localStorage.getItem('df_vcr')||''; }catch(e){}
+      }
+      return;
+    }
+    if(st.running){ $('#vcamMsg').textContent='🟢 '+(st.info||'running'); vcamPreviewStart(); }
+  }catch(e){}
+}
+let vcamModes = {};   // device index -> ["WxH", ...] from 🔍 Detect
+async function vcamDetect(){
+  $('#vcamMsg').textContent='detecting cameras… (takes a few seconds)';
+  try{
+    const r = await api('/api/camera/detect', {});
+    if(!r.ok){ $('#vcamMsg').textContent='⚠ '+(r.error||'detect failed'); return; }
+    vcamModes = {};
+    const dev=$('#vcamDev');
+    if(!(r.cameras||[]).length){ $('#vcamMsg').textContent='⚠ no cameras found'; return; }
+    dev.innerHTML='';
+    r.cameras.forEach(c=>{
+      vcamModes[c.device]=c.modes||[];
+      const o=document.createElement('option'); o.value=c.device;
+      o.textContent=`#${c.device} (${(c.modes||[]).length} sizes)`; dev.appendChild(o);
+    });
+    vcamDevPick();
+    $('#vcamMsg').textContent=`found ${r.cameras.length} camera${r.cameras.length===1?'':'s'}`;
+  }catch(e){ $('#vcamMsg').textContent='⚠ '+(e.message||e); }
+}
+function vcamDevPick(){
+  const modes = vcamModes[$('#vcamDev').value];
+  if(!modes || !modes.length) return;   // keep the static list until detected
+  const res=$('#vcamRes'), cur=res.value;
+  res.innerHTML = modes.map(m=>`<option>${m}</option>`).join('');
+  if(modes.includes(cur)) res.value=cur;
+}
 async function vcamStart(){
   const [w,h]=($('#vcamRes').value||'1280x720').split('x').map(Number);
   $('#vcamMsg').textContent='starting…';
   try{
     const r = await api('/api/camera/start', {device:+$('#vcamDev').value||0, width:w, height:h, fps:30});
     $('#vcamMsg').textContent = r.ok ? ('🟢 ' + (r.info||'running') + ' — pick the virtual camera in Discord') : ('⚠ ' + (r.error||'failed'));
+    if(r.ok) vcamPreviewStart();
   }catch(e){ $('#vcamMsg').textContent='⚠ '+(e.message||e); }
 }
 async function vcamStop(){
+  vcamPreviewStop();
   try{ await api('/api/camera/stop', {}); $('#vcamMsg').textContent='stopped'; }
   catch(e){ $('#vcamMsg').textContent='⚠ '+(e.message||e); }
+}
+// live preview of the composited virtual-cam output (desktop, ~1.5fps poll)
+let vcamPrevTimer=null;
+function vcamPreviewStart(){ if(!vcamPrevTimer){ vcamPrevTimer=setInterval(vcamPreviewTick, 700); vcamPreviewTick(); } }
+function vcamPreviewStop(){
+  if(vcamPrevTimer){ clearInterval(vcamPrevTimer); vcamPrevTimer=null; }
+  const im=$('#vcamPrev'); if(im){ im.style.display='none'; if(im.src) URL.revokeObjectURL(im.src); im.removeAttribute('src'); }
+}
+async function vcamPreviewTick(){
+  const im=$('#vcamPrev'); if(!im) return;
+  try{
+    const dfAuth=(document.querySelector('meta[name="df-auth"]')||{}).content||'';
+    const resp = await fetch('/api/camera/preview', {headers:{'X-DiscoFlate-Auth':dfAuth}});
+    if(!resp.ok){ vcamPreviewStop(); return; }   // pipeline stopped
+    const url = URL.createObjectURL(await resp.blob());
+    if(im.src) URL.revokeObjectURL(im.src);
+    im.src=url; im.style.display='';
+  }catch(e){ /* transient — keep the last frame */ }
+}
+// phone self-view: the front camera above the chat (local only — Discord
+// mobile can't take an injected feed, so this is a monitor, not an output)
+let selfStream=null;
+async function selfViewStart(){
+  const v=$('#vcamSelf'); if(!v || selfStream) return;
+  try{
+    selfStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}, audio:false});
+    v.srcObject=selfStream; v.style.display='';
+  }catch(e){ /* no permission / no camera — stay hidden */ }
+}
+function selfViewStop(){
+  const v=$('#vcamSelf');
+  if(selfStream){ selfStream.getTracks().forEach(t=>t.stop()); selfStream=null; }
+  if(v){ v.style.display='none'; v.srcObject=null; }
+}
+// Device Sync: this server pulls gameplay + media from the other install
+async function syncPull(){
+  const a=($('#syncAddr').value||'').trim(), m=$('#syncMsg');
+  if(!a){ m.textContent='enter the other device\'s address first'; return; }
+  try{ localStorage.setItem('df_sync', a); }catch(e){}
+  m.textContent='⏳ pulling gameplay + media… (videos can take a bit)';
+  try{
+    const r = await api('/api/sync/pull', {addr:a});
+    if(!r.ok){ m.textContent='⚠ '+(r.error||'sync failed'); return; }
+    m.textContent=`✅ synced from v${r.from_version}: ${r.media_new} new media file${r.media_new===1?'':'s'} (${r.media_kept} already here), ${r.presets} preset${r.presets===1?'':'s'} — reloading…`;
+    setTimeout(()=>location.reload(), 1600);
+  }catch(e){ m.textContent='⚠ '+(e.message||e); }
+}
+try{ const _sa=document.getElementById('syncAddr');
+     if(_sa && !_sa.value) _sa.value=localStorage.getItem('df_sync')||''; }catch(e){}
+// VC Remote: hand the whole WebView to the PC's DiscoFlate panel
+function vcRemoteConnect(){
+  let a=($('#vcrAddr').value||'').trim();
+  if(!a){ toastMsg('enter your PC\'s address first'); return; }
+  try{ localStorage.setItem('df_vcr', a); }catch(e){}
+  if(!/^https?:\/\//i.test(a)) a='http://'+a;
+  if(!/:\d+/.test(a.split('//')[1]||'')) a=a.replace(/\/+$/,'')+':8765';
+  location.href=a;
 }
 function renderOverlayButtons(){
   const box=$('#overlayBtns'); if(!box) return;
@@ -1668,8 +1807,10 @@ function renderOvbEditor(){
 }
 setInterval(()=>chatPoll(false), 2000);
 document.addEventListener('click', e=>{
-  const b = e.target.closest && e.target.closest('[data-go="chat"]');
-  if(b){ chatChannels().then(()=>chatPoll(true)); }
+  const t = e.target.closest && e.target.closest('.tab-btn');
+  if(!t) return;
+  if(t.dataset.go==='chat'){ chatChannels().then(()=>{ chatPoll(true); chatVideoUi(); }); }
+  else { vcamPreviewStop(); selfViewStop(); }   // leaving Chat: release the camera
 });
 async function controlCapacity(){ ctl('/api/control/capacity', {}); }
 async function controlLeaderboard(){ ctl('/api/control/leaderboard', {}); }
@@ -2002,10 +2143,26 @@ $('#mock').addEventListener('change', async e => {
   await apiRev('/api/mock', {enabled: e.target.checked}); refresh();
 });
 
+// 👁 next to the token: fetch the saved token into the field as copyable
+// plaintext; press again to hide (field re-masks and empties).
+let tokenShown=false;
+async function tokenEye(){
+  const inp=$('#token'), b=$('#tokenEye');
+  if(tokenShown){
+    inp.type='password'; inp.value=''; inp.placeholder='paste bot token…';
+    b.style.background=''; tokenShown=false; return;
+  }
+  try{
+    const r = await api('/api/token/reveal', {});
+    inp.type='text'; inp.value=r.token||''; tokenShown=true;
+    b.style.background='var(--warn)';
+    if(!r.token) inp.placeholder='no token saved yet';
+  }catch(e){ toastMsg('⚠ '+(e.message||e)); }
+}
 async function saveToken(){
   try{
     const s = await api('/api/token', {token: $('#token').value});
-    $('#token').value=''; applyState(s, true);
+    $('#token').value=''; tokenShown=false; $('#token').type='password'; applyState(s, true);
   }catch(e){ toastMsg('⚠ token save failed: '+(e.message||e)); }
 }
 // ---- bot avatar (PFP) ----

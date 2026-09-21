@@ -8,12 +8,18 @@ roll settings, and the capacity-range -> dice table. Written atomically with
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
 import shutil
 import tempfile
 import time
+
+try:
+    import pyaes   # pure-Python AES, already shipped for the Tapo KLAP driver
+except Exception:  # noqa: BLE001 — optional: without it the token stays plaintext
+    pyaes = None
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # DISCOFLATE_DATA_DIR lets tests use a throwaway directory so they can never
@@ -483,6 +489,59 @@ def _factory_seed() -> dict:
         return {}
 
 
+# ---- token at rest: AES-CTR with a per-install key ---------------------------
+# config.json is the file people screenshot, share for help, and hand-edit —
+# the bot token shouldn't sit in it as plaintext. AES-CTR (pyaes) with a random
+# key in data/token.key keeps it opaque there; load() hands callers plaintext.
+# Ceiling: someone with BOTH files in data/ can still recover it — that's
+# inherent to a self-hosted bot that must present the real token to Discord.
+_TOK_PREFIX = "enc1:"
+
+
+def _token_key() -> bytes:
+    path = os.path.join(DATA_DIR, "token.key")
+    try:
+        with open(path, "rb") as fh:
+            k = fh.read()
+        if len(k) == 32:
+            return k
+    except OSError:
+        pass
+    k = os.urandom(32)
+    os.makedirs(DATA_DIR, exist_ok=True)
+    with open(path, "wb") as fh:
+        fh.write(k)
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+    return k
+
+
+def _enc_token(tok: str) -> str:
+    if not tok or pyaes is None or tok.startswith(_TOK_PREFIX):
+        return tok
+    nonce = os.urandom(16)
+    ctr = pyaes.AESModeOfOperationCTR(
+        _token_key(), counter=pyaes.Counter(initial_value=int.from_bytes(nonce, "big")))
+    ct = ctr.encrypt(tok.encode("utf-8"))
+    return _TOK_PREFIX + base64.b64encode(nonce + ct).decode("ascii")
+
+
+def _dec_token(tok: str) -> str:
+    if not tok or not tok.startswith(_TOK_PREFIX):
+        return tok
+    if pyaes is None:
+        return ""
+    try:
+        raw = base64.b64decode(tok[len(_TOK_PREFIX):])
+        ctr = pyaes.AESModeOfOperationCTR(
+            _token_key(), counter=pyaes.Counter(initial_value=int.from_bytes(raw[:16], "big")))
+        return ctr.decrypt(raw[16:]).decode("utf-8")
+    except Exception:  # noqa: BLE001 — corrupt blob / wrong key: treat as no token
+        return ""
+
+
 def load() -> dict:
     global RECOVERED_FROM
     os.makedirs(DATA_DIR, exist_ok=True)
@@ -507,7 +566,9 @@ def load() -> dict:
         stored = {}
     # Migrate the RAW stored config (merging first would inherit DEFAULTS'
     # current config_version and skip every step).
-    return _coerce_numbers(_deep_merge(DEFAULTS, _migrate(stored)))
+    cfg = _coerce_numbers(_deep_merge(DEFAULTS, _migrate(stored)))
+    cfg["discord_token"] = _dec_token(cfg.get("discord_token") or "")
+    return cfg
 
 
 _LEGACY_EMBED_TYPES = {"embed_message", "winner_button", "session_leader_event"}
@@ -1144,10 +1205,14 @@ def save(cfg: dict) -> dict:
     os.makedirs(DATA_DIR, exist_ok=True)
     cfg["config_rev"] = int(cfg.get("config_rev") or 0) + 1
     _rotate_backups()
+    # Only the ON-DISK copy carries the encrypted token; callers keep using
+    # the returned dict with the plaintext one (the bot needs the real thing).
+    disk = dict(cfg)
+    disk["discord_token"] = _enc_token(disk.get("discord_token") or "")
     fd, tmp = tempfile.mkstemp(dir=DATA_DIR, prefix=".config-", suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            json.dump(cfg, fh, indent=2)
+            json.dump(disk, fh, indent=2)
             fh.flush()
             os.fsync(fh.fileno())   # data on disk BEFORE the rename makes it live
         try:

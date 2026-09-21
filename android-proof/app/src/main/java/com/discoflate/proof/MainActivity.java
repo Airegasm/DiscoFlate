@@ -275,6 +275,21 @@ public class MainActivity extends Activity {
             });
         }
 
+        /** Stage view: hold the screen awake while it's live (and release after). */
+        @JavascriptInterface
+        public void keepAwake(final boolean on) {
+            runOnUiThread(() -> {
+                try {
+                    if (on) getWindow().addFlags(
+                            android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                    else getWindow().clearFlags(
+                            android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
+        }
+
         /** Save a config backup to the public Downloads folder (survives uninstall). */
         @JavascriptInterface
         public void saveConfig(final String json) {

@@ -1,0 +1,173 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>DiscoFlate Stage</title>
+<style>
+  html,body{margin:0;height:100%;background:#000;overflow:hidden;
+            font-family:system-ui,-apple-system,sans-serif;
+            -webkit-user-select:none;user-select:none}
+  #cam{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+  #cam.mir{transform:scaleX(-1)}
+  #layers{position:fixed;inset:0;pointer-events:none;z-index:10}
+  .ov{position:absolute;pointer-events:none}
+  #brb{position:fixed;inset:0;background:#0a0d12;display:none;align-items:center;
+       justify-content:center;color:#9fd6a5;font-size:10vw;font-weight:800;
+       letter-spacing:.12em;z-index:40}
+  #msg{position:fixed;top:calc(12px + env(safe-area-inset-top));left:0;right:0;
+       text-align:center;color:#ff7a7a;font-size:14px;z-index:45;
+       text-shadow:0 1px 3px #000;pointer-events:none}
+  #lockhint{position:fixed;top:calc(12px + env(safe-area-inset-top));left:0;right:0;
+       text-align:center;color:rgba(255,255,255,.45);font-size:13px;z-index:61;
+       display:none;pointer-events:none}
+  #bar{position:fixed;left:0;right:0;bottom:0;display:flex;gap:10px;flex-wrap:wrap;
+       justify-content:center;padding:14px 10px calc(14px + env(safe-area-inset-bottom));
+       z-index:50;transition:opacity .25s}
+  #bar.hide{opacity:0;pointer-events:none}
+  #bar button{background:rgba(18,22,30,.85);color:#dfe7f3;
+       border:1px solid rgba(255,255,255,.18);border-radius:12px;
+       padding:12px 16px;font-size:16px;cursor:pointer}
+  #shield{position:fixed;inset:0;z-index:60;display:none}
+</style>
+</head>
+<body>
+<video id="cam" autoplay muted playsinline></video>
+<div id="layers"></div>
+<div id="brb">⏸ BRB</div>
+<div id="msg"></div>
+<div id="lockhint">🔒 locked — hold anywhere for 1.5s to unlock</div>
+<div id="bar">
+  <button onclick="flipCam()">🔄 Camera</button>
+  <button onclick="mirror()">🪞 Mirror</button>
+  <button onclick="lockStage()">🔒 Lock</button>
+  <button onclick="leave()">✕ Exit</button>
+</div>
+<div id="shield"></div>
+<script>
+const $ = s => document.querySelector(s);
+const AUTH = (document.querySelector('meta[name="df-auth"]')||{}).content || '';
+const HDRS = {'Content-Type':'application/json','X-DiscoFlate-Auth':AUTH};
+
+// ---- camera -----------------------------------------------------------
+let facing='user', stream=null, wakeLock=null;
+async function startCam(){
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+  stream=null;
+  try{
+    stream = await navigator.mediaDevices.getUserMedia(
+      {video:{facingMode:facing,width:{ideal:1920},height:{ideal:1920}}, audio:false});
+    $('#cam').srcObject = stream; $('#msg').textContent='';
+  }catch(e){ $('#msg').textContent = 'camera unavailable: '+(e.message||e); }
+}
+function flipCam(){ facing = facing==='user' ? 'environment' : 'user'; startCam(); showBar(); }
+function mirror(){ $('#cam').classList.toggle('mir'); showBar(); }
+function leave(){
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+  if(window.Android && window.Android.keepAwake){ try{ Android.keepAwake(false); }catch(e){} }
+  location.href = '/';
+}
+
+// ---- keep-awake: APK bridge when present, Wake Lock API otherwise ------
+async function grabWake(){ try{ wakeLock = await navigator.wakeLock.request('screen'); }catch(e){} }
+if(window.Android && window.Android.keepAwake){ try{ Android.keepAwake(true); }catch(e){} }
+else grabWake();
+
+// ---- BRB card + camera revive when we come back -------------------------
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden){ $('#brb').style.display='flex'; return; }
+  $('#brb').style.display='none';
+  const t = stream && stream.getVideoTracks()[0];
+  if(!t || t.readyState!=='live') startCam();
+  if(!(window.Android && window.Android.keepAwake)) grabWake();
+});
+
+// ---- touch lock: a shield eats every tap; hold 1.5s to unlock -----------
+let unlockT=null;
+function lockStage(){
+  $('#shield').style.display='block'; $('#bar').classList.add('hide');
+  flashHint();
+}
+function flashHint(){ const h=$('#lockhint'); h.style.display='block';
+  setTimeout(()=>{ h.style.display='none'; }, 2200); }
+$('#shield').addEventListener('pointerdown', ()=>{
+  unlockT = setTimeout(()=>{ unlockT=null;
+    $('#shield').style.display='none'; $('#lockhint').style.display='none'; showBar();
+  }, 1500);
+});
+const cancelUnlock = ()=>{ if(unlockT){ clearTimeout(unlockT); unlockT=null; flashHint(); } };
+$('#shield').addEventListener('pointerup', cancelUnlock);
+$('#shield').addEventListener('pointercancel', cancelUnlock);
+
+// ---- control bar auto-hides so it never shows on stream -----------------
+let barT=null;
+function showBar(){
+  $('#bar').classList.remove('hide');
+  if(barT) clearTimeout(barT);
+  barT = setTimeout(()=>$('#bar').classList.add('hide'), 4000);
+}
+document.addEventListener('pointerdown', e=>{
+  if(e.target.closest('#shield')) return;
+  showBar();
+});
+
+// ---- overlay layers: poll the registry, reconcile the DOM ---------------
+const live = {};   // overlay id -> element
+function place(el, o){
+  const p = o.pos || 'center', M = '3vw';
+  el.style.width = Math.max(5, Math.min(100, (o.scale||0.5)*100)) + 'vw';
+  el.style.left = el.style.right = el.style.top = el.style.bottom = 'auto';
+  if(p.includes('left')) el.style.left = M;
+  else if(p.includes('right')) el.style.right = M;
+  else el.style.left = '50%';
+  if(p.includes('top')) el.style.top = M;
+  else if(p.includes('bottom')) el.style.bottom = M;
+  else el.style.top = '50%';
+  const tx = (p.includes('left')||p.includes('right')) ? '0' : '-50%';
+  const ty = (p.includes('top')||p.includes('bottom')) ? '0' : '-50%';
+  el.style.transform = `translate(${tx},${ty})`;
+}
+async function pollOverlays(){
+  try{
+    const r = await fetch('/api/stage/active', {method:'POST', headers:HDRS, body:'{}'});
+    if(!r.ok) throw new Error('http '+r.status);
+    const j = await r.json();
+    const want = {};
+    (j.overlays||[]).forEach(o=>{
+      want[o.id] = 1;
+      if(live[o.id]) return;
+      const url = '/api/stage/media/' + encodeURIComponent(o.media);
+      let el;
+      if(o.kind === 'video'){
+        el = document.createElement('video');
+        el.autoplay = true; el.muted = true; el.playsInline = true;
+        el.setAttribute('playsinline','');
+        el.loop = o.mode !== 'once';
+        if(o.mode === 'once') el.addEventListener('ended', ()=>{
+          el.remove(); delete live[o.id];
+          fetch('/api/stage/done', {method:'POST', headers:HDRS,
+            body:JSON.stringify({id:o.id})}).catch(()=>{});
+        });
+        el.src = url;
+      } else {
+        el = document.createElement('img');
+        el.src = url;
+      }
+      el.className = 'ov';
+      place(el, o);
+      $('#layers').appendChild(el);   // fire order = z-order (later on top)
+      live[o.id] = el;
+    });
+    Object.keys(live).forEach(id=>{
+      if(!want[id]){ live[id].remove(); delete live[id]; }
+    });
+  }catch(e){ /* transient — keep the current scene */ }
+}
+
+startCam();
+pollOverlays();
+setInterval(pollOverlays, 500);
+showBar();
+</script>
+</body>
+</html>

@@ -8,7 +8,7 @@ PY_DST=android-proof/app/src/main/python
 ASSETS=android-proof/app/src/main/assets
 
 PY_FILES=(app.py camera.py config_store.py device_control.py discord_bot.py engine.py
-          kasa_legacy.py minigames.py pumpdirect_import.py version.json
+          kasa_legacy.py minigames.py pumpdirect_import.py stage.py version.json
           default_preset.json)
 
 check_only=false
@@ -35,6 +35,7 @@ for f in vendors/*.py; do
   copy_or_check "$f" "$PY_DST/$f"
 done
 copy_or_check web/index.html "$ASSETS/web/index.html"
+copy_or_check web/stage.html "$ASSETS/web/stage.html"
 copy_or_check default_config.json "$ASSETS/seed/config.json"
 
 if $check_only; then
