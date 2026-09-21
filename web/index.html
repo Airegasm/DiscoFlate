@@ -1094,12 +1094,20 @@ let allDevices = [];        // device list (for command targeting dropdowns)
 let allCommandKeys = ['roll'];  // 'roll' + custom command names (for range cooldowns)
 
 async function api(path, body){
-  const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'},
+  // belt & braces vs cookie-blocking browsers: the page carries the local-auth
+  // secret in a meta tag and we echo it as a header on every call
+  const dfAuth = (document.querySelector('meta[name="df-auth"]')||{}).content || '';
+  const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json',
+                              'X-DiscoFlate-Auth': dfAuth},
                               body: JSON.stringify(body||{})});
   if(!r.ok){
     // aiohttp error responses are plain text — surface them instead of blowing
     // up in r.json() and leaving the user thinking the call worked.
     const txt = await r.text().catch(()=> '');
+    if(txt.includes('missing local auth'))
+      // stale/restored tab lost its auth cookie — reloading the page re-issues it
+      throw new Error('this tab lost its local session — press Ctrl+R (reload) and try again. '+
+        'If it keeps happening, allow cookies for this address and always use the same one (http://127.0.0.1:8765).');
     throw new Error(txt || (r.status+' '+r.statusText));
   }
   return r.json();

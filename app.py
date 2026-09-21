@@ -487,7 +487,15 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     app = web.Application(middlewares=[security_mw])
 
     async def index(request):
-        resp = web.FileResponse(os.path.join(WEB_DIR, "index.html"))
+        with open(os.path.join(WEB_DIR, "index.html"), "r", encoding="utf-8") as fh:
+            html = fh.read()
+        # The local-auth secret ALSO rides in the page (meta tag): browsers that
+        # block or strip cookies on localhost (Opera's blocker, embedded docks/
+        # webviews) still authorize — api() echoes it as X-DiscoFlate-Auth.
+        # Same trust boundary as the cookie: only a page load that passed the
+        # IP-whitelist + host-pinning gates can obtain it.
+        html = html.replace("<head>", f'<head><meta name="df-auth" content="{secret}">', 1)
+        resp = web.Response(text=html, content_type="text/html")
         resp.set_cookie("df_auth", secret, httponly=True, samesite="Strict", path="/")
         return resp
 

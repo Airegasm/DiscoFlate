@@ -1,6 +1,6 @@
 {
-  "version": "3.44.3",
-  "versionCode": 117,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.44.3/discoflate.apk",
-  "notes": "DiscoFlate v3.44.3 \u2014 embed toggles (each with its own titlebar) for every remaining built-in message: range milestones (image now renders INSIDE the embed card), Activation ON/OFF, the capacity & pump-timer replies, the cooldown notice, the operator Pump broadcast, the auto-report, and one shared toggle for the three session pause/resume messages. Blank titlebars get sensible defaults; placeholders work in titles. Also fixed: the bot's send path used to drop images when posting embeds."
+  "version": "3.44.4",
+  "versionCode": 118,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.44.4/discoflate.apk",
+  "notes": "DiscoFlate v3.44.4 \u2014 local auth no longer depends on browser cookies: the panel page carries the auth secret and sends it as a header on every call, so cookie-blocking browsers (Opera/Opera GX shields, strict privacy modes, embedded docks) can save the token and use sensitive endpoints normally. The old 'missing local auth' failure also now explains the fix (reload the tab) instead of just failing."
 }
