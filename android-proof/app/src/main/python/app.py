@@ -582,13 +582,25 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     # virtual camera when it's running (desktop) AND the /stage registry
     # (always recorded, so a Stage page shows the current scene the moment it
     # opens). Ok when either surface is actually watched; quiet skip otherwise.
+    def _group_hidden(scn, group) -> bool:
+        """A group the operator muted on the Scenes tab: it doesn't come up
+        with the scene and a scene_group action won't play it."""
+        g = str(group or "").strip().lower()
+        if not g:
+            return False
+        return any(str(x).strip().lower() == g
+                   for x in ((scn or {}).get("hidden_groups") or []))
+
     def _scene_group(cfg0, scene_name, group):
         """Every overlay tagged with this group name, in the linked SCENE then
-        the globals — the batch a scene_group action fires or kills."""
+        the globals — the batch a scene_group action fires or kills. A HIDDEN
+        group returns nothing, so firing it is a quiet no-op."""
         g = str(group or "").strip().lower()
         if not g:
             return []
         scn = _find_scene(cfg0, scene_name)
+        if _group_hidden(scn, g):
+            return []
         pool = (list((scn or {}).get("overlays") or [])
                 + list(cfg0.get("scene_globals") or []))
         return [o for o in pool if str(o.get("group") or "").strip().lower() == g]
@@ -605,7 +617,9 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             # two scenes may reuse "intro" for completely different looks.
             items = _scene_group(cfg0, scene_name, spec.get("group"))
             if not items:
-                return {"ok": True, "skipped": f"scene group '{spec.get('group')}' is empty"}
+                why = ("is hidden" if _group_hidden(_find_scene(cfg0, scene_name),
+                                                    spec.get("group")) else "is empty")
+                return {"ok": True, "skipped": f"scene group '{spec.get('group')}' {why}"}
             for it in items:
                 sub = {k: v for k, v in spec.items() if k != "group"}
                 sub["id"] = it.get("id")
@@ -631,7 +645,9 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                     if found is not None:
                         break
             if found is None:
-                return {"ok": True, "skipped": f"overlay {oid} not in any stage"}
+                return {"ok": True, "skipped": f"overlay {oid} not in any scene"}
+            if _group_hidden(_find_scene(cfg0, scene_name), found.get("group")):
+                return {"ok": True, "skipped": f"group '{found.get('group')}' is hidden"}
             lay = found.get("layer") or f"itm-{found.get('id')}"
             if spec.get("mode") == "update":      # update_overlay_text
                 txt = _bake(spec.get("text"), spec.get("ctx"))
@@ -756,7 +772,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             scene = (last.get("scene") or "").strip() or cfg0.get("chat_scene", "")
             scn = _find_scene(cfg0, scene)
             for o in ((scn or {}).get("overlays") or []):
-                if not o.get("visible"):
+                if not o.get("visible") or _group_hidden(scn, o.get("group")):
                     continue
                 lay = o.get("layer") or f"itm-{o.get('id')}"
                 if (o.get("kind") or "media") != "media":
@@ -1549,7 +1565,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         if st["running"] and scene_name:
             scn = _find_scene(config_store.load(), scene_name)
             for o in ((scn or {}).get("overlays") or []):
-                if not o.get("visible"):
+                if not o.get("visible") or _group_hidden(scn, o.get("group")):
                     continue
                 lay = o.get("layer") or f"itm-{o.get('id')}"
                 if (o.get("kind") or "media") != "media":

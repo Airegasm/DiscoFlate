@@ -141,6 +141,15 @@
   /* Stages tab: the design canvas + draggable overlay items */
   #stgCanvas{position:relative;background:#05070b;border:1px solid var(--line);
              border-radius:8px;overflow:hidden;touch-action:none;width:100%;max-width:900px}
+  /* layout grid: a line every 5%, brighter every 25%, brightest on the centre.
+     Percentages (not pixels) so it means the same at any scene resolution. */
+  #stgCanvas.grid{background-image:
+      repeating-linear-gradient(to right,  rgba(255,255,255,.055) 0 1px, transparent 1px 5%),
+      repeating-linear-gradient(to bottom, rgba(255,255,255,.055) 0 1px, transparent 1px 5%),
+      repeating-linear-gradient(to right,  rgba(255,255,255,.14) 0 1px, transparent 1px 25%),
+      repeating-linear-gradient(to bottom, rgba(255,255,255,.14) 0 1px, transparent 1px 25%),
+      linear-gradient(to right,  transparent calc(50% - 1px), rgba(120,190,255,.30) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px)),
+      linear-gradient(to bottom, transparent calc(50% - 1px), rgba(120,190,255,.30) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px))}
   .stgItem{position:absolute;cursor:grab;outline:1px dashed rgba(255,255,255,.28);border-radius:4px}
   .stgItem img,.stgItem video{width:100%;display:block;pointer-events:none;border-radius:4px}
   .stgItem.sel{outline:2px solid var(--accent);z-index:5}
@@ -481,6 +490,7 @@
           <label class="field">Resolution <select id="stgRes" style="width:130px" onchange="stgResPick()">
             <option>1280x720</option><option>1920x1080</option><option>640x480</option>
             <option>720x1280</option><option>1080x1920</option></select></label>
+          <label class="row" style="gap:6px" title="show a 5% grid and snap to it — hold Shift while dragging to place freely"><input type="checkbox" id="stgGridOn" checked style="width:auto" onchange="stgGridToggle()"> grid &amp; snap</label>
         </div>
         <div class="stglists">
           <div class="stgpane">
@@ -490,6 +500,7 @@
           <div class="stgpane">
             <div class="row" style="gap:6px;align-items:center;margin-bottom:7px;flex-wrap:nowrap">
               <select id="stgGroupPick" style="flex:1;min-width:0" onchange="stgSetGroupFilter(this.value)"></select>
+              <button class="ghost pmini" id="stgGroupEye" title="hide/show this whole group" onclick="stgGroupHide()">👁</button>
               <button class="ghost pmini" title="new scene group" onclick="stgGroupNew()">➕</button>
               <button class="ghost pmini" title="rename this group" onclick="stgGroupRename()">✏️</button>
               <button class="ghost pmini" title="delete this group (its overlays stay, untagged)" onclick="stgGroupDelete()">🗑</button>
@@ -497,7 +508,7 @@
             <div class="stglist" id="stgContents"></div>
           </div>
         </div>
-        <div class="hint" style="margin:8px 0 0">Add from the left. The right-hand list shows one <b>scene group</b> at a time — pick it in the dropdown, or <b>All overlays</b>; <b>➕✏️🗑</b> create, rename and delete groups (deleting a group keeps its overlays, just untagged). Anything you add while a group is selected <b>joins that group</b>, and a group fires as a batch from a <code>scene_group</code> action. Rows are the draw stack, front first: <b>👁</b> always-on vs callable, <b>▲▼</b> front/back, <b>⚙</b> options, <b>−</b> remove. On the canvas: drag to place, <b>◢</b> resize, <b>⟳</b> rotate.</div>
+        <div class="hint" style="margin:8px 0 0">Drag on the canvas snaps to the <b>5% grid</b> — hold <b>Shift</b> to place freely, or untick <b>grid &amp; snap</b>. Add from the left. The right-hand list shows one <b>scene group</b> at a time — pick it in the dropdown, or <b>All overlays</b>; <b>➕✏️🗑</b> create, rename and delete groups (deleting a group keeps its overlays, just untagged). Anything you add while a group is selected <b>joins that group</b>, and a group fires as a batch from a <code>scene_group</code> action. Rows are the draw stack, front first: <b>👁</b> always-on vs callable, <b>▲▼</b> front/back, <b>⚙</b> options, <b>−</b> remove. On the canvas: drag to place, <b>◢</b> resize, <b>⟳</b> rotate.</div>
         <div id="stgCanvas" style="margin-top:8px"></div>
         <div id="stgProps" style="margin-top:8px"></div>
       </div>
@@ -1207,6 +1218,7 @@
         <li><b>🛑 cancel</b> — stops every <i>other</i> running action block (events mid-loop, waits, overlapping commands) while this one carries on. The panic button when things overlap.</li>
         <li><b>"once" tickbox</b> — on any action row. That row fires a <b>single time per session</b> and is skipped afterwards, resetting on session reset. Each command keeps its own memory, so the same row in two places doesn't share a count.</li>
         <li><b>🎬 Go Live Options (Dashboard)</b> — flipping <b>LIVE</b> on can open with an <b>intro</b> instead of starting the game. A scene group plays, an optional announcement posts (repeating and refreshing if you want), and <b>commands stay held</b> the whole time — anyone who tries gets a polite standby reply instead of pumping during your pre-show. Timed events wait too. You can allow specific commands through (a signup, say). Set a length, or set it to <b>0</b> and the intro waits until you press <b>🎬 Start now</b> in the Chat tab — that button appears only while an intro is running and shows the countdown. Flipping LIVE off mid-intro cancels it cleanly. <code>[intro_timer]</code> counts down in messages <i>and</i> in Text overlays. The announcement can carry an <b>image</b> (picked from the media library), posted with the first message.</li>
+        <li><b>Hiding a scene group</b> — the <b>👁</b> beside the group dropdown mutes the whole group: it stops coming up with the scene, a <code>scene_group</code> action won't play it, and even firing one of its overlays individually is ignored. Its overlays grey out on the canvas so you can still see where they sit. Click again to bring it back. Handy for building a group you aren't ready to use, or dropping a segment from a show without deleting it.</li>
         <li><b>🎬 Scene groups</b> — there's no separate place to create one: on the <b>Scenes</b> tab, click an overlay and type a name into its <b>Scene group</b> box (say <code>intro</code>) — the group exists the moment an overlay carries that name, and the box autocompletes names you already use. Every group in the scene is listed under the canvas with its overlay count; click one to jump to it. Then <b>scene_group</b> plays the whole set at once and <b>scene_group_kill</b> clears it. Each overlay keeps its own mode, position and fades. Firing a group that has no overlays does nothing at all.</li>
         <li><b>🗂 Layer order</b> — every overlay has a <b>layer order</b> number (with ⬆/⬇ buttons): higher draws on top. Equal numbers keep fire order, so the newest still lands above. The designer canvas stacks the same way it will on the feed.</li>
         <li><b>🔁 repeat</b> — run a nested block <b>a fixed number of times</b> (the count can be a placeholder) or <b>until conditions pass</b>. <code>[loop_i]</code> is the round number. Loops are hard-capped at 500 rounds so a mistake can't wedge the bot.</li>
@@ -2159,8 +2171,10 @@ function overlayLabelById(id){
 function sceneGroupScope(){
   const linked = scenesData.find(s=>s.name===chatSceneName);
   const scene = linked || scenesData[stgCur] || null;
-  const names = s => [...new Set((s?.overlays||[])
-    .map(o=>(o.group||'').trim()).filter(Boolean))].sort();
+  // include groups you have created but not filled yet, or a brand-new
+  // "Intro" is invisible to the Go Live picker until it has an overlay
+  const names = s => [...new Set([...(s?.overlays||[])
+    .map(o=>(o.group||'').trim()).filter(Boolean), ...stgPending])].sort();
   return {scene, sceneName: scene?scene.name:'',
           linked: !!linked, groups: names(scene),
           globals: [...new Set(sceneGlobals.map(o=>(o.group||'').trim()).filter(Boolean))].sort()};
@@ -2224,6 +2238,30 @@ const STG_FONTS={sans:'system-ui,-apple-system,sans-serif',bold:'system-ui,sans-
   serif:'Georgia,serif',mono:'ui-monospace,Menlo,monospace',
   script:'"Segoe Script","Brush Script MT",cursive'};
 function stgStage(){ return scenesData[stgCur]||null; }
+// The Scenes tab remembers what you were working on across reloads: which
+// scene, which group filter, and whether the grid is on. Scenes are stored by
+// NAME because indices shift as scenes are added, removed or renamed.
+function stgRemember(){
+  try{
+    const s=stgStage();
+    localStorage.setItem('df_scene', s ? (s.name||'') : '');
+    localStorage.setItem('df_scene_group', stgGroupFilter||'');
+  }catch(e){}
+}
+function stgRestore(){
+  let want='', grp='';
+  try{ want=localStorage.getItem('df_scene')||''; grp=localStorage.getItem('df_scene_group')||''; }catch(e){}
+  if(want){
+    const i=scenesData.findIndex(s=>(s.name||'')===want);
+    if(i>=0) stgCur=i;
+  }
+  if(stgCur<0 && scenesData.length) stgCur=0;
+  if(stgCur>=scenesData.length) stgCur=scenesData.length-1;
+  // only restore a group that still exists in this scene
+  const s=stgStage();
+  const has=(s?.overlays||[]).some(o=>(o.group||'').trim()===grp);
+  stgGroupFilter = (grp && (has || grp===STG_UNGROUPED)) ? grp : '';
+}
 function renderStages(){
   const sel=$('#scnSel'); if(!sel) return;
   sel.innerHTML = scenesData.map((s,i)=>`<option value="${i}" ${i===stgCur?'selected':''}>${esc(s.name||('Stage '+(i+1)))}</option>`).join('')
@@ -2242,6 +2280,7 @@ function renderStgCanvas(){
   const s=stgStage(), cv=$('#stgCanvas'); if(!cv) return;
   if(!s){ cv.innerHTML=''; return; }
   cv.style.aspectRatio = `${s.width||1280} / ${s.height||720}`;
+  cv.classList.toggle('grid', ($('#stgGridOn')||{checked:true}).checked);
   const CH = cv.clientHeight || 400;   // px per 1.0 of `size`
   cv.innerHTML = (s.overlays||[]).map(o=>{
     let inner='', box='';
@@ -2313,13 +2352,14 @@ function renderStgCanvas(){
     }
     const rot = o.rot ? `transform:rotate(${o.rot}deg);transform-origin:center center;` : '';
     const fl  = o.flash ? `animation:dfflash ${(+o.flash||1)*2}s steps(1,end) infinite;` : '';
+    const hid = stgGroupHidden(o.group) ? 'opacity:.18;filter:grayscale(1);' : '';
     const handles = o.id===scnSelId
       ? '<span class="stgRot">⟳</span>' +
         ['nw','n','ne','w','e','sw','s','se'].map(h=>`<span class="stgH" data-h="${h}"></span>`).join('')
       : '';
     return `<div class="stgItem${o.id===scnSelId?' sel':''}" data-id="${esc(o.id)}" `+
            `style="left:${(o.x*100).toFixed(2)}%;top:${(o.y*100).toFixed(2)}%;${box};${rot}${fl}`+
-           `z-index:${Math.round(+o.z||0)+10};opacity:${Math.max(0,Math.min(100,o.opacity??100))/100}">`+
+           `z-index:${Math.round(+o.z||0)+10};opacity:${Math.max(0,Math.min(100,o.opacity??100))/100};${hid}">`+
            `${inner}${handles}</div>`;
   }).join('');
 }
@@ -2352,7 +2392,11 @@ let stgDrag=null;
   cv.addEventListener('pointermove', e=>{
     if(!stgDrag) return;
     const {o,el,R,handle,rot,box}=stgDrag;
-    const fx=(e.clientX-R.left)/R.width, fy=(e.clientY-R.top)/R.height;
+    // snap to the 5% grid; hold SHIFT to place freely
+    const snapOn = ($('#stgGridOn')||{checked:true}).checked && !e.shiftKey;
+    const SNAP = 0.05;
+    const q = v => snapOn ? Math.round(v/SNAP)*SNAP : v;
+    const fx=q((e.clientX-R.left)/R.width), fy=q((e.clientY-R.top)/R.height);
     if(rot){
       let deg = Math.atan2(fy-stgDrag.cy, fx-stgDrag.cx)*180/Math.PI + 90;
       if(e.shiftKey) deg = Math.round(deg/15)*15;          // shift snaps to 15°
@@ -2388,8 +2432,8 @@ let stgDrag=null;
       renderStgCanvas();
       return;
     }
-    o.x=Math.max(0,Math.min(0.98,fx-stgDrag.dx));
-    o.y=Math.max(0,Math.min(0.98,fy-stgDrag.dy));
+    o.x=Math.max(0,Math.min(0.98, snapOn ? Math.round((fx-stgDrag.dx)/SNAP)*SNAP : fx-stgDrag.dx));
+    o.y=Math.max(0,Math.min(0.98, snapOn ? Math.round((fy-stgDrag.dy)/SNAP)*SNAP : fy-stgDrag.dy));
     if(el){ el.style.left=(o.x*100)+'%'; el.style.top=(o.y*100)+'%'; }
   });
   const up=()=>{ if(stgDrag){ stgDrag=null; renderStgCanvas(); renderStgProps(); scheduleSave(); } };
@@ -2429,7 +2473,7 @@ const STG_UNGROUPED='\u0000none';
 function stgApplyGroup(o){
   if(stgGroupFilter && stgGroupFilter!==STG_UNGROUPED) o.group=stgGroupFilter;
 }
-function stgSetGroupFilter(v){ stgGroupFilter=v; renderStgContents(); }
+function stgSetGroupFilter(v){ stgGroupFilter=v; stgRemember(); renderStgContents(); }
 // Groups are normally DERIVED from the overlays that carry them — but a group
 // you have just created has none yet. `stgPending` keeps those alive so a new
 // empty group can be selected and filled, instead of vanishing on creation.
@@ -2448,16 +2492,44 @@ function renderStgGroupPick(){
   const un=all.filter(o=>!(o.group||'').trim()).length;
   sel.innerHTML =
     `<option value="">📋 All overlays (${all.length})</option>`+
-    groups.map(g=>`<option value="${esc(g)}" ${stgGroupFilter===g?'selected':''}>🎬 ${esc(g)} (${all.filter(o=>(o.group||'').trim()===g).length})</option>`).join('')+
+    groups.map(g=>`<option value="${esc(g)}" ${stgGroupFilter===g?'selected':''}>${stgGroupHidden(g)?'🚫':'🎬'} ${esc(g)} (${all.filter(o=>(o.group||'').trim()===g).length})${stgGroupHidden(g)?' — hidden':''}</option>`).join('')+
     `<option value="${STG_UNGROUPED}" ${stgGroupFilter===STG_UNGROUPED?'selected':''}>— ungrouped (${un}) —</option>`;
   sel.value = stgGroupFilter;
+  const eye=$('#stgGroupEye');
+  if(eye){
+    const real = stgGroupFilter && stgGroupFilter!==STG_UNGROUPED;
+    const hid  = real && stgGroupHidden(stgGroupFilter);
+    eye.textContent = hid ? '🚫' : '👁';
+    eye.style.opacity = real ? 1 : .35;
+    eye.title = !real ? 'pick a group to hide it'
+              : hid ? `"${stgGroupFilter}" is hidden — click to show`
+                    : `hide "${stgGroupFilter}" (it stops playing)`;
+  }
+}
+// A hidden group is skipped everywhere: it doesn't come up with the scene and
+// a scene_group action won't play it. Stored per scene so it survives a reload.
+function stgHiddenGroups(){
+  const s=stgStage(); if(!s) return [];
+  if(!Array.isArray(s.hidden_groups)) s.hidden_groups=[];
+  return s.hidden_groups;
+}
+function stgGroupHidden(name){
+  return stgHiddenGroups().some(g=>String(g).trim().toLowerCase()===String(name||'').trim().toLowerCase());
+}
+function stgGroupHide(){
+  const s=stgStage(); if(!s) return;
+  if(!stgGroupFilter || stgGroupFilter===STG_UNGROUPED){ toastMsg('pick a group to hide'); return; }
+  const h=stgHiddenGroups(), i=h.findIndex(g=>String(g).trim().toLowerCase()===stgGroupFilter.toLowerCase());
+  if(i>=0) h.splice(i,1); else h.push(stgGroupFilter);
+  renderStgGroupPick(); renderStgContents(); renderStgCanvas(); scheduleSave();
+  toastMsg(i>=0 ? `👁 "${stgGroupFilter}" shown` : `🚫 "${stgGroupFilter}" hidden — it won't play`);
 }
 function stgGroupNew(){
   const s=stgStage(); if(!s){ toastMsg('create a scene first'); return; }
   const n=(prompt('New scene group name:','')||'').trim(); if(!n) return;
   stgPending.add(n);                         // empty for now — keep it listed
   stgGroupFilter=n;                          // anything added now joins it
-  renderStgGroupPick(); renderStgContents(); renderStgGroups();
+  renderStgGroupPick(); renderStgContents(); renderStgGroups(); goliveUi();
   toastMsg(`🎬 "${n}" — overlays you add now join this group`);
 }
 function stgGroupRename(){
@@ -2467,7 +2539,7 @@ function stgGroupRename(){
   (s.overlays||[]).forEach(o=>{ if((o.group||'').trim()===stgGroupFilter) o.group=n; });
   if(stgPending.delete(stgGroupFilter)) stgPending.add(n);
   stgGroupFilter=n;
-  renderStgGroupPick(); renderStgContents(); renderStgGroups(); scheduleSave();
+  renderStgGroupPick(); renderStgContents(); renderStgGroups(); goliveUi(); scheduleSave();
 }
 function stgGroupDelete(){
   const s=stgStage(); if(!s||!stgGroupFilter||stgGroupFilter===STG_UNGROUPED){
@@ -2477,7 +2549,7 @@ function stgGroupDelete(){
   (s.overlays||[]).forEach(o=>{ if((o.group||'').trim()===stgGroupFilter) o.group=''; });
   stgPending.delete(stgGroupFilter);
   stgGroupFilter='';
-  renderStgGroupPick(); renderStgContents(); renderStgGroups(); scheduleSave();
+  renderStgGroupPick(); renderStgContents(); renderStgGroups(); goliveUi(); scheduleSave();
 }
 function renderStgContents(){
   const box=$('#stgContents'); if(!box) return;
@@ -2503,7 +2575,7 @@ function renderStgContents(){
         `<button class="ghost" style="opacity:${o.visible?1:.4}" title="${o.visible?'always on — click to make it callable instead':'callable — click to make it always on'}" onclick="event.stopPropagation();stgItemVis('${esc(o.id)}')">${o.visible?'👁':'🚫'}</button>`+
         `<span>${ico(o.kind)}</span>`+
         `<span class="nm">${esc(String(nm).split('\n')[0].slice(0,34))}</span>`+
-        ((o.group||'').trim()?`<span class="tag">🎬 ${esc(o.group.trim())}</span>`:'')+
+        ((o.group||'').trim()?`<span class="tag">${stgGroupHidden(o.group)?'🚫':'🎬'} ${esc(o.group.trim())}</span>`:'')+
         (+o.delay?`<span class="tag" title="appears ${o.delay}s after the group fires">+${o.delay}s</span>`:'')+
 
         `<button class="ghost" title="move up (draws in front)" onclick="event.stopPropagation();stgReorder('${esc(o.id)}',1)">▲</button>`+
@@ -2675,6 +2747,17 @@ function renderStgProps(){
     sect('Content', content)+ sect('Style', style)+
     sect('Placement &amp; motion', place)+ sect('Firing', fire)+`</div>`;
 }
+function stgGridToggle(){
+  const cv=$('#stgCanvas'), on=($('#stgGridOn')||{checked:true}).checked;
+  if(cv) cv.classList.toggle('grid', on);
+  try{ localStorage.setItem('df_scene_grid', on?'1':'0'); }catch(e){}
+}
+(function(){   // restore the grid preference before the first render
+  try{
+    const v=localStorage.getItem('df_scene_grid');
+    if(v!==null){ const el=document.getElementById('stgGridOn'); if(el) el.checked = v==='1'; }
+  }catch(e){}
+})();
 function stgLayer(dir){
   const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===scnSelId); if(!o) return;
   o.z=(+o.z||0)+dir; renderStgCanvas(); renderStgProps(); scheduleSave();
@@ -2684,7 +2767,9 @@ function stgItemSet(k,v){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id
   if(k==='fade_in'||k==='fade_out') v = Math.max(0, +v||0);  // plain seconds
   if(k==='opacity') v = Math.max(0, Math.min(100, +v||0));   // percent, as stored
   if(k==='h') v = (v===null||v==='') ? null : Math.max(0.02, (+v||0)/100);
-  o[k]=v; renderStgCanvas(); renderStgGroups(); renderStgContents(); renderStgProps(); sceneButtonsRefresh(); scheduleSave(); }
+  o[k]=v; renderStgCanvas(); renderStgGroups(); renderStgContents(); renderStgProps();
+  if(k==='group') goliveUi();
+  sceneButtonsRefresh(); scheduleSave(); }
 function stgItemDup(){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===scnSelId); if(!o) return;
   const c=JSON.parse(JSON.stringify(o)); c.id=stgNewItem('x').id;
   c.x=Math.min(0.95,o.x+0.04); c.y=Math.min(0.95,o.y+0.04);
@@ -2692,7 +2777,7 @@ function stgItemDup(){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===
 function stgItemDel(){ const s=stgStage(); if(!s) return;
   s.overlays=(s.overlays||[]).filter(x=>x.id!==scnSelId); scnSelId=null;
   renderStgCanvas(); renderStgGroups(); renderStgContents(); renderStgProps(); sceneButtonsRefresh(); scheduleSave(); }
-function stgPick(i){ stgCur=i; scnSelId=null; stgGroupFilter=''; stgPending.clear(); renderStages(); }
+function stgPick(i){ stgCur=i; scnSelId=null; stgGroupFilter=''; stgPending.clear(); stgRemember(); renderStages(); }
 // "or default if no scenes": overlay options always have a stage to live in
 function stgEnsureDefault(){
   if(scenesData.length) return false;
@@ -5538,8 +5623,7 @@ function applyState(st, full){
     chatIsoChan = st.chat_isolate_channel||'';
     if($('#chatIso') && document.activeElement!==$('#chatIso')) $('#chatIso').checked = !!st.chat_isolate;
     gpPresetNames = (st.gameplay_presets||[]).map(p=>p.name).filter(Boolean);
-    if(stgCur >= scenesData.length) stgCur = scenesData.length-1;
-    if(stgCur < 0 && scenesData.length) stgCur = 0;
+    stgRestore();
     renderStages(); renderStgGlobals();
     renderCommands();
     renderAlwaysOn();

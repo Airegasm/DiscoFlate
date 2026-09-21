@@ -362,7 +362,8 @@ DEFAULTS = {
     "broadcasts": [],
 
     # Scenes (Scenes tab) — OBS-style overlay designs. Each:
-    #   {name, preset, width, height, overlays: [{id, label, kind, media,
+    #   {name, preset, width, height, hidden_groups: [names muted on the tab],
+    #    overlays: [{id, label, kind, media,
     #    x, y, w, z, group, mode, seconds, layer, visible}]}
     # kind: media | text | timer | capacity_gauge | device_timers | poll_viewer.
     # x/y/w are FRACTIONS of the scene frame (0..1); z is draw order; `group`

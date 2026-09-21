@@ -1,6 +1,6 @@
 {
-  "version": "3.55.2",
-  "versionCode": 135,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.55.2/discoflate-v3.55.2.apk",
-  "notes": "DiscoFlate v3.55.2 — fixes adding overlays on the Scenes tab, which has been broken since 3.51.0. A block of property-panel markup had been spliced into the function that builds a new overlay, so creating ANY overlay — media, text, timer, gauge, poll viewer — threw an error and silently did nothing. The panel's chroma-key controls are unaffected; this only removes the stray copy that ended up in the wrong place."
+  "version": "3.56.0",
+  "versionCode": 136,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.56.0/discoflate-v3.56.0.apk",
+  "notes": "DiscoFlate v3.56.0 — the Scenes canvas gets a GRID: a line every 5%, brighter every 25%, with centre lines, and dragging snaps to it. Hold SHIFT to place freely, or untick grid & snap. New 👁 button beside the group dropdown HIDES A WHOLE SCENE GROUP — it stops coming up with the scene, a scene_group action won't play it, and firing one of its overlays individually is ignored too; its overlays grey out on the canvas so you can still see the layout. The Scenes tab now REMEMBERS which scene and group you were working on across refreshes (by name, so it survives reordering), along with your grid preference. Fixes a newly-created scene group not appearing in the Go Live intro dropdown, which also now refreshes the moment groups change instead of waiting for the next poll."
 }
