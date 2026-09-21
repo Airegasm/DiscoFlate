@@ -22,9 +22,10 @@ import time
 
 try:
     import cv2
+    import numpy as np
     _CV_ERR = None
 except Exception as e:  # noqa: BLE001 — missing/broken wheel
-    cv2 = None
+    cv2 = np = None
     _CV_ERR = f"opencv not available ({e.__class__.__name__})"
 
 try:
@@ -51,6 +52,10 @@ class VirtualCam:
         self._size = (1280, 720)
         self._fps = 30
         self._last = None   # latest composited frame (BGR) for the panel preview
+        # OFF by default: we send the TRUE image, so remote viewers see you (and
+        # overlay text) correctly. Discord mirrors your own self-view preview on
+        # its end — that's cosmetic and local, not what viewers get.
+        self._mirror = False
         self.state_cb = None       # () -> {"capacity","firing","remaining"} for widgets
         self._state = {}
         self._state_at = 0.0
@@ -66,9 +71,17 @@ class VirtualCam:
                 "error": ("" if running else (self.available() or self._err or "")),
                 "info": self._info, "device": self._device,
                 "width": self._size[0], "height": self._size[1], "fps": self._fps,
-                "overlays": len(self._overlays)}
+                "mirror": self._mirror, "overlays": len(self._overlays)}
 
-    def start(self, device=0, width=1280, height=720, fps=30) -> dict:
+    def set_mirror(self, on: bool) -> dict:
+        """Flip the whole outgoing frame horizontally (live) — camera AND
+        overlays. Exists to cancel Discord's un-disableable self-view mirror:
+        ON = your own Discord tile reads correctly but viewers see everything
+        mirrored; OFF (default) = viewers get the true image."""
+        self._mirror = bool(on)
+        return {"ok": True, "mirror": self._mirror}
+
+    def start(self, device=0, width=1280, height=720, fps=30, mirror=None) -> dict:
         why = self.available()
         if why:
             return {"ok": False, "error":
@@ -82,6 +95,8 @@ class VirtualCam:
             self._fps = max(5, min(60, int(fps or 30)))
         except (TypeError, ValueError):
             return {"ok": False, "error": "bad camera parameters"}
+        if mirror is not None:
+            self._mirror = bool(mirror)
         self._stop.clear()
         self._err = None
         self._thread = threading.Thread(target=self._run, daemon=True,
@@ -155,15 +170,22 @@ class VirtualCam:
                     o["dead"] = True
         return {"ok": True}
 
-    def add_widget(self, widget: str, x=None, y=None, w=None,
-                   layer: str | None = None) -> dict:
-        """A live game widget layer (capacity_gauge / pump_timer), drawn each
-        frame from state_cb. Named layers replace like media overlays."""
-        key = (str(layer or "").strip().lower()) or None
-        ent = {"kind": "widget", "widget": str(widget or ""), "layer": key,
-               "dead": False, "until": None, "pos": "center",
-               "scale": max(0.05, min(1.0, float(w or 0.35))),
-               "x": x, "y": y}
+    def add_item(self, item: dict, seconds=None, layer: str | None = None) -> dict:
+        """A DRAWN overlay layer — text / capacity_gauge / pump_timer — rendered
+        fresh each frame from `item` (its full style: color/size/font/bg/rot/
+        orient/flash) plus live game state. Named layers replace, like media."""
+        item = dict(item or {})
+        key = (str(layer or item.get("layer") or "").strip().lower()) or None
+        until = None
+        if seconds:
+            try:
+                until = time.monotonic() + max(0.2, float(seconds))
+            except (TypeError, ValueError):
+                until = None
+        ent = {"kind": "draw", "item": item, "layer": key, "dead": False,
+               "until": until, "pos": str(item.get("pos") or "center").lower(),
+               "x": item.get("x"), "y": item.get("y"),
+               "rot": item.get("rot"), "flash": item.get("flash")}
         with self._lock:
             if key:
                 for o in self._overlays:
@@ -172,9 +194,15 @@ class VirtualCam:
             self._overlays.append(ent)
         return {"ok": True}
 
+    def add_widget(self, widget: str, x=None, y=None, w=None,
+                   layer: str | None = None) -> dict:
+        """Back-compat shim for the plain gauge/timer call."""
+        return self.add_item({"kind": str(widget or ""), "x": x, "y": y,
+                              "w": w or 0.35}, layer=layer)
+
     def fire_overlay(self, media: str, seconds=5.0, pos: str = "center",
                      scale=0.5, mode: str = "timed", layer: str | None = None,
-                     x=None, y=None) -> dict:
+                     x=None, y=None, rot=None, flash=None, h=None) -> dict:
         """Show a MEDIA layer over the camera. `media` = an image (PNG alpha
         welcome) or a video file from data/images (or an absolute path).
         mode: "timed"  = shown/looping for `seconds`
@@ -182,7 +210,9 @@ class VirtualCam:
               "once"   = a video plays through once, then removes itself
               "clear"  = remove the named layer (or ALL when no layer given)
         `layer` names the slot — firing the same layer name REPLACES it (scene
-        building). pos/scale as before (anchor + fraction of frame width)."""
+        building). pos/scale as before (anchor + fraction of frame width);
+        x/y are stage-designer fractions that override pos, `rot` spins the
+        layer, `flash` blinks it (seconds visible = seconds hidden)."""
         why = self.available()
         if why:
             return {"ok": False, "error": why}
@@ -202,6 +232,7 @@ class VirtualCam:
             secs, sc = 5.0, 0.5
         entry = {"layer": key, "pos": str(pos or "center").lower(), "scale": sc,
                  "dead": False, "x": x, "y": y,   # fractional coords beat `pos`
+                 "rot": rot, "flash": flash, "h": h,
                  "until": (time.monotonic() + secs) if mode == "timed" else None}
         if os.path.splitext(path)[1].lower() in self._VIDEO_EXTS:
             cap = cv2.VideoCapture(path)
@@ -257,55 +288,153 @@ class VirtualCam:
             self._state_at = now
         return self._state
 
-    def _draw_widget(self, frame, o, W: int, H: int) -> None:
+    # ---- sprite rendering: text / gauge / timer, all as RGBA layers -------- #
+    _FONTS = {"sans": 0, "bold": 1, "serif": 3, "mono": 4, "script": 6}
+    # cv2: 0=SIMPLEX 1=PLAIN 3=COMPLEX 4=TRIPLEX 6=SCRIPT_SIMPLEX
+
+    @staticmethod
+    def _bgr(color, default=(255, 255, 255)):
+        """#RRGGBB (or #RGB) -> BGR tuple. Blank/bad -> default."""
+        s = str(color or "").strip().lstrip("#")
+        if len(s) == 3:
+            s = "".join(c * 2 for c in s)
+        if len(s) != 6:
+            return default
+        try:
+            return (int(s[4:6], 16), int(s[2:4], 16), int(s[0:2], 16))
+        except ValueError:
+            return default
+
+    def _text_sprite(self, txt: str, item: dict, H: int):
+        """An RGBA sprite of `txt` honouring color / size / font / bg."""
+        txt = str(txt if txt is not None else "")
+        if not txt:
+            return None
+        font = self._FONTS.get(str(item.get("font") or "sans").lower(), 0)
+        try:
+            size = max(0.01, min(0.9, float(item.get("size") or 0.06)))
+        except (TypeError, ValueError):
+            size = 0.06
+        px = max(10, int(H * size))                 # target cap height in pixels
+        scale = px / 22.0                           # Hershey units -> ~px
+        thick = max(1, int(round(scale * 1.6)))
+        (tw, th), base = cv2.getTextSize(txt, font, scale, thick)
+        pad = max(4, int(px * 0.28))
+        w, h = tw + pad * 2, th + base + pad * 2
+        sp = np.zeros((h, w, 4), np.uint8)
+        bg = str(item.get("bg") or "").strip()
+        if bg:                                      # blank bg = transparent
+            sp[:, :, :3] = self._bgr(bg, (0, 0, 0))
+            sp[:, :, 3] = 255
+        org = (pad, pad + th)
+        col = self._bgr(item.get("color"), (255, 255, 255))
+        if not bg:   # unbacked text gets a dark outline so it reads on any feed
+            cv2.putText(sp, txt, org, font, scale, (0, 0, 0, 255),
+                        thick + max(2, thick), cv2.LINE_AA)
+        cv2.putText(sp, txt, org, font, scale, (*col, 255), thick, cv2.LINE_AA)
+        return sp
+
+    def _gauge_sprite(self, item: dict, W: int, H: int, pct: float):
+        """Capacity bar as an RGBA sprite; horizontal or vertical."""
+        vert = str(item.get("orient") or "h").lower().startswith("v")
+        try:
+            length_f = max(0.04, min(1.0, float(item.get("w") or 0.35)))
+            thick_f = max(0.01, min(0.6, float(item.get("size") or 0.05)))
+        except (TypeError, ValueError):
+            length_f, thick_f = 0.35, 0.05
+        length = max(24, int((H if vert else W) * length_f))
+        thick = max(10, int(H * thick_f))
+        w, h = (thick, length) if vert else (length, thick)
+        sp = np.zeros((h, w, 4), np.uint8)
+        frac = max(0.0, min(1.0, pct / 100.0))
+        fill = self._bgr(item.get("color"), None) or \
+            (60, int(200 - 150 * frac), int(70 + 170 * frac))   # green -> red
+        bg = self._bgr(item.get("bg"), (30, 30, 30))
+        sp[:, :, :3] = bg
+        sp[:, :, 3] = 255
+        if frac > 0:
+            n = max(1, int((h if vert else w) * frac))
+            if vert:   # vertical bars fill upward
+                sp[h - n:, :, :3] = fill
+            else:
+                sp[:, :n, :3] = fill
+        cv2.rectangle(sp, (0, 0), (w - 1, h - 1), (240, 240, 240, 255), 2)
+        if item.get("show_pct", True):
+            lbl = f"{pct:.0f}%"
+            fs = max(0.35, thick / 42.0)
+            (tw, th), _b = cv2.getTextSize(lbl, 0, fs, max(1, int(fs * 2)))
+            if tw < w - 4 and th < h - 4:
+                org = ((w - tw) // 2, (h + th) // 2)
+                cv2.putText(sp, lbl, org, 0, fs, (0, 0, 0, 255),
+                            max(3, int(fs * 4)), cv2.LINE_AA)
+                cv2.putText(sp, lbl, org, 0, fs, (255, 255, 255, 255),
+                            max(1, int(fs * 2)), cv2.LINE_AA)
+        return sp
+
+    def _render_item(self, item: dict, W: int, H: int):
+        """RGBA sprite for a non-media overlay, or None to draw nothing."""
+        kind = str(item.get("kind") or "text")
         st = self._get_state()
-        bw = max(60, int(W * float(o.get("scale") or 0.35)))
-        if o.get("x") is not None and o.get("y") is not None:
-            x, y = int(W * float(o["x"])), int(H * float(o["y"]))
-        else:
-            x, y = self._place(W, H, bw, int(bw * 0.14) + 4, o.get("pos") or "center")
-        x = max(0, min(W - 20, x))
-        y = max(0, min(H - 20, y))
-        if o.get("widget") == "capacity_gauge":
+        if kind == "capacity_gauge":
             try:
                 pct = float(st.get("capacity") or 0)
             except (TypeError, ValueError):
                 pct = 0.0
-            bh = min(max(16, int(bw * 0.11)), H - y - 2)
-            bw = min(bw, W - x - 2)
-            if bh <= 4 or bw <= 20:
-                return
-            frac = max(0.0, min(1.0, pct / 100.0))
-            color = (60, int(200 - 150 * frac), int(70 + 170 * frac))   # green→red
-            cv2.rectangle(frame, (x, y), (x + bw, y + bh), (30, 30, 30), -1)
-            if frac > 0:
-                cv2.rectangle(frame, (x, y), (x + int(bw * frac), y + bh), color, -1)
-            cv2.rectangle(frame, (x, y), (x + bw, y + bh), (240, 240, 240), 2)
-            fs = max(0.5, bh / 32.0)
-            org = (x + 8, y + bh - max(4, int(bh * 0.25)))
-            cv2.putText(frame, f"{pct:.0f}%", org, cv2.FONT_HERSHEY_SIMPLEX,
-                        fs, (0, 0, 0), int(fs * 4) + 2, cv2.LINE_AA)
-            cv2.putText(frame, f"{pct:.0f}%", org, cv2.FONT_HERSHEY_SIMPLEX,
-                        fs, (255, 255, 255), max(1, int(fs * 2)), cv2.LINE_AA)
-        else:   # pump_timer
+            return self._gauge_sprite(item, W, H, pct)
+        if kind == "pump_timer":
             try:
                 rem = float(st.get("remaining") or 0)
             except (TypeError, ValueError):
                 rem = 0.0
             firing = bool(st.get("firing"))
-            label = f"PUMP {rem:.0f}s" if firing else "PUMP idle"
-            fs = max(0.6, bw / 260.0)
-            (tw_, th_), _b = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX,
-                                             fs, max(1, int(fs * 2)))
-            pad = max(6, int(th_ * 0.5))
-            x2 = min(W - 1, x + tw_ + pad * 2)
-            y2 = min(H - 1, y + th_ + pad * 2)
-            cv2.rectangle(frame, (x, y), (x2, y2), (25, 25, 25), -1)
-            cv2.rectangle(frame, (x, y), (x2, y2),
-                          (70, 200, 70) if firing else (110, 110, 110), 2)
-            cv2.putText(frame, label, (x + pad, y + pad + th_),
-                        cv2.FONT_HERSHEY_SIMPLEX, fs, (255, 255, 255),
-                        max(1, int(fs * 2)), cv2.LINE_AA)
+            txt = (str(item.get("fmt_on") or "PUMP [secs]s").replace("[secs]", f"{rem:.0f}")
+                   if firing else str(item.get("fmt_off") or "PUMP idle"))
+            return self._text_sprite(txt, item, H)
+        # plain text — [capacity] / [secs] stay live so a label can count
+        txt = str(item.get("text") or "")
+        if "[" in txt:
+            try:
+                txt = txt.replace("[capacity]", f"{float(st.get('capacity') or 0):.0f}")
+                txt = txt.replace("[secs]", f"{float(st.get('remaining') or 0):.0f}")
+            except (TypeError, ValueError):
+                pass
+        return self._text_sprite(txt, item, H)
+
+    @staticmethod
+    def _rotate(sprite, deg):
+        """Rotate an RGBA sprite about its centre, expanding to fit."""
+        try:
+            deg = float(deg or 0)
+        except (TypeError, ValueError):
+            return sprite
+        if not deg % 360:
+            return sprite
+        h, w = sprite.shape[:2]
+        M = cv2.getRotationMatrix2D((w / 2, h / 2), deg, 1.0)
+        cos, sin = abs(M[0, 0]), abs(M[0, 1])
+        nw, nh = int(h * sin + w * cos), int(h * cos + w * sin)
+        M[0, 2] += nw / 2 - w / 2
+        M[1, 2] += nh / 2 - h / 2
+        return cv2.warpAffine(sprite, M, (max(1, nw), max(1, nh)),
+                              flags=cv2.INTER_LINEAR,
+                              borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0, 0))
+
+    @staticmethod
+    def _blend(frame, ov, x: int, y: int) -> None:
+        """Alpha-composite an RGBA sprite onto the frame at x,y (clipped)."""
+        H, W = frame.shape[:2]
+        th, tw = ov.shape[:2]
+        sx, sy = max(0, -x), max(0, -y)      # sprite may start off the left/top
+        x, y = max(0, x), max(0, y)
+        th = min(th - sy, H - y)
+        tw = min(tw - sx, W - x)
+        if th <= 0 or tw <= 0:
+            return
+        ov = ov[sy:sy + th, sx:sx + tw]
+        roi = frame[y:y + th, x:x + tw]
+        a = ov[:, :, 3:4].astype("float32") / 255.0
+        roi[:] = (ov[:, :, :3].astype("float32") * a
+                  + roi.astype("float32") * (1.0 - a)).astype("uint8")
 
     def _composite(self, frame):
         now = time.monotonic()
@@ -325,10 +454,25 @@ class VirtualCam:
             return frame
         H, W = frame.shape[:2]
         for o in ovs:
-            if o.get("kind") == "widget":
+            # flash: N seconds visible, N hidden (0/blank = always visible)
+            fl = o.get("flash") or (o.get("item") or {}).get("flash")
+            if fl:
                 try:
-                    self._draw_widget(frame, o, W, H)
-                except Exception:  # noqa: BLE001 — a bad widget never kills the pipe
+                    period = max(0.1, float(fl))
+                    if int(now / period) % 2:
+                        continue
+                except (TypeError, ValueError):
+                    pass
+            if o.get("kind") == "draw":
+                try:
+                    sp = self._render_item(o.get("item") or {}, W, H)
+                    if sp is None:
+                        continue
+                    sp = self._rotate(sp, (o.get("item") or {}).get("rot"))
+                    ih, iw = sp.shape[:2]
+                    x, y = self._spot(o, W, H, iw, ih)
+                    self._blend(frame, sp, x, y)
+                except Exception:  # noqa: BLE001 — a bad item never kills the pipe
                     o["dead"] = True
                 continue
             if o.get("kind") == "video":
@@ -343,29 +487,32 @@ class VirtualCam:
             else:
                 img = o["img"]
             tw = max(8, int(W * o["scale"]))
-            th = max(8, int(img.shape[0] * tw / max(1, img.shape[1])))
-            if th > H:
-                th = H
-                tw = max(8, int(img.shape[1] * th / max(1, img.shape[0])))
-            ov = cv2.resize(img, (tw, th), interpolation=cv2.INTER_AREA)
-            if o.get("x") is not None and o.get("y") is not None:
-                try:   # stage-designed spot: exact fractional coordinates
-                    x = max(0, min(W - 8, int(W * float(o["x"]))))
-                    y = max(0, min(H - 8, int(H * float(o["y"]))))
+            if o.get("h") is not None:      # stage-designer stretch (w x h)
+                try:
+                    th = max(8, int(H * float(o["h"])))
                 except (TypeError, ValueError):
-                    x, y = self._place(W, H, tw, th, o["pos"])
+                    th = max(8, int(img.shape[0] * tw / max(1, img.shape[1])))
             else:
-                x, y = self._place(W, H, tw, th, o["pos"])
-            th = min(th, H - y)
-            tw = min(tw, W - x)
-            if th <= 0 or tw <= 0:
-                continue
-            ov = ov[:th, :tw]
-            roi = frame[y:y + th, x:x + tw]
-            a = ov[:, :, 3:4].astype("float32") / 255.0
-            roi[:] = (ov[:, :, :3].astype("float32") * a
-                      + roi.astype("float32") * (1.0 - a)).astype("uint8")
+                th = max(8, int(img.shape[0] * tw / max(1, img.shape[1])))
+                if th > H:
+                    th = H
+                    tw = max(8, int(img.shape[1] * th / max(1, img.shape[0])))
+            ov = cv2.resize(img, (tw, th), interpolation=cv2.INTER_AREA)
+            ov = self._rotate(ov, o.get("rot"))
+            th, tw = ov.shape[:2]
+            x, y = self._spot(o, W, H, tw, th)
+            self._blend(frame, ov, x, y)
         return frame
+
+    def _spot(self, o: dict, W: int, H: int, w: int, h: int) -> tuple[int, int]:
+        """Top-left pixel for an overlay: exact fractional x/y when the stage
+        designer set one, else the named anchor."""
+        if o.get("x") is not None and o.get("y") is not None:
+            try:
+                return (int(W * float(o["x"])), int(H * float(o["y"])))
+            except (TypeError, ValueError):
+                pass
+        return self._place(W, H, w, h, o.get("pos") or "center")
 
     def _run(self):
         cap = None
@@ -395,6 +542,13 @@ class VirtualCam:
                         self._err = "camera read failed (unplugged / in use?)"
                         break
                     frame = self._composite(frame[:H, :W])
+                    if self._mirror:
+                        # Flip the FINISHED frame (camera + overlays together).
+                        # Discord mirrors your own self-view and offers no way
+                        # to turn that off, so this exists to cancel it: ON =
+                        # your Discord tile reads correctly, viewers see
+                        # everything mirrored. OFF (default) = viewers correct.
+                        frame = cv2.flip(frame, 1)
                     self._last = frame   # cap.read() hands out fresh arrays
                     cam.send(cv2.cvtColor(frame, cv2.COLOR_BGR2YUV_I420) if i420
                              else cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))

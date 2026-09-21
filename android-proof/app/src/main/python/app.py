@@ -321,6 +321,7 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "stages": cfg.get("stages") or [],
         "stage_globals": cfg.get("stage_globals") or [],
         "chat_stage": cfg.get("chat_stage", ""),
+        "vcam_mirror": bool(cfg.get("vcam_mirror", True)),
         "chat_isolate": bool(cfg.get("chat_isolate")),
         "chat_isolate_channel": cfg.get("chat_isolate_channel", ""),
         "gameplay_presets": ([{"name": BUILTIN_PRESET_NAME, "builtin": True}]
@@ -488,6 +489,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     secret = _web_secret()
     net = net if net is not None else {}
     vcam = camera.VirtualCam(IMAGES_DIR)   # the Chat tab's OBS-style overlay pipe
+    vcam.set_mirror(config_store.load().get("vcam_mirror", False))
     net["vcam"] = vcam
     # live game state for stage widgets (capacity gauge / pump timer);
     # camera.py throttles how often it calls this
@@ -505,19 +507,27 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     # opens). Ok when either surface is actually watched; quiet skip otherwise.
     def _overlay_action(spec: dict) -> dict:
         mode = (spec.get("mode") or "timed")
+        item = spec.get("item")   # a drawn overlay (text / gauge / timer)
         vres = {"ok": False}
         if mode == "clear" or vcam.status()["running"]:
             try:
-                vres = vcam.fire_overlay(spec.get("media"), spec.get("seconds"),
-                                         spec.get("pos") or "center", spec.get("scale"),
-                                         mode=mode, layer=spec.get("layer"),
-                                         x=spec.get("x"), y=spec.get("y"))
+                if item is not None:
+                    vres = vcam.add_item(
+                        item, layer=spec.get("layer"),
+                        seconds=(spec.get("seconds") if mode == "timed" else None))
+                else:
+                    vres = vcam.fire_overlay(spec.get("media"), spec.get("seconds"),
+                                             spec.get("pos") or "center", spec.get("scale"),
+                                             mode=mode, layer=spec.get("layer"),
+                                             x=spec.get("x"), y=spec.get("y"),
+                                             rot=spec.get("rot"), flash=spec.get("flash"),
+                                             h=spec.get("h"))
             except Exception as ex:  # noqa: BLE001
                 vres = {"ok": False, "error": str(ex)}
         sres = stg.fire(spec.get("media"), spec.get("seconds"),
                         spec.get("pos") or "center", spec.get("scale"),
                         mode=mode, layer=spec.get("layer"),
-                        x=spec.get("x"), y=spec.get("y"))
+                        x=spec.get("x"), y=spec.get("y"), item=item)
         if mode == "clear" or vres.get("ok") or (sres.get("ok") and stg.watching()):
             return {"ok": True}
         return {"ok": False, "error": sres.get("error") if not sres.get("ok")
@@ -1227,7 +1237,8 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             return web.json_response({"ok": False, "error": _VCAM_ANDROID})
         b = await _json(request)
         res = vcam.start(b.get("device") or 0, b.get("width") or 1280,
-                         b.get("height") or 720, b.get("fps") or 30)
+                         b.get("height") or 720, b.get("fps") or 30,
+                         mirror=b.get("mirror"))
         if not res.get("ok"):
             return web.json_response(res)
         await asyncio.sleep(0.8)   # let the pipeline surface open errors
@@ -1240,12 +1251,13 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                 if not o.get("visible"):
                     continue
                 lay = o.get("layer") or f"itm-{o.get('id')}"
-                if (o.get("kind") or "media") in ("capacity_gauge", "pump_timer"):
-                    vcam.add_widget(o["kind"], x=o.get("x"), y=o.get("y"),
-                                    w=o.get("w"), layer=lay)
+                if (o.get("kind") or "media") != "media":
+                    vcam.add_item(o, layer=lay)   # text / gauge / timer
                 elif o.get("media"):
                     vcam.fire_overlay(o["media"], mode="hold", layer=lay,
-                                      scale=o.get("w"), x=o.get("x"), y=o.get("y"))
+                                      scale=o.get("w"), x=o.get("x"), y=o.get("y"),
+                                      rot=o.get("rot"), flash=o.get("flash"),
+                                      h=o.get("h"))
         return web.json_response({"ok": st["running"], **st})
 
     async def camera_detect(request):
@@ -1356,6 +1368,16 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         return web.Response(body=data, content_type="image/jpeg",
                             headers={"Cache-Control": "no-store"})
 
+    async def camera_mirror(request):
+        """Flip the camera horizontally, live (the 🪞 toggle). Persisted so the
+        pipeline comes back the same way next start."""
+        await guard(request)
+        b = await _json(request)
+        on = bool(b.get("mirror"))
+        cfg = config_store.update({"vcam_mirror": on})
+        engine.set_config(cfg)
+        return web.json_response(vcam.set_mirror(on))
+
     async def camera_stop(request):
         await guard(request)
         await asyncio.get_event_loop().run_in_executor(None, vcam.stop)
@@ -1369,14 +1391,18 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             item = _stage_item(config_store.load(), b.get("stage"), b.get("id"))
             if item is None:
                 return web.json_response({"ok": False, "error": "no such stage overlay"})
+            lay = item.get("layer") or f"itm-{item.get('id')}"
             if (item.get("kind") or "media") != "media":
-                return web.json_response({"ok": False,
-                                          "error": "gauges/timers are always-on stage widgets, not callable"})
+                # a drawn item (text / gauge / timer) fired as a timed layer
+                return web.json_response(_overlay_action({
+                    "item": item, "mode": item.get("mode") or "timed",
+                    "seconds": item.get("seconds"), "layer": lay}))
             return web.json_response(_overlay_action({
                 "media": item.get("media"), "seconds": item.get("seconds"),
                 "scale": item.get("w"), "mode": item.get("mode") or "timed",
-                "layer": (item.get("layer") or f"itm-{item.get('id')}"),
-                "x": item.get("x"), "y": item.get("y")}))
+                "layer": lay, "x": item.get("x"), "y": item.get("y"),
+                "rot": item.get("rot"), "flash": item.get("flash"),
+                "h": item.get("h")}))
         # same router as `overlay` action rows: vcam when running + the Stage
         return web.json_response(_overlay_action({
             "media": b.get("media") or b.get("image"), "seconds": b.get("seconds"),
@@ -1784,6 +1810,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/camera/status", camera_status),
         web.post("/api/camera/start", camera_start),
         web.post("/api/camera/stop", camera_stop),
+        web.post("/api/camera/mirror", camera_mirror),
         web.post("/api/camera/detect", camera_detect),
         web.post("/api/camera/driver", camera_driver),
         web.get("/api/camera/preview", camera_preview),

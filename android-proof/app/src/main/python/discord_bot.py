@@ -483,22 +483,41 @@ class BotManager:
         )
 
     def _targets(self, cfg: dict) -> list[dict]:
-        """Every channel the bot listens/broadcasts in. Uses listen_targets if
-        set, else falls back to the single legacy listen_guild/channel. With
-        the Chat tab's ISOLATE on, broadcasts narrow to just its active channel
-        (commands typed elsewhere still get their direct replies there)."""
+        """Every channel the bot listens in. Uses listen_targets if set, else
+        falls back to the single legacy listen_guild/channel. NEVER narrowed by
+        Isolate — the bot must keep hearing commands everywhere (and the Chat
+        tab must keep listing every channel so you can switch/un-isolate)."""
         targets = [t for t in (cfg.get("listen_targets") or [])
                    if str(t.get("guild_id") or "").strip() and str(t.get("channel_id") or "").strip()]
-        if not targets:
-            gid = str(cfg.get("listen_guild_id") or "").strip()
-            cid = str(cfg.get("listen_channel_id") or "").strip()
-            targets = [{"guild_id": gid, "channel_id": cid}] if gid and cid else []
+        if targets:
+            return targets
+        gid = str(cfg.get("listen_guild_id") or "").strip()
+        cid = str(cfg.get("listen_channel_id") or "").strip()
+        if gid and cid:
+            return [{"guild_id": gid, "channel_id": cid}]
+        return []
+
+    def _isolated_to(self, cfg: dict) -> str | None:
+        """The channel every broadcast is pinned to, or None. Fails open when
+        the pinned channel isn't a live target (never silence everything)."""
         iso = str(cfg.get("chat_isolate_channel") or "").strip()
-        if cfg.get("chat_isolate") and iso:
-            hit = [t for t in targets if str(t.get("channel_id")) == iso]
-            if hit:   # unknown isolate channel → fail open to all targets
-                return hit
-        return targets
+        if not (cfg.get("chat_isolate") and iso):
+            return None
+        known = {str(t.get("channel_id")) for t in self._targets(cfg)}
+        known.add(str(cfg.get("announce_channel_id") or "").strip())
+        return iso if iso in known else None
+
+    def _broadcast_targets(self, cfg: dict) -> list[dict]:
+        """Where broadcasts (events, milestones, echoes, owner voice) go. This
+        is the ONLY place Isolate applies: pinned → just that channel, across
+        every server."""
+        targets = self._targets(cfg)
+        iso = self._isolated_to(cfg)
+        if iso is None:
+            return targets
+        hit = [t for t in targets if str(t.get("channel_id")) == iso]
+        # the pinned channel may be the announce channel (not a listen target)
+        return hit or [{"guild_id": "", "channel_id": iso}]
 
     def _allowed(self, cfg: dict, message: discord.Message) -> bool:
         uids = (cfg.get("allow", {}) or {}).get("user_ids") or []
@@ -613,11 +632,12 @@ class BotManager:
         (a clean_previous loop round), the prior round's message in each channel is
         deleted before the new one is posted. `embed` posts a rich card instead."""
         cfg = self.get_config()
-        chan_ids = {str(t["channel_id"]) for t in self._targets(cfg)}
+        chan_ids = {str(t["channel_id"]) for t in self._broadcast_targets(cfg)}
         # The optional announce channel gets every broadcast too (auto-reports,
-        # milestones, events, pause/resume) — deduped if it's also a listen target.
+        # milestones, events, pause/resume) — deduped if it's also a listen
+        # target, and suppressed while Isolate pins output to one channel.
         ann = str(cfg.get("announce_channel_id") or "").strip()
-        if ann:
+        if ann and self._isolated_to(cfg) is None:
             chan_ids.add(ann)
         if exclude_channel_id is not None:
             chan_ids.discard(str(exclude_channel_id))
@@ -808,7 +828,7 @@ class BotManager:
         """Owner-voiced text to every listen channel (#owner-command rows and
         'as the OWNER' message rows inside action blocks). Never raises."""
         cfg = self.get_config()
-        for t in self._targets(cfg):
+        for t in self._broadcast_targets(cfg):
             ch = await self._channel(str(t["channel_id"]))
             if ch is not None:
                 await self.owner_say(ch, text, strict=strict)
@@ -1122,7 +1142,7 @@ class BotManager:
             author_id = int(uid) if uid else None
         except (TypeError, ValueError):
             author_id = None
-        for t in self._targets(cfg):
+        for t in self._broadcast_targets(cfg):
             cid = str(t.get("channel_id") or "")
             if not cid or (exclude_channel_id and cid == str(exclude_channel_id)):
                 continue
@@ -1378,7 +1398,7 @@ class BotManager:
         cfg = self.get_config()
         origin = str(message.channel.id) if message.guild is not None else None
         author_id = message.author.id
-        for t in self._targets(cfg):
+        for t in self._broadcast_targets(cfg):
             cid = str(t.get("channel_id") or "")
             if not cid or cid == origin:
                 continue

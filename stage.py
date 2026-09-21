@@ -34,22 +34,33 @@ class Stage:
 
     def fire(self, media, seconds=5.0, pos: str = "center", scale=0.5,
              mode: str = "timed", layer: str | None = None,
-             x=None, y=None) -> dict:
+             x=None, y=None, item=None) -> dict:
         """Register an overlay; semantics mirror VirtualCam.fire_overlay."""
         mode = str(mode or "timed").lower()
         key = (str(layer or "").strip().lower()) or None
         if mode == "clear":
             return self.clear(key)
-        name = os.path.basename(str(media or "").strip())
-        if not name:
-            return {"ok": False, "error": "no overlay media set"}
-        if not os.path.isfile(os.path.join(self.images_dir, name)):
-            return {"ok": False, "error": f"media not found: {name}"}
         try:
             secs = max(0.5, float(seconds or 5))
             sc = max(0.05, min(1.0, float(scale or 0.5)))
         except (TypeError, ValueError):
             secs, sc = 5.0, 0.5
+        if item is not None:
+            # a DRAWN overlay (text / gauge / timer): the page renders it from
+            # the item's own style, so pass the whole spec through verbatim
+            ent = {"id": next(self._ids), "kind": "draw", "item": dict(item),
+                   "mode": mode, "seconds": secs, "layer": key,
+                   "until": (time.time() + secs) if mode == "timed" else None}
+            with self._lock:
+                if key:
+                    self._items = [o for o in self._items if o.get("layer") != key]
+                self._items.append(ent)
+            return {"ok": True, "overlays": len(self._items)}
+        name = os.path.basename(str(media or "").strip())
+        if not name:
+            return {"ok": False, "error": "no overlay media set"}
+        if not os.path.isfile(os.path.join(self.images_dir, name)):
+            return {"ok": False, "error": f"media not found: {name}"}
         kind = ("video" if os.path.splitext(name)[1].lower() in VIDEO_EXTS
                 else "image")
         # a play-once image is just a short timed one (same rule as the vcam)

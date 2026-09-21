@@ -372,6 +372,12 @@ DEFAULTS = {
     "stage_globals": [],   # overlay items callable from every stage
     "chat_stage": "",      # the Stage linked to the Chat tab's video section
 
+    # Virtual camera: mirror the OUTGOING feed. Default off — viewers get the
+    # true image and overlay text reads correctly to them. (Discord mirrors
+    # your own self-view preview on its end; that's cosmetic and local.)
+    # Applied to the raw frame BEFORE overlays composite either way.
+    "vcam_mirror": False,
+
     # Chat tab Isolate: broadcasts go ONLY to the chat tab's active channel
     # while enabled (other live channels still hear direct command replies).
     "chat_isolate": False,

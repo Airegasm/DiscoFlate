@@ -2588,5 +2588,6 @@
   "stage_globals": [],
   "chat_stage": "",
   "chat_isolate": false,
-  "chat_isolate_channel": ""
+  "chat_isolate_channel": "",
+  "vcam_mirror": false
 }
