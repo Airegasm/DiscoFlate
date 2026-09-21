@@ -34,7 +34,8 @@ class Stage:
 
     def fire(self, media, seconds=5.0, pos: str = "center", scale=0.5,
              mode: str = "timed", layer: str | None = None,
-             x=None, y=None, item=None) -> dict:
+             x=None, y=None, item=None, z=None, opacity=None,
+             rot=None, flash=None, anim=None, anim_dir=None) -> dict:
         """Register an overlay; semantics mirror VirtualCam.fire_overlay."""
         mode = str(mode or "timed").lower()
         key = (str(layer or "").strip().lower()) or None
@@ -49,7 +50,7 @@ class Stage:
             # a DRAWN overlay (text / gauge / timer): the page renders it from
             # the item's own style, so pass the whole spec through verbatim
             ent = {"id": next(self._ids), "kind": "draw", "item": dict(item),
-                   "mode": mode, "seconds": secs, "layer": key,
+                   "mode": mode, "seconds": secs, "layer": key, "z": z,
                    "until": (time.time() + secs) if mode == "timed" else None}
             with self._lock:
                 if key:
@@ -68,7 +69,9 @@ class Stage:
             mode = "timed"
         ent = {"id": next(self._ids), "media": name, "kind": kind, "mode": mode,
                "seconds": secs, "pos": str(pos or "center").lower(),
-               "scale": sc, "layer": key, "x": x, "y": y,
+               "scale": sc, "layer": key, "x": x, "y": y, "z": z,
+               "opacity": opacity, "rot": rot, "flash": flash,
+               "anim": anim, "anim_dir": anim_dir,
                "until": (time.time() + secs) if mode == "timed" else None}
         with self._lock:
             if key:   # named slot: replace the previous holder

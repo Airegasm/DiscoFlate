@@ -391,6 +391,10 @@ DEFAULTS = {
         "commands": [],             # allowed anyway during the intro
     },
 
+    # How the virtual camera was last started, so a `camera: start` action can
+    # bring it up exactly the same way (device, size, fps, linked scene).
+    "vcam_last": {},
+
     # Virtual camera: mirror the OUTGOING feed. Default off — viewers get the
     # true image and overlay text reads correctly to them. (Discord mirrors
     # your own self-view preview on its end; that's cosmetic and local.)

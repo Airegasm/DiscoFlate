@@ -369,7 +369,9 @@ async function pollOverlays(){
         place(el, o);
         applyBox(el, {x:null, y:null, rot:o.rot, flash:o.flash});
       }
-      $('#layers').appendChild(el);   // fire order = z-order (later on top)
+      if(o.z!=null || (o.item&&o.item.z!=null))
+        el.style.zIndex = String(Math.round(+(o.z ?? o.item.z) || 0) + 10);
+      $('#layers').appendChild(el);   // ties fall back to fire order
       applyAnim(el, (o.kind==='draw' ? (o.item||{}) : o));
       live[o.id] = el;
     });

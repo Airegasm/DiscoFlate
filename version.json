@@ -1,6 +1,6 @@
 {
-  "version": "3.54.0",
-  "versionCode": 132,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.54.0/discoflate-v3.54.0.apk",
-  "notes": "DiscoFlate v3.54.0 — the Scenes tab is now scene-group-centric. The overlay list's title strip has a scene-group dropdown (All overlays · each group with its count · ungrouped) with ➕✏️🗑 to create, rename and delete groups, the list filters to whichever you pick, and anything you add while a group is selected joins that group. Deleting a group keeps its overlays, just untagged. Also fixed two confusing names: 'Layer order' was the same thing as the ▲▼ arrows in the list, so the duplicate numeric field is gone; 'Layer slot' had nothing to do with draw order at all — it's a named REPLACEMENT slot, so it's now called 'Replaces'."
+  "version": "3.55.0",
+  "versionCode": 133,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.55.0/discoflate-v3.55.0.apk",
+  "notes": "DiscoFlate v3.55.0 — scene groups can stagger themselves and run an outro. Every overlay gets a DELAY, so one scene group can fan its overlays out over time without a chain of wait actions — and because delay doesn't block, one video can start halfway through another and they play together. New CAMERA action: start, freeze (holds the last frame while overlays keep animating on top), resume, stop — so an outro can freeze the picture, fade to black and shut the camera down. Start repeats however you last started it, bringing the linked scene's always-on overlays back with it. New SNAPSHOT action posts the current camera frame — overlays included — to chat with an optional caption; unlike the Camera tab's browser snapshot, a command or event can fire this one. All of these work in commands, timed events, capacity events, polls, competitions and bonus rounds alike."
 }

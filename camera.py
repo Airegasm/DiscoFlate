@@ -59,6 +59,8 @@ class VirtualCam:
         # overlay text) correctly. Discord mirrors your own self-view preview on
         # its end — that's cosmetic and local, not what viewers get.
         self._mirror = False
+        self._frozen = False       # hold the last camera frame (outro freeze)
+        self._raw = None           # the last frame read from the webcam
         # () -> {"capacity","firing","remaining","device_timers":[...]} for widgets
         self.state_cb = None
         # () -> rendered string. Set by app.py to engine.render, so ANY
@@ -79,7 +81,15 @@ class VirtualCam:
                 "error": ("" if running else (self.available() or self._err or "")),
                 "info": self._info, "device": self._device,
                 "width": self._size[0], "height": self._size[1], "fps": self._fps,
-                "mirror": self._mirror, "overlays": len(self._overlays)}
+                "mirror": self._mirror, "frozen": self._frozen,
+                "overlays": len(self._overlays)}
+
+    def set_frozen(self, on: bool) -> dict:
+        """Freeze-frame: stop pulling new webcam frames and keep compositing
+        over the last one. Overlays still animate on top, so an outro can
+        freeze the picture, fade to black, then stop the camera."""
+        self._frozen = bool(on)
+        return {"ok": True, "frozen": self._frozen}
 
     def set_mirror(self, on: bool) -> dict:
         """Flip the whole outgoing frame horizontally (live) — camera AND
@@ -194,6 +204,20 @@ class VirtualCam:
 
     _QUEUE_MAX = 12      # a burst deeper than this is noise; drop the overflow
 
+    @staticmethod
+    def _arm(ent: dict, now: float) -> None:
+        """Stamp when a layer starts and (for timed ones) when it ends. A
+        delayed layer is admitted immediately but stays invisible until its
+        moment — that's what staggers a scene group without a timeline editor."""
+        try:
+            d = max(0.0, float(ent.get("delay") or 0))
+        except (TypeError, ValueError):
+            d = 0.0
+        ent["start_at"] = now + d
+        ent["born"] = ent["start_at"]          # fades begin when it appears
+        if ent.get("_dur"):
+            ent["until"] = ent["start_at"] + ent["_dur"]
+
     def _admit(self, ent: dict, key: str | None) -> dict:
         """Put an overlay on screen, or QUEUE it behind the one already on its
         layer. Queueing is what stops a rush of notifications from landing on
@@ -209,9 +233,7 @@ class VirtualCam:
                 return {"ok": True, "queued": len(q)}
             for o in live:      # no queueing: the newest replaces
                 o["dead"] = True
-            ent["born"] = time.monotonic()
-            if ent.get("_dur"):     # timed entries date from when they appear
-                ent["until"] = ent["born"] + ent["_dur"]
+            self._arm(ent, time.monotonic())
             self._overlays.append(ent)
         return {"ok": True, "overlays": len(self._overlays)}
 
@@ -265,7 +287,8 @@ class VirtualCam:
                "rot": item.get("rot"), "flash": item.get("flash"),
                "fade_in": item.get("fade_in"), "fade_out": item.get("fade_out"),
                "anim": item.get("anim"), "anim_dir": item.get("anim_dir"),
-               "queue": item.get("queue"), "born": time.monotonic()}
+               "queue": item.get("queue"), "delay": item.get("delay"),
+               "born": time.monotonic()}
         return self._admit(ent, key)
 
     def add_widget(self, widget: str, x=None, y=None, w=None,
@@ -279,7 +302,7 @@ class VirtualCam:
                      x=None, y=None, rot=None, flash=None, h=None,
                      fade_in=None, fade_out=None, anim=None, anim_dir=None,
                      queue=None, chroma_on=None, chroma=None, chroma_tol=None,
-                     chroma_soft=None, z=None, opacity=None) -> dict:
+                     chroma_soft=None, z=None, opacity=None, delay=None) -> dict:
         """Show a MEDIA layer over the camera. `media` = an image (PNG alpha
         welcome) or a video file from data/images (or an absolute path).
         mode: "timed"  = shown/looping for `seconds`
@@ -312,7 +335,7 @@ class VirtualCam:
                  "rot": rot, "flash": flash, "h": h,
                  "fade_in": fade_in, "fade_out": fade_out, "born": time.monotonic(),
                  "anim": anim, "anim_dir": anim_dir, "queue": queue,
-                 "z": z, "opacity": opacity,
+                 "z": z, "opacity": opacity, "delay": delay,
                  "chroma_on": chroma_on, "chroma": chroma,
                  "chroma_tol": chroma_tol, "chroma_soft": chroma_soft,
                  "until": (time.monotonic() + secs) if mode == "timed" else None}
@@ -794,9 +817,7 @@ class VirtualCam:
                 nxt = self._queued[key].pop(0)
                 if not self._queued[key]:
                     self._queued.pop(key, None)
-                nxt["born"] = now
-                if nxt.get("_dur"):
-                    nxt["until"] = now + nxt["_dur"]
+                self._arm(nxt, now)
                 self._overlays.append(nxt)
         if not ovs:
             return frame
@@ -809,6 +830,8 @@ class VirtualCam:
                 return 0.0
         ovs.sort(key=_z)        # stable: equal z keeps fire order (newest on top)
         for o in ovs:
+            if o.get("start_at") and now < o["start_at"]:
+                continue                       # staggered — not its turn yet
             # flash: N seconds visible, N hidden (0/blank = always visible)
             fl = o.get("flash") or (o.get("item") or {}).get("flash")
             if fl:
@@ -909,10 +932,14 @@ class VirtualCam:
                                      fmt=fmt, print_fps=False) as cam:
                 self._info = f"{cam.device} · {W}x{H} @ {self._fps}fps"
                 while not self._stop.is_set():
-                    ok, frame = cap.read()
-                    if not ok or frame is None:
-                        self._err = "camera read failed (unplugged / in use?)"
-                        break
+                    if self._frozen and self._raw is not None:
+                        frame = self._raw.copy()      # hold the last picture
+                    else:
+                        ok, frame = cap.read()
+                        if not ok or frame is None:
+                            self._err = "camera read failed (unplugged / in use?)"
+                            break
+                        self._raw = frame
                     frame = self._composite(frame[:H, :W])
                     if self._mirror:
                         # Flip the FINISHED frame (camera + overlays together).

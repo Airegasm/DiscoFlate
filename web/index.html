@@ -2204,7 +2204,7 @@ function stgNewItem(kind, media, visible){
              w:kind==='media'?0.3:0.35, mode:'timed', seconds:5, layer:'',
              rot:0, flash:0,
              visible: visible!==undefined ? visible : kind!=='media'};
-  o.group=''; o.z=0; o.opacity=100;   // scene group, layer order, opacity
+  o.group=''; o.z=0; o.opacity=100; o.delay=0;   // group, layer, opacity, stagger
   if(kind!=='media'){            // drawn overlays carry their own styling
     o.color = kind==='capacity_gauge' ? '' : '#ffffff';
     o.size = kind==='capacity_gauge' ? 0.05 : 0.06;
@@ -2507,6 +2507,7 @@ function renderStgContents(){
         `<span>${ico(o.kind)}</span>`+
         `<span class="nm">${esc(String(nm).split('\n')[0].slice(0,34))}</span>`+
         ((o.group||'').trim()?`<span class="tag">🎬 ${esc(o.group.trim())}</span>`:'')+
+        (+o.delay?`<span class="tag" title="appears ${o.delay}s after the group fires">+${o.delay}s</span>`:'')+
 
         `<button class="ghost" title="move up (draws in front)" onclick="event.stopPropagation();stgReorder('${esc(o.id)}',1)">▲</button>`+
         `<button class="ghost" title="move down (draws behind)" onclick="event.stopPropagation();stgReorder('${esc(o.id)}',-1)">▼</button>`+
@@ -2657,6 +2658,7 @@ function renderStgProps(){
     F('Rotation °', num('rot',Math.round(o.rot||0),-360,360,1)+
       `<button class="ghost pmini" title="reset to 0°" onclick="stgItemSet('rot',0)">↺</button>`)+
     F('Flash', num('flash',o.flash??0,0,10,0.5),'seconds visible = seconds hidden · 0 = steady')+
+    F('Delay', num('delay',o.delay??0,0,600,0.5),'wait this long before it appears — how a scene group staggers itself')+
     F('Fade in', num('fade_in',o.fade_in??0,0,10,0.1))+
     F('Fade out', num('fade_out',o.fade_out??0,0,10,0.1))+
     chk('anim',o.anim,'animate','slide in and out instead of just appearing')+
@@ -4263,6 +4265,8 @@ function actGist(a){
   if(t==='if'){ const c=(a.conditions||[])[0];
     return c ? `if ${s(c.left)} ${s(c.op)||'=='} ${s(c.right)}` + ((a.conditions||[]).length>1?` +${a.conditions.length-1}`:'') : 'if …'; }
   if(t==='repeat') return (a.mode==='until') ? `repeat until …` : `repeat ×${s(a.iterations)||'3'}`;
+  if(t==='camera') return `camera: ${s(a.op)||'freeze'}`;
+  if(t==='snapshot') return `snapshot${s(a.caption)?' · '+s(a.caption).slice(0,22):''}`;
   if(t==='scene_group') return `play group "${s(a.group)||'—'}"`;
   if(t==='scene_group_kill') return `clear group "${s(a.group)||'—'}"`;
   if(t==='update_overlay_text')
@@ -4306,7 +4310,7 @@ function actionRow(base, rr, j, a, condLabels){
     cond=`<label class="field">Run <select onchange="${T('if_option')}=+this.value;scheduleSave()">${opts}</select></label>`;
   }
   const typeSel = `<select onchange="${T('type')}=this.value;${rr}();scheduleSave()">`+
-    ['message','broadcast','command','fire','roll','chance','var','if','repeat','random','group','label','goto','goto_if','cancel','capacity','wait','poll','competition','bonus_round','award','command_gate','overlay','overlay_kill','scene_group','scene_group_kill','update_overlay_text','start_timer','stop_timer','stop_devices','end_session'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select>`;
+    ['message','broadcast','command','fire','roll','chance','var','if','repeat','random','group','label','goto','goto_if','cancel','capacity','wait','poll','competition','bonus_round','award','command_gate','overlay','overlay_kill','scene_group','scene_group_kill','camera','snapshot','update_overlay_text','start_timer','stop_timer','stop_devices','end_session'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select>`;
   let fields=cond;
   if(typ==='wait')
     fields += `<label class="field">Seconds <input value="${esc(String(a.seconds??10))}" placeholder="10" title="a number or a [placeholder] like [winner_score]" style="width:110px" onchange="${T('seconds')}=this.value;scheduleSave()"></label>`;
@@ -4418,6 +4422,18 @@ function actionRow(base, rr, j, a, condLabels){
         [['all','ALL of'],['any','ANY of']].map(([v,l])=>`<option value="${v}" ${(a.match||'all')===v?'selected':''}>${l}</option>`).join('')+`</select></label>`;
     }
     if(typ==='repeat') fields += `<span class="muted" style="align-self:center"><code>[loop_i]</code> = the round number</span>`;
+  }
+  if(typ==='snapshot'){
+    fields += `<label class="field" style="flex:1;min-width:220px">Caption <span class="muted">(optional · placeholders work)</span>`+
+      `<input value="${esc(a.caption||'')}" placeholder="📸 [user] at [capacity]%" style="width:100%" onchange="${T('caption')}=this.value;scheduleSave()"></label>`+
+      `<span class="muted" style="align-self:center">posts the current camera frame — overlays included · quiet when the camera isn't running</span>`;
+  }
+  if(typ==='camera'){
+    fields += `<label class="field">Do <select style="width:200px" onchange="${T('op')}=this.value;scheduleSave()">`+
+      [['start','⏺ start the virtual camera'],['freeze','❄ freeze the picture'],
+       ['resume','▶ let it run again'],['stop','⏹ stop the virtual camera']].map(([v,l])=>`<option value="${v}" ${(a.op||'freeze')===v?'selected':''}>${l}</option>`).join('')+
+      `</select></label>`+
+      `<span class="muted" style="align-self:center">freeze holds the last frame while overlays keep playing on top · quiet when no camera is running</span>`;
   }
   if(typ==='scene_group' || typ==='scene_group_kill'){
     const sc = sceneGroupScope(), names = sceneGroupNames();

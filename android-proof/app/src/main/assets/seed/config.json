@@ -2599,5 +2599,6 @@
     "announce_every": 0,
     "hold_commands": true,
     "commands": []
-  }
+  },
+  "vcam_last": {}
 }

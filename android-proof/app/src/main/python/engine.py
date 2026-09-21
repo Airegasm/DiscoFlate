@@ -68,6 +68,8 @@ class Engine:
         self._intro_open: bool = False
         self._intro_task = None
         self.intro_done_cb = None       # app.py: finish activation for real
+        self.camera_cb = None           # app.py: start/stop/freeze/resume the vcam
+        self.snapshot_cb = None         # app.py: post the current frame to chat
         self._runs: list = []            # live action-block cancel flags
 
         self._tick_task: asyncio.Task | None = None
@@ -1998,6 +2000,28 @@ class Engine:
                                          "fade_out": self._num_expr(a.get("fade_out"), xc, 0.0)})
                     except Exception as ex:  # noqa: BLE001
                         self._log("error", f"{name}: {typ} failed: {ex}")
+                    continue
+                if typ == "snapshot":
+                    # Post the CURRENT camera frame (overlays included) to chat.
+                    if self.snapshot_cb is None:
+                        continue
+                    try:
+                        r = await self.snapshot_cb(R(a.get("caption") or ""))
+                        if not r.get("ok"):
+                            self._log("bot", f"{name}: snapshot skipped — {r.get('error')}")
+                    except Exception as ex:  # noqa: BLE001
+                        self._log("error", f"{name}: snapshot failed: {ex}")
+                    continue
+                if typ == "camera":
+                    # Freeze the picture, let it run again, or stop the virtual
+                    # camera — the tail end of an outro. Quiet when there's no
+                    # camera (wrong platform, not running).
+                    if self.camera_cb is None:
+                        continue
+                    try:
+                        await self.camera_cb(a.get("op") or "freeze")
+                    except Exception as ex:  # noqa: BLE001
+                        self._log("error", f"{name}: camera {a.get('op')} failed: {ex}")
                     continue
                 if typ == "overlay_kill":
                     # Remove a playing overlay (fading it out when asked).

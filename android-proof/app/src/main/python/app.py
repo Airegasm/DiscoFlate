@@ -677,7 +677,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                         "chroma_on": found.get("chroma_on"), "chroma": found.get("chroma"),
                         "chroma_tol": found.get("chroma_tol"),
                         "chroma_soft": found.get("chroma_soft"), "z": found.get("z"),
-                        "opacity": found.get("opacity")}
+                        "opacity": found.get("opacity"), "delay": found.get("delay")}
         elif mode == "clear":
             vcam.clear_overlays(spec.get("layer"), fade_out=spec.get("fade_out"))
             stg.clear(spec.get("layer"))
@@ -709,18 +709,87 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                                              chroma_tol=spec.get("chroma_tol"),
                                              chroma_soft=spec.get("chroma_soft"),
                                              z=spec.get("z"),
-                                             opacity=spec.get("opacity"))
+                                             opacity=spec.get("opacity"),
+                                             delay=spec.get("delay"))
             except Exception as ex:  # noqa: BLE001
                 vres = {"ok": False, "error": str(ex)}
         sres = stg.fire(spec.get("media"), spec.get("seconds"),
                         spec.get("pos") or "center", spec.get("scale"),
                         mode=mode, layer=spec.get("layer"),
-                        x=spec.get("x"), y=spec.get("y"), item=item)
+                        x=spec.get("x"), y=spec.get("y"), item=item,
+                        z=spec.get("z"), opacity=spec.get("opacity"),
+                        rot=spec.get("rot"), flash=spec.get("flash"),
+                        anim=spec.get("anim"), anim_dir=spec.get("anim_dir"))
         if mode == "clear" or vres.get("ok") or (sres.get("ok") and stg.watching()):
             return {"ok": True}
         return {"ok": False, "error": sres.get("error") if not sres.get("ok")
                 else "no virtual camera running and no Stage open"}
     engine.overlay_cb = _overlay_action
+
+    async def _camera_action(op: str) -> dict:
+        """The `camera` action: start or stop the virtual camera, freeze the
+        picture, or let it run again. `start` repeats however you last started
+        it from the Chat tab (device, size, fps, linked scene)."""
+        op = (op or "").lower()
+        if op == "freeze":
+            return vcam.set_frozen(True)
+        if op in ("resume", "unfreeze"):
+            return vcam.set_frozen(False)
+        if op == "stop":
+            vcam.set_frozen(False)
+            await asyncio.get_event_loop().run_in_executor(None, vcam.stop)
+            return {"ok": True}
+        if op == "start":
+            if vcam.status()["running"]:
+                vcam.set_frozen(False)
+                return {"ok": True, "already": True}
+            cfg0 = config_store.load()
+            last = cfg0.get("vcam_last") or {}
+            res = vcam.start(last.get("device") or 0, last.get("width") or 1280,
+                             last.get("height") or 720, last.get("fps") or 30,
+                             mirror=cfg0.get("vcam_mirror", False))
+            if not res.get("ok"):
+                return res
+            await asyncio.sleep(0.8)
+            if not vcam.status()["running"]:
+                return {"ok": False, "error": vcam.status().get("error") or "camera didn't start"}
+            scene = (last.get("scene") or "").strip() or cfg0.get("chat_scene", "")
+            scn = _find_scene(cfg0, scene)
+            for o in ((scn or {}).get("overlays") or []):
+                if not o.get("visible"):
+                    continue
+                lay = o.get("layer") or f"itm-{o.get('id')}"
+                if (o.get("kind") or "media") != "media":
+                    if o.get("kind") == "timer" and o.get("autostart"):
+                        _timer_op(o.get("id"), "start", configured=o.get("seconds"))
+                    vcam.add_item(o, layer=lay)
+                elif o.get("media"):
+                    vcam.fire_overlay(o["media"], mode="hold", layer=lay,
+                                      scale=o.get("w"), x=o.get("x"), y=o.get("y"),
+                                      rot=o.get("rot"), flash=o.get("flash"),
+                                      h=o.get("h"), z=o.get("z"),
+                                      opacity=o.get("opacity"), delay=o.get("delay"),
+                                      chroma_on=o.get("chroma_on"), chroma=o.get("chroma"),
+                                      chroma_tol=o.get("chroma_tol"),
+                                      chroma_soft=o.get("chroma_soft"))
+            return {"ok": True, "scene": scene}
+        return {"ok": False, "error": f"unknown camera op '{op}'"}
+
+    async def _snapshot_action(caption: str) -> dict:
+        """The `snapshot` action: grab the CURRENT virtual-camera frame —
+        overlays and all — and post it to chat. Quiet when the camera isn't
+        running, like every other camera-dependent action."""
+        data = await asyncio.get_event_loop().run_in_executor(None, vcam.preview_jpeg)
+        if not data:
+            return {"ok": False, "error": "virtual camera isn't running"}
+        os.makedirs(IMAGES_DIR, exist_ok=True)
+        name = f"snap-{uuid.uuid4().hex}.jpg"
+        with open(os.path.join(IMAGES_DIR, name), "wb") as fh:
+            fh.write(data)
+        await botmgr.announce((caption or "").strip(), f"images/{name}")
+        return {"ok": True, "file": name}
+    engine.snapshot_cb = _snapshot_action
+    engine.camera_cb = _camera_action
 
     @web.middleware
     async def security_mw(request, handler):
@@ -1465,6 +1534,12 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         res = vcam.start(b.get("device") or 0, b.get("width") or 1280,
                          b.get("height") or 720, b.get("fps") or 30,
                          mirror=b.get("mirror"))
+        if res.get("ok"):   # remember it, so a `camera: start` action can repeat it
+            cfgv = config_store.update({"vcam_last": {
+                "device": b.get("device") or 0, "width": b.get("width") or 1280,
+                "height": b.get("height") or 720, "fps": b.get("fps") or 30,
+                "scene": (b.get("stage") or "")}})
+            engine.set_config(cfgv)
         if not res.get("ok"):
             return web.json_response(res)
         await asyncio.sleep(0.8)   # let the pipeline surface open errors
@@ -1490,7 +1565,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                                       chroma_on=o.get("chroma_on"), chroma=o.get("chroma"),
                                       chroma_tol=o.get("chroma_tol"),
                                       chroma_soft=o.get("chroma_soft"),
-                                      opacity=o.get("opacity"))
+                                      opacity=o.get("opacity"), delay=o.get("delay"))
         return web.json_response({"ok": st["running"], **st})
 
     async def camera_detect(request):
@@ -1600,6 +1675,11 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                                      status=404)
         return web.Response(body=data, content_type="image/jpeg",
                             headers={"Cache-Control": "no-store"})
+
+    async def camera_freeze(request):
+        await guard(request)
+        b = await _json(request)
+        return web.json_response(vcam.set_frozen(bool(b.get("frozen"))))
 
     async def camera_mirror(request):
         """Flip the camera horizontally, live (the 🪞 toggle). Persisted so the
@@ -2087,6 +2167,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/camera/start", camera_start),
         web.post("/api/camera/stop", camera_stop),
         web.post("/api/camera/mirror", camera_mirror),
+        web.post("/api/camera/freeze", camera_freeze),
         web.post("/api/camera/detect", camera_detect),
         web.post("/api/camera/driver", camera_driver),
         web.get("/api/camera/preview", camera_preview),
