@@ -1233,7 +1233,8 @@
         }
       ],
       "notify_enabled": true,
-      "notify": "[user] just triggered [command]"
+      "notify": "[user] just triggered [command]",
+      "notify_desc": true
     },
     {
       "name": "inflate",
@@ -1273,7 +1274,8 @@
         }
       ],
       "notify_enabled": true,
-      "notify": "[user] just triggered [command]"
+      "notify": "[user] just triggered [command]",
+      "notify_desc": true
     },
     {
       "name": "pump",
@@ -1313,7 +1315,8 @@
         }
       ],
       "notify_enabled": true,
-      "notify": "[user] just triggered [command]"
+      "notify": "[user] just triggered [command]",
+      "notify_desc": true
     },
     {
       "name": "squeeze",
@@ -1353,7 +1356,8 @@
         }
       ],
       "notify_enabled": true,
-      "notify": "[user] just triggered [command]"
+      "notify": "[user] just triggered [command]",
+      "notify_desc": true
     },
     {
       "name": "tease",
@@ -1393,7 +1397,8 @@
         }
       ],
       "notify_enabled": true,
-      "notify": "[user] just triggered [command]"
+      "notify": "[user] just triggered [command]",
+      "notify_desc": true
     },
     {
       "name": "topup",
@@ -1433,7 +1438,8 @@
         }
       ],
       "notify_enabled": true,
-      "notify": "[user] just triggered [command]"
+      "notify": "[user] just triggered [command]",
+      "notify_desc": true
     },
     {
       "name": "agtoss",
@@ -1752,7 +1758,8 @@
         }
       ],
       "notify_enabled": true,
-      "notify": "[user] just triggered [command]"
+      "notify": "[user] just triggered [command]",
+      "notify_desc": true
     }
   ],
   "always_on_enabled": true,
@@ -2810,11 +2817,11 @@
           "label": "Notification",
           "kind": "text",
           "media": "",
-          "x": 0.1,
+          "x": 0.03,
           "y": 0.86,
-          "w": 0.8,
+          "w": 0.44,
           "mode": "timed",
-          "seconds": 5,
+          "seconds": 3,
           "layer": "notify",
           "rot": 0,
           "flash": 0,
@@ -2823,13 +2830,16 @@
           "z": 20,
           "opacity": 100,
           "delay": 0,
-          "size": 0.045,
+          "size": 0.04,
           "color": "#ffffff",
           "font": "bold",
-          "bg": "#12121aCC",
-          "align": "center",
-          "text": "[user] just triggered [command]",
-          "fade_out": 0.4
+          "bg": "#2563ebE6",
+          "align": "left",
+          "text": "[user] triggered [command] [command_overlay_desc]",
+          "fade_out": 1.2,
+          "anim": true,
+          "anim_dir": "up",
+          "fade_in": 0
         },
         {
           "id": "dfdefpausebg",
@@ -2957,7 +2967,8 @@
               }
             ],
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]"
+            "notify": "[user] just triggered [command]",
+            "notify_desc": true
           },
           {
             "name": "inflate",
@@ -2997,7 +3008,8 @@
               }
             ],
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]"
+            "notify": "[user] just triggered [command]",
+            "notify_desc": true
           },
           {
             "name": "pump",
@@ -3037,7 +3049,8 @@
               }
             ],
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]"
+            "notify": "[user] just triggered [command]",
+            "notify_desc": true
           },
           {
             "name": "squeeze",
@@ -3077,7 +3090,8 @@
               }
             ],
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]"
+            "notify": "[user] just triggered [command]",
+            "notify_desc": true
           },
           {
             "name": "tease",
@@ -3117,7 +3131,8 @@
               }
             ],
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]"
+            "notify": "[user] just triggered [command]",
+            "notify_desc": true
           },
           {
             "name": "topup",
@@ -3157,7 +3172,8 @@
               }
             ],
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]"
+            "notify": "[user] just triggered [command]",
+            "notify_desc": true
           },
           {
             "name": "agtoss",
@@ -3476,7 +3492,8 @@
               }
             ],
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]"
+            "notify": "[user] just triggered [command]",
+            "notify_desc": true
           }
         ],
         "broadcasts": [],
@@ -5415,11 +5432,11 @@
           "label": "Notification",
           "kind": "text",
           "media": "",
-          "x": 0.1,
+          "x": 0.03,
           "y": 0.86,
-          "w": 0.8,
+          "w": 0.44,
           "mode": "timed",
-          "seconds": 5,
+          "seconds": 3,
           "layer": "notify",
           "rot": 0,
           "flash": 0,
@@ -5428,13 +5445,16 @@
           "z": 20,
           "opacity": 100,
           "delay": 0,
-          "size": 0.045,
+          "size": 0.04,
           "color": "#ffffff",
           "font": "bold",
-          "bg": "#12121aCC",
-          "align": "center",
-          "text": "[user] just triggered [command]",
-          "fade_out": 0.4
+          "bg": "#2563ebE6",
+          "align": "left",
+          "text": "[user] triggered [command] [command_overlay_desc]",
+          "fade_out": 1.2,
+          "anim": true,
+          "anim_dir": "up",
+          "fade_in": 0
         },
         {
           "id": "dfdefpausebg",
@@ -5561,7 +5581,8 @@
               }
             ],
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]"
+            "notify": "[user] just triggered [command]",
+            "notify_desc": true
           },
           {
             "name": "inflate",
@@ -5601,7 +5622,8 @@
               }
             ],
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]"
+            "notify": "[user] just triggered [command]",
+            "notify_desc": true
           },
           {
             "name": "pump",
@@ -5641,7 +5663,8 @@
               }
             ],
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]"
+            "notify": "[user] just triggered [command]",
+            "notify_desc": true
           },
           {
             "name": "squeeze",
@@ -5681,7 +5704,8 @@
               }
             ],
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]"
+            "notify": "[user] just triggered [command]",
+            "notify_desc": true
           },
           {
             "name": "tease",
@@ -5721,7 +5745,8 @@
               }
             ],
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]"
+            "notify": "[user] just triggered [command]",
+            "notify_desc": true
           },
           {
             "name": "topup",
@@ -5761,7 +5786,8 @@
               }
             ],
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]"
+            "notify": "[user] just triggered [command]",
+            "notify_desc": true
           },
           {
             "name": "agtoss",
@@ -6080,7 +6106,8 @@
               }
             ],
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]"
+            "notify": "[user] just triggered [command]",
+            "notify_desc": true
           }
         ],
         "broadcasts": [],

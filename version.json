@@ -1,6 +1,6 @@
 {
-  "version": "3.71.0",
-  "versionCode": 156,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.71.0/discoflate-v3.71.0.apk",
-  "notes": "DiscoFlate v3.71.0 \u2014 each Discord channel now has two independent tickboxes: Listen (take commands typed there) and Announce (post events and milestones there), both on by default. Untick Listen for a spectator channel, untick Announce to keep a busy channel quiet, untick both to mute it. Replaces the single Active tickbox and the separate Announce channel setting."
+  "version": "3.72.0",
+  "versionCode": 157,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.72.0/discoflate-v3.72.0.apk",
+  "notes": "DiscoFlate v3.72.0 \u2014 the notification overlay stops showing its placeholder text on the stream the moment the intro ends: it now only ever appears when something actually notifies. Restyled to the bottom-left corner, white on blue, 3 seconds, rising and fading as it goes. A new per-command tickbox, 'say what it did', fills [command_overlay_desc] with the seconds really delivered and the pump they went to \u2014 e.g. '+5s to Belly'."
 }

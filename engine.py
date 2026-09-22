@@ -2373,6 +2373,13 @@ class Engine:
                                "secs2capacity": self._secs_to_capacity(dur, target),
                                "timer": f"{wait_secs:.1f}", "total_secs": f"{wait_secs:.1f}",
                                "total_seconds": f"{wait_secs:.1f}"})
+                    # A one-line summary of what this fire actually did, for the
+                    # notification overlay: "+5s to Belly". Several fires in one
+                    # block join up, so a command that drives two pumps says so.
+                    _d = self._device(target) or {}
+                    _nm = (_d.get("label") or _d.get("name") or "").strip()
+                    _bit = f"+{dur:g}s" + (f" to {_nm}" if _nm else "")
+                    xc["fired_desc"] = ((xc.get("fired_desc") + " · ") if xc.get("fired_desc") else "") + _bit
                     if typ == "roll":
                         xc.update({"result": total, "total": total,
                                    "dice": f"{dice}d{sides}", "sides": sides})
@@ -3901,10 +3908,15 @@ class Engine:
             if res.get("ok") and cmd.get("notify_enabled") and self.notify_cb:
                 line = (cmd.get("notify") or "").strip()
                 if line:
+                    # [command_overlay_desc] is what the command DID — only
+                    # when the command opts in, and empty (not a stray token)
+                    # when it fired nothing.
+                    desc = str(res.get("fired_desc") or "") if cmd.get("notify_desc") else ""
                     await self.notify_cb(line, {
                         "user": who, "mention": self._mention(uid, who),
                         "command": self._cmd_display(cmd.get("name", "")),
                         "cmd": self._cmd_display(cmd.get("name", "")),
+                        "command_overlay_desc": desc, "overlay_desc": desc,
                     })
         except Exception as e:  # noqa: BLE001 — a notification can't break a command
             self._log("error", f"{cmd.get('name')}: notify overlay failed: {e}")
@@ -4074,6 +4086,7 @@ class Engine:
                                              {**base, "user": who,
                                               "mention": self._mention(uid, who)})}
             return {"ok": True, "device": True, "started": True, "events_posted": ev_posts,
+                    "fired_desc": (bctx or {}).get("fired_desc", ""),
                     "reply": self.render(tmpl, {**base, "user": who, "mention": self._mention(uid, who)}),
                     "reply_anon": self.render(tmpl, {**base, "user": anon, "mention": anon})}
 

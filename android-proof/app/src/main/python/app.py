@@ -646,7 +646,13 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             return []      # intro group, but Go Live isn't opening with one
         pool = (list((scn or {}).get("overlays") or [])
                 + list(cfg0.get("scene_globals") or []))
-        return [o for o in pool if str(o.get("group") or "").strip().lower() == g]
+        # The NOTIFY overlay is driven only by a command's notification — it is
+        # never part of a group play, or the after-group at the end of the
+        # intro would paint its placeholder text on the stream for no reason.
+        skip = engine.session_overlay("notify_overlay").strip()
+        return [o for o in pool
+                if str(o.get("group") or "").strip().lower() == g
+                and not (skip and str(o.get("id") or "") == skip)]
 
     def _overlay_action(spec: dict) -> dict:
         mode = spec.get("mode") or "timed"   # may be refined per-item below

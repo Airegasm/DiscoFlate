@@ -1451,6 +1451,7 @@ esphome dashboard config/</code></pre>
             <tr><td><code>[user]</code></td><td>the person's name (plain text)</td></tr>
             <tr><td><code>[mention]</code></td><td>@pings the person (a real Discord mention)</td></tr>
             <tr><td><code>[command]</code></td><td>the command that fired, with its prefix (e.g. <code>!fill</code>) — available in a command's <b>📣 notify overlay</b> line and its cooldown reply</td></tr>
+            <tr><td><code>[command_overlay_desc]</code></td><td>what the command actually <b>did</b>, for the notify overlay — e.g. <b>+5s to Belly</b>, built from its fire rows as they run (several fires join with ·). Tick <b>say what it did</b> on the command to fill it; without that, and when the run fires nothing, it is <b>empty</b> rather than a stray token.</td></tr>
             <tr><td><code>[operator]</code> <code>[owner]</code></td><td>the bot operator's name (set at the top of the Chat tab; blank → the bot's own Discord name). <code>[owner]</code> is the same value — it just reads better in stream copy.</td></tr>
             <tr><td><code>[winner]</code> / <code>[winner_score]</code></td><td>the most recent competition's winner and their winning score</td></tr>
             <tr><td><code>[runnerup]</code> / <code>[runnerup_score]</code></td><td>the most recent competition's 2nd place and their score</td></tr>
@@ -1904,7 +1905,7 @@ function btnNewCommand(i){
   commandRows.push({name, type:'actions', enabled:true, owner_only:true,
                     hide_in_list:true, range_gate:'all', start_events:[],
                     description:'runs from the '+(b.label||'button')+' button',
-                    react_only:false, react_emoji:'', notify_enabled:false,
+                    react_only:false, react_emoji:'', notify_enabled:false, notify_desc:false,
                     notify:'[user] just triggered [command]',
                     actions:[{type:'message', message:''}]});
   b.name=name;
@@ -4625,9 +4626,19 @@ function renderCommands(){
       `<div class="row" style="gap:10px;align-items:flex-end">`+
         `<label class="row" style="gap:6px;white-space:nowrap" title="Show a line on the shared NOTIFY overlay when this command runs. One overlay serves every command — set an overlay's Layer slot to 'notify' on the Scenes tab; without one this does nothing."><input type="checkbox" ${c.notify_enabled?'checked':''} onchange="commandRows[${i}].notify_enabled=this.checked;renderCommands();scheduleSave()"> 📣 notify overlay</label>`+
         (c.notify_enabled
-          ? `<label class="field grow"><input value="${esc(c.notify??'[user] just triggered [command]')}" placeholder="[user] just triggered [command]" style="width:100%" title="[user] [mention] [command] and the usual placeholders work" onchange="commandRows[${i}].notify=this.value;scheduleSave()"></label>`
+          ? `<label class="field grow"><input value="${esc(c.notify??'[user] triggered [command] [command_overlay_desc]')}" placeholder="[user] triggered [command] [command_overlay_desc]" style="width:100%" title="[user] [mention] [command] [command_overlay_desc] and the usual placeholders work" onchange="commandRows[${i}].notify=this.value;scheduleSave()"></label>`
           : `<span class="muted">off — this command puts nothing on screen</span>`)+
       `</div>`+
+      (c.notify_enabled
+        ? `<div class="row" style="gap:10px;align-items:center;margin-top:4px">`+
+          `<label class="row" style="gap:6px;white-space:nowrap" title="Fill [command_overlay_desc] with what this command actually did — e.g. &quot;+5s to Belly&quot;. Built from the fire rows as they run, so it reports the seconds really delivered and the pump they went to.">`+
+            `<input type="checkbox" ${c.notify_desc?'checked':''} onchange="commandRows[${i}].notify_desc=this.checked;renderCommands();scheduleSave()"> `+
+            `say what it did</label>`+
+          `<span class="muted">${c.notify_desc
+            ? 'fills <code>[command_overlay_desc]</code> — e.g. <b>+5s to Belly</b> (blank when it fires nothing)'
+            : '<code>[command_overlay_desc]</code> stays empty'}</span>`+
+        `</div>`
+        : '')+
       `<label class="field">Description <input value="${esc(c.description||'')}" placeholder="what it does (shown in the command list)" onchange="commandRows[${i}].description=this.value"></label>`+
       actionsSection('⚙️ Actions', `commandRows[${i}].actions`, 'renderCommands',
             c.actions, "{type:'fire',fire_mode:'seconds',seconds:3}",
@@ -4649,7 +4660,7 @@ function cleanCommands(){
       range_gate: c.range_gate||'all',
       description: c.description||'', hide_in_list: !!c.hide_in_list,
       react_only: !!c.react_only, react_emoji: (c.react_emoji||'').trim(),
-      notify_enabled: !!c.notify_enabled,
+      notify_enabled: !!c.notify_enabled, notify_desc: !!c.notify_desc,
       notify: (c.notify ?? '[user] just triggered [command]'),
     };
     {
