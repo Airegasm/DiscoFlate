@@ -4239,114 +4239,7 @@
           }
         ],
         "capacity_events": [],
-        "polls": [
-          {
-            "name": "Belly-shock",
-            "title": "Create an electrifying experience?",
-            "body": "**[operator] currently has TENS unit electrodes attached to the sides of their belly!** It is up to you whether or not the e-stim machine gets activated to shock their belly and and cause involuntary abdominal muscle contractions. A successful vote to activate the device will keep it running for 5 minutes. Choose wisely!",
-            "duration": 60,
-            "repeat_every": 15,
-            "options": [
-              {
-                "label": "ACTIVATE!",
-                "fallback": true,
-                "actions": [
-                  {
-                    "type": "message",
-                    "message": "**The decision has been made to activate the electro stimulation machine and begins sending shocking pulses into [operator]'s belly, forcing contractions during the inflation process. This will continue for 5 minutes.**",
-                    "seconds": null,
-                    "device_id": null,
-                    "dice": null,
-                    "sides": null,
-                    "capacity_op": "add",
-                    "capacity_value": 0,
-                    "poll": null,
-                    "broadcast": null,
-                    "if_option": null
-                  }
-                ]
-              },
-              {
-                "label": "Mercy!",
-                "fallback": false,
-                "actions": [
-                  {
-                    "type": "message",
-                    "message": "**The inflators have chosen to show [operator] mercy, sparing them from the shocking jolts that would have been applied to their swelling gut.**",
-                    "seconds": null,
-                    "device_id": null,
-                    "dice": null,
-                    "sides": null,
-                    "capacity_op": "add",
-                    "capacity_value": 0,
-                    "poll": null,
-                    "broadcast": null,
-                    "if_option": null
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "name": "Popordonot",
-            "title": "[operator]'s belly has reached critical capacity!",
-            "body": "It is now up to the pump operators to decide how this inflation procedure session ends! You can choose to end the session now, allowing [operator] to deflate and release the air safely, or you could decide that you want to see just how much pressure their belly can actually take before it pops!",
-            "duration": 60,
-            "repeat_every": 15,
-            "options": [
-              {
-                "label": "Deflate",
-                "fallback": false,
-                "actions": [
-                  {
-                    "type": "message",
-                    "message": "** The operators have decided to allow [operator] to deflate safely! **",
-                    "seconds": null,
-                    "device_id": null,
-                    "dice": null,
-                    "sides": null,
-                    "capacity_op": "add",
-                    "capacity_value": 0,
-                    "poll": null,
-                    "broadcast": null,
-                    "if_option": null
-                  },
-                  {
-                    "type": "end_session",
-                    "seconds": null,
-                    "device_id": null,
-                    "dice": null,
-                    "sides": null,
-                    "capacity_op": "add",
-                    "capacity_value": 0,
-                    "poll": null,
-                    "broadcast": null,
-                    "if_option": null
-                  }
-                ]
-              },
-              {
-                "label": "Burst",
-                "fallback": true,
-                "actions": [
-                  {
-                    "type": "message",
-                    "message": "** The operators have decided to over inflate [operator]'s belly until it bursts! **",
-                    "seconds": null,
-                    "device_id": null,
-                    "dice": null,
-                    "sides": null,
-                    "capacity_op": "add",
-                    "capacity_value": 0,
-                    "poll": null,
-                    "broadcast": null,
-                    "if_option": null
-                  }
-                ]
-              }
-            ]
-          }
-        ],
+        "polls": [],
         "competitions": [],
         "bonus_rounds": [],
         "event_in_process_message": "\u23f3 [event] is already running.",
@@ -6908,114 +6801,7 @@
           }
         ],
         "capacity_events": [],
-        "polls": [
-          {
-            "name": "Belly-shock",
-            "title": "Create an electrifying experience?",
-            "body": "**[operator] currently has TENS unit electrodes attached to the sides of their belly!** It is up to you whether or not the e-stim machine gets activated to shock their belly and and cause involuntary abdominal muscle contractions. A successful vote to activate the device will keep it running for 5 minutes. Choose wisely!",
-            "duration": 60,
-            "repeat_every": 15,
-            "options": [
-              {
-                "label": "ACTIVATE!",
-                "fallback": true,
-                "actions": [
-                  {
-                    "type": "message",
-                    "message": "**The decision has been made to activate the electro stimulation machine and begins sending shocking pulses into [operator]'s belly, forcing contractions during the inflation process. This will continue for 5 minutes.**",
-                    "seconds": null,
-                    "device_id": null,
-                    "dice": null,
-                    "sides": null,
-                    "capacity_op": "add",
-                    "capacity_value": 0,
-                    "poll": null,
-                    "broadcast": null,
-                    "if_option": null
-                  }
-                ]
-              },
-              {
-                "label": "Mercy!",
-                "fallback": false,
-                "actions": [
-                  {
-                    "type": "message",
-                    "message": "**The inflators have chosen to show [operator] mercy, sparing them from the shocking jolts that would have been applied to their swelling gut.**",
-                    "seconds": null,
-                    "device_id": null,
-                    "dice": null,
-                    "sides": null,
-                    "capacity_op": "add",
-                    "capacity_value": 0,
-                    "poll": null,
-                    "broadcast": null,
-                    "if_option": null
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "name": "Popordonot",
-            "title": "[operator]'s belly has reached critical capacity!",
-            "body": "It is now up to the pump operators to decide how this inflation procedure session ends! You can choose to end the session now, allowing [operator] to deflate and release the air safely, or you could decide that you want to see just how much pressure their belly can actually take before it pops!",
-            "duration": 60,
-            "repeat_every": 15,
-            "options": [
-              {
-                "label": "Deflate",
-                "fallback": false,
-                "actions": [
-                  {
-                    "type": "message",
-                    "message": "** The operators have decided to allow [operator] to deflate safely! **",
-                    "seconds": null,
-                    "device_id": null,
-                    "dice": null,
-                    "sides": null,
-                    "capacity_op": "add",
-                    "capacity_value": 0,
-                    "poll": null,
-                    "broadcast": null,
-                    "if_option": null
-                  },
-                  {
-                    "type": "end_session",
-                    "seconds": null,
-                    "device_id": null,
-                    "dice": null,
-                    "sides": null,
-                    "capacity_op": "add",
-                    "capacity_value": 0,
-                    "poll": null,
-                    "broadcast": null,
-                    "if_option": null
-                  }
-                ]
-              },
-              {
-                "label": "Burst",
-                "fallback": true,
-                "actions": [
-                  {
-                    "type": "message",
-                    "message": "** The operators have decided to over inflate [operator]'s belly until it bursts! **",
-                    "seconds": null,
-                    "device_id": null,
-                    "dice": null,
-                    "sides": null,
-                    "capacity_op": "add",
-                    "capacity_value": 0,
-                    "poll": null,
-                    "broadcast": null,
-                    "if_option": null
-                  }
-                ]
-              }
-            ]
-          }
-        ],
+        "polls": [],
         "competitions": [],
         "bonus_rounds": [],
         "event_in_process_message": "\u23f3 [event] is already running.",
@@ -7954,7 +7740,8 @@
         "commands": []
       },
       "notify_overlay": "dfdefnotify",
-      "pause_overlay": "Pause"
+      "pause_overlay": "Pause",
+      "pristine": true
     }
   ],
   "scene_globals": [],

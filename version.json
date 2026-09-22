@@ -1,6 +1,6 @@
 {
-  "version": "3.66.0",
-  "versionCode": 149,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.66.0/discoflate-v3.66.0.apk",
-  "notes": "DiscoFlate v3.66.0 \u2014 canvas and scene-lock fixes. Scoping the canvas to a scene group now actually clears the other groups off it (picking a group only moved the list before). Selecting an overlay from the list highlights it and lets you drag it even when something sits on top, while the canvas still previews the true stacking. Editing anything scene-scoped on the read-only DiscoFlate Default now tells you to switch to Your Scene instead of silently reverting. Intro countdown defaults to 15s."
+  "version": "3.67.0",
+  "versionCode": 150,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.67.0/discoflate-v3.67.0.apk",
+  "notes": "DiscoFlate v3.67.0 \u2014 'Your Scene' is now a living copy of the read-only DiscoFlate Default: change what we ship and an untouched copy follows along, so you always start from the current baseline. The moment you edit or rename it, it is yours and updates stop touching it. Both shipped scenes now start clean \u2014 no sample polls, broadcasts or capacity events."
 }

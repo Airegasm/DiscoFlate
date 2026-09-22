@@ -49,6 +49,13 @@ CONFIG_VERSION = 14
 # to and compare against, so nothing may write to it.
 DEFAULT_SCENE_NAME = "DiscoFlate Default"
 
+# The starter scene. It ships as a carbon copy of the read-only baseline and
+# keeps tracking it — change what we ship and an untouched copy follows — right
+# up until the operator makes it theirs by editing or renaming it. From that
+# moment it is their scene and we never touch it again. `pristine` is the mark
+# of "still ours"; the first edit clears it for good.
+STARTER_SCENE_NAME = "Your Scene"
+
 # The gameplay half of the config: everything that defines HOW THE SHOW PLAYS,
 # as opposed to the infrastructure it runs on (token, devices, calibration,
 # channels, scores). A SCENE owns this set outright — pick a scene and you have
@@ -706,6 +713,9 @@ def load() -> dict:
     # Migrate the RAW stored config (merging first would inherit DEFAULTS'
     # current config_version and skip every step).
     cfg = _coerce_numbers(_deep_merge(DEFAULTS, _migrate(stored)))
+    # an untouched starter picks up whatever we ship now, without waiting for
+    # a save or a config-version bump
+    _sync_starter(cfg, None)
     cfg["discord_token"] = _dec_token(cfg.get("discord_token") or "")
     return cfg
 
@@ -1419,6 +1429,12 @@ def _migrate(cfg: dict) -> dict:
             gp = dflt.setdefault("gameplay", {})
             gp["broadcasts"] = []
             gp["capacity_events"] = []
+            gp["polls"] = []
+        # The starter we just handed over is untouched by construction, so mark
+        # it as ours — it keeps tracking the shipped scene until they edit it.
+        start = _by(STARTER_SCENE_NAME.lower())
+        if start is not None:
+            start["pristine"] = True
         # never leave the panel pointed at a scene nobody can edit
         if (str(cfg.get("chat_scene") or "").strip().lower()
                 == DEFAULT_SCENE_NAME.lower()):
@@ -1482,6 +1498,76 @@ def _fsync_dir(path: str) -> None:
         pass
 
 
+def _shipped(name: str) -> dict | None:
+    want = name.strip().lower()
+    return next((sc for sc in (_factory_seed().get("scenes") or [])
+                 if str(sc.get("name") or "").strip().lower() == want), None)
+
+
+def _named(sc: dict, like: dict) -> dict:
+    """`sc` under the other scene's name, for a name-blind comparison."""
+    out = dict(sc)
+    out["name"] = like.get("name")
+    return out
+
+
+def _scene_body(sc: dict) -> str:
+    """A scene's content, ignoring the pristine mark, for change detection."""
+    return json.dumps({k: v for k, v in sc.items() if k != "pristine"},
+                      sort_keys=True, default=str)
+
+
+def _sync_starter(cfg: dict, previous: list | None) -> None:
+    """Keep an untouched starter matching what we ship; release an edited one.
+
+    `previous` is the scene list as it was on disk. If the incoming starter
+    differs from it, the operator just edited it — drop the mark and leave it
+    alone for ever after. Otherwise refresh it from the factory, which is what
+    lets a change to the shipped scene reach people who never touched theirs.
+    """
+    scenes = cfg.get("scenes")
+    if not isinstance(scenes, list):
+        return
+    want = STARTER_SCENE_NAME.strip().lower()
+    for sc in scenes:
+        # renamed it → it's theirs now, whatever else they did
+        if isinstance(sc, dict) and sc.get("pristine") \
+                and str(sc.get("name") or "").strip().lower() != want:
+            sc.pop("pristine", None)
+    at = next((i for i, sc in enumerate(scenes)
+               if isinstance(sc, dict) and sc.get("pristine")
+               and str(sc.get("name") or "").strip().lower() == want), None)
+    if at is None:
+        return
+    fresh = _shipped(STARTER_SCENE_NAME)
+    if previous is not None:
+        # Untouched means matching EITHER what we ship (load() may have just
+        # refreshed it) OR what was last written (we shipped a change they have
+        # not picked up yet). Only when it matches neither did they edit it.
+        body = _scene_body(scenes[at])
+        was = next((sc for sc in previous
+                    if isinstance(sc, dict)
+                    and str(sc.get("name") or "").strip().lower() == want), None)
+        same_as_shipped = fresh is not None and _scene_body(_named(fresh, scenes[at])) == body
+        same_as_disk = was is not None and _scene_body(was) == body
+        if not (same_as_shipped or same_as_disk):
+            scenes[at].pop("pristine", None)      # edited → hands off from now on
+            return
+    if fresh is not None:
+        scenes[at] = copy.deepcopy(fresh)
+        scenes[at]["pristine"] = True
+
+
+def _disk_scenes() -> list | None:
+    """The scene list exactly as stored, for before/after comparison."""
+    try:
+        with open(CONFIG_PATH, "r", encoding="utf-8") as fh:
+            d = json.load(fh)
+        return d.get("scenes") if isinstance(d, dict) else None
+    except (FileNotFoundError, ValueError, OSError):
+        return None
+
+
 def _enforce_builtin(cfg: dict) -> None:
     """Restore the read-only shipped scene, whatever the caller sent.
 
@@ -1509,6 +1595,7 @@ def _enforce_builtin(cfg: dict) -> None:
 
 def save(cfg: dict) -> dict:
     os.makedirs(DATA_DIR, exist_ok=True)
+    _sync_starter(cfg, _disk_scenes())
     _enforce_builtin(cfg)
     cfg["config_rev"] = int(cfg.get("config_rev") or 0) + 1
     _rotate_backups()
