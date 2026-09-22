@@ -2377,7 +2377,10 @@ class Engine:
                     # notification overlay: "+5s to Belly". Several fires in one
                     # block join up, so a command that drives two pumps says so.
                     _d = self._device(target) or {}
-                    _nm = (_d.get("label") or _d.get("name") or "").strip()
+                    # the PUMP's name, not the plug's alias — `label` is the
+                    # smart plug ("P3"), `name` is what it drives ("Gut Buster").
+                    # Same order as devName() in the panel.
+                    _nm = ((_d.get("name") or "").strip() or (_d.get("label") or "").strip())
                     _bit = f"+{dur:g}s" + (f" to {_nm}" if _nm else "")
                     xc["fired_desc"] = ((xc.get("fired_desc") + " · ") if xc.get("fired_desc") else "") + _bit
                     if typ == "roll":
