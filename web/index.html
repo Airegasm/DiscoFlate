@@ -1824,19 +1824,12 @@ function renderChatBtnEditor(){
   const box=$('#chatBtnRows'); if(!box) return;
   box.innerHTML = chatButtons.map((b,i)=>{
     const missing = (b.name||'').trim() && !commandRows.some(c=>(c.name||'').trim()===b.name);
-    // A button used to be able to do one of five things directly. They all
-    // collapsed into "run a command", so an old one needs rebuilding — say
-    // what it used to do rather than leaving a button that quietly fails.
-    const WAS = {poll:'start a poll', owner:'post an #owner command',
-                 overlay:'play an overlay', group:'play a scene group'};
-    const legacy = WAS[b.kind];
     return `<div class="row ovedit">`+
       `<label class="field">Label <input value="${esc(b.label||'')}" placeholder="🔥 Blast" style="width:170px" onchange="chatButtons[${i}].label=this.value;renderChatButtons();scheduleSave()"></label>`+
       `<label class="field grow">Runs <select style="width:100%" onchange="chatButtons[${i}].name=this.value;renderChatBtnEditor();scheduleSave()">${cmdNameOpts(b.name)}</select></label>`+
       `<button class="ghost" title="make a new owner-only command for this button and open it" onclick="btnNewCommand(${i})">＋ new</button>`+
       `<button class="ghost" onclick="chatButtons.splice(${i},1);renderChatBtnEditor();renderChatButtons();scheduleSave()">✕</button>`+
-      (legacy?`<span class="muted" style="width:100%">⚠ this button used to <b>${esc(legacy)}</b> directly. Buttons run a <b>!command</b> now — pick one above, or <b>＋ new</b> to build it.</span>`
-       : missing?`<span class="muted" style="width:100%">⚠ there's no command called <b>${esc(b.name)}</b> any more</span>`:'')+
+      (missing?`<span class="muted" style="width:100%">⚠ there's no command called <b>${esc(b.name)}</b> any more</span>`:'')+
     `</div>`;
   }).join('') || '<div class="muted">no buttons yet</div>';
 }
@@ -2794,13 +2787,14 @@ function renderStgContents(){
     .map(({o,i})=>{
       const nm=o.label||o.text||o.media||OV_KINDS.find(x=>x[0]===(o.kind||'media'))?.[2]||o.kind;
       return `<div class="stgrow${o.id===scnSelId?' sel':''}" onclick="stgSelect('${esc(o.id)}')">`+
-        `<button class="ghost" style="opacity:${o.visible?1:.4}" title="${
-          o.kind==='poll_viewer'
-            ? (o.visible?'always on — mounted for the scene; it shows itself only while a poll runs. Click to make it callable instead'
-                        :'callable — nothing shows unless an action mounts it first. Click to make it always on')
-            : (o.visible?'always on — click to make it callable instead'
-                        :'callable — click to make it always on')
-        }" onclick="event.stopPropagation();stgItemVis('${esc(o.id)}')">${o.visible?'👁':'🚫'}</button>`+
+        // A Poll Viewer draws itself only while a poll is running, so whether
+        // it's "always on" was never a real choice — its GROUP governs it.
+        (o.kind==='poll_viewer'
+          ? `<span class="pmini" title="shows itself whenever a poll runs — turn its scene group off to stop it" style="opacity:.5;cursor:default">🗳</span>`
+          : `<button class="ghost" style="opacity:${o.visible?1:.4}" title="${
+              o.visible?'always on — click to make it callable instead'
+                       :'callable — click to make it always on'
+            }" onclick="event.stopPropagation();stgItemVis('${esc(o.id)}')">${o.visible?'👁':'🚫'}</button>`)+
         `<span>${ico(o.kind)}</span>`+
         `<span class="nm">${esc(String(nm).split('\n')[0].slice(0,34))}</span>`+
         ((o.group||'').trim()?`<span class="tag">${stgGroupHidden(o.group)?'🚫':'🎬'} ${esc(o.group.trim())}</span>`:'')+
@@ -2982,9 +2976,7 @@ function renderStgProps(){
   // A Poll Viewer gates ITSELF — it draws nothing unless a poll is running —
   // so always-on/callable decides whether it's MOUNTED, not whether it shows.
   const fire = `<span class="muted">${o.kind==='poll_viewer'
-      ? (o.visible
-         ? 'Always on — mounted for the whole scene, and it draws itself only while a poll is running (plus its results window). This is the one you want.'
-         : 'Callable — only mounted after an action fires it, so a poll that starts beforehand shows nothing. Use this only to limit polls to one segment.')
+      ? 'Shows itself whenever a poll is running (plus its results window) and nothing the rest of the time — so it has no always-on/callable switch. To stop it appearing, turn its <b>scene group</b> off.'
       : o.visible
       ? 'Always on — up whenever the scene is live, and HOLDS when a scene group plays it.'
       : 'Callable — plays when an action, button or scene group fires it.'}</span>`+

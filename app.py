@@ -849,7 +849,12 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             scene = (last.get("scene") or "").strip() or cfg0.get("chat_scene", "")
             scn = _find_scene(cfg0, scene)
             for o in ((scn or {}).get("overlays") or []):
-                if not o.get("visible") or _group_hidden(scn, o.get("group")):
+                # A Poll Viewer gates ITSELF — it draws nothing unless a poll is
+                # running — so it mounts whenever its group is on screen. Its
+                # always-on/callable flag would only ever be a way to make polls
+                # silently invisible, so it is not consulted.
+                if (not o.get("visible") and (o.get("kind") or "") != "poll_viewer") \
+                        or _group_hidden(scn, o.get("group")):
                     continue
                 if _group_is_intro(scn, o.get("group")):
                     continue     # the pre-show mounts these, not the camera
@@ -1957,7 +1962,12 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             cfg_now = config_store.load()
             scn = _find_scene(cfg_now, scene_name)
             for o in ((scn or {}).get("overlays") or []):
-                if not o.get("visible") or _group_hidden(scn, o.get("group")):
+                # A Poll Viewer gates ITSELF — it draws nothing unless a poll is
+                # running — so it mounts whenever its group is on screen. Its
+                # always-on/callable flag would only ever be a way to make polls
+                # silently invisible, so it is not consulted.
+                if (not o.get("visible") and (o.get("kind") or "") != "poll_viewer") \
+                        or _group_hidden(scn, o.get("group")):
                     continue
                 if _group_is_intro(scn, o.get("group")):
                     continue     # the pre-show mounts these, not the camera
