@@ -32,7 +32,7 @@ or bank volume) · `command_gate` (Block/Allow/Resume play) · `achievement` ·
 `stop_devices` · `end_session` — plus `broadcast` and `command`, control flow
 (`var` · `if` · `repeat` · `random` · `group` · `label` · `goto` · `cancel`), and
 the stream rows (`overlay` · `scene_group` · `camera` · `snapshot` ·
-`update_overlay_text` · `start_timer` / `stop_timer`). The bot speaks only
+`update_overlay_text` · `start_timer` / `stop_timer`) and `minigame`. The bot speaks only
 through **message** rows; results (`[secs]`, `[result]`, `[bonus_cmd]`, …) flow
 into the rows after them.
 
@@ -44,9 +44,11 @@ into the rows after them.
   one-time milestone messages + images. **Range values always beat a command's
   own**; **Always-On** hosts range-free utility commands (a command lives in
   ranges *or* Always-On, never both).
-- **Custom commands = gates + an action block.** Six interactive **minigames**
-  (push-luck, simon, balloon, RPS, slots, blackjack) are the only special types —
-  private button play, score→tier outcomes that can run any action block.
+- **Custom commands = gates + an action block.** A `minigame` row plays a named
+  **minigame profile** (push-luck, simon, balloon, RPS, slots, blackjack) — private
+  button play with score→tier outcomes that run any action block. Only that one
+  player's run waits; everyone else plays on. Two profiles of the same game can
+  differ completely in limits, luck and outcomes.
 - **Timed events = three blocks** — 🚀 on activation → 🔁 each round → 🏁 when it
   ends. Rounds never overlap and never stall the game; `clean_previous` keeps
   loops to a single live message.
@@ -71,11 +73,15 @@ into the rows after them.
   groups** from any action block. Go Live can open on a **chain of intro
   stages** over a black feed; pausing covers the stream with a pause card.
   **Snapshot** posts the current composited frame — overlays and all.
-- **Operator Controls** — dashboard buttons (Roll, Pump, Broadcasts,
-  Leaderboards, Cleanup) that fire real in-channel actions *as the owner*.
-- **Gameplay Presets & Templates** — save/load whole game setups (the shipped
-  **Defaults (built-in)** preset included) or single commands/events/ranges;
-  everything auto-migrates across versions, presets and templates included.
+- **A scene is the whole show.** A scene owns its overlays and groups *and* its
+  commands, triggers, buttons, wording and limits. Switching scenes switches all
+  of it at once, so a command can never name a group that belongs somewhere else.
+  Ships with a read-only **DiscoFlate Default** to compare against and an editable
+  **Your Scene** that tracks it until you edit or rename it.
+- **Operator Controls** — buttons on the Chat tab (Roll, Pump, Broadcast, Poll,
+  Capacity, Cleanup) that fire real in-channel actions *as the owner*.
+- **Templates** — save/load single commands, events or ranges; everything
+  auto-migrates across versions.
 - **Mock mode** — run the entire game (capacity, timers, messages, leaderboard)
   with **no hardware at all**; set the virtual pump's calibration on the Devices tab.
 
@@ -196,7 +202,7 @@ away.
 > [**fix-clone.sh** (Linux/Mac)](https://github.com/Airegasm/DiscoFlate/releases/download/v3.9.0/fix-clone.sh).
 > Either is just `git fetch origin && git reset --hard origin/main`.
 
-The app checks for a newer release on launch and shows a banner on the Dashboard.
+The app checks for a newer release on launch and shows a banner on the Chat tab.
 **Help → Updates** applies it: on desktop it `git pull`s the latest code (then
 restart DiscoFlate). If the folder isn't a clone — the usual cause being a ZIP
 download — it says so and offers **🛠 Fix my install** instead of failing with a
@@ -220,7 +226,7 @@ export your config first via **Help → Export config**.) APKs are published on
 | `vendors/` | per-brand drivers (kasa is `kasa_legacy.py`) |
 | `kasa_legacy.py` | legacy Kasa driver (UDP/TCP 9999, XOR autokey cipher) |
 | `config_store.py` | `data/config.json` (atomic + fsync, 0600 — holds your token; git-ignored; auto-backups in `data/backups/`) |
-| `web/index.html` | the control-surface GUI |
+| `web/index.html` | the control-surface GUI (Chat · Scenes · Triggers · Devices · Discord · System · Help) |
 | `android-proof/` | the Chaquopy Android app |
 
 Your token and runtime state live in `data/` (git-ignored) — it's recreated on

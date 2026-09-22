@@ -635,7 +635,7 @@
             <input id="cooldownExempt" placeholder="123456789012345678"></label>
           <label class="field">Default per-user cooldown <span class="muted">(seconds)</span>
             <input type="number" id="cooldown" value="30" min="0" step="1" style="width:110px"></label>
-          <div class="hint" style="margin-top:0">The Owner <b>name</b> is now set at the top of the <b>Dashboard</b>. Owner bypasses <b>cooldowns and per-person max-uses</b> (still limited only by in-progress events) and runs owner-only commands. Cooldown messages are on the <b>Commands</b> tab.</div>
+          <div class="hint" style="margin-top:0">Your Discord <b>name</b> is set at the top of the <b>Chat</b> tab. Owner bypasses <b>cooldowns and per-person max-uses</b> (still limited only by in-progress events) and runs owner-only commands. Cooldown messages are on the <b>Commands</b> tab.</div>
         </div>
         <div class="colsec" style="flex:1;min-width:240px">
           <h3>Auto-report</h3>
@@ -731,7 +731,7 @@
         <label class="field" style="width:170px;flex:none">Titlebar <input id="cooldownTitle" placeholder="⏳ Cooldown"></label>
       </div>
       <div class="row" style="gap:12px;align-items:flex-end;margin-top:10px;flex-wrap:nowrap">
-        <label class="field" style="flex:1">Operator Pump message <span class="muted">(Dashboard → Controls → 💨 Pump · [secs] [secs2capacity] [capacity] [timer] [operator] · reuse it anywhere as <code>[pump_msg]</code>)</span>
+        <label class="field" style="flex:1">Operator Pump message <span class="muted">(Chat → Controls → 💨 Pump · [secs] [secs2capacity] [capacity] [timer] [operator] · reuse it anywhere as <code>[pump_msg]</code>)</span>
           <textarea id="pumpMsg" rows="2"></textarea></label>
         <label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" id="pumpEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
         <label class="field" style="width:170px;flex:none">Titlebar <input id="pumpTitle" placeholder="💨 Pump"></label>
@@ -827,7 +827,7 @@
         <button class="ghost" onclick="addBroadcast()">+ Add broadcast</button>
         <div style="flex:1"></div>
       </div>
-      <div class="hint">Preset messages you can fire from the <b>Dashboard → Controls</b> (“Broadcast Custom”). Placeholders work (<code>[capacity]</code>, <code>[operator]</code>, …). Posted to your channel as the owner.</div>
+      <div class="hint">Preset messages you can fire from the <b>Chat tab → Controls</b> (“Broadcast Custom”). Placeholders work (<code>[capacity]</code>, <code>[operator]</code>, …). Posted to your channel as the owner.</div>
       </details>
     </div>
     <div class="card span" data-tab="triggers">
@@ -1150,26 +1150,6 @@
       <div class="hint" style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px"><b>Backups</b> live on the <a style="cursor:pointer" onclick="showTab('system')">System tab</a> (full config, token included). Your commands, events and wording belong to the <b>scene</b> now, so to keep a setup around, <a style="cursor:pointer" onclick="showTab('stages')">copy the scene</a> rather than saving a preset.</div>
     </div>
 
-    <div class="card span" data-tab="help">
-      <details class="help"><summary><h2>About DiscoFlate</h2></summary>
-      <div class="hint" style="max-width:820px;margin-top:8px">A self-hosted <b>Discord bot + local control panel</b> that turns chat commands into timed smart-plug fires, driving an inflation-themed capacity game. Everything runs on <b>your own device</b> and controls <b>your own</b> smart plugs on <b>your own</b> network — no cloud middleman. It's a <b>real bot account</b> (not a self-bot), so it stays within Discord's rules.</div>
-      <h3 style="margin:14px 0 6px">What it does</h3>
-      <ul style="line-height:1.7;padding-left:22px;margin:0;max-width:820px">
-        <li><b>Capacity engine</b> — capacity accumulates while the active pump runs, at a rate set by that device's <code>seconds-to-100%</code> calibration.</li>
-        <li><b>Per-range everything</b> — dice (<code>N</code>d<code>sides</code>) + luck, per-command cooldowns (per-user or shared), per-person use budgets, per-range fire overrides (seconds + device), ongoing announce text, one-time milestone messages + images. <b>Range values always beat a command's own.</b></li>
-        <li><b>Custom commands = action blocks</b> — every command is an ordered sequence of action rows (message / fire / roll / chance / award / poll / competition / command_gate / …); the bot speaks only through <b>message</b> rows. Six interactive minigames are the only special types.</li>
-        <li><b>Perfect Prizes</b> — N perfect rolls (or any named achievement, e.g. a blackjack 21) runs an unlock action block for the earner — typically awarding a limited-charge bonus command. Re-earnable, range-gateable.</li>
-        <li><b>End sequences</b> — let capacity run past 100% to a final burst threshold with its own entry milestone and final message/image.</li>
-        <li><b>Timed events, modes, leaderboard, per-user cooldowns, anti-spam buffer,</b> and multi-server support with anonymized cross-server echoes.</li>
-        <li><b>Snapshots</b> — the <b>snapshot</b> action grabs the <b>current virtual-camera frame, overlays and all</b>, and posts it to the channel. Fire it from any action block (commands, events, ranges…) with an optional caption. It needs the virtual cam running — the Chat tab's 🎥 section starts it — and is quiet when it isn't.</li>
-        <li><b>Operator Controls</b> — dashboard buttons (Roll, Stop, Pump, Broadcast Capacity/Users) that fire real in-channel actions <i>as the owner</i>, exactly as if they'd typed the command.</li>
-        <li><b>Mock mode</b> — run the whole game with no hardware at all; set the virtual pump's calibration on the Devices tab.</li>
-      </ul>
-      <div class="hint" style="max-width:820px">Messages are fully templated via <code>[placeholders]</code> — <code>[capacity]</code>, <code>[capacity_bar]</code>, <code>[dice]</code>, <code>[result]</code>, <code>[secs2capacity]</code>, <code>[timer]</code>, <code>[commands]</code>, <code>[custom_commands]</code>, <code>[cmd_remain]</code>, <code>[operator]</code>, and more (see <b>Placeholders &amp; examples</b> below).</div>
-      <div class="hint" style="max-width:820px">⚠️ Physical devices are involved. The app forces the active device <b>off</b> on shutdown (and on Android when torn down), but always keep a physical power switch as a backstop. Built for consenting adult roleplay.</div>
-      <div style="margin-top:10px"><a href="https://github.com/Airegasm/DiscoFlate" target="_blank" rel="noopener" onclick="return openExternal('https://github.com/Airegasm/DiscoFlate', event)">Full docs &amp; source on GitHub ↗</a></div>
-      </details>
-    </div>
 
     <div class="card span" data-tab="help">
       <details class="help"><summary><h2>Custom commands — how to set them up</h2></summary>
@@ -1200,8 +1180,8 @@
         <li><b>Description</b> — shown next to the command in <code>[commands]</code>.</li>
         <li><b>Starts events</b> — comma-separated names of (off-by-default) timed events this command switches on temporarily. They revert on Session reset / app restart.</li>
         <li><b>🎮 Minigames are profiles, not command types.</b> A minigame is a named profile on the <b>Triggers</b> tab — a game, its settings, its luck and its <b>outcome tiers</b>. Any command plays one with a <b>minigame</b> action row, so the command can fire a pump and post a message <i>before</i> the game and carry on <i>after</i> it, with <code>[score]</code> <code>[game]</code> <code>[secs]</code> filled in. Only that one player's run waits — everyone else's commands, the timed events and the capacity loop carry on. Two profiles of the same game can differ completely, and any number of commands can call either.</li>
-        <li><b>📣 Notify overlay (per command).</b> One overlay serves every command. Design a <b>Text</b> overlay on the <b>Scenes</b> tab, then pick it in <b>Dashboard → Go Live Options → 🖼 Session Overlays</b>; each command's own line plays on it when the command runs. Tick <b>📣 notify overlay</b> on a command and edit its text — <code>[user]</code> <code>[mention]</code> <code>[command]</code> and the usual placeholders all work, and the default is <code>[user] just triggered [command]</code>. A run that was blocked (paused, on cooldown, held by an intro, gated) never announces itself, and with no notify overlay picked it's a quiet no-op.</li>
-        <li><b>⏸ Pause overlay.</b> A <b>scene group</b> that covers the stream the moment you hit <b>⏸ Pause</b> in the header, and clears on <b>▶ Resume</b>. Pick it in <b>Dashboard → Go Live Options → 🖼 Session Overlays</b>. The shipped <b>Pause</b> group is a full-frame black card reading <code>[operator] will be right back!</code>, drawn above everything else.</li>
+        <li><b>📣 Notify overlay (per command).</b> One overlay serves every command. Design a <b>Text</b> overlay on the <b>Scenes</b> tab, then pick it in <b>Scenes → 🖼 Session Overlays</b>; each command's own line plays on it when the command runs. Tick <b>📣 notify overlay</b> on a command and edit its text — <code>[user]</code> <code>[mention]</code> <code>[command]</code> and the usual placeholders all work, and the default is <code>[user] just triggered [command]</code>. A run that was blocked (paused, on cooldown, held by an intro, gated) never announces itself, and with no notify overlay picked it's a quiet no-op.</li>
+        <li><b>⏸ Pause overlay.</b> A <b>scene group</b> that covers the stream the moment you hit <b>⏸ Pause</b> in the header, and clears on <b>▶ Resume</b>. Pick it in <b>Scenes → 🖼 Session Overlays</b>. The shipped <b>Pause</b> group is a full-frame black card reading <code>[operator] will be right back!</code>, drawn above everything else.</li>
         <li><b>Row icons</b> — every command / event / range row has <b>📋 Duplicate</b> (a clash-safe copy, e.g. <code>fill</code> → <code>fill-copy</code>), <b>💾 Save as template</b> (stashes it in <b>System → Templates</b> for reuse), and <b>✕ Delete</b>. To open or close a row, <b>click its title strip</b> — anywhere that isn't one of those buttons, a checkbox, a field or the <b>⋮⋮</b> drag handle. Click it again to close. In <b>System → Templates</b>, <b>＋ Add to Config</b> ports a saved template back in (auto-renaming on a clash).</li>
       </ul>
       <div class="hint" style="max-width:820px"><b>⚠️ Two-step setup — this trips people up:</b> creating a command does <b>nothing</b> on its own. It only works after you either <b>add it to a range</b> (Game → <b>Capacity ranges</b> → open a range → “<b>+ Add command to this range</b>”) or put it in <b>⚡ Always-On</b> — never both: a range-bound command leaves Always-On automatically. Per range you set its <b>cooldown</b>, <b>max uses/person</b>, <b>scope</b>, and (for fire commands) a <b>Fire override</b> — <b>range values always beat the command's own</b>, so one <code>!pump</code> can drive different pumps for different lengths in different bands.</div>
@@ -1271,7 +1251,7 @@
         <h3 style="margin:14px 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--accent2)">Then, every session, in this order</h3>
         <div class="hint" style="max-width:880px;margin-top:0">
           <ol style="margin:4px 0 0 18px">
-            <li><b>Build a scene</b> (Scenes tab) — or use the shipped <b>Basic Overlays</b>. Whichever scene is selected here is the <b>live</b> one.</li>
+            <li><b>Build a scene</b> (Scenes tab) — or start from the shipped <b>Your Scene</b>. Whichever scene is selected here is the <b>live</b> one.</li>
             <li><b>Join the Discord voice/video channel</b> and pick it in the Chat tab's <b>Channel</b> dropdown. The 🎥 section only appears for <b>video</b> channels.</li>
             <li><b>▶ Start virtual cam.</b> The preview shows exactly what viewers get — trust it over your own Discord tile, which Discord always mirrors.</li>
             <li><b>In Discord</b> → voice &amp; video settings → pick <b>DiscoFlate Cam</b> as your camera, then turn your camera on in the call. Nothing shows yet, and that's correct: <b>the feed is black until you go LIVE.</b> Get yourself set up in private.</li>
@@ -1321,7 +1301,7 @@
         <li><b>🏷 label / goto / goto_if / group</b> — jump around inside a block instead of nesting deeper. Drop a <b>label</b> (or name a <b>group</b>), then <b>goto</b> it; <b>goto_if</b> jumps only when its conditions pass, which is how you build retry loops and skip-aheads. Jumping to a <b>label</b> resumes after it; jumping to a named <b>group</b> runs that group and then carries on. Jumps are capped at 2000 per block, and an unknown label is a quiet no-op.</li>
         <li><b>🛑 cancel</b> — stops every <i>other</i> running action block (events mid-loop, waits, overlapping commands) while this one carries on. The panic button when things overlap.</li>
         <li><b>"once" tickbox</b> — on any action row. That row fires a <b>single time per session</b> and is skipped afterwards, resetting on session reset. Each command keeps its own memory, so the same row in two places doesn't share a count.</li>
-        <li><b>🎬 Go Live Options (Dashboard)</b> — flipping <b>LIVE</b> on can open with an <b>intro</b> instead of starting the game. A scene group plays, an optional announcement posts (repeating and refreshing if you want), and <b>commands stay held</b> the whole time — anyone who tries gets a polite standby reply instead of pumping during your pre-show. Timed events wait too. You can allow specific commands through (a signup, say). Set a length, or set it to <b>0</b> and the intro waits until you press <b>🎬 Start now</b> in the Chat tab — that button appears only while an intro is running and shows the countdown. Flipping LIVE off mid-intro cancels it cleanly. <b>The camera sends black whenever the session isn't LIVE</b> — so you can start it, pick it in Discord and get set up without anyone seeing the room — and it stays black through the intro (untick <b>black during intro</b> if you'd rather show the camera behind it). Overlays draw on top of the black either way. <code>[intro_timer]</code> counts down in messages <i>and</i> in Text overlays. The announcement can carry an <b>image</b> (picked from the media library), posted with the first message.</li>
+        <li><b>🎬 Go Live Options (Scenes tab)</b> — flipping <b>LIVE</b> on can open with an <b>intro</b> instead of starting the game. A scene group plays, an optional announcement posts (repeating and refreshing if you want), and <b>commands stay held</b> the whole time — anyone who tries gets a polite standby reply instead of pumping during your pre-show. Timed events wait too. You can allow specific commands through (a signup, say). Set a length, or set it to <b>0</b> and the intro waits until you press <b>🎬 Start now</b> in the Chat tab — that button appears only while an intro is running and shows the countdown. Flipping LIVE off mid-intro cancels it cleanly. <b>The camera sends black whenever the session isn't LIVE</b> — so you can start it, pick it in Discord and get set up without anyone seeing the room — and it stays black through the intro (untick <b>black during intro</b> if you'd rather show the camera behind it). Overlays draw on top of the black either way. <code>[intro_timer]</code> counts down in messages <i>and</i> in Text overlays. The announcement can carry an <b>image</b> (picked from the media library), posted with the first message.</li>
         <li><b>Turning a scene group off</b> — the <b>👁</b> beside the group dropdown takes the whole group <b>off the stream</b>: it goes away immediately and doesn't come up when the scene loads. It is <b>not</b> a mute — firing it (a button, an event, a <code>scene_group</code> action) still plays it, which is exactly how an on-demand group like fireworks or an outro works: leave it off, fire it when you want it. Its overlays grey out on the canvas so you can still see where they sit. Click again to put it back on. Handy for building a group you aren't ready to use, or dropping a segment from a show without deleting it.</li>
         <li><b>🎬 Scene groups</b> — there's no separate place to create one: on the <b>Scenes</b> tab, click an overlay and type a name into its <b>Scene group</b> box (say <code>intro</code>) — the group exists the moment an overlay carries that name, and the box autocompletes names you already use. Every group in the scene is listed under the canvas with its overlay count; click one to jump to it. Then <b>scene_group</b> plays the whole set at once and <b>scene_group_kill</b> clears it. Each overlay keeps its own mode, position and fades. Firing a group that has no overlays does nothing at all.</li>
         <li><b>🗂 Layer order</b> — every overlay has a <b>layer order</b> number (with ⬆/⬇ buttons): higher draws on top. Equal numbers keep fire order, so the newest still lands above. The designer canvas stacks the same way it will on the feed.</li>
@@ -1357,7 +1337,7 @@
         <li><b>Get the token:</b> on that same <b>Bot</b> page, in the <b>Token</b> section click <b>Reset Token</b> (Discord keeps the token hidden, so this reveals a fresh one) → <b>Copy</b> it immediately — it's only shown once. Keep it secret; it's your bot's password. You'll paste it into DiscoFlate's <b>Discord</b> tab shortly. (Lost it? Just Reset Token again — that makes a new one.)</li>
         <li>Left sidebar → <b>OAuth2</b> → <b>URL Generator</b>. Tick scope <b>bot</b>; under permissions tick <b>Send Messages</b> (and <b>Attach Files</b> if you'll use images/snapshots). Copy the generated URL at the bottom, open it, and add the bot to <b>your</b> server.</li>
         <li>Back here → <b>Discord</b> tab → paste the token → <b>Save &amp; connect</b> → pick the <b>server</b> and <b>channel</b> to listen on.</li>
-        <li>Flip <b>Activation</b> on (top-right) and test from the <b>Dashboard → Controls</b>.</li>
+        <li>Flip <b>Activation</b> on (top-right) and test from the <b>Chat tab → Controls</b>.</li>
       </ol>
       <div class="hint" style="max-width:820px">If it connects but doesn't respond to commands, re-check that <b>Message Content Intent</b> is on and that you picked the right channel.</div>
 
@@ -1470,7 +1450,7 @@ esphome dashboard config/</code></pre>
             <tr><td><code>[user]</code></td><td>the person's name (plain text)</td></tr>
             <tr><td><code>[mention]</code></td><td>@pings the person (a real Discord mention)</td></tr>
             <tr><td><code>[command]</code></td><td>the command that fired, with its prefix (e.g. <code>!fill</code>) — available in a command's <b>📣 notify overlay</b> line and its cooldown reply</td></tr>
-            <tr><td><code>[operator]</code> <code>[owner]</code></td><td>the bot operator's name (set on the Dashboard; blank → the bot's own Discord name). <code>[owner]</code> is the same value — it just reads better in stream copy.</td></tr>
+            <tr><td><code>[operator]</code> <code>[owner]</code></td><td>the bot operator's name (set at the top of the Chat tab; blank → the bot's own Discord name). <code>[owner]</code> is the same value — it just reads better in stream copy.</td></tr>
             <tr><td><code>[winner]</code> / <code>[winner_score]</code></td><td>the most recent competition's winner and their winning score</td></tr>
             <tr><td><code>[runnerup]</code> / <code>[runnerup_score]</code></td><td>the most recent competition's 2nd place and their score</td></tr>
             <tr><td><code>[total_score]</code></td><td>combined dice total of ALL finishers in the competition (live during a run, final afterward) — pairs with a roll-off's "Add ALL totals"</td></tr>
@@ -1638,7 +1618,7 @@ function pushGameplay(){
 document.querySelectorAll('.tab-btn').forEach(b=>{
   b.addEventListener('click', ()=>showTab(b.getAttribute('data-go')));
 });
-// Android (WebView loads with ?android=1) always homes to the Dashboard on
+// Android (WebView loads with ?android=1) always homes to Chat on
 // startup; desktop restores the last tab you were on.
 let IS_ANDROID=false;
 try{ IS_ANDROID = new URLSearchParams(location.search).has('android') || !!(window.Android && window.Android.openUrl); }catch(e){}
@@ -3540,7 +3520,7 @@ function renderBroadcasts(){
     const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap='6px';
     el.innerHTML =
       `<div class="row" style="gap:8px">`+
-        `<label class="row" style="gap:5px" title="Active — an inactive broadcast is hidden from the Dashboard dropdown and a broadcast action skips it"><input type="checkbox" ${b.enabled!==false?'checked':''} style="width:auto" onchange="broadcastRows[${i}].enabled=this.checked;renderBroadcastDropdown();scheduleSave()"> active</label>`+
+        `<label class="row" style="gap:5px" title="Active — an inactive broadcast is hidden from the Controls dropdown and a broadcast action skips it"><input type="checkbox" ${b.enabled!==false?'checked':''} style="width:auto" onchange="broadcastRows[${i}].enabled=this.checked;renderBroadcastDropdown();scheduleSave()"> active</label>`+
         `<input value="${esc(b.name||'')}" placeholder="name (shown in the dropdown)" style="width:240px" onchange="broadcastRows[${i}].name=this.value;renderBroadcastDropdown()">`+
         `<div style="flex:1"></div>`+
         `<button class="ghost" onclick="delBroadcast(${i})">✕</button>`+
@@ -3661,7 +3641,7 @@ async function repairRepo(){
     if(r.ok) setTimeout(checkUpdates, 800);
   }catch(e){ if(msg) msg.textContent='⚠ '+(e.message||e); }
 }
-// Dashboard banner shown above Capacity when a newer version exists.
+// Update banner, shown above Capacity on the Chat tab.
 function showUpdateBanner(available){
   const b=$('#updBanner'); if(b) b.style.display = available ? '' : 'none';
 }

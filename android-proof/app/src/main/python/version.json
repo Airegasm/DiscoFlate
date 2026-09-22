@@ -1,6 +1,6 @@
 {
-  "version": "3.69.0",
-  "versionCode": 153,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.69.0/discoflate-v3.69.0.apk",
-  "notes": "DiscoFlate v3.69.0 \u2014 the read-only scene now refuses ONLY the things a scene actually owns. Your Discord name, the channel, Isolate, and every video setting save normally whichever scene is selected. Your camera and output size are remembered between sessions instead of resetting. The banner above the tabs is gone \u2014 the header pill names the scene, and a refused edit says so."
+  "version": "3.69.1",
+  "versionCode": 154,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.69.1/discoflate-v3.69.1.apk",
+  "notes": "DiscoFlate v3.69.1 \u2014 Help and the README catch up with the scene model. The About section is gone, and every pointer to the removed Dashboard, Game tab and Gameplay Presets now names where things actually live."
 }
