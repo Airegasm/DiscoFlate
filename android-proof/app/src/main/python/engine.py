@@ -245,7 +245,14 @@ class Engine:
 
     # -- config / device lookup --------------------------------------------- #
     def set_config(self, cfg: dict) -> None:
-        self.cfg = cfg
+        # The live SCENE owns gameplay, so lay its block over the top level
+        # once, here. Every cfg.get("command_prefix") downstream then answers
+        # for the scene that is running without knowing scenes exist.
+        # self._raw keeps the unlayered config for anything that must see the
+        # file as written (scene list, per-scene blocks, saving).
+        self._raw = cfg
+        self.cfg = config_store.resolved(cfg)
+        cfg = self.cfg
         # The pause latch persists (a crash while paused comes back paused). Only
         # pause()/resume() write these keys — set_config just mirrors them.
         self._paused = bool(cfg.get("session_paused"))
@@ -4611,7 +4618,8 @@ class Engine:
         self._paused = True
         self._paused_by = who
         cfg = config_store.update({"session_paused": True, "session_paused_by": who})
-        self.cfg = cfg
+        self._raw = cfg
+        self.cfg = config_store.resolved(cfg)
         self._log("bot", f"SESSION PAUSED by {who}")
         # cover the stream immediately — before the (slower) relay work below
         if self.pause_overlay_cb is not None:
@@ -4669,7 +4677,8 @@ class Engine:
         self._paused = False
         self._paused_by = ""
         cfg = config_store.update({"session_paused": False, "session_paused_by": ""})
-        self.cfg = cfg
+        self._raw = cfg
+        self.cfg = config_store.resolved(cfg)
         self._log("bot", f"SESSION RESUMED by {who}")
         if self.pause_overlay_cb is not None:
             try:

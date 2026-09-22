@@ -43,7 +43,80 @@ DEFAULT_PUMPDIRECT_PATH = os.path.normpath(
 
 # Schema version of the stored config. Bump it + add a _migrate step whenever a
 # key is renamed/moved, so old configs upgrade instead of silently stranding data.
-CONFIG_VERSION = 13
+CONFIG_VERSION = 14
+
+# The scene we ship read-only. It is the baseline every install can fall back
+# to and compare against, so nothing may write to it.
+DEFAULT_SCENE_NAME = "DiscoFlate Default"
+
+# The gameplay half of the config: everything that defines HOW THE SHOW PLAYS,
+# as opposed to the infrastructure it runs on (token, devices, calibration,
+# channels, scores). A SCENE owns this set outright — pick a scene and you have
+# picked its look, its rules and its wording together. Nothing can point at a
+# group that belongs to some other scene, because there is no longer a second
+# axis to get out of step.
+GAMEPLAY_KEYS = [
+    # Commands tab
+    "command_prefix", "command_names", "roll", "system_buffer_seconds",
+    "capacity_message", "pumptimer_message", "pump_message",
+    "cooldown_message",
+    "capacity_embed", "capacity_title", "pumptimer_embed", "pumptimer_title",
+    "cooldown_embed", "cooldown_title", "pump_embed", "pump_title",
+    "commands", "broadcasts", "modes", "prizes", "owner_commands", "chat_buttons",
+    # Game tab
+    "cooldown_seconds", "auto_report",
+    "listener_message_on", "listener_message_off",
+    "listener_on_embed", "listener_on_title", "listener_off_embed", "listener_off_title",
+    "pause_message", "resume_message", "paused_notice_message",
+    "pause_embed", "pause_title",
+    "output_headers", "rich_output",
+    "capacity_ranges", "always_on_enabled", "always_on_commands",
+    # Events tab
+    "events", "capacity_events", "polls", "competitions", "bonus_rounds",
+    "event_in_process_message", "event_cooldown_message",
+    # Templates tab
+    "templates",
+]
+
+def scene_gameplay(cfg: dict, name: str | None = None) -> dict:
+    """The gameplay block of one scene (the live one by default)."""
+    want = str(name if name is not None else cfg.get("chat_scene") or "").strip().lower()
+    for sc in (cfg.get("scenes") or []):
+        if str(sc.get("name") or "").strip().lower() == want:
+            gp = sc.get("gameplay")
+            return gp if isinstance(gp, dict) else {}
+    return {}
+
+
+def live_gameplay(cfg: dict) -> dict:
+    """The live scene's gameplay dict, MUTABLE and created in place if absent.
+
+    For handlers that flip a flag and save the whole config. Falls back to the
+    config itself when there is no live scene, so a scene-less install keeps
+    working exactly as before.
+    """
+    want = str(cfg.get("chat_scene") or "").strip().lower()
+    for sc in (cfg.get("scenes") or []):
+        if str(sc.get("name") or "").strip().lower() == want:
+            if not isinstance(sc.get("gameplay"), dict):
+                sc["gameplay"] = {}
+            return sc["gameplay"]
+    return cfg
+
+
+def resolved(cfg: dict) -> dict:
+    """`cfg` with the live scene's gameplay layered over the top level.
+
+    Every reader downstream keeps calling cfg.get("command_prefix") and simply
+    gets the live scene's answer. The top-level values survive as the fallback
+    for a scene that has no block of its own yet.
+    """
+    gp = scene_gameplay(cfg)
+    if not gp:
+        return cfg
+    return {**cfg, **{k: v for k, v in gp.items() if k in GAMEPLAY_KEYS}}
+
+
 
 # The dead "dice recharged" default that a remediation migration accidentally
 # promoted to the live cooldown-ready message. Migration v3 undoes that.
@@ -1301,6 +1374,58 @@ def _migrate(cfg: dict) -> dict:
             if mine:
                 sc.setdefault("notify_overlay", cfg.get("notify_overlay") or "")
                 sc.setdefault("pause_overlay", cfg.get("pause_overlay") or "")
+    if v < 14:
+        # v14: the SCENE absorbs gameplay. There used to be two independent
+        # axes — the live scene, and the gameplay settings/preset loaded over
+        # it — so a command could name a group that only existed in some other
+        # scene. One axis now: a scene IS the show, rules and wording included.
+        # Every existing scene inherits what has been running, verbatim, so an
+        # upgrade changes nothing until the operator deliberately diverges one.
+        mine = {k: copy.deepcopy(cfg[k]) for k in GAMEPLAY_KEYS if k in cfg}
+        for sc in (cfg.get("scenes") or []):
+            if not isinstance(sc, dict):
+                continue
+            if isinstance(sc.get("gameplay"), dict) and sc["gameplay"]:
+                continue
+            sc["gameplay"] = copy.deepcopy(mine)
+        scenes = cfg.get("scenes") or []
+
+        def _by(nm):
+            return next((x for x in scenes
+                         if str(x.get("name") or "").strip().lower() == nm), None)
+
+        # "Basic Overlays" was both the shipped scene AND the one people edited.
+        # Now that a read-only DiscoFlate Default exists, an edited copy under
+        # the old name is confusing — give it a name of its own and keep every
+        # bit of its content, including the gameplay just folded into it.
+        old = _by("basic overlays")
+        if old is not None and _by(DEFAULT_SCENE_NAME.lower()) is not None:
+            taken = {str(x.get("name") or "").strip().lower() for x in scenes}
+            want = str(cfg.get("operator_name") or "").strip() or "My Scene"
+            nm, n = want, 2
+            while nm.strip().lower() in taken:
+                nm = f"{want} {n}"
+                n += 1
+            if str(cfg.get("chat_scene") or "").strip().lower() == "basic overlays":
+                cfg["chat_scene"] = nm
+            old["name"] = nm
+            old.pop("builtin", None)
+
+        # The shipped default is read-only and ships clean — no sample
+        # broadcasts or capacity events to delete on every fresh install.
+        dflt = _by(DEFAULT_SCENE_NAME.lower())
+        if dflt is not None:
+            dflt["builtin"] = True
+            gp = dflt.setdefault("gameplay", {})
+            gp["broadcasts"] = []
+            gp["capacity_events"] = []
+        # never leave the panel pointed at a scene nobody can edit
+        if (str(cfg.get("chat_scene") or "").strip().lower()
+                == DEFAULT_SCENE_NAME.lower()):
+            other = next((x for x in scenes
+                          if not x.get("builtin")), None)
+            if other is not None:
+                cfg["chat_scene"] = other.get("name") or ""
     cfg["config_version"] = CONFIG_VERSION
     return cfg
 
@@ -1357,8 +1482,34 @@ def _fsync_dir(path: str) -> None:
         pass
 
 
+def _enforce_builtin(cfg: dict) -> None:
+    """Restore the read-only shipped scene, whatever the caller sent.
+
+    Enforced here rather than in the API handler so EVERY write path — panel,
+    device sync, import, preset load — gets the same answer: the DiscoFlate
+    Default is the one thing you can always compare against, so nothing may
+    edit it, rename it or delete it.
+    """
+    want = DEFAULT_SCENE_NAME.strip().lower()
+    shipped = next((sc for sc in (_factory_seed().get("scenes") or [])
+                    if str(sc.get("name") or "").strip().lower() == want), None)
+    if shipped is None:
+        return
+    scenes = cfg.get("scenes")
+    if not isinstance(scenes, list):
+        return
+    at = next((i for i, sc in enumerate(scenes)
+               if isinstance(sc, dict)
+               and str(sc.get("name") or "").strip().lower() == want), None)
+    if at is None:
+        scenes.insert(0, copy.deepcopy(shipped))   # deleted → put it back
+    else:
+        scenes[at] = copy.deepcopy(shipped)        # edited → undo it
+
+
 def save(cfg: dict) -> dict:
     os.makedirs(DATA_DIR, exist_ok=True)
+    _enforce_builtin(cfg)
     cfg["config_rev"] = int(cfg.get("config_rev") or 0) + 1
     _rotate_backups()
     # Only the ON-DISK copy carries the encrypted token; callers keep using

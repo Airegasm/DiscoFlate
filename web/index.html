@@ -294,6 +294,12 @@
      flex-stretched. */
   /* operator controls in the Chat side panel: one feature per line, the
      button at a fixed width so every row lines up in a narrow column */
+  .scenebar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+    margin:0 0 12px;padding:8px 12px;border:1px solid var(--line);
+    border-left:3px solid var(--accent);border-radius:8px;background:var(--card)}
+  .scenebar.ro{border-left-color:var(--warn)}
+  .scenebar select{min-height:32px;max-width:260px}
+  .scenebar button{padding:6px 10px;font-size:13px}
   .ctrlstack{display:flex;flex-direction:column;gap:7px}
   .ctrlline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .ctrlline>button{flex:0 0 132px;text-align:left;padding:8px 10px;font-size:14px}
@@ -319,6 +325,7 @@
 <div class="wrap">
   <header>
     <div class="logo">Disco<span>Flate</span> <span class="muted" id="verLabel" style="font-size:13px;font-weight:400"></span></div>
+    <span class="pill" id="scenePill" title="The scene that is loaded: its overlays, its commands, its rules. Click to manage scenes." onclick="showTab('stages')" style="cursor:pointer">🎬 <b id="scenePillName">—</b></span>
     <span class="pill"><span id="botDot" class="dot"></span><span id="botText">bot: —</span></span>
     <span class="pill"><span id="fireDot" class="dot"></span><span id="fireText">idle</span></span>
     <span class="pill" id="pausedPill" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700">⏸ SESSION PAUSED</span>
@@ -336,7 +343,6 @@
 
   <nav class="tabs" id="tabbar">
     <button class="tab-btn" data-go="chat">Chat</button>
-    <button class="tab-btn" data-go="game">Game</button>
     <button class="tab-btn" data-go="stages">Scenes</button>
     <button class="tab-btn" data-go="triggers">Triggers</button>
     <button class="tab-btn" data-go="devices">Devices</button>
@@ -344,6 +350,15 @@
     <button class="tab-btn" data-go="system">System</button>
     <button class="tab-btn" data-go="help">Help</button>
   </nav>
+
+  <!-- Whose rules am I editing? Gameplay belongs to the SCENE, so every tab
+       that edits it says which scene, and lets you change scene from here. -->
+  <div id="scenebar" class="scenebar" style="display:none">
+    <span class="muted">editing the rules for</span>
+    <select id="scenebarPick" onchange="scenebarPick(this.value)"></select>
+    <span class="muted" id="scenebarNote"></span>
+    <button class="ghost" id="scenebarCopy" onclick="sceneBarCopy()">⇪ Copy rules to…</button>
+  </div>
 
   <div class="grid">
     <!-- capacity -->
@@ -458,7 +473,8 @@
 
     <!-- stages: OBS-style overlay designer -->
     <div class="card span" data-tab="stages">
-      <h2>🎭 Scenes</h2>
+      <details class="help" open><summary><b style="font-size:1.02rem">🎭 Scenes</b></summary>
+
       <div class="hint">Design overlay <b>scenes</b> for video calls, OBS-style: pick a resolution, drag overlays onto the canvas, mark each one <b>always-on</b> or <b>callable</b>. Link a Gameplay Preset so the whole bundle travels together. The Chat tab's 🎥 section links a chat to a stage — its callable overlays become one-tap buttons there, and ▶ Start virtual cam (or the phone's 🎭 Stage view) puts the always-on items live. Everything autosaves.</div>
       <div class="row" style="gap:8px;align-items:flex-end;margin-top:8px">
         <label class="field">Scene <select id="scnSel" style="width:200px" onchange="stgPick(+this.value)"></select></label>
@@ -509,6 +525,7 @@
         </div>
         <div id="stgProps" style="margin-top:8px"></div>
       </div>
+      </details>
     </div>
 
     <!-- overlay media browser (Stages tab + pickers) -->
@@ -609,6 +626,129 @@
         <button class="warn" onclick="if(confirm('Reset the session? Capacity → 0%, all cooldowns cleared, timed events re-armed, command-started events reverted.')) act('/api/session-reset')">↺ Session reset</button>
       </div>
 
+    </div>
+
+    <!-- everything Game used to hold: a scene owns its rules, so they -->
+    <!-- live beside the scene that owns them -->
+    <div class="card span" data-tab="stages">
+      <details class="help"><summary><h2>📦 Gameplay Presets</h2></summary>
+      <div class="row" style="gap:8px;align-items:center;margin-top:8px"><span class="muted">Currently loaded:</span><span id="stgPresetNow" class="pill" title="Which preset the live gameplay was last LOADED from. Read-only: loading copies a preset into the live config, and editing the tabs afterwards never writes back to it.">—</span></div>
+      <div class="hint" style="margin-top:8px;max-width:860px">Saved snapshots of your whole <b>Game, Commands, Events &amp; Templates</b> — swap between whole setups instantly. Your ongoing edits autosave to the <b>live</b> config as always; a preset only changes when you <b>Save</b> or <b>Update</b> it. Presets never include your token, devices, or server settings, so preset files are safe to share. <b>Defaults (built-in)</b> is the shipped starter setup — load it any time; it can't be edited, renamed, or deleted.</div>
+      <div class="row" style="margin-top:10px;gap:8px;align-items:center;flex-wrap:wrap">
+      <button onclick="presetSaveCurrent()">💾 Save Current to Preset</button>
+      <div style="flex-basis:100%;height:0"></div>
+      <select id="presetSel" style="min-width:200px"></select>
+      <button class="ghost" onclick="presetLoad()">▶ Load</button>
+      <button class="ghost" onclick="presetUpdate()">⟳ Update</button>
+      <button class="ghost" title="Rename this preset" onclick="presetRename()">✏️</button>
+      <button class="ghost" onclick="presetExport()">⬇ Export</button>
+      <button class="ghost bad" onclick="presetDelete()">✕</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+      <button onclick="$('#importPresetFile').click()">⬆ Import Preset File</button>
+      <input type="file" id="importPresetFile" accept="application/json,.json" style="display:none" onchange="importPresetFile(this)">
+      <span class="muted" id="presetMsg"></span>
+      </div>
+      <div class="hint" style="margin-top:8px"><b>Load</b> swaps all four tabs to the selected preset (your live edits are replaced). <b>Update</b> overwrites the selected preset with your current settings. <b>Export</b> saves it as a shareable file; <b>Import Preset File</b> brings one in under a name you choose.</div>
+      </details>
+    </div>
+
+    <div class="card span" data-tab="stages">
+      <details class="help"><summary><h2>Limits &amp; announcements</h2></summary>
+      <label class="row" style="gap:8px;margin-bottom:8px"><input type="checkbox" id="outputHeaders" style="width:auto"> <b>Display output headers</b>
+        <span class="muted">— prefix each command / minigame / event message with a <code>[label · user]</code> tag so interleaved output stays readable (cross-server shows <code>ANON</code>).</span></label>
+      <label class="row" style="gap:8px;margin-bottom:12px"><input type="checkbox" id="richOutput" style="width:auto"> <b>Rich status embeds</b>
+        <span class="muted">— post the capacity check, both leaderboards, the auto-report, and custom Broadcasts as bordered embed cards so those blocks stand apart from command chatter.</span></label>
+      <div class="row" style="gap:24px;align-items:flex-start">
+        <div class="colsec" style="min-width:240px;max-width:320px;flex:1">
+          <h3>Owner ID &amp; cooldown</h3>
+          <label class="field">Owner user ID <span class="muted">(optional, spoof-proof)</span>
+            <input id="cooldownExempt" placeholder="123456789012345678"></label>
+          <label class="field">Default per-user cooldown <span class="muted">(seconds)</span>
+            <input type="number" id="cooldown" value="30" min="0" step="1" style="width:110px"></label>
+          <div class="hint" style="margin-top:0">The Owner <b>name</b> is now set at the top of the <b>Dashboard</b>. Owner bypasses <b>cooldowns and per-person max-uses</b> (still limited only by in-progress events) and runs owner-only commands. Cooldown messages are on the <b>Commands</b> tab.</div>
+        </div>
+        <div class="colsec" style="flex:1;min-width:240px">
+          <h3>Auto-report</h3>
+          <label class="row" style="gap:6px"><input type="checkbox" id="autoEnabled" style="width:auto"> every
+            <input type="number" id="autoSecs" value="300" min="15" step="5" style="width:90px"> seconds</label>
+          <label class="field">Message <span class="muted">(blank = default)</span>
+            <textarea id="autoMessage" rows="6" placeholder="Capacity [capacity]%\nCommands: [commands]"></textarea></label>
+          <div class="row" style="gap:12px;align-items:flex-end">
+            <label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" id="autoEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
+            <label class="field" style="flex:1">Titlebar <input id="autoTitle" placeholder="📊 Auto-report" onchange="scheduleSave()"></label>
+          </div>
+        </div>
+        <div class="colsec" style="flex:1;min-width:240px">
+          <h3>Activation messages</h3>
+          <label class="field">ON message
+            <textarea id="listenerOn" rows="4" placeholder="blank = say nothing"></textarea></label>
+          <div class="row" style="gap:12px;align-items:flex-end">
+            <label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" id="listenerOnEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
+            <label class="field" style="flex:1">ON titlebar <input id="listenerOnTitle" placeholder="🟢 Activation ON" onchange="scheduleSave()"></label>
+          </div>
+          <label class="field">OFF message
+            <textarea id="listenerOff" rows="4" placeholder="blank = say nothing"></textarea></label>
+          <div class="row" style="gap:12px;align-items:flex-end">
+            <label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" id="listenerOffEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
+            <label class="field" style="flex:1">OFF titlebar <input id="listenerOffTitle" placeholder="🔴 Activation OFF" onchange="scheduleSave()"></label>
+          </div>
+          <div class="hint" style="margin-top:6px">Both auto-append a fixed footer — <code>DiscoFlate v[version] by AireGasm</code> — as small subtext (not editable, only shown when the message isn't blank).</div>
+        </div>
+        <div class="colsec" style="flex:1;min-width:240px">
+          <h3>Session pause (STOP button)</h3>
+          <div class="row" style="gap:12px;align-items:flex-end">
+            <label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" id="pauseEmbed" style="width:auto" onchange="scheduleSave()"> embed (all three)</label>
+            <label class="field" style="flex:1">Titlebar <input id="pauseTitle" placeholder="⏸️ Session" onchange="scheduleSave()"></label>
+          </div>
+          <label class="field">Paused broadcast <span class="muted">([user] = who paused)</span>
+            <textarea id="pauseMsg" rows="3" placeholder="⏸️ Session paused by [user]…"></textarea></label>
+          <label class="field">Resumed broadcast
+            <textarea id="resumeMsg" rows="3" placeholder="▶️ Session resumed by [user]…"></textarea></label>
+          <label class="field">Paused notice <span class="muted">(reply to a command while paused)</span>
+            <input id="pausedNoticeMsg" placeholder="⏸️ [mention], the session is paused…"></label>
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <span class="muted">Placeholders: <code>[capacity] [capacity_bar] [commands]</code> … see <b>Help</b>. Enter = newline.</span></div>
+      </details>
+    </div>
+
+    <div class="card span" data-tab="stages">
+<details class="help" style="margin-top:14px"><summary><b style="font-size:1.02rem">🏆 Leaderboards</b></summary>
+        <div id="users"><div class="muted">No one has pumped yet.</div></div>
+        <div class="row" style="margin-top:12px;gap:8px;align-items:center;flex-wrap:wrap">
+          <span class="muted">Broadcast Top Pumpers:</span>
+          <button class="ghost" onclick="controlLeaderboard()">🏆 Current</button>
+          <button class="ghost" title="Reset the current-session Top Pumpers" onclick="if(confirm('Reset the current-session Top Pumpers & tracked list? Lifetime is untouched.')) act('/api/reset-session-leaderboard')">🗑</button>
+          <button class="ghost" onclick="controlLeaderboardLife()">🏆 Lifetime</button>
+          <button class="ghost" title="Wipe the all-time leaderboard" onclick="if(confirm('Wipe the ALL-TIME leaderboard? This can\'t be undone.')) act('/api/reset-lifetime')">🗑</button>
+        </div>
+        <div class="hint">Posts the Top Pumpers to your channel (same as the <code>leaderboard</code> / <code>toppumpers-life</code> commands) — needs Activation on + a channel selected. The 🗑 next to each resets that board: <b>Current</b> clears this session's pumpers &amp; tracked list; <b>Lifetime</b> wipes the persistent all-time board.</div>
+        </details>
+    </div>
+
+    <div class="card span" data-tab="stages">
+      <details class="help"><summary><h2>Capacity ranges</h2></summary>
+      <details class="help" style="margin-bottom:14px"><summary><b style="font-size:1.02rem">⚡ Always-On commands</b></summary>
+        <label class="row" style="gap:8px;margin:4px 0 8px"><input type="checkbox" id="alwaysOnEnabled" style="width:auto" onchange="renderAlwaysOn();scheduleSave()"> Enable — commands added here work in <b>every</b> range (bypassing per-range membership)</label>
+        <div id="alwaysOnBox"></div>
+        <div class="hint" style="margin-top:8px">Use for utility commands (like <code>!cointoss</code>) that should always be available. Each entry sets its own <b>cooldown</b> / <b>max per person</b> (blank = default / unlimited). <b>A command lives here OR in ranges, never both</b> — adding it to a range moves it out automatically, and range-bound commands don't show in the picker.</div>
+      </details>
+      <div id="ranges"></div>
+      <div class="row" style="margin-top:10px" id="rangeButtons">
+        <button class="ghost" onclick="addRange()">+ Add range</button>
+        <button class="ghost" onclick="addEndSequence()" title="A buildup range that ends & resets the session at its End threshold">+ Add End Sequence</button>
+        <button class="ghost" onclick="addEnd()" title="Just the terminal threshold — ends & resets when capacity reaches it (no buildup)">+ Add End</button>
+        <div style="flex:1"></div>
+      </div>
+      <div class="hint"><b>Announce</b> shows with roll/capacity while in the range · <b>Milestone</b>/<b>Image</b> post
+        once on reaching it. <b>⚙ Per-command settings</b> sets each command's dice (roll), enabled toggle, cooldown &amp; scope,
+        a Range Start Command, and event actions on entry.<br>
+        🏁 <b>End Sequence</b> = a range with a final threshold; reaching it posts a final message then ends &amp; resets the
+        session (no activation-off message). <b>End</b> = just that terminal threshold, no buildup. Capacity may tick
+        <b>above 100%</b> up to the End threshold. Only one End / End Sequence is allowed, and nothing comes after it.</div>
+      </details>
     </div>
 
     <!-- overlay editors (Chat tab) -->
@@ -742,130 +882,13 @@
 
     <!-- automation: cooldown + auto-report + activation messages -->
     <!-- gameplay presets (moved off System: a preset IS gameplay) -->
-    <div class="card span" data-tab="game">
-      <details class="help"><summary><h2>📦 Gameplay Presets</h2></summary>
-      <div class="row" style="gap:8px;align-items:center;margin-top:8px"><span class="muted">Currently loaded:</span><span id="stgPresetNow" class="pill" title="Which preset the live gameplay was last LOADED from. Read-only: loading copies a preset into the live config, and editing the tabs afterwards never writes back to it.">—</span></div>
-      <div class="hint" style="margin-top:8px;max-width:860px">Saved snapshots of your whole <b>Game, Commands, Events &amp; Templates</b> — swap between whole setups instantly. Your ongoing edits autosave to the <b>live</b> config as always; a preset only changes when you <b>Save</b> or <b>Update</b> it. Presets never include your token, devices, or server settings, so preset files are safe to share. <b>Defaults (built-in)</b> is the shipped starter setup — load it any time; it can't be edited, renamed, or deleted.</div>
-      <div class="row" style="margin-top:10px;gap:8px;align-items:center;flex-wrap:wrap">
-      <button onclick="presetSaveCurrent()">💾 Save Current to Preset</button>
-      <div style="flex-basis:100%;height:0"></div>
-      <select id="presetSel" style="min-width:200px"></select>
-      <button class="ghost" onclick="presetLoad()">▶ Load</button>
-      <button class="ghost" onclick="presetUpdate()">⟳ Update</button>
-      <button class="ghost" title="Rename this preset" onclick="presetRename()">✏️</button>
-      <button class="ghost" onclick="presetExport()">⬇ Export</button>
-      <button class="ghost bad" onclick="presetDelete()">✕</button>
-      </div>
-      <div class="row" style="margin-top:8px">
-      <button onclick="$('#importPresetFile').click()">⬆ Import Preset File</button>
-      <input type="file" id="importPresetFile" accept="application/json,.json" style="display:none" onchange="importPresetFile(this)">
-      <span class="muted" id="presetMsg"></span>
-      </div>
-      <div class="hint" style="margin-top:8px"><b>Load</b> swaps all four tabs to the selected preset (your live edits are replaced). <b>Update</b> overwrites the selected preset with your current settings. <b>Export</b> saves it as a shareable file; <b>Import Preset File</b> brings one in under a name you choose.</div>
-      </details>
-    </div>
 
-    <div class="card span" data-tab="game">
-      <details class="help"><summary><h2>Limits &amp; announcements</h2></summary>
-      <label class="row" style="gap:8px;margin-bottom:8px"><input type="checkbox" id="outputHeaders" style="width:auto"> <b>Display output headers</b>
-        <span class="muted">— prefix each command / minigame / event message with a <code>[label · user]</code> tag so interleaved output stays readable (cross-server shows <code>ANON</code>).</span></label>
-      <label class="row" style="gap:8px;margin-bottom:12px"><input type="checkbox" id="richOutput" style="width:auto"> <b>Rich status embeds</b>
-        <span class="muted">— post the capacity check, both leaderboards, the auto-report, and custom Broadcasts as bordered embed cards so those blocks stand apart from command chatter.</span></label>
-      <div class="row" style="gap:24px;align-items:flex-start">
-        <div class="colsec" style="min-width:240px;max-width:320px;flex:1">
-          <h3>Owner ID &amp; cooldown</h3>
-          <label class="field">Owner user ID <span class="muted">(optional, spoof-proof)</span>
-            <input id="cooldownExempt" placeholder="123456789012345678"></label>
-          <label class="field">Default per-user cooldown <span class="muted">(seconds)</span>
-            <input type="number" id="cooldown" value="30" min="0" step="1" style="width:110px"></label>
-          <div class="hint" style="margin-top:0">The Owner <b>name</b> is now set at the top of the <b>Dashboard</b>. Owner bypasses <b>cooldowns and per-person max-uses</b> (still limited only by in-progress events) and runs owner-only commands. Cooldown messages are on the <b>Commands</b> tab.</div>
-        </div>
-        <div class="colsec" style="flex:1;min-width:240px">
-          <h3>Auto-report</h3>
-          <label class="row" style="gap:6px"><input type="checkbox" id="autoEnabled" style="width:auto"> every
-            <input type="number" id="autoSecs" value="300" min="15" step="5" style="width:90px"> seconds</label>
-          <label class="field">Message <span class="muted">(blank = default)</span>
-            <textarea id="autoMessage" rows="6" placeholder="Capacity [capacity]%\nCommands: [commands]"></textarea></label>
-          <div class="row" style="gap:12px;align-items:flex-end">
-            <label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" id="autoEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
-            <label class="field" style="flex:1">Titlebar <input id="autoTitle" placeholder="📊 Auto-report" onchange="scheduleSave()"></label>
-          </div>
-        </div>
-        <div class="colsec" style="flex:1;min-width:240px">
-          <h3>Activation messages</h3>
-          <label class="field">ON message
-            <textarea id="listenerOn" rows="4" placeholder="blank = say nothing"></textarea></label>
-          <div class="row" style="gap:12px;align-items:flex-end">
-            <label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" id="listenerOnEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
-            <label class="field" style="flex:1">ON titlebar <input id="listenerOnTitle" placeholder="🟢 Activation ON" onchange="scheduleSave()"></label>
-          </div>
-          <label class="field">OFF message
-            <textarea id="listenerOff" rows="4" placeholder="blank = say nothing"></textarea></label>
-          <div class="row" style="gap:12px;align-items:flex-end">
-            <label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" id="listenerOffEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
-            <label class="field" style="flex:1">OFF titlebar <input id="listenerOffTitle" placeholder="🔴 Activation OFF" onchange="scheduleSave()"></label>
-          </div>
-          <div class="hint" style="margin-top:6px">Both auto-append a fixed footer — <code>DiscoFlate v[version] by AireGasm</code> — as small subtext (not editable, only shown when the message isn't blank).</div>
-        </div>
-        <div class="colsec" style="flex:1;min-width:240px">
-          <h3>Session pause (STOP button)</h3>
-          <div class="row" style="gap:12px;align-items:flex-end">
-            <label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" id="pauseEmbed" style="width:auto" onchange="scheduleSave()"> embed (all three)</label>
-            <label class="field" style="flex:1">Titlebar <input id="pauseTitle" placeholder="⏸️ Session" onchange="scheduleSave()"></label>
-          </div>
-          <label class="field">Paused broadcast <span class="muted">([user] = who paused)</span>
-            <textarea id="pauseMsg" rows="3" placeholder="⏸️ Session paused by [user]…"></textarea></label>
-          <label class="field">Resumed broadcast
-            <textarea id="resumeMsg" rows="3" placeholder="▶️ Session resumed by [user]…"></textarea></label>
-          <label class="field">Paused notice <span class="muted">(reply to a command while paused)</span>
-            <input id="pausedNoticeMsg" placeholder="⏸️ [mention], the session is paused…"></label>
-        </div>
-      </div>
-      <div class="row" style="margin-top:12px">
-        <span class="muted">Placeholders: <code>[capacity] [capacity_bar] [commands]</code> … see <b>Help</b>. Enter = newline.</span></div>
-      </details>
-    </div>
 
     <!-- go live options -->
 
     <!-- leaderboards -->
-    <div class="card span" data-tab="game">
-<details class="help" style="margin-top:14px"><summary><b style="font-size:1.02rem">🏆 Leaderboards</b></summary>
-        <div id="users"><div class="muted">No one has pumped yet.</div></div>
-        <div class="row" style="margin-top:12px;gap:8px;align-items:center;flex-wrap:wrap">
-          <span class="muted">Broadcast Top Pumpers:</span>
-          <button class="ghost" onclick="controlLeaderboard()">🏆 Current</button>
-          <button class="ghost" title="Reset the current-session Top Pumpers" onclick="if(confirm('Reset the current-session Top Pumpers & tracked list? Lifetime is untouched.')) act('/api/reset-session-leaderboard')">🗑</button>
-          <button class="ghost" onclick="controlLeaderboardLife()">🏆 Lifetime</button>
-          <button class="ghost" title="Wipe the all-time leaderboard" onclick="if(confirm('Wipe the ALL-TIME leaderboard? This can\'t be undone.')) act('/api/reset-lifetime')">🗑</button>
-        </div>
-        <div class="hint">Posts the Top Pumpers to your channel (same as the <code>leaderboard</code> / <code>toppumpers-life</code> commands) — needs Activation on + a channel selected. The 🗑 next to each resets that board: <b>Current</b> clears this session's pumpers &amp; tracked list; <b>Lifetime</b> wipes the persistent all-time board.</div>
-        </details>
-    </div>
 
     <!-- capacity ranges -->
-    <div class="card span" data-tab="game">
-      <details class="help"><summary><h2>Capacity ranges</h2></summary>
-      <details class="help" style="margin-bottom:14px"><summary><b style="font-size:1.02rem">⚡ Always-On commands</b></summary>
-        <label class="row" style="gap:8px;margin:4px 0 8px"><input type="checkbox" id="alwaysOnEnabled" style="width:auto" onchange="renderAlwaysOn();scheduleSave()"> Enable — commands added here work in <b>every</b> range (bypassing per-range membership)</label>
-        <div id="alwaysOnBox"></div>
-        <div class="hint" style="margin-top:8px">Use for utility commands (like <code>!cointoss</code>) that should always be available. Each entry sets its own <b>cooldown</b> / <b>max per person</b> (blank = default / unlimited). <b>A command lives here OR in ranges, never both</b> — adding it to a range moves it out automatically, and range-bound commands don't show in the picker.</div>
-      </details>
-      <div id="ranges"></div>
-      <div class="row" style="margin-top:10px" id="rangeButtons">
-        <button class="ghost" onclick="addRange()">+ Add range</button>
-        <button class="ghost" onclick="addEndSequence()" title="A buildup range that ends & resets the session at its End threshold">+ Add End Sequence</button>
-        <button class="ghost" onclick="addEnd()" title="Just the terminal threshold — ends & resets when capacity reaches it (no buildup)">+ Add End</button>
-        <div style="flex:1"></div>
-      </div>
-      <div class="hint"><b>Announce</b> shows with roll/capacity while in the range · <b>Milestone</b>/<b>Image</b> post
-        once on reaching it. <b>⚙ Per-command settings</b> sets each command's dice (roll), enabled toggle, cooldown &amp; scope,
-        a Range Start Command, and event actions on entry.<br>
-        🏁 <b>End Sequence</b> = a range with a final threshold; reaching it posts a final message then ends &amp; resets the
-        session (no activation-off message). <b>End</b> = just that terminal threshold, no buildup. Capacity may tick
-        <b>above 100%</b> up to the End threshold. Only one End / End Sequence is allowed, and nothing comes after it.</div>
-      </details>
-    </div>
 
     <!-- system commands + roll/cooldown settings (one section) -->
     <div class="card span" data-tab="triggers">
@@ -1152,7 +1175,7 @@
       </div>
       <div class="hint">On the phone app this downloads &amp; installs the new APK; on desktop it pulls the latest code from GitHub (then restart DiscoFlate).
         Update APKs are <b>version-named</b> (<code>discoflate-vX.Y.Z.apk</code>) so downloads never collide — make sure you install the newest one. Old copies in Downloads are safe to delete. <b>Coming from v3.45 or older with a stuck update?</b> Delete any old <code>discoflate*.apk</code> files first — same-named downloads used to cache and re-install stale copies.</div>
-      <div class="hint" style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px"><b>Backups</b> live on the <a style="cursor:pointer" onclick="showTab('system')">System tab</a> (full config, token included); <b>Gameplay Presets</b> moved to the <a style="cursor:pointer" onclick="showTab('game')">Game tab</a>, with a read-only line showing which preset the live gameplay was last loaded from.</div>
+      <div class="hint" style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px"><b>Backups</b> live on the <a style="cursor:pointer" onclick="showTab('system')">System tab</a> (full config, token included); <b>Gameplay Presets</b> moved to the <a style="cursor:pointer" onclick="showTab('stages')">Game tab</a>, with a read-only line showing which preset the live gameplay was last loaded from.</div>
     </div>
 
     <div class="card span" data-tab="help">
@@ -1582,6 +1605,95 @@ function showTab(name){
     b.classList.toggle('active', b.getAttribute('data-go')===name);
   });
   try{ localStorage.setItem('df_tab', name); }catch(e){}
+  // showTab runs once at startup, before the scene state vars are initialised —
+  // the first applyState paints the bar, so a miss here is harmless
+  try{ renderSceneBar(name); }catch(e){}
+}
+// Tabs whose contents ARE the scene's gameplay. On these the scene bar shows,
+// because what you type lands in one scene and not the others.
+const GAMEPLAY_TABS = ['stages','triggers','chat'];
+function renderSceneBar(tab){
+  // the header pill is always right, whatever tab you are on
+  const pill=$('#scenePillName');
+  if(pill) pill.textContent = chatSceneName || '(no scene)';
+  const ro = isBuiltinScene(stgStage());
+  const ph=$('#scenePill');
+  if(ph) ph.title = ro
+    ? 'DiscoFlate Default is read-only — switch scenes or copy it to make changes'
+    : 'The scene that is loaded: its overlays, its commands, its rules. Click to manage scenes.';
+
+  const bar=$('#scenebar'); if(!bar) return;
+  tab = tab || (document.querySelector('.tab-btn.active')||{getAttribute:()=>''}).getAttribute('data-go');
+  const on = GAMEPLAY_TABS.includes(tab) && (scenesData||[]).length>0;
+  bar.style.display = on ? '' : 'none';
+  if(!on) return;
+  const sel=$('#scenebarPick');
+  if(sel && document.activeElement!==sel){
+    // explicit value: the label carries "(read-only)" but the value must stay
+    // the bare name, or picking the baseline would match no scene at all
+    sel.innerHTML=(scenesData||[]).map(sc=>
+      `<option value="${esc(sc.name||'')}" ${sc.name===chatSceneName?'selected':''}>${esc(sc.name||'(unnamed)')}${sc.builtin?' 🔒':''}</option>`).join('');
+    if(chatSceneName) sel.value=chatSceneName;
+  }
+  const n=$('#scenebarNote');
+  if(n) n.textContent = ro
+    ? '🔒 read-only — the shipped baseline. Edits here are discarded.'
+    : ((scenesData||[]).length>1 ? `· ${scenesData.length} scenes, each with its own rules`
+                                 : '· your only scene');
+  bar.classList.toggle('ro', ro);
+  const cp=$('#scenebarCopy');
+  if(cp) cp.textContent = ro ? '📋 Make an editable copy' : '⇪ Copy rules to…';
+}
+// The shipped baseline. The server restores it on every save, so the panel
+// just says so up front rather than letting edits vanish silently.
+function isBuiltinScene(sc){ return !!(sc && sc.builtin); }
+// Divergence is the point, but a typo fix shouldn't mean editing N scenes.
+// Copy THIS scene's rules onto the ones you tick — all of them, or just the
+// commands. Anything not ticked is left completely alone.
+// On the read-only baseline this duplicates it into an editable scene; on any
+// other scene it pushes that scene's rules onto the ones you tick.
+function sceneBarCopy(){ return isBuiltinScene(stgStage()) ? stgCopy() : pushGameplay(); }
+function pushGameplay(){
+  const me=stgStage(); if(!me) return toastMsg('no scene selected');
+  const others=(scenesData||[]).filter(sc=>sc!==me);
+  if(!others.length) return toastMsg('there is only one scene');
+  const rows=others.map(sc=>
+    `<label class="row" style="gap:8px"><input type="checkbox" class="pgTarget" data-i="${scenesData.indexOf(sc)}" style="width:auto"> ${esc(sc.name||'(unnamed)')}</label>`).join('');
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML=`<div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px;max-width:460px;width:100%">`+
+    `<h2 style="margin:0 0 6px">Copy rules from “${esc(me.name||'')}”</h2>`+
+    `<div class="hint" style="margin:0 0 12px">Overwrites the ticked scenes' rules. Their overlays, groups and Go Live settings are left alone.</div>`+
+    `<label class="row" style="gap:8px;margin-bottom:10px"><input type="checkbox" id="pgOnlyCmds" style="width:auto"> only the commands, not the wording and limits</label>`+
+    `<div style="max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:8px">${rows}</div>`+
+    `<div class="row" style="gap:8px;margin-top:14px;justify-content:flex-end">`+
+      `<button id="pgCancel" class="ghost">Cancel</button>`+
+      `<button id="pgGo">Copy</button></div>`+
+  `</div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('#pgCancel').onclick=()=>ov.remove();
+  ov.querySelector('#pgGo').onclick=()=>{
+    const only=ov.querySelector('#pgOnlyCmds').checked;
+    const src=JSON.parse(JSON.stringify(me.gameplay||{}));
+    delete src.preset_loaded;
+    const picked=[...ov.querySelectorAll('.pgTarget')].filter(c=>c.checked).map(c=>+c.dataset.i);
+    if(!picked.length) return toastMsg('tick at least one scene');
+    picked.forEach(i=>{
+      const sc=scenesData[i]; if(!sc) return;
+      sc.gameplay = only
+        ? {...(sc.gameplay||{}), commands:JSON.parse(JSON.stringify(src.commands||[]))}
+        : JSON.parse(JSON.stringify(src));
+    });
+    ov.remove();
+    // structure-only save: the gameplay fields on screen belong to THIS scene
+    sceneSwitchSave();
+    toastMsg(`⇪ copied to ${picked.length} scene${picked.length===1?'':'s'}`);
+  };
+}
+// Switching from the bar is the same switch the Scenes tab does.
+function scenebarPick(name){
+  const i=(scenesData||[]).findIndex(sc=>sc.name===name);
+  if(i>=0) stgPick(i);
 }
 document.querySelectorAll('.tab-btn').forEach(b=>{
   b.addEventListener('click', ()=>showTab(b.getAttribute('data-go')));
@@ -1593,6 +1705,9 @@ try{ IS_ANDROID = new URLSearchParams(location.search).has('android') || !!(wind
 (function(){
   let t='chat';
   if(!IS_ANDROID){ try{ t=localStorage.getItem('df_tab')||'chat'; }catch(e){} }
+  // a remembered tab that no longer exists (Dashboard, Game) would show a
+  // blank page — fall back rather than stranding anyone mid-upgrade
+  if(!document.querySelector(`.tab-btn[data-go="${t}"]`)) t='chat';
   showTab(t);
 })();
 let allDevices = [];        // device list (for command targeting dropdowns)
@@ -3054,7 +3169,7 @@ function stgPick(i){
   stgGlobalMode=false;                 // picking a scene leaves the global pool
   stgCur=i; scnSelId=null; stgGroupFilter=''; stgPending.clear();
   stgSyncLive();                       // one picker: this IS the live scene
-  stgRemember(); renderStages(); showReload(); scheduleSave();
+  stgRemember(); renderStages(); showReload(); sceneSwitchSave();
 }
 // Keep chat_scene pinned to whatever the Scenes tab has selected.
 function stgSyncLive(){
@@ -3070,9 +3185,15 @@ function stgEnsureDefault(){
   return true;
 }
 function stgAdd(){ const name=prompt('Scene name:','My Scene'); if(!name) return;
-  scenesData.push({name:name.trim(), preset:'', width:1280, height:720, overlays:[]});
+  // A scene owns its rules, so a brand-new one with none would have no commands
+  // at all. Start it from the rules you are looking at — an empty STAGE, but a
+  // working SHOW — and diverge it from there.
+  const seed=JSON.parse(JSON.stringify((stgStage()||{}).gameplay||{}));
+  delete seed.preset_loaded;
+  scenesData.push({name:name.trim(), preset:'', width:1280, height:720, overlays:[],
+                   gameplay:seed});
   stgCur=scenesData.length-1; scnSelId=null; stgSyncLive();
-  renderStages(); showReload(); scheduleSave(); }
+  renderStages(); showReload(); sceneSwitchSave(); }
 function stgRename(){ if(stgGlobalMode) return toastMsg('the global pool has no name');
   const s=stgStage(); if(!s) return; const n=prompt('New name:', s.name||''); if(!n) return;
   if(chatSceneName===s.name) chatSceneName=n.trim();
@@ -3083,7 +3204,7 @@ function stgDelete(){ if(stgGlobalMode) return toastMsg('the global pool can\u20
   if(chatSceneName===s.name) chatSceneName='';
   scenesData.splice(stgCur,1); stgCur=scenesData.length?0:-1; scnSelId=null;
   stgSyncLive();
-  renderStages(); showReload(); scheduleSave(); }
+  renderStages(); showReload(); sceneSwitchSave(); }
 // "Thing" -> "Thing copy" -> "Thing copy 2". Strips an existing copy suffix
 // first, so duplicating a duplicate never produces "copy copy".
 function copyName(name, taken){
@@ -3106,7 +3227,7 @@ function stgCopy(){
   scenesData.push(c);
   stgCur=scenesData.length-1; scnSelId=null; stgGroupFilter='';
   stgSyncLive();
-  stgRemember(); renderStages(); showReload(); scheduleSave();
+  stgRemember(); renderStages(); showReload(); sceneSwitchSave();
   toastMsg(`📋 copied to "${n}"`);
 }
 function stgProp(k,v){ const s=stgStage(); if(s){ s[k]=v; scheduleSave(); } }
@@ -5738,7 +5859,7 @@ function addTemplateToConfig(kind, idx){
   const copy=clone(tpl);
   if(kind==='ranges'){
     if(copy.is_end && hasEnd()){ toastMsg('⚠ You already have an End — delete it first'); return; }
-    rangeRows.push(copy); renderRanges(); scheduleSave(); showTab('game');
+    rangeRows.push(copy); renderRanges(); scheduleSave(); showTab('stages');
     toastMsg(copy.is_end?'End added':'Range added — set its From/To % in Capacity ranges');
     return;
   }
@@ -6378,6 +6499,7 @@ function applyState(st, full){
     // Go Live and the session overlays belong to the SCENE: their stages and
     // the pause overlay name scene GROUPS, which are per-scene.
     showToDom((st.scenes||[])[stgCur] || (st.scenes||[]).find(x=>x.name===st.chat_scene) || {}, st, false);
+    renderSceneBar();   // which scene owns what is on screen — never let it go stale
     // the pre-show banner + Start-now button
     { const intro=st.intro, b=$('#introNow'), nx=$('#introNext');
       if(b) b.style.display = intro ? '' : 'none';
@@ -6629,6 +6751,25 @@ function saveBadge(ok){
   el.style.color = ok ? 'var(--accent2)' : 'var(--bad)';
   el.style.opacity = 1; clearTimeout(el._t);
   if(ok) el._t = setTimeout(()=>el.style.opacity=0, 1400);
+}
+// Switching scenes is NOT an ordinary save. The gameplay fields on screen
+// still hold the scene we are leaving, and the server files gameplay under
+// whichever scene is live — so a normal save here would stamp the old scene's
+// rules onto the new one. Send the scene STRUCTURE only, then repaint every
+// field from the server's resolved view of the scene we just switched to.
+async function sceneSwitchSave(){
+  clearTimeout(saveT); saveT = null;
+  const payload = { scenes: _scenesWithShow(), chat_scene: chatSceneName,
+                    scene_globals: sceneGlobals, scene_globals_meta: globalsMeta };
+  if(configRev != null) payload.config_rev = configRev;
+  try{
+    const r = await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if(!r.ok) throw new Error(await r.text().catch(()=>r.status));
+    const st = await r.json();
+    configRev = st.config_rev ?? configRev;
+    applyState(st, true);           // force: repaint from the new scene
+    saveBadge(true);
+  }catch(e){ saveBadge(false); toastMsg('⚠ could not switch scene: '+e.message); }
 }
 async function doSave(){
   saveT = null;

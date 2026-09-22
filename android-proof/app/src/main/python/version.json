@@ -1,6 +1,6 @@
 {
-  "version": "3.64.0",
-  "versionCode": 147,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.64.0/discoflate-v3.64.0.apk",
-  "notes": "DiscoFlate v3.64.0 \u2014 the Dashboard is gone and its parts moved to where they're used: Go Live Options and the session overlays now live on Scenes and belong to the SCENE, Leaderboards moved to Game, the Activity log to System, and the capacity slider and operator controls to Chat. Each scene carries its own intro, after-group, notify overlay and pause overlay, so switching scenes switches the whole show \u2014 no more one global intro pointing at groups that only exist in another scene. Existing configs migrate: your live scene inherits your current settings verbatim."
+  "version": "3.65.0",
+  "versionCode": 148,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.65.0/discoflate-v3.65.0.apk",
+  "notes": "DiscoFlate v3.65.0 \u2014 a SCENE is now the whole show. It owns its overlays, its commands, its triggers, its chat buttons, its wording and its limits, so picking a scene picks everything at once and a command can never point at a group from some other scene. Gameplay settings are gone as a separate idea \u2014 the Dashboard and Game tabs with them; everything they held lives on Scenes. Ships with a read-only 'DiscoFlate Default' to compare against and an editable 'Your Scene' to build on. Existing setups migrate into a scene of their own with nothing lost."
 }

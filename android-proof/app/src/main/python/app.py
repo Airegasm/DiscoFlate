@@ -12,6 +12,7 @@ Start:  python3 app.py     then open http://127.0.0.1:8765
 from __future__ import annotations
 
 import asyncio
+import copy
 import fnmatch
 import io
 import ipaddress
@@ -105,28 +106,9 @@ _DEFAULT_LIST_KEYS = {
 # everything personal/connection: discord_token, devices, vendors (creds),
 # listen targets / server IDs / announce channel, allow-lists, cooldown-exempt
 # names/IDs, operator name, mock/pumpdirect/runtime state.
-_GAMEPLAY_KEYS = [
-    # Commands tab
-    "command_prefix", "command_names", "roll", "system_buffer_seconds",
-    "capacity_message", "pumptimer_message", "pump_message",
-    "cooldown_message",
-    "capacity_embed", "capacity_title", "pumptimer_embed", "pumptimer_title",
-    "cooldown_embed", "cooldown_title", "pump_embed", "pump_title",
-    "commands", "broadcasts", "modes", "prizes", "owner_commands", "chat_buttons",
-    # Game tab
-    "cooldown_seconds", "auto_report",
-    "listener_message_on", "listener_message_off",
-    "listener_on_embed", "listener_on_title", "listener_off_embed", "listener_off_title",
-    "pause_message", "resume_message", "paused_notice_message",
-    "pause_embed", "pause_title",
-    "output_headers", "rich_output",
-    "capacity_ranges", "always_on_enabled", "always_on_commands",
-    # Events tab
-    "events", "capacity_events", "polls", "competitions", "bonus_rounds",
-    "event_in_process_message", "event_cooldown_message",
-    # Templates tab
-    "templates",
-]
+# The gameplay key set lives in config_store now, because the store is what
+# lays a scene's block over the config. One definition, both sides.
+_GAMEPLAY_KEYS = config_store.GAMEPLAY_KEYS
 # List keys → identity fn, for "add missing only" additive merge (by name/key).
 _GAMEPLAY_LIST_KEYS = {
     "commands": lambda c: (c.get("name") or "").strip().lower(),
@@ -150,7 +132,10 @@ def _gp_blank(v) -> bool:
 
 
 def _gameplay_export(cfg: dict) -> dict:
-    return {k: cfg[k] for k in _GAMEPLAY_KEYS if k in cfg}
+    """The gameplay actually in play — the live scene's block, since that is
+    what the operator sees on the tabs and what a preset should capture."""
+    r = config_store.resolved(cfg)
+    return {k: r[k] for k in _GAMEPLAY_KEYS if k in r}
 
 
 def _gameplay_merge(cur: dict, incoming: dict, mode: str) -> dict:
@@ -244,7 +229,11 @@ def _mask_vendors(vendors: dict) -> dict:
 
 
 def _public_state(engine: Engine, botmgr: BotManager) -> dict:
-    cfg = config_store.load()
+    # RESOLVED: the panel must show the rules the live scene is actually
+    # playing by, not the stale top-level copy they were migrated from.
+    # Non-gameplay keys (scenes, devices, channels) pass through untouched.
+    raw = config_store.load()
+    cfg = config_store.resolved(raw)
     snap = engine.snapshot()
     return {
         **snap,
@@ -321,7 +310,7 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         # its own wins, one that doesn't still falls back. The UI reads the
         # scene first and only uses these as the fallback, so they must agree.
         "pause_overlay": engine.session_overlay("pause_overlay"),
-        "scenes": cfg.get("scenes") or [],
+        "scenes": raw.get("scenes") or [],
         "minigames": cfg.get("minigames") or [],
         "scene_globals": cfg.get("scene_globals") or [],
         "scene_globals_meta": cfg.get("scene_globals_meta") or {},
@@ -1076,8 +1065,11 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                     "system_buffer_seconds", "cooldown_message", "pumptimer_message", "pump_message",
                     "roll", "prizes", "owner_commands", "chat_buttons",
                     "scenes", "scene_globals", "scene_globals_meta", "chat_scene",
-                    "notify_overlay", "pause_overlay",
-                    "golive",
+                    # golive / notify_overlay / pause_overlay are NOT accepted
+                    # at the top level any more: the scene owns them, and
+                    # /api/state reports the RESOLVED values, so a client that
+                    # round-trips state back into config would otherwise flatten
+                    # the live scene's show into the global fallback.
                     "chat_isolate", "chat_isolate_channel",
                     "capacity_ranges", "commands", "modes", "events",
                     "capacity_events", "polls", "competitions", "minigames",
@@ -1097,6 +1089,28 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                 if want and not isinstance(body[key], want):
                     raise web.HTTPBadRequest(text=f"{key} must be a {want.__name__}")
                 patch[key] = body[key]
+        # Gameplay belongs to the SCENE. Route those keys into the live scene's
+        # block instead of the top level, so editing Commands or Game while
+        # "Tuesday Show" is selected changes Tuesday Show and nothing else.
+        # `scenes` itself is sent whole by the panel, so a patch carrying both
+        # must fold the gameplay INTO the scenes it also just sent.
+        gp = {k: patch.pop(k) for k in list(patch) if k in config_store.GAMEPLAY_KEYS}
+        if gp:
+            base = config_store.load()
+            scenes = copy.deepcopy(patch.get("scenes")
+                                   if isinstance(patch.get("scenes"), list)
+                                   else (base.get("scenes") or []))
+            live = str(patch.get("chat_scene", base.get("chat_scene")) or "").strip().lower()
+            hit = next((sc for sc in scenes
+                        if str(sc.get("name") or "").strip().lower() == live), None)
+            if hit is not None:
+                blk = hit.get("gameplay")
+                hit["gameplay"] = {**(blk if isinstance(blk, dict) else {}), **gp}
+                patch["scenes"] = scenes
+            else:
+                # no scene to own it (none selected yet) — keep the old behaviour
+                # rather than dropping the edit on the floor
+                patch.update(gp)
         cfg = config_store.update(patch)
         engine.set_config(cfg)
         return web.json_response(_public_state(engine, botmgr))
@@ -1212,7 +1226,8 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         b = await _json(request)
         name, enabled = (b.get("name") or "").strip().lower(), bool(b.get("enabled"))
         cfg = config_store.load()
-        for c in cfg.get("commands", []):
+        gp = config_store.live_gameplay(cfg)   # the live scene owns the commands
+        for c in gp.get("commands", []):
             if (c.get("name") or "").strip().lower() == name:
                 c["enabled"] = enabled
         config_store.save(cfg)
@@ -1225,17 +1240,18 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         b = await _json(request)
         name, enabled = (b.get("name") or "").strip().lower(), bool(b.get("enabled"))
         cfg = config_store.load()
-        mode = next((m for m in cfg.get("modes", [])
+        gp = config_store.live_gameplay(cfg)   # the live scene owns modes too
+        mode = next((m for m in gp.get("modes", [])
                      if (m.get("name") or "").strip().lower() == name), None)
         if mode is None:
             raise web.HTTPBadRequest(text="mode not found")
         mode["enabled"] = enabled
         members = {str(x).strip().lower() for x in (mode.get("commands") or [])}
         ev_members = {str(x).strip().lower() for x in (mode.get("events") or [])}
-        for c in cfg.get("commands", []):
+        for c in gp.get("commands", []):
             if (c.get("name") or "").strip().lower() in members:
                 c["enabled"] = enabled
-        for ev in cfg.get("events", []):
+        for ev in gp.get("events", []):
             if (ev.get("name") or "").strip().lower() in ev_members:
                 ev["enabled"] = enabled
         config_store.save(cfg)
@@ -1689,12 +1705,21 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             # stored presets were migrated with the config, but belt & braces:
             # the collapse is idempotent and cheap
             data = config_store._collapse_v10(dict(data))
-            merged = _gameplay_merge(cfg, data, "replace")
-            # Remember WHICH preset the live gameplay came from. A load is
+            # A preset is a TEMPLATE now: it loads into the scene you have
+            # selected, and stops there. That is what keeps one axis — there is
+            # no live "preset layer" that can drift out of step with the scene.
+            gp = config_store.live_gameplay(cfg)
+            merged = _gameplay_merge(gp, data, "replace")
+            # Remember WHICH preset this scene's gameplay came from. A load is
             # one-way — editing the tabs afterwards never writes back — so the
             # panel shows this as a readout, not as a link you can re-point.
             merged["preset_loaded"] = name
-            cfg = config_store.save(config_store._coerce_numbers(merged))
+            if gp is cfg:                       # no scene yet: old flat behaviour
+                cfg = config_store._coerce_numbers(merged)
+            else:
+                gp.clear()
+                gp.update(config_store._coerce_numbers(merged))
+            cfg = config_store.save(cfg)
             engine.set_config(cfg)
         elif action == "delete":
             cfg["gameplay_presets"] = [p for p in presets
