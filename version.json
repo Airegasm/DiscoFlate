@@ -1,6 +1,6 @@
 {
-  "version": "3.76.0",
-  "versionCode": 164,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.76.0/discoflate-v3.76.0.apk",
-  "notes": "DiscoFlate v3.76.0 \u2014 the canvas and the stream agree again. Text without a background was being charged a background box's padding, so every line sat ~0.4x its own size lower than the canvas showed, and device-timer rows stacked nearly twice as far apart. The canvas also now draws the percentage inside the capacity gauge, the way the live one does."
+  "version": "3.77.0",
+  "versionCode": 165,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.77.0/discoflate-v3.77.0.apk",
+  "notes": "DiscoFlate v3.77.0 \u2014 the canvas now previews text with its placeholders RESOLVED, so what you size is the length that actually goes out ([syscom_help] previewed nearly twice as wide as the !aghelp it becomes). New 'dead centre' tick keeps an overlay centred however the text resolves, and the shipped intro card is now three big centred lines matching STARTING SOON."
 }

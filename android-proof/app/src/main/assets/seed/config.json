@@ -2797,7 +2797,7 @@
           "media": "",
           "x": 0.1,
           "y": 0.44,
-          "w": 0.8,
+          "w": 0.9,
           "mode": "hold",
           "seconds": 5,
           "layer": "",
@@ -2808,12 +2808,13 @@
           "z": 0,
           "opacity": 100,
           "delay": 0,
-          "size": 0.055,
+          "size": 0.14,
           "color": "#ffffff",
           "font": "bold",
           "bg": "",
           "align": "center",
-          "text": "[owner]'s DiscoFlate stream will begin in [intro_timer]"
+          "text": "[owner]'s DiscoFlate stream\nwill begin in\n[intro_timer]",
+          "center": true
         },
         {
           "id": "dfdefnotify",
@@ -5414,7 +5415,7 @@
           "media": "",
           "x": 0.1,
           "y": 0.44,
-          "w": 0.8,
+          "w": 0.9,
           "mode": "hold",
           "seconds": 5,
           "layer": "",
@@ -5425,12 +5426,13 @@
           "z": 0,
           "opacity": 100,
           "delay": 0,
-          "size": 0.055,
+          "size": 0.14,
           "color": "#ffffff",
           "font": "bold",
           "bg": "",
           "align": "center",
-          "text": "[owner]'s DiscoFlate stream will begin in [intro_timer]"
+          "text": "[owner]'s DiscoFlate stream\nwill begin in\n[intro_timer]",
+          "center": true
         },
         {
           "id": "dfdefnotify",

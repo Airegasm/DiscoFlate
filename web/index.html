@@ -2406,6 +2406,40 @@ function renderStages(){
   }
   renderChatSceneSel(); sceneButtonsRefresh();
 }
+// The canvas drew [placeholders] literally, so every text block previewed at
+// the wrong WIDTH — "[syscom_help]" is nearly twice "!aghelp". Substitute live
+// values where we have them and a representative sample where we don't, so
+// what you size on the canvas is the length that actually goes out.
+function stgPreviewText(t){
+  let s = String(t==null ? '' : t);
+  if(!s.includes('[')) return s;
+  const st = lastState || {};
+  const pre = (st.prefix || '!');
+  const who = ($('#cooldownExemptNames')||{}).value || st.operator_name || 'AireGasm';
+  const dev = (allDevices||[]).find(d=>(d.name||'').trim()) || (allDevices||[])[0] || {};
+  const cap = Math.round(+st.capacity || 0);
+  const M = {
+    capacity: cap, capacity_bar: '🟩🟩🟩⬛⬛⬛⬛⬛⬛⬛',
+    user: who, mention: '@'+who, operator: who, owner: who, target: who,
+    command: pre+'pump', cmd: pre+'pump',
+    command_overlay_desc: '+12s to '+((dev.name||dev.label||'the pump')),
+    overlay_desc: '+12s to '+((dev.name||dev.label||'the pump')),
+    device: dev.name || dev.label || 'the pump',
+    secs: '12', seconds: '12', timer: '12', total_secs: '12',
+    secs2capacity: '3', result: '17', total: '17', dice: '2d10', sides: '10',
+    intro_timer: '12', loop_timer: '30', event: 'PumpRoulette',
+    current_loop: '1', total_loops: '3', score: '7', game: 'Push Your Luck',
+    winner: who, winner_score: '21', runnerup: 'Someone', cmd_remain: '3',
+    cmd_remain_note: ' · 3 uses left', prefix: pre, count: '2', goal: '3',
+    remaining: '1', counter: 'roll', prize: 'a bonus command',
+  };
+  for(const [k,v] of Object.entries(st.command_names||{})) M['syscom_'+k] = pre+v;
+  // anything we don't know keeps its brackets, so it still reads as a token
+  return s.replace(/\[([a-z_]+)\]/gi, (m,k)=>{
+    const v = M[String(k).toLowerCase()];
+    return v===undefined ? m : String(v);
+  });
+}
 function renderStgCanvas(){
   const s=stgStage(), cv=$('#stgCanvas'); if(!cv) return;
   if(!s){ cv.innerHTML=''; return; }
@@ -2465,7 +2499,7 @@ function renderStgCanvas(){
       const live = (lastState.timers||{})[o.id];
       const sec = live!=null ? live : (+o.seconds||0);
       const m=Math.floor(sec/60), s=Math.round(sec%60);
-      let t = String(o.text||'[secs]');
+      let t = stgPreviewText(String(o.text||'[secs]'));
       if(!/\[(secs|mmss)\]/.test(t)) t += ' [secs]';
       inner = `<div class="txt${(o.bg||'').trim()?' boxed':''}" style="color:${esc(o.color||'#fff')};`+
         `font-family:${fam};font-size:${fs}px;`+
@@ -2485,7 +2519,7 @@ function renderStgCanvas(){
           .replace('[secs]', Math.round(r.remaining||0))).join('\n') || '(no devices firing)';
       } else if(o.kind==='pump_timer'){
         txt = (o.fmt_on||'PUMP [secs]s').replace('[secs]','12');
-      } else { txt = (o.text||''); }
+      } else { txt = stgPreviewText(o.text||''); }
       inner = `<div class="txt${(o.bg||'').trim()?' boxed':''}" style="color:${esc(o.color||'#fff')};`+
               `font-family:${fam};font-size:${fs}px;text-align:${esc(o.align||'left')};`+
               `${(o.bg||'').trim()?`background:${esc(o.bg)}`:'text-shadow:0 1px 3px #000,0 0 2px #000'}">`+
@@ -2516,7 +2550,12 @@ function renderStgCanvas(){
     // out. Both multiply the item's own opacity rather than replacing it.
     const dim = stgGroupHidden(o.group) ? 0.18 : (o.visible ? 1 : 0.45);
     const hid = stgGroupHidden(o.group) ? 'filter:grayscale(1);' : '';
-    const geom = `left:${(o.x*100).toFixed(2)}%;top:${(o.y*100).toFixed(2)}%;${box};${rot}${fl}`;
+    // dead centre ignores x/y and stays centred however the text resolves
+    const rotT = o.rot ? ` rotate(${+o.rot||0}deg)` : '';
+    const geom = o.center
+      ? `left:50%;top:50%;${box};transform:translate(-50%,-50%)${rotT};`+
+        `transform-origin:center center;${fl}`
+      : `left:${(o.x*100).toFixed(2)}%;top:${(o.y*100).toFixed(2)}%;${box};${rot}${fl}`;
     // The SELECTED overlay gets a transparent editing shell above everything
     // (below). It keeps its real z-index here so the canvas still previews the
     // true stacking — the shell is what you grab and see the outline on.
@@ -2616,6 +2655,7 @@ let stgDrag=null;
       renderStgCanvas();
       return;
     }
+    if(o.center) o.center=false;   // you just placed it by hand
     o.x=Math.max(0,Math.min(0.98, snapOn ? Math.round((fx-stgDrag.dx)/SNAP)*SNAP : fx-stgDrag.dx));
     o.y=Math.max(0,Math.min(0.98, snapOn ? Math.round((fy-stgDrag.dy)/SNAP)*SNAP : fy-stgDrag.dy));
     for(const t of [el, shellEl]) if(t){
@@ -3103,6 +3143,7 @@ function renderStgProps(){
     F('Delay', num('delay',o.delay??0,0,600,0.5),'wait this long before it appears — how a scene group staggers itself')+
     F('Fade in', num('fade_in',o.fade_in??0,0,10,0.1))+
     F('Fade out', num('fade_out',o.fade_out??0,0,10,0.1))+
+    chk('center',o.center,'dead centre','ignore X/Y and stay centred on the frame — survives the text changing length when placeholders resolve')+
     chk('anim',o.anim,'animate','slide in and out instead of just appearing')+
     (o.anim?F('Direction', sel('anim_dir',['up','down','left','right'],o.anim_dir||'up',92)):'')+
     chk('queue',o.queue,'queue if busy','wait your turn instead of replacing what is on screen')+

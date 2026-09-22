@@ -328,6 +328,7 @@ class VirtualCam:
                "until": until, "_dur": (until - time.monotonic()) if until else None,
                "pos": str(item.get("pos") or "center").lower(),
                "x": item.get("x"), "y": item.get("y"),
+               "center": bool(item.get("center")),
                "rot": item.get("rot"), "flash": item.get("flash"),
                "fade_in": item.get("fade_in"), "fade_out": item.get("fade_out"),
                "anim": item.get("anim"), "anim_dir": item.get("anim_dir"),
@@ -1009,6 +1010,11 @@ class VirtualCam:
     def _spot(self, o: dict, W: int, H: int, w: int, h: int) -> tuple[int, int]:
         """Top-left pixel for an overlay: exact fractional x/y when the stage
         designer set one, else the named anchor."""
+        # DEAD CENTRE: stays centred however long the text renders, which a
+        # fixed top-left x/y cannot — [owner] and [intro_timer] change width
+        # every time they resolve.
+        if o.get("center") or (o.get("item") or {}).get("center"):
+            return self._place(W, H, w, h, "center")
         if o.get("x") is not None and o.get("y") is not None:
             try:
                 return (int(W * float(o["x"])), int(H * float(o["y"])))
