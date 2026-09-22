@@ -479,7 +479,7 @@
     <div class="card span" data-tab="stages">
       <details class="help" open><summary><b style="font-size:1.02rem">🎭 Scenes</b></summary>
 
-      <div class="hint">Design overlay <b>scenes</b> for video calls, OBS-style: pick a resolution, drag overlays onto the canvas, mark each one <b>always-on</b> or <b>callable</b>. Link a Gameplay Preset so the whole bundle travels together. The Chat tab's 🎥 section links a chat to a stage — its callable overlays become one-tap buttons there, and ▶ Start virtual cam (or the phone's 🎭 Stage view) puts the always-on items live. Everything autosaves.</div>
+      <div class="hint">A <b>scene is the whole show</b>: its overlays and groups, and also its commands, triggers, buttons, wording and limits. Pick a resolution, drag overlays onto the canvas, mark each one <b>always-on</b> or <b>callable</b> — then set up the rules that go with them. Switching scenes switches all of it at once, so nothing can point at a group that belongs to somewhere else. <b>DiscoFlate Default</b> is read-only: copy it, or edit <b>Your Scene</b>, and rename it to make it yours. ▶ Start virtual cam (or the phone's 🎭 Stage view) puts the always-on items live. Everything autosaves.</div>
       <div class="row" style="gap:8px;align-items:flex-end;margin-top:8px">
         <label class="field">Scene <select id="scnSel" style="width:200px" onchange="stgPick(+this.value)"></select></label>
         <button class="ghost pmini" onclick="stgAdd()" title="new scene">➕</button>
@@ -634,28 +634,6 @@
 
     <!-- everything Game used to hold: a scene owns its rules, so they -->
     <!-- live beside the scene that owns them -->
-    <div class="card span" data-tab="stages">
-      <details class="help"><summary><h2>📦 Gameplay Presets</h2></summary>
-      <div class="row" style="gap:8px;align-items:center;margin-top:8px"><span class="muted">Currently loaded:</span><span id="stgPresetNow" class="pill" title="Which preset the live gameplay was last LOADED from. Read-only: loading copies a preset into the live config, and editing the tabs afterwards never writes back to it.">—</span></div>
-      <div class="hint" style="margin-top:8px;max-width:860px">Saved snapshots of your whole <b>Game, Commands, Events &amp; Templates</b> — swap between whole setups instantly. Your ongoing edits autosave to the <b>live</b> config as always; a preset only changes when you <b>Save</b> or <b>Update</b> it. Presets never include your token, devices, or server settings, so preset files are safe to share. <b>Defaults (built-in)</b> is the shipped starter setup — load it any time; it can't be edited, renamed, or deleted.</div>
-      <div class="row" style="margin-top:10px;gap:8px;align-items:center;flex-wrap:wrap">
-      <button onclick="presetSaveCurrent()">💾 Save Current to Preset</button>
-      <div style="flex-basis:100%;height:0"></div>
-      <select id="presetSel" style="min-width:200px"></select>
-      <button class="ghost" onclick="presetLoad()">▶ Load</button>
-      <button class="ghost" onclick="presetUpdate()">⟳ Update</button>
-      <button class="ghost" title="Rename this preset" onclick="presetRename()">✏️</button>
-      <button class="ghost" onclick="presetExport()">⬇ Export</button>
-      <button class="ghost bad" onclick="presetDelete()">✕</button>
-      </div>
-      <div class="row" style="margin-top:8px">
-      <button onclick="$('#importPresetFile').click()">⬆ Import Preset File</button>
-      <input type="file" id="importPresetFile" accept="application/json,.json" style="display:none" onchange="importPresetFile(this)">
-      <span class="muted" id="presetMsg"></span>
-      </div>
-      <div class="hint" style="margin-top:8px"><b>Load</b> swaps all four tabs to the selected preset (your live edits are replaced). <b>Update</b> overwrites the selected preset with your current settings. <b>Export</b> saves it as a shareable file; <b>Import Preset File</b> brings one in under a name you choose.</div>
-      </details>
-    </div>
 
     <div class="card span" data-tab="stages">
       <details class="help"><summary><h2>Limits &amp; announcements</h2></summary>
@@ -732,7 +710,61 @@
         </details>
     </div>
 
-    <div class="card span" data-tab="stages">
+
+    <!-- capacity ranges + always-on: both are triggers, fired by the -->
+    <!-- capacity number rather than by a person typing -->
+    <div class="card span" data-tab="triggers">
+      <details class="help"><summary><h2>System commands</h2></summary>
+      <div class="row" style="gap:16px;align-items:flex-end;margin-top:8px">
+        <label class="field">Prefix <input id="prefix" value="!" style="width:60px"></label>
+        <label class="field">Anti-spam buffer (s) <input type="number" id="systemBuffer" value="8" min="0" step="1" style="width:80px" title="quietly ignore back-to-back uses of the same command within N seconds (0 = off)"></label>
+      </div>
+      <!-- each command's NAME sits next to ITS reply -->
+      <div class="row" style="gap:12px;align-items:flex-start;margin-top:10px;flex-wrap:nowrap">
+        <label class="field" style="width:160px;flex:none">Capacity command <input id="cmdCapacity" value="capacity"></label>
+        <label class="field" style="flex:1">Reply <textarea id="capacityMsg" rows="2"></textarea></label>
+        <label class="row" style="gap:6px;white-space:nowrap;margin-top:24px"><input type="checkbox" id="capacityEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
+        <label class="field" style="width:170px;flex:none">Titlebar <input id="capacityTitle" placeholder="📊 Capacity"></label>
+      </div>
+      <div class="row" style="gap:12px;align-items:flex-start;margin-top:8px;flex-wrap:nowrap">
+        <label class="field" style="width:160px;flex:none">Pump timer command <input id="cmdPumptimer" value="pumptimer"></label>
+        <label class="field" style="flex:1">Reply <span class="muted">([timer])</span> <textarea id="pumptimerMsg" rows="2"></textarea></label>
+        <label class="row" style="gap:6px;white-space:nowrap;margin-top:24px"><input type="checkbox" id="pumptimerEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
+        <label class="field" style="width:170px;flex:none">Titlebar <input id="pumptimerTitle" placeholder="⏱️ Pump timer"></label>
+      </div>
+      <div class="row" style="gap:16px;align-items:flex-end;margin-top:8px">
+        <label class="field">Help <input id="cmdHelp" value="aghelp" style="width:130px" title="DMs the command list — output isn't editable"></label>
+        <label class="field">Leaderboard <input id="cmdLeaderboard" value="leaderboard" style="width:140px" title="top pumpers this session — output isn't editable"></label>
+        <label class="field">Lifetime leaderboard <input id="cmdLeaderboardLife" value="toppumpers-life" style="width:150px" title="all-time top pumpers — output isn't editable"></label>
+      </div>
+      <div class="row" style="gap:12px;align-items:flex-end;margin-top:10px;flex-wrap:nowrap">
+        <label class="field" style="flex:1">Cooldown message <span class="muted">([cmd] = the command)</span>
+          <input id="cooldownMsg" placeholder="⏳ [mention], [cmd] is on cooldown — [cooldown]s left"></label>
+        <label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" id="cooldownEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
+        <label class="field" style="width:170px;flex:none">Titlebar <input id="cooldownTitle" placeholder="⏳ Cooldown"></label>
+      </div>
+      <div class="row" style="gap:12px;align-items:flex-end;margin-top:10px;flex-wrap:nowrap">
+        <label class="field" style="flex:1">Operator Pump message <span class="muted">(Dashboard → Controls → 💨 Pump · [secs] [secs2capacity] [capacity] [timer] [operator] · reuse it anywhere as <code>[pump_msg]</code>)</span>
+          <textarea id="pumpMsg" rows="2"></textarea></label>
+        <label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" id="pumpEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
+        <label class="field" style="width:170px;flex:none">Titlebar <input id="pumpTitle" placeholder="💨 Pump"></label>
+      </div>
+      </details>
+
+    </div>
+    <div class="card span" data-tab="triggers">
+      <details class="help"><summary><h2>Custom commands</h2></summary>
+      <div id="commands"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" onclick="addCommand()">+ Add command</button>
+        <div style="flex:1"></div>
+      </div>
+      <div class="hint">A command = its gates + an <b>action block</b> run in order when it's typed: <b>fire</b> (fixed seconds or until a %), <b>roll</b> (blank dice = the range's dice &amp; luck), <b>chance</b> (a gamble with nested win/miss blocks), <b>message</b> (how the bot replies — put it after the rows that produce <code>[secs]</code>/<code>[result]</code>), <b>award</b>, <b>command_gate</b>, and more.
+        The <b>minigame</b> types post a <b>▶ Play</b> button; the player plays privately and the final <b>score → tier</b> broadcasts (tiers can fire, run actions, even count toward a Perfect Prize).
+        A command works once it's in a <b>range</b> (Game → Capacity ranges) or in <b>⚡ Always-On</b> — range values (cooldown, fire seconds/device, dice, luck) always override the command's own. See the <b>Help</b> tab for placeholders.</div>
+      </details>
+    </div>
+    <div class="card span" data-tab="triggers">
       <details class="help"><summary><h2>Capacity ranges</h2></summary>
       <details class="help" style="margin-bottom:14px"><summary><b style="font-size:1.02rem">⚡ Always-On commands</b></summary>
         <label class="row" style="gap:8px;margin:4px 0 8px"><input type="checkbox" id="alwaysOnEnabled" style="width:auto" onchange="renderAlwaysOn();scheduleSave()"> Enable — commands added here work in <b>every</b> range (bypassing per-range membership)</label>
@@ -752,6 +784,118 @@
         🏁 <b>End Sequence</b> = a range with a final threshold; reaching it posts a final message then ends &amp; resets the
         session (no activation-off message). <b>End</b> = just that terminal threshold, no buildup. Capacity may tick
         <b>above 100%</b> up to the End threshold. Only one End / End Sequence is allowed, and nothing comes after it.</div>
+      </details>
+    </div>
+    <div class="card span" data-tab="triggers">
+      <details class="help"><summary><h2>📈 Capacity events</h2></summary>
+      <div class="hint" style="margin-top:8px;max-width:860px">One-shot triggers that fire the moment capacity reaches a threshold (<b>1–999%</b>; above 100% only happens inside an End Sequence's buildup). They operate <b>independently of ranges</b> — while one runs, its restrictions <b>take precedence over normal ranges</b> — but the <b>End / End Sequence overrules them</b>: nothing triggers after the end fires, and the session end cancels any running capacity event. One-shot per session (re-armed by Session reset / Activation).</div>
+      <div id="capEvents"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" onclick="addCapEvent()">+ Add capacity event</button>
+        <div style="flex:1"></div>
+      </div>
+      <div class="hint" style="max-width:860px"><b>During the event</b> = while its action block is running (actions execute in order; use <b>wait</b> to shape timing). Gate play with a <b>command_gate</b> row: a <b>Resume</b> row at the block's end lifts it when the event completes; leave it off and the gate persists for the session. Gates apply to <b>chat commands only</b> — dashboard controls still work; an <b>Allow</b> row wins over everything, including range membership.</div>
+      </details>
+    </div>
+    <div class="card span" data-tab="triggers">
+      <details class="help"><summary><h2>⏱ Timed events</h2></summary>
+      <div id="events"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" onclick="addEvent()">+ Add event</button>
+        <div style="flex:1"></div>
+      </div>
+      <div class="row" style="gap:16px;align-items:flex-start;margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
+        <label class="field" style="flex:1">“In process” message <span class="muted">(a command tried to start a running event)</span>
+          <input id="eventInProcessMsg" placeholder="⏳ [event] is already running."></label>
+        <label class="field" style="flex:1">“Cooldown” message <span class="muted">([event] on cooldown · [cooldown]s left)</span>
+          <input id="eventCooldownMsg" placeholder="⏳ [event] is on cooldown — [cooldown]s left."></label>
+      </div>
+      <div class="hint" style="margin-top:2px">These two are <b>global</b>: posted when a <code>!command</code> tries to <b>activate</b> an event that's already running or still on cooldown.</div>
+      <div class="hint">An event is <b>three action blocks</b>: 🚀 <b>On activation</b> (once, when a command starts it) → 🔁 <b>Each round</b> → 🏁 <b>When it ends</b>.
+        <b>Events are OFF by default</b> — tick one to run, or have a custom command start it temporarily.
+        <b>loop</b> runs a round every N seconds (set <b>max</b> to stop after that many; blank = forever); <b>once</b> runs a single round N seconds after arming.
+        Loop placeholders: <code>[current_loop]</code> <code>[total_loops]</code> <code>[loop_timer]</code> <code>[next_round]</code>.
+        Runs only while <b>Activation</b> is on; turning Activation off cancels all events and clears cooldowns. Rounds never overlap — a slow block (wait/poll) just delays the next round.</div>
+      </details>
+    </div>
+    <div class="card span" data-tab="triggers">
+      <details class="help"><summary><h2>🗳 Polls</h2></summary>
+      <div class="row" style="gap:10px;align-items:flex-end;margin-top:8px">
+        <label class="field">Poll vote command <span class="muted">(only active while a poll runs)</span>
+          <input id="cmdVote" value="agvote" style="width:130px"></label>
+        <span class="muted">People vote with <code>!agvote 1</code>, <code>/vote</code>, or the embed's buttons — <b>one vote per person</b>, no take-backs.</span>
+      </div>
+      <div class="hint" style="max-width:860px">A poll is an <b>action</b>: reference it from a command (type <b>poll</b>), a timed event (action <b>poll</b>), a capacity event's block, or even a winning option of another poll. It posts as a rich embed — <b>Poll: &lt;title&gt;</b> with the body and numbered options — runs for its duration (optionally reposting every N seconds), then the <b>winning option's actions execute</b>. Ties break at random; with no votes the <b>Fallback</b> option wins (none marked = nothing happens). One poll at a time. A poll inside an event's action block keeps that event <b>running</b> until the poll completes, then the event's remaining actions resolve.</div>
+      <div id="polls" style="margin-top:10px"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" onclick="addPoll()">+ Add poll</button>
+        <div style="flex:1"></div>
+      </div>
+      </details>
+    </div>
+    <div class="card span" data-tab="triggers">
+      <details class="help"><summary><h2>Broadcasts</h2></summary>
+      <div id="broadcasts"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" onclick="addBroadcast()">+ Add broadcast</button>
+        <div style="flex:1"></div>
+      </div>
+      <div class="hint">Preset messages you can fire from the <b>Dashboard → Controls</b> (“Broadcast Custom”). Placeholders work (<code>[capacity]</code>, <code>[operator]</code>, …). Posted to your channel as the owner.</div>
+      </details>
+    </div>
+    <div class="card span" data-tab="triggers">
+      <details class="help"><summary><h2>🎮 Minigames</h2></summary>
+      <div id="minigames"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" onclick="addMinigame()">+ Add minigame</button>
+        <div style="flex:1"></div>
+      </div>
+      <div class="hint">A minigame is a <b>named profile</b>: a game, its settings, its luck, and the <b>outcome tiers</b> that run when the score lands. Play one from any command with a <b>minigame</b> action row — so a command can fire a pump and post a message <i>before</i> the game, and carry on <i>after</i> it. Two profiles of the same game can differ completely, and any number of commands can call either.</div>
+      </details>
+    </div>
+    <div class="card span" data-tab="triggers">
+      <details class="help"><summary><h2>🏁 Competitions</h2></summary>
+      <div class="hint" style="max-width:880px;margin-top:8px">A competition is an <b>action</b> (start it from any action block). Fully <b>button-driven</b>: players press <b>Enter Challenge</b> on the embed and roll privately — the rolls you define below, in order (complete them all to qualify). Results post all at once; highest score wins by the <b>Win by</b> metric. Winner / no-winner outcomes are <b>action blocks</b> — e.g. an embed message row, <code>fire [winner_score]</code>, <b>award</b> a bonus command, or <b>command_gate</b> everyone else. <i>Race &amp; raffle are being redesigned and will return.</i> Placeholders: <code>[winner]</code> <code>[winner_score]</code> <code>[runnerup]</code> <code>[total_score]</code> <code>[results]</code>.</div>
+      <div id="competitions" style="margin-top:10px"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" onclick="addCompetition()">+ Add competition</button>
+        <div style="flex:1"></div>
+      </div>
+      </details>
+    </div>
+    <div class="card span" data-tab="triggers">
+      <details class="help"><summary><h2>🤝 Bonus Rounds</h2></summary>
+      <div class="hint" style="max-width:880px">A Bonus Round is a <b>teamwork cash-in</b>, started by a <b>bonus_round</b> action. First bank amounts with an <b>award</b> action (volume secs/%) (pump <b>seconds</b> or <b>capacity %</b>, on <code>[winner]</code>/<code>[range_leader]</code>/<code>[session_leader]</code>/…). The round posts an embed with a <b>Confirm</b> button for bonus holders; once the needed holders confirm (<b>all</b>, or just the <b>top holder</b>) before the timer, your action block runs with the pooled <code>[total_bonus_secs]</code> / <code>[total_bonus_pct]</code> — then the banks are spent. Use <code>fire [total_bonus_secs]</code> or <code>add % [total_bonus_pct]</code> to apply them.</div>
+      <div id="bonusRounds" style="margin-top:10px"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" onclick="addBonusRound()">+ Add bonus round</button>
+        <div style="flex:1"></div>
+      </div>
+      </details>
+    </div>
+    <div class="card span" data-tab="triggers">
+      <details class="help"><summary><b style="font-size:1.02rem">🏆 Rewards</b></summary>
+
+          <div class="hint" style="margin-top:0">Achievement rewards: N <b>perfects</b> unlock an <b>action block</b> for the earner (an <b>award</b> row grants a bonus command — target <code>[user]</code>).
+            A <b>perfect roll</b> (any roll action hitting its maximum) bumps the <b>roll</b> counter automatically; an <b>achievement</b> action row (e.g. on a blackjack 21 tier) bumps any counter you name.
+            Progress is per person, resets on unlock (re-earnable) and on Session reset. Progress placeholders: <code>[count]</code> <code>[goal]</code> <code>[remaining]</code> <code>[counter]</code> <code>[prize]</code>.</div>
+          <div id="prizes"></div>
+          <div class="row" style="margin-top:8px">
+            <button class="ghost" onclick="addPrize()">+ Add prize</button>
+            <div style="flex:1"></div>
+          </div>
+      </details>
+    </div>
+    <div class="card span" data-tab="triggers">
+      <details class="help"><summary><h2>Modes</h2></summary>
+      <div id="modes"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" onclick="addMode()">+ Add mode</button>
+        <div style="flex:1"></div>
+      </div>
+      <div class="hint">A mode's switch enables/disables all its <b>commands and events</b> at once. Fill On/Off messages to
+        announce the change in the announce channel, or leave them blank to toggle quietly. Save a mode before
+        its switch goes live.</div>
       </details>
     </div>
 
@@ -895,187 +1039,24 @@
     <!-- capacity ranges -->
 
     <!-- system commands + roll/cooldown settings (one section) -->
-    <div class="card span" data-tab="triggers">
-      <details class="help"><summary><h2>System commands</h2></summary>
-      <div class="row" style="gap:16px;align-items:flex-end;margin-top:8px">
-        <label class="field">Prefix <input id="prefix" value="!" style="width:60px"></label>
-        <label class="field">Anti-spam buffer (s) <input type="number" id="systemBuffer" value="8" min="0" step="1" style="width:80px" title="quietly ignore back-to-back uses of the same command within N seconds (0 = off)"></label>
-      </div>
-      <!-- each command's NAME sits next to ITS reply -->
-      <div class="row" style="gap:12px;align-items:flex-start;margin-top:10px;flex-wrap:nowrap">
-        <label class="field" style="width:160px;flex:none">Capacity command <input id="cmdCapacity" value="capacity"></label>
-        <label class="field" style="flex:1">Reply <textarea id="capacityMsg" rows="2"></textarea></label>
-        <label class="row" style="gap:6px;white-space:nowrap;margin-top:24px"><input type="checkbox" id="capacityEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
-        <label class="field" style="width:170px;flex:none">Titlebar <input id="capacityTitle" placeholder="📊 Capacity"></label>
-      </div>
-      <div class="row" style="gap:12px;align-items:flex-start;margin-top:8px;flex-wrap:nowrap">
-        <label class="field" style="width:160px;flex:none">Pump timer command <input id="cmdPumptimer" value="pumptimer"></label>
-        <label class="field" style="flex:1">Reply <span class="muted">([timer])</span> <textarea id="pumptimerMsg" rows="2"></textarea></label>
-        <label class="row" style="gap:6px;white-space:nowrap;margin-top:24px"><input type="checkbox" id="pumptimerEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
-        <label class="field" style="width:170px;flex:none">Titlebar <input id="pumptimerTitle" placeholder="⏱️ Pump timer"></label>
-      </div>
-      <div class="row" style="gap:16px;align-items:flex-end;margin-top:8px">
-        <label class="field">Help <input id="cmdHelp" value="aghelp" style="width:130px" title="DMs the command list — output isn't editable"></label>
-        <label class="field">Leaderboard <input id="cmdLeaderboard" value="leaderboard" style="width:140px" title="top pumpers this session — output isn't editable"></label>
-        <label class="field">Lifetime leaderboard <input id="cmdLeaderboardLife" value="toppumpers-life" style="width:150px" title="all-time top pumpers — output isn't editable"></label>
-      </div>
-      <div class="row" style="gap:12px;align-items:flex-end;margin-top:10px;flex-wrap:nowrap">
-        <label class="field" style="flex:1">Cooldown message <span class="muted">([cmd] = the command)</span>
-          <input id="cooldownMsg" placeholder="⏳ [mention], [cmd] is on cooldown — [cooldown]s left"></label>
-        <label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" id="cooldownEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
-        <label class="field" style="width:170px;flex:none">Titlebar <input id="cooldownTitle" placeholder="⏳ Cooldown"></label>
-      </div>
-      <div class="row" style="gap:12px;align-items:flex-end;margin-top:10px;flex-wrap:nowrap">
-        <label class="field" style="flex:1">Operator Pump message <span class="muted">(Dashboard → Controls → 💨 Pump · [secs] [secs2capacity] [capacity] [timer] [operator] · reuse it anywhere as <code>[pump_msg]</code>)</span>
-          <textarea id="pumpMsg" rows="2"></textarea></label>
-        <label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" id="pumpEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
-        <label class="field" style="width:170px;flex:none">Titlebar <input id="pumpTitle" placeholder="💨 Pump"></label>
-      </div>
-      </details>
-
-      <div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px">
-        <button class="ghost" onclick="togglePrizes()">🏆 Perfect Prizes <span id="prizeChevron">▸</span></button>
-        <div id="prizesWrap" style="display:none;margin-top:12px">
-          <div class="hint" style="margin-top:0">Achievement rewards: N <b>perfects</b> unlock an <b>action block</b> for the earner (an <b>award</b> row grants a bonus command — target <code>[user]</code>).
-            A <b>perfect roll</b> (any roll action hitting its maximum) bumps the <b>roll</b> counter automatically; an <b>achievement</b> action row (e.g. on a blackjack 21 tier) bumps any counter you name.
-            Progress is per person, resets on unlock (re-earnable) and on Session reset. Progress placeholders: <code>[count]</code> <code>[goal]</code> <code>[remaining]</code> <code>[counter]</code> <code>[prize]</code>.</div>
-          <div id="prizes"></div>
-          <div class="row" style="margin-top:8px">
-            <button class="ghost" onclick="addPrize()">+ Add prize</button>
-            <div style="flex:1"></div>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- custom commands -->
-    <div class="card span" data-tab="triggers">
-      <details class="help"><summary><h2>Custom commands</h2></summary>
-      <div id="commands"></div>
-      <div class="row" style="margin-top:10px">
-        <button class="ghost" onclick="addCommand()">+ Add command</button>
-        <div style="flex:1"></div>
-      </div>
-      <div class="hint">A command = its gates + an <b>action block</b> run in order when it's typed: <b>fire</b> (fixed seconds or until a %), <b>roll</b> (blank dice = the range's dice &amp; luck), <b>chance</b> (a gamble with nested win/miss blocks), <b>message</b> (how the bot replies — put it after the rows that produce <code>[secs]</code>/<code>[result]</code>), <b>award</b>, <b>command_gate</b>, and more.
-        The <b>minigame</b> types post a <b>▶ Play</b> button; the player plays privately and the final <b>score → tier</b> broadcasts (tiers can fire, run actions, even count toward a Perfect Prize).
-        A command works once it's in a <b>range</b> (Game → Capacity ranges) or in <b>⚡ Always-On</b> — range values (cooldown, fire seconds/device, dice, luck) always override the command's own. See the <b>Help</b> tab for placeholders.</div>
-      </details>
-    </div>
 
     <!-- minigames -->
-    <div class="card span" data-tab="triggers">
-      <details class="help"><summary><h2>🎮 Minigames</h2></summary>
-      <div id="minigames"></div>
-      <div class="row" style="margin-top:10px">
-        <button class="ghost" onclick="addMinigame()">+ Add minigame</button>
-        <div style="flex:1"></div>
-      </div>
-      <div class="hint">A minigame is a <b>named profile</b>: a game, its settings, its luck, and the <b>outcome tiers</b> that run when the score lands. Play one from any command with a <b>minigame</b> action row — so a command can fire a pump and post a message <i>before</i> the game, and carry on <i>after</i> it. Two profiles of the same game can differ completely, and any number of commands can call either.</div>
-      </details>
-    </div>
 
     <!-- broadcasts -->
-    <div class="card span" data-tab="triggers">
-      <details class="help"><summary><h2>Broadcasts</h2></summary>
-      <div id="broadcasts"></div>
-      <div class="row" style="margin-top:10px">
-        <button class="ghost" onclick="addBroadcast()">+ Add broadcast</button>
-        <div style="flex:1"></div>
-      </div>
-      <div class="hint">Preset messages you can fire from the <b>Dashboard → Controls</b> (“Broadcast Custom”). Placeholders work (<code>[capacity]</code>, <code>[operator]</code>, …). Posted to your channel as the owner.</div>
-      </details>
-    </div>
 
     <!-- modes -->
-    <div class="card span" data-tab="triggers">
-      <details class="help"><summary><h2>Modes</h2></summary>
-      <div id="modes"></div>
-      <div class="row" style="margin-top:10px">
-        <button class="ghost" onclick="addMode()">+ Add mode</button>
-        <div style="flex:1"></div>
-      </div>
-      <div class="hint">A mode's switch enables/disables all its <b>commands and events</b> at once. Fill On/Off messages to
-        announce the change in the announce channel, or leave them blank to toggle quietly. Save a mode before
-        its switch goes live.</div>
-      </details>
-    </div>
 
     <!-- timed events -->
-    <div class="card span" data-tab="triggers">
-      <details class="help"><summary><h2>⏱ Timed events</h2></summary>
-      <div id="events"></div>
-      <div class="row" style="margin-top:10px">
-        <button class="ghost" onclick="addEvent()">+ Add event</button>
-        <div style="flex:1"></div>
-      </div>
-      <div class="row" style="gap:16px;align-items:flex-start;margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
-        <label class="field" style="flex:1">“In process” message <span class="muted">(a command tried to start a running event)</span>
-          <input id="eventInProcessMsg" placeholder="⏳ [event] is already running."></label>
-        <label class="field" style="flex:1">“Cooldown” message <span class="muted">([event] on cooldown · [cooldown]s left)</span>
-          <input id="eventCooldownMsg" placeholder="⏳ [event] is on cooldown — [cooldown]s left."></label>
-      </div>
-      <div class="hint" style="margin-top:2px">These two are <b>global</b>: posted when a <code>!command</code> tries to <b>activate</b> an event that's already running or still on cooldown.</div>
-      <div class="hint">An event is <b>three action blocks</b>: 🚀 <b>On activation</b> (once, when a command starts it) → 🔁 <b>Each round</b> → 🏁 <b>When it ends</b>.
-        <b>Events are OFF by default</b> — tick one to run, or have a custom command start it temporarily.
-        <b>loop</b> runs a round every N seconds (set <b>max</b> to stop after that many; blank = forever); <b>once</b> runs a single round N seconds after arming.
-        Loop placeholders: <code>[current_loop]</code> <code>[total_loops]</code> <code>[loop_timer]</code> <code>[next_round]</code>.
-        Runs only while <b>Activation</b> is on; turning Activation off cancels all events and clears cooldowns. Rounds never overlap — a slow block (wait/poll) just delays the next round.</div>
-      </details>
-    </div>
 
     <!-- capacity events -->
-    <div class="card span" data-tab="triggers">
-      <details class="help"><summary><h2>📈 Capacity events</h2></summary>
-      <div class="hint" style="margin-top:8px;max-width:860px">One-shot triggers that fire the moment capacity reaches a threshold (<b>1–999%</b>; above 100% only happens inside an End Sequence's buildup). They operate <b>independently of ranges</b> — while one runs, its restrictions <b>take precedence over normal ranges</b> — but the <b>End / End Sequence overrules them</b>: nothing triggers after the end fires, and the session end cancels any running capacity event. One-shot per session (re-armed by Session reset / Activation).</div>
-      <div id="capEvents"></div>
-      <div class="row" style="margin-top:10px">
-        <button class="ghost" onclick="addCapEvent()">+ Add capacity event</button>
-        <div style="flex:1"></div>
-      </div>
-      <div class="hint" style="max-width:860px"><b>During the event</b> = while its action block is running (actions execute in order; use <b>wait</b> to shape timing). Gate play with a <b>command_gate</b> row: a <b>Resume</b> row at the block's end lifts it when the event completes; leave it off and the gate persists for the session. Gates apply to <b>chat commands only</b> — dashboard controls still work; an <b>Allow</b> row wins over everything, including range membership.</div>
-      </details>
-    </div>
 
     <!-- polls -->
-    <div class="card span" data-tab="triggers">
-      <details class="help"><summary><h2>🗳 Polls</h2></summary>
-      <div class="row" style="gap:10px;align-items:flex-end;margin-top:8px">
-        <label class="field">Poll vote command <span class="muted">(only active while a poll runs)</span>
-          <input id="cmdVote" value="agvote" style="width:130px"></label>
-        <span class="muted">People vote with <code>!agvote 1</code>, <code>/vote</code>, or the embed's buttons — <b>one vote per person</b>, no take-backs.</span>
-      </div>
-      <div class="hint" style="max-width:860px">A poll is an <b>action</b>: reference it from a command (type <b>poll</b>), a timed event (action <b>poll</b>), a capacity event's block, or even a winning option of another poll. It posts as a rich embed — <b>Poll: &lt;title&gt;</b> with the body and numbered options — runs for its duration (optionally reposting every N seconds), then the <b>winning option's actions execute</b>. Ties break at random; with no votes the <b>Fallback</b> option wins (none marked = nothing happens). One poll at a time. A poll inside an event's action block keeps that event <b>running</b> until the poll completes, then the event's remaining actions resolve.</div>
-      <div id="polls" style="margin-top:10px"></div>
-      <div class="row" style="margin-top:10px">
-        <button class="ghost" onclick="addPoll()">+ Add poll</button>
-        <div style="flex:1"></div>
-      </div>
-      </details>
-    </div>
 
     <!-- competitions -->
-    <div class="card span" data-tab="triggers">
-      <details class="help"><summary><h2>🏁 Competitions</h2></summary>
-      <div class="hint" style="max-width:880px;margin-top:8px">A competition is an <b>action</b> (start it from any action block). Fully <b>button-driven</b>: players press <b>Enter Challenge</b> on the embed and roll privately — the rolls you define below, in order (complete them all to qualify). Results post all at once; highest score wins by the <b>Win by</b> metric. Winner / no-winner outcomes are <b>action blocks</b> — e.g. an embed message row, <code>fire [winner_score]</code>, <b>award</b> a bonus command, or <b>command_gate</b> everyone else. <i>Race &amp; raffle are being redesigned and will return.</i> Placeholders: <code>[winner]</code> <code>[winner_score]</code> <code>[runnerup]</code> <code>[total_score]</code> <code>[results]</code>.</div>
-      <div id="competitions" style="margin-top:10px"></div>
-      <div class="row" style="margin-top:10px">
-        <button class="ghost" onclick="addCompetition()">+ Add competition</button>
-        <div style="flex:1"></div>
-      </div>
-      </details>
-    </div>
 
     <!-- bonus rounds -->
-    <div class="card span" data-tab="triggers">
-      <details class="help"><summary><h2>🤝 Bonus Rounds</h2></summary>
-      <div class="hint" style="max-width:880px">A Bonus Round is a <b>teamwork cash-in</b>, started by a <b>bonus_round</b> action. First bank amounts with an <b>award</b> action (volume secs/%) (pump <b>seconds</b> or <b>capacity %</b>, on <code>[winner]</code>/<code>[range_leader]</code>/<code>[session_leader]</code>/…). The round posts an embed with a <b>Confirm</b> button for bonus holders; once the needed holders confirm (<b>all</b>, or just the <b>top holder</b>) before the timer, your action block runs with the pooled <code>[total_bonus_secs]</code> / <code>[total_bonus_pct]</code> — then the banks are spent. Use <code>fire [total_bonus_secs]</code> or <code>add % [total_bonus_pct]</code> to apply them.</div>
-      <div id="bonusRounds" style="margin-top:10px"></div>
-      <div class="row" style="margin-top:10px">
-        <button class="ghost" onclick="addBonusRound()">+ Add bonus round</button>
-        <div style="flex:1"></div>
-      </div>
-      </details>
-    </div>
 
     <!-- templates -->
     <!-- system -->
@@ -1116,7 +1097,7 @@
       </details>
 
       <details class="help" style="margin-top:16px"><summary><b style="font-size:1.02rem">🔁 Device Sync</b></summary>
-        <div class="hint" style="margin-top:8px;max-width:820px">Pull the <b>gameplay setup + overlay media</b> from your other DiscoFlate install (phone ⇄ PC) so both have the same commands, events, buttons, saved Gameplay Presets and <code>data/images</code> files. On the <b>other</b> device: enable <b>Remote access</b> and whitelist <b>this</b> device's IP. <b>⬇ Pull</b> brings their setup here; <b>⬆ Push</b> sends this device's setup to them — handy when you build a Stage on the phone and want it on the PC without walking over. Push works by asking the other device to fetch from this one, so <b>Remote access must be on at BOTH ends</b>, each whitelisting the other's IP. Either direction <b>replaces</b> the receiving device's live gameplay settings and stages (token, devices and network settings are never touched — save a Gameplay Preset first if you want a way back). Files already present with the same name+size are skipped.</div>
+        <div class="hint" style="margin-top:8px;max-width:820px">Pull the <b>gameplay setup + overlay media</b> from your other DiscoFlate install (phone ⇄ PC) so both have the same scenes — commands, events, buttons and wording — plus the <code>data/images</code> files they use. On the <b>other</b> device: enable <b>Remote access</b> and whitelist <b>this</b> device's IP. <b>⬇ Pull</b> brings their setup here; <b>⬆ Push</b> sends this device's setup to them — handy when you build a Stage on the phone and want it on the PC without walking over. Push works by asking the other device to fetch from this one, so <b>Remote access must be on at BOTH ends</b>, each whitelisting the other's IP. Either direction <b>replaces</b> the receiving device's scenes (token, devices and network settings are never touched — copy a scene first if you want a way back). Files already present with the same name+size are skipped.</div>
         <div class="row" style="gap:8px;margin-top:10px;align-items:flex-end">
           <label class="field" style="flex:1;min-width:180px;max-width:320px">Other device's address <input id="syncAddr" placeholder="192.168.1.50:8765"></label>
           <button onclick="syncPull()">⬇ Pull from there</button>
@@ -1179,7 +1160,7 @@
       </div>
       <div class="hint">On the phone app this downloads &amp; installs the new APK; on desktop it pulls the latest code from GitHub (then restart DiscoFlate).
         Update APKs are <b>version-named</b> (<code>discoflate-vX.Y.Z.apk</code>) so downloads never collide — make sure you install the newest one. Old copies in Downloads are safe to delete. <b>Coming from v3.45 or older with a stuck update?</b> Delete any old <code>discoflate*.apk</code> files first — same-named downloads used to cache and re-install stale copies.</div>
-      <div class="hint" style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px"><b>Backups</b> live on the <a style="cursor:pointer" onclick="showTab('system')">System tab</a> (full config, token included); <b>Gameplay Presets</b> moved to the <a style="cursor:pointer" onclick="showTab('stages')">Game tab</a>, with a read-only line showing which preset the live gameplay was last loaded from.</div>
+      <div class="hint" style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px"><b>Backups</b> live on the <a style="cursor:pointer" onclick="showTab('system')">System tab</a> (full config, token included). Your commands, events and wording belong to the <b>scene</b> now, so to keep a setup around, <a style="cursor:pointer" onclick="showTab('stages')">copy the scene</a> rather than saving a preset.</div>
     </div>
 
     <div class="card span" data-tab="help">
@@ -1332,7 +1313,7 @@
       <ul style="line-height:1.7;padding-left:22px;margin:8px 0 0;max-width:820px">
         <li><b>Plain text posts AS YOU</b> — your Owner name + Discord avatar, via a webhook the bot manages. Without the <b>Manage Webhooks</b> permission it falls back to a <b>Owner:</b>-prefixed bot post (the status line under the send box tells you which mode you're in).</li>
         <li><b><code>!command</code></b> executes <b>as the Owner</b> — cooldown-exempt, owner-only commands allowed, reply lands in that channel. Enter sends. To speak in your own voice from a command, use a <b>message</b> row set to <b>As: the OWNER</b>.</li>
-        <li><b>Custom Buttons</b> — one-click launchers managed via 🔧. A button <b>runs a <code>!command</code></b>, and that command's action block does the rest — fire a pump, play an overlay or a scene group, start a poll, run a whole sequence. <b>＋ new</b> makes a fresh <b>owner-only, hidden</b> command for a button. They live in Gameplay Presets, so profiles swap them on the fly.</li>
+        <li><b>Custom Buttons</b> — one-click launchers managed via 🔧. A button <b>runs a <code>!command</code></b>, and that command's action block does the rest — fire a pump, play an overlay or a scene group, start a poll, run a whole sequence. <b>＋ new</b> makes a fresh <b>owner-only, hidden</b> command for a button. They belong to the <b>scene</b>, so switching scenes swaps the whole button set with it.</li>
         <li><b>Video channels</b> — on desktop your feed shows <b>above the chat</b>: the live virtual-cam output (overlays included — exactly what viewers see), and <b>🔍 Detect</b> probes each attached camera for the sizes it really supports, portrait modes included. On the phone the video section becomes <b>🖥 VC Remote</b>: video calls run on your PC, and Connect links the app straight into the PC's panel (same Chat tab, buttons and camera controls, driving the PC) — enable <b>Remote access</b> + whitelist the phone's IP on the PC first; the phone's back button returns to the local app.</li>
         <li><b>The virtual camera is desktop-only.</b> Android has no way for an app to register a fake camera — that needs a system driver (root) — and Discord mobile only ever lists the real front/back cameras. On desktop, run DiscoFlate on the PC you join the call from and pick the virtual cam in Discord desktop's video settings.</li>
         <li><b>Overlays live on the PC.</b> The virtual camera is the camera home base — design scenes on the <b>Scenes</b> tab and they play into your Discord call from the PC. (A phone-hosted view exists at <code>/stage</code> for screen-share setups, but it's parked and not linked from the UI.)</li>
@@ -1365,7 +1346,7 @@
         <li><b>Command pacing.</b> Plug commands are paced per device — cloud vendors (Govee, Tuya, Wyze) at most one ON every 2s, LAN vendors every 0.5s — so a burst of events can't get you throttled or banned by a vendor's API. <b>Turning a device OFF is never delayed</b>, at any time: it's a safety operation and always goes straight through.</li>
         <li><b>Renaming devices</b> — the ✏️ next to any device on the Devices tab. Purely cosmetic: everything references devices by id, so renaming can't break commands, ranges or overlays. Leave it blank to restore the original vendor label.</li>
         <li><b>🖥 Take over the PC session (System tab, phone app).</b> Hands the whole app over to your PC's DiscoFlate — every tab, not just Chat — so you drive the PC instance as if you were sitting at it, while the PC stays the bot and the camera home base. A <b>🖥 CONTROLLING PC · ↩ Release</b> chip sits in the header the whole time; tap it (or the back button) to return to this phone's own instance. Needs Remote access enabled + this phone whitelisted on the PC. If both installs share a bot token, takeover offers to switch <b>this</b> device's Activation off first, so commands don't get answered twice.</li>
-        <li><b>🔁 Device Sync (System tab)</b> keeps both installs matching over Wi-Fi — the whole gameplay setup (commands, events, buttons, saved Gameplay Presets), <b>all your Stages</b>, and <b>the overlay images/videos</b> they use. <b>⬇ Pull</b> brings the other device's setup here; <b>⬆ Push</b> sends this one's over — so a Stage built on the phone lands on the PC without export/import or walking over. <b>📡 Send scenes</b> (beside them) pushes just your scenes and their media. Push asks the other device to fetch from this one, so <b>Remote access must be on at both ends</b>, each whitelisting the other's IP. Same-name-same-size files are skipped; tokens, devices and network settings never sync.</li>
+        <li><b>🔁 Device Sync (System tab)</b> keeps both installs matching over Wi-Fi — <b>all your scenes</b> with the commands, events, buttons and wording each one owns, and <b>the overlay images/videos</b> they use. <b>⬇ Pull</b> brings the other device's setup here; <b>⬆ Push</b> sends this one's over — so a Stage built on the phone lands on the PC without export/import or walking over. <b>📡 Send scenes</b> (beside them) pushes just your scenes and their media. Push asks the other device to fetch from this one, so <b>Remote access must be on at both ends</b>, each whitelisting the other's IP. Same-name-same-size files are skipped; tokens, devices and network settings never sync.</li>
         <li><b>The permission line</b> (under the send box) shows the bot's rights in the scoped channel live: 🚫 = it can't post there (Send disables, the missing permissions are listed) · ⚠ no Manage Webhooks = owner posts fall back to the bot-prefixed style · ⚠ no Read Message History = the mirror starts from now (no backfill).</li>
       </ul>
       <h3 style="margin:14px 0 6px">Granting Manage Webhooks on a server the bot already joined</h3>
@@ -6316,8 +6297,6 @@ async function discoverVendor(v){
 }
 // ---- Max Roll Prizes (list) ----
 let prizeRows = [];
-let prizesOpen = false;
-function togglePrizes(){ prizesOpen=!prizesOpen; $('#prizesWrap').style.display=prizesOpen?'block':'none'; $('#prizeChevron').textContent=prizesOpen?'▾':'▸'; }
 function renderPrizes(){
   const box=$('#prizes'); box.innerHTML='';
   if(!prizeRows.length){ box.innerHTML='<div class="muted">No prizes yet.</div>'; return; }

@@ -43,7 +43,7 @@ DEFAULT_PUMPDIRECT_PATH = os.path.normpath(
 
 # Schema version of the stored config. Bump it + add a _migrate step whenever a
 # key is renamed/moved, so old configs upgrade instead of silently stranding data.
-CONFIG_VERSION = 14
+CONFIG_VERSION = 15
 
 # The scene we ship read-only. It is the baseline every install can fall back
 # to and compare against, so nothing may write to it.
@@ -79,7 +79,7 @@ GAMEPLAY_KEYS = [
     "output_headers", "rich_output",
     "capacity_ranges", "always_on_enabled", "always_on_commands",
     # Events tab
-    "events", "capacity_events", "polls", "competitions", "bonus_rounds",
+    "events", "capacity_events", "polls", "competitions", "bonus_rounds", "minigames",
     "event_in_process_message", "event_cooldown_message",
     # Templates tab
     "templates",
@@ -715,7 +715,7 @@ def load() -> dict:
     cfg = _coerce_numbers(_deep_merge(DEFAULTS, _migrate(stored)))
     # an untouched starter picks up whatever we ship now, without waiting for
     # a save or a config-version bump
-    _sync_starter(cfg, None)
+    _sync_starter(cfg, None, compare=False)
     cfg["discord_token"] = _dec_token(cfg.get("discord_token") or "")
     return cfg
 
@@ -1171,6 +1171,61 @@ def _collapse_v11(c: dict) -> None:
     _cmds((c.get("templates") or {}).get("commands"))
 
 
+def _games_to_profiles(block: dict) -> None:
+    """Turn legacy `type: game-*` commands into minigame PROFILES + a minigame
+    action row, in place. v13 did this for the whole config; a SCENE carries its
+    own commands now, so each scene's block needs the same treatment — including
+    the ones we ship, which v14 skips because they already have a block.
+    """
+    # only the fields that KIND actually reads — a command carries defaults
+    # for every game type, and copying them all makes a noisy profile
+    _BY_KIND = {
+        "pushluck": ("pl_bust_start", "pl_bust_step", "pl_max_pumps", "pl_points"),
+        "simon":    ("sm_symbols", "sm_max_rounds", "sm_reveal"),
+        "balloon":  ("bl_cells", "bl_pops", "bl_points"),
+        "rps":      ("rps_wins",),
+        "slots":    ("sl_symbols",),
+        "blackjack": (),
+    }
+    _CFG_FIELDS = tuple(f for fs in _BY_KIND.values() for f in fs)
+    games = list(block.get("minigames") or [])
+    taken = {str(g.get("name", "")).strip().lower() for g in games}
+    for c in (block.get("commands") or []):
+        if not isinstance(c, dict):
+            continue
+        t = str(c.get("type") or "").lower()
+        if not t.startswith("game-"):
+            continue
+        kind = t[5:]
+        base = (c.get("name") or kind or "game").strip() or kind
+        nm, n = base, 2
+        while nm.lower() in taken:
+            nm = f"{base} {n}"
+            n += 1
+        taken.add(nm.lower())
+        gid = "mg:" + uuid.uuid4().hex[:8]
+        games.append({
+            "id": gid, "name": nm, "kind": kind,
+            "config": {k: c[k] for k in _BY_KIND.get(kind, ()) if k in c},
+            "tiers": c.get("game_tiers") or [],
+            "luck": c.get("game_luck"),
+            "intro": c.get("game_intro") or "",
+            "intro_embed": bool(c.get("game_intro_embed")),
+            "intro_title": c.get("game_intro_title") or "",
+            "start_events": list(c.get("start_events") or []),
+        })
+        # the command keeps its gates and becomes an ordinary action block
+        # whose single row plays that profile
+        c["type"] = "actions"
+        c["actions"] = list(c.get("actions") or []) + [
+            {"type": "minigame", "minigame": gid}]
+        for k in (*_CFG_FIELDS, "game_tiers", "game_luck", "game_intro",
+                  "game_intro_embed", "game_intro_title"):
+            c.pop(k, None)
+    if games:
+        block["minigames"] = games
+
+
 def _migrate(cfg: dict) -> dict:
     """Ordered upgrades for configs written by older versions. Each step bumps
     config_version; unknown future keys always pass through untouched."""
@@ -1312,51 +1367,7 @@ def _migrate(cfg: dict) -> dict:
         # kind differ in limits, luck and score tiers.
         # only the fields that KIND actually reads — a command carries defaults
         # for every game type, and copying them all makes a noisy profile
-        _BY_KIND = {
-            "pushluck": ("pl_bust_start", "pl_bust_step", "pl_max_pumps", "pl_points"),
-            "simon":    ("sm_symbols", "sm_max_rounds", "sm_reveal"),
-            "balloon":  ("bl_cells", "bl_pops", "bl_points"),
-            "rps":      ("rps_wins",),
-            "slots":    ("sl_symbols",),
-            "blackjack": (),
-        }
-        _CFG_FIELDS = tuple(f for fs in _BY_KIND.values() for f in fs)
-        games = list(cfg.get("minigames") or [])
-        taken = {str(g.get("name", "")).strip().lower() for g in games}
-        for c in (cfg.get("commands") or []):
-            if not isinstance(c, dict):
-                continue
-            t = str(c.get("type") or "").lower()
-            if not t.startswith("game-"):
-                continue
-            kind = t[5:]
-            base = (c.get("name") or kind or "game").strip() or kind
-            nm, n = base, 2
-            while nm.lower() in taken:
-                nm = f"{base} {n}"
-                n += 1
-            taken.add(nm.lower())
-            gid = "mg:" + uuid.uuid4().hex[:8]
-            games.append({
-                "id": gid, "name": nm, "kind": kind,
-                "config": {k: c[k] for k in _BY_KIND.get(kind, ()) if k in c},
-                "tiers": c.get("game_tiers") or [],
-                "luck": c.get("game_luck"),
-                "intro": c.get("game_intro") or "",
-                "intro_embed": bool(c.get("game_intro_embed")),
-                "intro_title": c.get("game_intro_title") or "",
-                "start_events": list(c.get("start_events") or []),
-            })
-            # the command keeps its gates and becomes an ordinary action block
-            # whose single row plays that profile
-            c["type"] = "actions"
-            c["actions"] = list(c.get("actions") or []) + [
-                {"type": "minigame", "minigame": gid}]
-            for k in (*_CFG_FIELDS, "game_tiers", "game_luck", "game_intro",
-                      "game_intro_embed", "game_intro_title"):
-                c.pop(k, None)
-        if games:
-            cfg["minigames"] = games
+        _games_to_profiles(cfg)
         # A scene we SHIP only ever reaches brand-new installs, because the
         # factory config is a first-run seed. Anyone with an existing config
         # would never see it — so hand over any shipped scene they don't
@@ -1398,6 +1409,12 @@ def _migrate(cfg: dict) -> dict:
             if isinstance(sc.get("gameplay"), dict) and sc["gameplay"]:
                 continue
             sc["gameplay"] = copy.deepcopy(mine)
+        # A scene that ALREADY had a block (the ones we ship) never went through
+        # the v13 pass, so its game-* commands are still sitting there with no
+        # actions at all. Convert every block, not just the one we just copied.
+        for sc in (cfg.get("scenes") or []):
+            if isinstance(sc, dict) and isinstance(sc.get("gameplay"), dict):
+                _games_to_profiles(sc["gameplay"])
         scenes = cfg.get("scenes") or []
 
         def _by(nm):
@@ -1442,6 +1459,30 @@ def _migrate(cfg: dict) -> dict:
                           if not x.get("builtin")), None)
             if other is not None:
                 cfg["chat_scene"] = other.get("name") or ""
+    if v < 15:
+        # v14 moved gameplay into the scene before minigame PROFILES were part
+        # of that set, so a scene got the game commands but not the games they
+        # play — and its empty list then shadowed the top-level one, leaving
+        # every game command pointing at nothing. Pull back any profile a
+        # scene's own commands actually reference.
+        pool = {}
+        for src in [cfg] + list(cfg.get("scenes") or []):
+            block = src.get("gameplay") if src is not cfg else cfg
+            for g in ((block or {}).get("minigames") or []):
+                if isinstance(g, dict) and g.get("id"):
+                    pool.setdefault(g["id"], g)
+        for sc in (cfg.get("scenes") or []):
+            gp = sc.get("gameplay")
+            if not isinstance(gp, dict):
+                continue
+            have = {g.get("id") for g in (gp.get("minigames") or []) if isinstance(g, dict)}
+            want = {a.get("minigame") for c in (gp.get("commands") or [])
+                    if isinstance(c, dict)
+                    for a in (c.get("actions") or [])
+                    if isinstance(a, dict) and a.get("type") == "minigame"}
+            missing = [pool[i] for i in want if i and i not in have and i in pool]
+            if missing:
+                gp["minigames"] = list(gp.get("minigames") or []) + copy.deepcopy(missing)
     cfg["config_version"] = CONFIG_VERSION
     return cfg
 
@@ -1517,13 +1558,15 @@ def _scene_body(sc: dict) -> str:
                       sort_keys=True, default=str)
 
 
-def _sync_starter(cfg: dict, previous: list | None) -> None:
+def _sync_starter(cfg: dict, previous: list | None, compare: bool) -> None:
     """Keep an untouched starter matching what we ship; release an edited one.
 
-    `previous` is the scene list as it was on disk. If the incoming starter
-    differs from it, the operator just edited it — drop the mark and leave it
-    alone for ever after. Otherwise refresh it from the factory, which is what
-    lets a change to the shipped scene reach people who never touched theirs.
+    Only a SAVE can tell an edit from an untouched copy, because only a save
+    has both the incoming scenes and the stored ones. `compare=True` makes that
+    judgement. A LOAD passes compare=False: the config it just read IS the
+    stored copy, so comparing would always say "unchanged" — the stored
+    `pristine` mark is already the record of whether they had touched it, and
+    the refresh is what carries a newly shipped version across.
     """
     scenes = cfg.get("scenes")
     if not isinstance(scenes, list):
@@ -1540,19 +1583,22 @@ def _sync_starter(cfg: dict, previous: list | None) -> None:
     if at is None:
         return
     fresh = _shipped(STARTER_SCENE_NAME)
-    if previous is not None:
-        # Untouched means matching EITHER what we ship (load() may have just
-        # refreshed it) OR what was last written (we shipped a change they have
-        # not picked up yet). Only when it matches neither did they edit it.
-        body = _scene_body(scenes[at])
-        was = next((sc for sc in previous
-                    if isinstance(sc, dict)
-                    and str(sc.get("name") or "").strip().lower() == want), None)
-        same_as_shipped = fresh is not None and _scene_body(_named(fresh, scenes[at])) == body
-        same_as_disk = was is not None and _scene_body(was) == body
-        if not (same_as_shipped or same_as_disk):
-            scenes[at].pop("pristine", None)      # edited → hands off from now on
-            return
+    if compare:
+      # Untouched means matching EITHER what we ship (load() may have just
+    # refreshed it) OR what was last written (we shipped a change they have not
+    # picked up yet). Only when it matches neither did they edit it.
+    # With no stored copy to compare against — the very first write — matching
+    # what we ship is the only evidence of "untouched", and we must not refresh
+    # on a guess or we would wipe content the caller deliberately put there.
+      body = _scene_body(scenes[at])
+      was = next((sc for sc in (previous or [])
+                  if isinstance(sc, dict)
+                  and str(sc.get("name") or "").strip().lower() == want), None)
+      same_as_shipped = fresh is not None and _scene_body(_named(fresh, scenes[at])) == body
+      same_as_disk = was is not None and _scene_body(was) == body
+      if not (same_as_shipped or same_as_disk):
+          scenes[at].pop("pristine", None)        # edited → hands off from now on
+          return
     if fresh is not None:
         scenes[at] = copy.deepcopy(fresh)
         scenes[at]["pristine"] = True
@@ -1595,7 +1641,7 @@ def _enforce_builtin(cfg: dict) -> None:
 
 def save(cfg: dict) -> dict:
     os.makedirs(DATA_DIR, exist_ok=True)
-    _sync_starter(cfg, _disk_scenes())
+    _sync_starter(cfg, _disk_scenes(), compare=True)
     _enforce_builtin(cfg)
     cfg["config_rev"] = int(cfg.get("config_rev") or 0) + 1
     _rotate_backups()
