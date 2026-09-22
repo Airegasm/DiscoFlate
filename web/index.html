@@ -375,6 +375,8 @@
             <option>1280x720</option><option>1920x1080</option><option>640x480</option>
             <option>720x1280</option><option>1080x1920</option></select></label>
           <label class="row" style="gap:5px" title="Discord mirrors your own video tile and can't be told not to — so your overlays read backwards TO YOU there, while viewers see them correctly. Tick this to cancel that: your Discord tile reads right, but viewers then see everything mirrored. The preview above is always what viewers get."><input type="checkbox" id="vcamMirror" style="width:auto" onchange="vcamMirrorSet()"> 🪞 Mirror</label>
+          <label class="field grow" style="min-width:200px" title="Big centred text anyone sees if they pick your virtual camera BEFORE you go LIVE — so a black rectangle doesn't read as a broken camera. Blank = a plain black screen.">Standby card
+            <input id="standbyText" placeholder="STARTING SOON" onchange="scheduleSave()"></label>
          </div>
          <div class="row vcamrow" style="gap:8px;align-items:center;margin-top:8px">
           <button onclick="vcamStart()">▶ Start virtual cam</button>
@@ -556,10 +558,6 @@
               <label class="field">Then switch to <span class="muted">(optional)</span> <select id="glAfter" style="width:170px" onchange="scheduleSave()"></select></label>
               <label class="row" style="gap:6px" title="keep the picture black while the intro plays — untick to show the camera behind it"><input type="checkbox" id="glBlack" checked onchange="scheduleSave()" style="width:auto"> black during intro</label>
               <label class="row" style="gap:6px"><input type="checkbox" id="glHold" checked onchange="scheduleSave()" style="width:auto"> hold commands</label>
-            </div>
-            <div class="row" style="gap:12px;align-items:flex-end">
-              <label class="field grow">Standby card <span class="muted">— big centred text a viewer sees if they pick your virtual camera <b>before</b> you go LIVE (blank = a plain black screen)</span>
-                <input id="glStandby" placeholder="STARTING SOON" onchange="scheduleSave()"></label>
             </div>
             <div class="row" style="gap:12px;align-items:flex-end;margin-top:8px">
               <label class="field" style="flex:1;min-width:240px">Announcement <span class="muted">(blank = none · [intro_timer])</span>
@@ -6448,6 +6446,8 @@ function applyState(st, full){
         pp.style.color='#3a2a00'; }
     }
     if($('#vcamMirror') && document.activeElement!==$('#vcamMirror')) $('#vcamMirror').checked = !!st.vcam_mirror;
+    { const sb=$('#standbyText');
+      if(sb && document.activeElement!==sb && st.standby_text!=null) sb.value = st.standby_text; }
     // the camera list is built asynchronously, so remember the wanted values
     // and let vcamDevPick apply them once the options exist
     if(st.vcam_device!=null) vcamWant.device = String(st.vcam_device);
@@ -6561,7 +6561,6 @@ function showToDom(sc, st, force){
   set('#glAnnounce', g.announce||'');
   set('#glEvery', g.announce_every??0); set('#glImage', g.announce_image||'');
   set('#glCmds', (g.commands||[]).join(', '));
-  set('#glStandby', g.standby_text ?? 'STARTING SOON');
   // stages, with the pre-stages shape folded in so old configs still work
   if(force || !document.querySelector('#glStages select:focus, #glStages input:focus')){
     glStages = Array.isArray(g.stages) && g.stages.length
@@ -6597,7 +6596,6 @@ function _scenesWithShow(){
       announce_every: Math.max(0, parseInt(($('#glEvery')||{}).value,10)||0),
       announce_image: ($('#glImage')||{}).value||'',
       hold_commands: $('#glHold')?$('#glHold').checked:true,
-      standby_text: ($('#glStandby')||{}).value ?? 'STARTING SOON',
       blackout: $('#glBlack')?$('#glBlack').checked:true,
       commands: idList(($('#glCmds')||{}).value||''),
     };
@@ -6626,6 +6624,7 @@ function gatherConfig(){
     scene_globals_meta: globalsMeta,
     chat_isolate: $('#chatIso')?$('#chatIso').checked:false, chat_isolate_channel: chatIsoChan,
     // camera + output size: global, so switching scenes never re-points them
+    standby_text: $('#standbyText') ? $('#standbyText').value : 'STARTING SOON',
     vcam_device: $('#vcamDev') ? (+$('#vcamDev').value||0) : 0,
     vcam_size: $('#vcamRes') ? ($('#vcamRes').value||'1280x720') : '1280x720',
     anon_user_label:$('#anonLabel').value,

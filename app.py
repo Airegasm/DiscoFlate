@@ -319,6 +319,7 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "scene_globals_meta": cfg.get("scene_globals_meta") or {},
         "chat_scene": cfg.get("chat_scene", ""),
         "vcam_mirror": bool(cfg.get("vcam_mirror", True)),
+        "standby_text": cfg.get("standby_text", "STARTING SOON"),
         "vcam_device": cfg.get("vcam_device", 0),
         "vcam_size": cfg.get("vcam_size", "1280x720"),
         "golive": engine.golive(),
@@ -503,9 +504,9 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         """
         cfg0 = engine.cfg or {}
         if not cfg0.get("listener_enabled"):
-            # keep the standby line in step with the LIVE scene while we're here
-            g = engine.golive()
-            want = g.get("standby_text", "STARTING SOON")
+            # keep the standby line in step while we're here — it is a global
+            # camera setting, the same whichever scene happens to be selected
+            want = cfg0.get("standby_text", "STARTING SOON")
             if want != getattr(vcam, "_standby_text", None):
                 vcam.set_standby(want)
             return "off"
@@ -1087,7 +1088,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                     # round-trips state back into config would otherwise flatten
                     # the live scene's show into the global fallback.
                     "chat_isolate", "chat_isolate_channel",
-                    "vcam_device", "vcam_size",
+                    "vcam_device", "vcam_size", "standby_text",
                     "capacity_ranges", "commands", "modes", "events",
                     "capacity_events", "polls", "competitions", "minigames",
                     "bonus_rounds",

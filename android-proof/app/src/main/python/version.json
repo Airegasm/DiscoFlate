@@ -1,6 +1,6 @@
 {
-  "version": "3.75.0",
-  "versionCode": 162,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.75.0/discoflate-v3.75.0.apk",
-  "notes": "DiscoFlate v3.75.0 \u2014 pick the virtual camera in Discord before you go LIVE and you now get a big centred STARTING SOON instead of a black rectangle nobody can tell from a broken camera. Editable per scene under Go Live Options; blank it for a plain black screen."
+  "version": "3.75.1",
+  "versionCode": 163,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.75.1/discoflate-v3.75.1.apk",
+  "notes": "DiscoFlate v3.75.1 \u2014 the STARTING SOON standby card is one universal setting, not a per-scene one. It now sits with the other camera settings on the Chat tab, beside Camera, Size and Mirror."
 }

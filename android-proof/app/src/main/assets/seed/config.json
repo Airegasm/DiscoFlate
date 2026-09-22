@@ -2217,6 +2217,7 @@
   "chat_isolate": false,
   "chat_isolate_channel": "",
   "vcam_mirror": false,
+  "standby_text": "STARTING SOON",
   "vcam_device": 0,
   "vcam_size": "1280x720",
   "minigames": [
@@ -5281,8 +5282,7 @@
         "announce_image": "",
         "hold_commands": true,
         "blackout": true,
-        "commands": [],
-        "standby_text": "STARTING SOON"
+        "commands": []
       },
       "notify_overlay": "dfdefnotify",
       "pause_overlay": "Pause"
@@ -7898,8 +7898,7 @@
         "announce_image": "",
         "hold_commands": true,
         "blackout": true,
-        "commands": [],
-        "standby_text": "STARTING SOON"
+        "commands": []
       },
       "notify_overlay": "dfdefnotify",
       "pause_overlay": "Pause",
@@ -7924,8 +7923,7 @@
     "hold_commands": true,
     "commands": [],
     "after_group": "Main",
-    "blackout": true,
-    "standby_text": "STARTING SOON"
+    "blackout": true
   },
   "vcam_last": {},
   "pause_overlay": "Pause",

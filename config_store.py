@@ -43,7 +43,7 @@ DEFAULT_PUMPDIRECT_PATH = os.path.normpath(
 
 # Schema version of the stored config. Bump it + add a _migrate step whenever a
 # key is renamed/moved, so old configs upgrade instead of silently stranding data.
-CONFIG_VERSION = 17
+CONFIG_VERSION = 18
 
 # The scene we ship read-only. It is the baseline every install can fall back
 # to and compare against, so nothing may write to it.
@@ -480,9 +480,6 @@ DEFAULTS = {
     # Placeholders: [intro_timer] counts down in messages and overlay text.
     "golive": {
         "intro_enabled": False,
-        # what a viewer sees if they pick the virtual camera before you go
-        # live — blank for a genuinely black screen
-        "standby_text": "STARTING SOON",
         "seconds": 15,              # 0 = hold until you press Start now
         "scene_group": "",
         "announce": "",             # blank = say nothing
@@ -505,6 +502,9 @@ DEFAULTS = {
     "vcam_mirror": False,
     # Your webcam and the size you send: hardware, not show design. Global on
     # purpose — switching scenes must never re-point your camera.
+    # What anyone sees if they pick the virtual camera before you go live.
+    # A property of the CAMERA, not of any one scene — blank = plain black.
+    "standby_text": "STARTING SOON",
     "vcam_device": 0,
     "vcam_size": "1280x720",
 
@@ -1530,6 +1530,19 @@ def _migrate(cfg: dict) -> dict:
             t["listen"] = bool(t.get("listen", on and not ann_only))
             t["announce"] = bool(t.get("announce", on))
             t.pop("active", None)
+    if v < 18:
+        # v18: the pre-show standby line is universal, not per scene — one
+        # camera, one thing it says before you go live. Lift whatever any
+        # scene set (first non-empty wins) and stop carrying it per scene.
+        found = str((cfg.get("golive") or {}).get("standby_text") or "").strip()
+        for sc in (cfg.get("scenes") or []):
+            g = sc.get("golive")
+            if isinstance(g, dict):
+                found = found or str(g.pop("standby_text", "") or "").strip()
+                g.pop("standby_text", None)
+        (cfg.get("golive") or {}).pop("standby_text", None)
+        if found and not str(cfg.get("standby_text") or "").strip():
+            cfg["standby_text"] = found
     cfg["config_version"] = CONFIG_VERSION
     return cfg
 
