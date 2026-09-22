@@ -1,6 +1,6 @@
 {
-  "version": "3.58.0",
-  "versionCode": 140,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.58.0/discoflate-v3.58.0.apk",
-  "notes": "DiscoFlate v3.58.0 \u2014 installed from the GitHub ZIP instead of git clone? Help \u2192 Updates now spots it and offers \ud83d\udee0 Fix my install, which turns the folder into a proper clone in place (your data/ is never touched). New Help section: Video streams \u2014 getting started, covering the one-time driver and the exact order to start everything. Help and README brought in line with v3.57."
+  "version": "3.59.0",
+  "versionCode": 141,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.59.0/discoflate-v3.59.0.apk",
+  "notes": "DiscoFlate v3.59.0 \u2014 Kasa POWER STRIPS now work. Discovery confirms every device over TCP instead of trusting the UDP broadcast reply, which strips often answer without listing their outlets, and a new \ud83c\udfaf Add by IP asks one address directly \u2014 so you can add a strip (or anything) that broadcast never reached."
 }

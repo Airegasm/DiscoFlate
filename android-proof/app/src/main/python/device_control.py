@@ -134,6 +134,23 @@ async def get_state(device: dict, creds: dict):
     return result
 
 
+async def probe(vendor: str, host: str) -> list[dict]:
+    """Ask ONE address what it is, and list every outlet on it.
+
+    Kasa only for now: it's the vendor with multi-outlet strips and a local
+    protocol we can query without credentials."""
+    v = _ALIASES.get((vendor or "kasa").strip().lower(), (vendor or "kasa").strip().lower())
+    if v != "kasa":
+        raise ValueError(f"{v} devices can't be added by address — use Discover")
+    _dbg(f"SEARCH probe vendor=kasa host={host} …")
+    outlets = await kasa.probe(host)
+    found = [{"label": o.alias or o.host, "vendor": "kasa", "host": o.host,
+              "child_id": o.child_id, "model": o.model} for o in outlets]
+    _dbg(f"SEARCH probe host={host} found={len(found)}: "
+         + ", ".join(_ident(d) for d in found[:20]))
+    return found
+
+
 async def discover(vendor: str, creds: dict) -> list[dict]:
     """Enumerate devices for a vendor. Returns DiscoFlate device dicts."""
     v = _ALIASES.get((vendor or "kasa").strip().lower(), (vendor or "kasa").strip().lower())

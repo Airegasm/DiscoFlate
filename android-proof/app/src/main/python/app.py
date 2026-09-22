@@ -1296,6 +1296,22 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             raise web.HTTPBadRequest(text=f"discover failed: {e}")
         return web.json_response(found)
 
+    async def probe_device(request):
+        """Ask ONE address what it is. This is how you add a POWER STRIP whose
+        outlets never showed up in Discover: broadcast can be dropped by mesh
+        APs, client isolation or a separate VLAN, and some strips answer the
+        broadcast with a trimmed record that omits their children entirely."""
+        await guard(request)
+        b = await _json(request)
+        host = (b.get("host") or "").strip()
+        if not host:
+            raise web.HTTPBadRequest(text="an address is required")
+        try:
+            found = await device_control.probe(b.get("vendor") or "kasa", host)
+        except Exception as e:  # noqa: BLE001
+            raise web.HTTPBadRequest(text=f"nothing answered at {host}: {e}")
+        return web.json_response(found)
+
     async def add_device(request):
         await guard(request)
         b = await _json(request)
@@ -2423,6 +2439,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/token/reveal", reveal_token),
         web.post("/api/devices/import", import_pumpdirect),
         web.post("/api/devices/discover", discover),
+        web.post("/api/devices/probe", probe_device),
         web.post("/api/devices/add", add_device),
         web.post("/api/devices/remove", remove_device),
         web.post("/api/devices/active", set_active),

@@ -219,12 +219,50 @@ def outlets_from_sysinfo(host: str, sysinfo: dict) -> list[Outlet]:
 # --------------------------------------------------------------------------- #
 # Async-friendly public API
 # --------------------------------------------------------------------------- #
+def _full_sysinfo(host: str, fallback: dict) -> dict:
+    """Ask a host directly for its sysinfo, falling back to what it broadcast.
+
+    This matters for POWER STRIPS: the UDP broadcast reply can come back
+    trimmed, without the `children` array, so a strip looks like a single
+    plug and its outlets are never offered. A direct TCP query always returns
+    the full record.
+    """
+    try:
+        reply = _tcp_query(host, {"system": {"get_sysinfo": {}}})
+        si = reply["system"]["get_sysinfo"]
+        if isinstance(si, dict) and si:
+            return si
+    except Exception:  # noqa: BLE001 — offline/slow device: use what we have
+        pass
+    return fallback
+
+
+async def probe(host: str) -> list[Outlet]:
+    """Every controllable outlet at ONE address, asked directly.
+
+    The way to add a strip when broadcast discovery doesn't reach it — some
+    networks (mesh APs, client isolation, a separate VLAN) drop the broadcast
+    even though the device is perfectly reachable.
+    """
+    reply = await asyncio.to_thread(_tcp_query, host, {"system": {"get_sysinfo": {}}})
+    sysinfo = reply["system"]["get_sysinfo"]
+    return outlets_from_sysinfo(host, sysinfo)
+
+
 async def discover(timeout: float = 3.0, broadcast: str = BROADCAST_ADDR) -> list[Outlet]:
     """Broadcast-discover the LAN and return a flat list of controllable Outlets."""
     raw = await asyncio.to_thread(_discover_raw, timeout, broadcast)
+
+    async def _one(host: str, sysinfo: dict) -> list[Outlet]:
+        full = await asyncio.to_thread(_full_sysinfo, host, sysinfo)
+        return outlets_from_sysinfo(host, full)
+
+    results = await asyncio.gather(*(_one(h, si) for h, si in raw.items()),
+                                   return_exceptions=True)
     outlets: list[Outlet] = []
-    for host, sysinfo in raw.items():
-        outlets.extend(outlets_from_sysinfo(host, sysinfo))
+    for r in results:
+        if isinstance(r, list):
+            outlets.extend(r)
     outlets.sort(key=lambda o: o.alias.lower())
     return outlets
 

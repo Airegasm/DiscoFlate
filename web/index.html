@@ -681,6 +681,7 @@
           <label class="field">Brand <select id="addVendor" onchange="onVendorChange()"></select></label>
           <span id="addFields" class="row" style="gap:10px;align-items:flex-end"></span>
           <button class="ghost" id="addDiscoverBtn" onclick="discoverVendor()">🔍 Discover</button>
+          <button class="ghost" id="addProbeBtn" onclick="probeByIp()" title="Ask one address directly what it is, and list every outlet on it. This is how you add a POWER STRIP whose outlets never appeared in Discover.">🎯 Add by IP</button>
           <button onclick="addManual()">+ Add</button>
           <button class="ghost" onclick="importPD()">⇩ Import PumpDirect</button>
           <span class="muted" id="devMsg"></span>
@@ -5736,6 +5737,8 @@ function onVendorChange(){ addDraft={}; renderAddFields(); $('#discovered').inne
 function renderAddFields(){
   const meta=VENDORS[currentVendor()]||VENDORS.kasa;
   const b=$('#addDiscoverBtn'); if(b) b.style.display=meta.discover?'':'none';
+  // probing an address only means anything for the local-protocol brand
+  const pb=$('#addProbeBtn'); if(pb) pb.style.display=(currentVendor()==='kasa')?'':'none';
   const fields=['label', ...meta.add];
   $('#addFields').innerHTML = fields.map(f=>`<label class="field">${f} <input value="${esc(addDraft[f]||'')}" placeholder="${esc(FIELD_PH[f]||f)}" style="width:150px" oninput="addDraft['${f}']=this.value"></label>`).join('');
 }
@@ -5865,20 +5868,46 @@ async function addManual(){
   try{ applyState(await api('/api/devices/add', {vendor:v, source:'manual', ...addDraft}), true); addDraft={}; renderAddFields(); $('#devMsg').textContent='added'; }
   catch(e){ $('#devMsg').textContent='add failed: '+(e.message||e); }
 }
+// Broadcast discovery can miss a device entirely (mesh APs, client isolation,
+// a separate VLAN) and some power strips answer the broadcast with a trimmed
+// record that omits their outlets. Asking one address directly always works.
+async function probeByIp(){
+  const v=currentVendor();
+  const guess=(addDraft.host||'').trim();
+  const host=(prompt('Address of the device (a power strip, or anything Discover missed):\n\ne.g. 192.168.1.50', guess)||'').trim();
+  if(!host) return;
+  $('#devMsg').textContent='asking '+host+'…';
+  try{
+    const list=await api('/api/devices/probe',{vendor:v, host});
+    renderDiscovered(list);
+    $('#devMsg').textContent = list.length===1
+      ? `found 1 outlet at ${host}`
+      : `found ${list.length} outlets at ${host} — add the ones you want`;
+  }catch(e){ $('#devMsg').textContent=(e.message||e); }
+}
+// One renderer for both Discover and Add by IP.
+function renderDiscovered(list){
+  const box=$('#discovered'); box.innerHTML='';
+  const have=new Set((lastState.devices||[]).map(d=>`${d.host}|${d.child_id||''}`));
+  list.forEach(d=>{
+    const el=document.createElement('div'); el.className='dev';
+    const already=have.has(`${d.host}|${d.child_id||''}`);
+    const sub=[d.host,d.device_id,d.mac,d.entity_id,d.sku,d.model,
+               d.child_id&&('outlet '+String(d.child_id).slice(-2))].filter(Boolean).join(' · ');
+    el.innerHTML=`<div class="grow"><div class="name">${esc(d.label)}${d.child_id?' <span class="pill" style="padding:1px 8px;font-size:10px">strip outlet</span>':''}</div><div class="tag">${esc(sub)}</div></div>`+
+      (already ? `<span class="muted">already added</span>`
+               : `<button data-dev='${esc(JSON.stringify(d))}' onclick="addDisc(this)">Add</button>`);
+    box.appendChild(el);
+  });
+  if(!list.length) box.innerHTML='<div class="muted">nothing found</div>';
+}
 async function discoverVendor(){
   const v=currentVendor();
   $('#devMsg').textContent='discovering '+v+'…';
   try{
     const list=await api('/api/devices/discover',{vendor:v});
     $('#devMsg').textContent=`found ${list.length}`;
-    const box=$('#discovered'); box.innerHTML='';
-    list.forEach(d=>{
-      const el=document.createElement('div'); el.className='dev';
-      const sub=[d.host,d.device_id,d.mac,d.entity_id,d.sku,d.model,d.child_id&&('outlet '+d.child_id)].filter(Boolean).join(' · ');
-      el.innerHTML=`<div class="grow"><div class="name">${esc(d.label)}</div><div class="tag">${esc(sub)}</div></div>`+
-        `<button data-dev='${esc(JSON.stringify(d))}' onclick="addDisc(this)">Add</button>`;
-      box.appendChild(el);
-    });
+    renderDiscovered(list);
   }catch(e){ $('#devMsg').textContent='discover failed: '+(e.message||e); }
 }
 // ---- Max Roll Prizes (list) ----
