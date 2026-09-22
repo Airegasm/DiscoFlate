@@ -9,8 +9,10 @@ roll settings, and the capacity-range -> dice table. Written atomically with
 from __future__ import annotations
 
 import base64
+import copy
 import json
 import os
+import uuid
 import re
 import shutil
 import tempfile
@@ -41,7 +43,7 @@ DEFAULT_PUMPDIRECT_PATH = os.path.normpath(
 
 # Schema version of the stored config. Bump it + add a _migrate step whenever a
 # key is renamed/moved, so old configs upgrade instead of silently stranding data.
-CONFIG_VERSION = 12
+CONFIG_VERSION = 13
 
 # The dead "dice recharged" default that a remediation migration accidentally
 # promoted to the live cooldown-ready message. Migration v3 undoes that.
@@ -372,6 +374,10 @@ DEFAULTS = {
     # presets (a scene LINKS a preset by name) but ride along in Device Sync
     # with their media files.
     "scenes": [],
+    # Minigame PROFILES: a named game config a `minigame` action calls by name.
+    # [{id,name,kind,config{},tiers[],luck,intro,start_events[]}] — two profiles
+    # of the same kind can differ in limits, luck and score tiers.
+    "minigames": [],
     "scene_globals": [],   # overlay items callable from every scene
     # Group metadata for that pool, mirroring a scene's own shape — so an
     # empty global group survives a reload the same way a scene's does.
@@ -1216,6 +1222,68 @@ def _migrate(cfg: dict) -> dict:
                 cfg[new_k] = cfg.pop(old_k)
             else:
                 cfg.pop(old_k, None)
+    if v < 13:
+        # v13: a minigame stops being a command TYPE and becomes a named
+        # PROFILE that a `minigame` ACTION calls. That's what lets a command do
+        # things BEFORE and AFTER a game, and lets two profiles of the same
+        # kind differ in limits, luck and score tiers.
+        # only the fields that KIND actually reads — a command carries defaults
+        # for every game type, and copying them all makes a noisy profile
+        _BY_KIND = {
+            "pushluck": ("pl_bust_start", "pl_bust_step", "pl_max_pumps", "pl_points"),
+            "simon":    ("sm_symbols", "sm_max_rounds", "sm_reveal"),
+            "balloon":  ("bl_cells", "bl_pops", "bl_points"),
+            "rps":      ("rps_wins",),
+            "slots":    ("sl_symbols",),
+            "blackjack": (),
+        }
+        _CFG_FIELDS = tuple(f for fs in _BY_KIND.values() for f in fs)
+        games = list(cfg.get("minigames") or [])
+        taken = {str(g.get("name", "")).strip().lower() for g in games}
+        for c in (cfg.get("commands") or []):
+            if not isinstance(c, dict):
+                continue
+            t = str(c.get("type") or "").lower()
+            if not t.startswith("game-"):
+                continue
+            kind = t[5:]
+            base = (c.get("name") or kind or "game").strip() or kind
+            nm, n = base, 2
+            while nm.lower() in taken:
+                nm = f"{base} {n}"
+                n += 1
+            taken.add(nm.lower())
+            gid = "mg:" + uuid.uuid4().hex[:8]
+            games.append({
+                "id": gid, "name": nm, "kind": kind,
+                "config": {k: c[k] for k in _BY_KIND.get(kind, ()) if k in c},
+                "tiers": c.get("game_tiers") or [],
+                "luck": c.get("game_luck"),
+                "intro": c.get("game_intro") or "",
+                "intro_embed": bool(c.get("game_intro_embed")),
+                "intro_title": c.get("game_intro_title") or "",
+                "start_events": list(c.get("start_events") or []),
+            })
+            # the command keeps its gates and becomes an ordinary action block
+            # whose single row plays that profile
+            c["type"] = "actions"
+            c["actions"] = list(c.get("actions") or []) + [
+                {"type": "minigame", "minigame": gid}]
+            for k in (*_CFG_FIELDS, "game_tiers", "game_luck", "game_intro",
+                      "game_intro_embed", "game_intro_title"):
+                c.pop(k, None)
+        if games:
+            cfg["minigames"] = games
+        # A scene we SHIP only ever reaches brand-new installs, because the
+        # factory config is a first-run seed. Anyone with an existing config
+        # would never see it — so hand over any shipped scene they don't
+        # already have, BY NAME. Their own scenes are never touched.
+        have = {str(x.get("name") or "").strip().lower()
+                for x in (cfg.get("scenes") or [])}
+        added = [sc for sc in (_factory_seed().get("scenes") or [])
+                 if str(sc.get("name") or "").strip().lower() not in have]
+        if added:
+            cfg["scenes"] = list(cfg.get("scenes") or []) + copy.deepcopy(added)
     cfg["config_version"] = CONFIG_VERSION
     return cfg
 

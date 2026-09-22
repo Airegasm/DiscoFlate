@@ -1,6 +1,6 @@
 {
-  "version": "3.62.1",
-  "versionCode": 145,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.62.1/discoflate-v3.62.1.apk",
-  "notes": "DiscoFlate v3.62.1 \u2014 the Poll Viewer loses its always-on/callable eyeball. It already draws itself only while a poll is running, so that switch could only ever make polls silently invisible. Its scene group governs it now, and existing scenes heal without a migration."
+  "version": "3.63.0",
+  "versionCode": 146,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.63.0/discoflate-v3.63.0.apk",
+  "notes": "DiscoFlate v3.63.0 \u2014 minigames become PROFILES and the command 'type' dropdown is gone. A command plays a game with a minigame ACTION row, so it can fire a pump and post before the game and carry on after it. Only that one player's run waits. Two profiles of the same game can differ completely. Your existing game commands migrate automatically, and the shipped Basic Overlays scene now reaches existing configs too, not just fresh installs."
 }

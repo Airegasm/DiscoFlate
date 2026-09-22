@@ -890,9 +890,14 @@ class BotManager:
         if res.get("game"):
             if uid is None:
                 return {"ok": False, "error": "set the Owner user ID (Game tab) to start games from here"}
-            glabel = self.engine.game_display_name(cmd)
+            # A minigame ACTION hands back its own row (game + tiers + settings)
+            # plus a token for the block waiting on it. A legacy game-typed
+            # command has neither, so it falls back to the command itself.
+            gcmd = res.get("game_cmd") or cmd
+            gcmd = {**gcmd, "__resume": res.get("resume_token")}
+            glabel = self.engine.game_display_name(gcmd)
             intro = (res.get("reply") or "").strip() or f"🎮 **{who}** started **{name}** — press Play!"
-            view = minigames.make_play_view(self, cmd, who, uid)
+            view = minigames.make_play_view(self, gcmd, who, uid)
             try:
                 view.message = await ch.send(self._hdr(cfg, glabel, who) + intro, view=view)
             except Exception as e:  # noqa: BLE001
@@ -1191,7 +1196,9 @@ class BotManager:
         """A minigame finished — fire the tier's devices (credited to the player)
         and broadcast the game-labeled result, respecting cross-server anonymity."""
         try:
-            res = await self.engine.game_result(cmd, score, who, uid)
+            token = (cmd or {}).get("__resume")
+            res = (await self.engine.resume_minigame(token, score, who, uid)
+                   if token else await self.engine.game_result(cmd, score, who, uid))
             label = self.engine.game_display_name(cmd)
             if (res.get("real") or "").strip():   # tier message rows may replace the score line
                 await self._broadcast_named(res.get("real"), res.get("anon"), uid, label=label, who=who)
@@ -1200,6 +1207,15 @@ class BotManager:
                 await self.engine.run_actions(res["tier_actions"], f"{label} tier",
                                               uid=uid, who=who, score=res.get("score"),
                                               game=label)
+            # …and then the REST of the block that was waiting on this game,
+            # for this player. Their score and the game's totals ride along so
+            # later rows can use [score] / [secs] / [game].
+            if token:
+                await self.engine.resume_block(token, {
+                    "score": res.get("score"), "game": res.get("game") or label,
+                    "secs": res.get("secs"), "seconds": res.get("seconds"),
+                    "secs2capacity": res.get("secs2capacity"),
+                    "luck": res.get("luck"), "user": who})
             # events the game's start_events activated (activation lines + any
             # fire_immediately first rounds) follow the result
             for post in (res.get("events_posted") or []):
@@ -1352,9 +1368,12 @@ class BotManager:
             if res.get("game"):
                 # Minigame: post the public Play button (locked to the author). The
                 # game itself runs ephemerally; the result is broadcast at the end.
-                glabel = self.engine.game_display_name(custom)
+                # the minigame ACTION's own row when there is one, else the command
+                gcmd = {**(res.get("game_cmd") or custom),
+                        "__resume": res.get("resume_token")}
+                glabel = self.engine.game_display_name(gcmd)
                 intro = (res.get("reply") or "").strip() or f"🎮 **{who}** started **{custom.get('name')}** — press Play!"
-                view = minigames.make_play_view(self, custom, who, str(message.author.id))
+                view = minigames.make_play_view(self, gcmd, who, str(message.author.id))
                 try:
                     if custom.get("game_intro_embed"):
                         ttl = self.engine.render(

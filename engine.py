@@ -28,6 +28,7 @@ import math
 import random
 import re
 import time
+import uuid
 from collections import deque
 
 import kasa_legacy as kasa
@@ -76,6 +77,10 @@ class Engine:
         self.notify_cb = None           # app.py: play a command's notify line
         self.pause_overlay_cb = None    # app.py: cover/uncover the stream on pause
         self._runs: list = []            # live action-block cancel flags
+        # Action blocks parked mid-run waiting on ONE player: token -> where to
+        # pick up. Nothing global is paused — everyone else's commands, the
+        # timed events and the capacity loop carry on exactly as before.
+        self._suspended: dict = {}
 
         self._tick_task: asyncio.Task | None = None
         self.events: deque = deque(maxlen=100)
@@ -1493,11 +1498,66 @@ class Engine:
                 pass
         return default
 
+    _MAX_PARKED = 200          # a player who never finishes can't grow this forever
+    _PARK_TTL = 30 * 60.0      # …and a parked run is dropped after half an hour
+
+    def _park_block(self, rows, idx, xc, name, hdr, uid, who, cmdkey, run_flag) -> str:
+        """Stash where an action block got to, so a later event can pick it up.
+
+        Keyed per INVOCATION: two people playing the same game at once park
+        separately, and neither blocks the other or anything else."""
+        self._reap_parked()
+        tok = uuid.uuid4().hex[:12]
+        keep = dict(xc)
+        keep.pop("_run_flag", None)          # the flag rides separately
+        # It isn't running while it waits, so take it out of the cancel list —
+        # resume puts it back.
+        try:
+            self._runs.remove(run_flag)
+        except ValueError:
+            pass
+        self._suspended[tok] = {"rows": rows, "idx": idx, "xc": keep, "name": name,
+                                "hdr": hdr, "uid": uid, "who": who, "cmdkey": cmdkey,
+                                "flag": run_flag, "at": time.monotonic()}
+        return tok
+
+    def _reap_parked(self) -> None:
+        now = time.monotonic()
+        for tok in [t for t, v in self._suspended.items()
+                    if now - v.get("at", now) > self._PARK_TTL]:
+            self._suspended.pop(tok, None)
+        while len(self._suspended) >= self._MAX_PARKED:
+            self._suspended.pop(next(iter(self._suspended)), None)
+
+    def parked_row(self, token: str) -> dict | None:
+        """The minigame row a parked block is waiting on (None if it's gone)."""
+        st = self._suspended.get(str(token or ""))
+        return None if st is None else (st.get("rows") or [{}])[max(0, st["idx"] - 1)]
+
+    async def resume_block(self, token: str, extra: dict | None = None) -> dict:
+        """Carry on where a parked block left off, merging in what it waited for."""
+        st = self._suspended.pop(str(token or ""), None)
+        if st is None:
+            return {}
+        xc = {**st["xc"], **(extra or {})}
+        return await self._run_action_block(
+            st["rows"], st["name"], st["hdr"], st["uid"], st["who"],
+            extra_ctx=xc, cmdkey=st["cmdkey"],
+            _start_at=st["idx"], _resume_flag=st["flag"])
+
+    def drop_parked(self) -> int:
+        """Forget every parked block — session reset / deactivation."""
+        n = len(self._suspended)
+        self._suspended.clear()
+        return n
+
     async def _run_action_block(self, actions, name: str, hdr: str | None = None,
                                 uid=None, who: str | None = None,
                                 extra_ctx: dict | None = None,
                                 replace_key: str | None = None,
-                                cmdkey: str | None = None) -> dict:
+                                cmdkey: str | None = None,
+                                _start_at: int = 0,
+                                _resume_flag: dict | None = None) -> dict:
         """Execute an ordered action block: message | broadcast | command | fire |
         roll | capacity | wait | poll | competition | bonus_round | award | chance |
         command_gate | stop_devices | end_session. Shared by timed & capacity
@@ -1518,9 +1578,13 @@ class Engine:
         xc = dict(extra_ctx or {})
         # A nested block shares its parent's cancel flag (cancelling a run must
         # stop the whole tree); a top-level block registers a fresh one.
-        run_flag = (extra_ctx or {}).get("_run_flag")
-        own_flag = run_flag is None
-        if own_flag:
+        run_flag = _resume_flag or (extra_ctx or {}).get("_run_flag")
+        # A resumed block re-owns its cancel flag: it was lifted out of _runs
+        # while it waited, so it has to go back in and be cleaned up at the end.
+        own_flag = run_flag is None or _resume_flag is not None
+        if own_flag and _resume_flag is not None:
+            self._runs.append(run_flag)
+        elif own_flag:
             run_flag = {"cancelled": False, "name": name}
             self._runs.append(run_flag)
         xc["_run_flag"] = run_flag
@@ -1539,7 +1603,7 @@ class Engine:
             return self.render(template, {**xc, **(more or {})})
 
         rows = list(actions or [])
-        idx, goto_budget = 0, 0
+        idx, goto_budget = max(0, int(_start_at or 0)), 0
         while idx < len(rows):
             a = rows[idx]
             idx += 1
@@ -1568,6 +1632,20 @@ class Engine:
                     continue
             typ = ((a or {}).get("type") or "message").lower()
             try:
+                if typ == "minigame":
+                    prof = self.find_minigame(a.get("minigame") or a.get("game"))
+                    if prof is None:
+                        self._log("error", f"{name}: no minigame profile "
+                                           f"'{a.get('minigame') or a.get('game')}' — skipped")
+                        continue
+                    # Park THIS invocation and hand the game back to the caller.
+                    # Only this run waits; nothing else in the session does.
+                    tok = self._park_block(rows, idx, xc, name, hdr, uid, who,
+                                           cmdkey, run_flag)
+                    out = dict(xc)
+                    out.pop("_run_flag", None)
+                    out["__game"] = {"token": tok, "profile": self.minigame_shim(prof)}
+                    return out
                 if typ == "label":
                     continue                      # a jump target, nothing to do
                 if typ == "goto" or typ == "goto_if":
@@ -3946,6 +4024,19 @@ class Engine:
             anon = self._anon_label()
             tmpl = cmd.get("reply") or ""   # legacy pre-v10 replies — [secs]/[result] flow in
             base = {**(bctx or {}), "cmd_remain": _remain()}
+            game = (bctx or {}).get("__game")
+            if game:
+                # The block hit a minigame row and parked itself. Hand the game
+                # up so the bot can post its Play button; the rest of the block
+                # runs when THIS player finishes.
+                shim = dict(game.get("profile") or {})
+                return {"ok": True, "game": True, "game_type": shim.get("type"),
+                        "game_cmd": shim, "resume_token": game.get("token"),
+                        "events_posted": ev_posts,
+                        "reply": self.render(shim.get("game_intro")
+                                             or cmd.get("game_intro") or "",
+                                             {**base, "user": who,
+                                              "mention": self._mention(uid, who)})}
             return {"ok": True, "device": True, "started": True, "events_posted": ev_posts,
                     "reply": self.render(tmpl, {**base, "user": who, "mention": self._mention(uid, who)}),
                     "reply_anon": self.render(tmpl, {**base, "user": anon, "mention": anon})}
@@ -4137,6 +4228,37 @@ class Engine:
             step = 12.0
         return max(0.0, min(100.0, start + step * max(0, int(pumps))))
 
+    def find_minigame(self, ref) -> dict | None:
+        """A minigame PROFILE by id or name. Profiles are the configurable unit:
+        two blackjack profiles can differ in limits, luck and score tiers, and
+        any number of commands can call either."""
+        want = str(ref or "").strip().lower()
+        if not want:
+            return None
+        for g in (self.cfg.get("minigames") or []):
+            if str(g.get("id") or "").lower() == want:
+                return g
+            if str(g.get("name") or "").strip().lower() == want:
+                return g
+        return None
+
+    def minigame_shim(self, prof: dict) -> dict:
+        """A profile flattened into the command-shaped dict the game views and
+        the tier machinery already expect — so a profile needs no new plumbing
+        anywhere downstream."""
+        prof = prof or {}
+        cfg = dict(prof.get("config") or {})
+        kind = str(prof.get("kind") or prof.get("type") or "").strip().lower()
+        kind = kind[5:] if kind.startswith("game-") else kind
+        return {**cfg,
+                "name": prof.get("name") or kind or "game",
+                "type": "game-" + kind if kind else "actions",
+                "game_tiers": prof.get("tiers") or prof.get("game_tiers") or [],
+                "game_luck": prof.get("luck", prof.get("game_luck")),
+                "game_intro": prof.get("intro") or prof.get("game_intro") or "",
+                "start_events": prof.get("start_events") or [],
+                "__minigame_id": prof.get("id")}
+
     def game_luck(self, cmd: dict) -> float:
         """Luck modifier for a minigame (a flat ± added to the final score). A range
         the command is a member of wins; otherwise its Always-On entry; else 0."""
@@ -4158,6 +4280,10 @@ class Engine:
     def game_display_name(self, cmd: dict) -> str:
         """The full game name from the command type (e.g. 'Rock Paper Scissors'),
         falling back to the command's own name for non-game commands."""
+        # A PROFILE has its own name on purpose — "High Stakes BJ" is more use
+        # in a header than "Blackjack" when you run two blackjack profiles.
+        if cmd.get("__minigame_id") and (cmd.get("name") or "").strip():
+            return cmd["name"].strip()
         return GAME_DISPLAY_NAMES.get((cmd.get("type") or "").lower(), cmd.get("name", "game"))
 
     def slots_spin(self, cmd: dict):
@@ -4201,6 +4327,17 @@ class Engine:
                 best = (v, t)
         return best[1] if best else {}
 
+    async def resume_minigame(self, token: str, score, who: str, uid) -> dict:
+        """A minigame ROW finished: run its winning tier, then carry on with the
+        rest of the block that was waiting on it — for this player only."""
+        row = self.parked_row(token) or {}
+        prof = self.find_minigame(row.get("minigame") or row.get("game"))
+        shim = self.minigame_shim(prof) if prof else dict(row)
+        res = await self.game_result(shim, score, who, uid)
+        res["resume_token"] = token
+        res["_shim"] = shim
+        return res
+
     async def game_result(self, cmd: dict, score, who: str, uid) -> dict:
         """Build the public score line for a finished minigame — always labeled
         with the game, in real + anonymized versions so the bot can respect
@@ -4237,7 +4374,12 @@ class Engine:
             anon_msg = header + self.render(tmpl, {"user": anon, "mention": anon, **base})
         self._log("roll", f"{who} finished {name} — score {score}" + (f", fired {total}s" if fired else ""))
         return {"real": real, "anon": anon_msg, "events_posted": ev_posts,
-                "tier_actions": tier.get("actions") or [], "score": score}
+                "tier_actions": tier.get("actions") or [], "score": score,
+                # a block resumed after this game needs the same numbers its
+                # tier rows got, or [secs]/[luck] come back empty downstream
+                "secs": base["secs"], "seconds": base["seconds"],
+                "luck": base["luck"], "game": name,
+                "secs2capacity": base["secs2capacity"]}
 
     async def run_actions(self, actions, name: str, uid=None, who: str | None = None,
                           score=None, game: str | None = None) -> None:

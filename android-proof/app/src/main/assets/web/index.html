@@ -927,6 +927,18 @@
       </details>
     </div>
 
+    <!-- minigames -->
+    <div class="card span" data-tab="triggers">
+      <details class="help"><summary><h2>🎮 Minigames</h2></summary>
+      <div id="minigames"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" onclick="addMinigame()">+ Add minigame</button>
+        <div style="flex:1"></div>
+      </div>
+      <div class="hint">A minigame is a <b>named profile</b>: a game, its settings, its luck, and the <b>outcome tiers</b> that run when the score lands. Play one from any command with a <b>minigame</b> action row — so a command can fire a pump and post a message <i>before</i> the game, and carry on <i>after</i> it. Two profiles of the same game can differ completely, and any number of commands can call either.</div>
+      </details>
+    </div>
+
     <!-- broadcasts -->
     <div class="card span" data-tab="triggers">
       <details class="help"><summary><h2>Broadcasts</h2></summary>
@@ -1171,6 +1183,7 @@
         <li><b>Range gate</b> — an EXTRA capacity band on top of range membership; useful for granted bonus commands.</li>
         <li><b>Description</b> — shown next to the command in <code>[commands]</code>.</li>
         <li><b>Starts events</b> — comma-separated names of (off-by-default) timed events this command switches on temporarily. They revert on Session reset / app restart.</li>
+        <li><b>🎮 Minigames are profiles, not command types.</b> A minigame is a named profile on the <b>Triggers</b> tab — a game, its settings, its luck and its <b>outcome tiers</b>. Any command plays one with a <b>minigame</b> action row, so the command can fire a pump and post a message <i>before</i> the game and carry on <i>after</i> it, with <code>[score]</code> <code>[game]</code> <code>[secs]</code> filled in. Only that one player's run waits — everyone else's commands, the timed events and the capacity loop carry on. Two profiles of the same game can differ completely, and any number of commands can call either.</li>
         <li><b>📣 Notify overlay (per command).</b> One overlay serves every command. Design a <b>Text</b> overlay on the <b>Scenes</b> tab, then pick it in <b>Dashboard → Go Live Options → 🖼 Session Overlays</b>; each command's own line plays on it when the command runs. Tick <b>📣 notify overlay</b> on a command and edit its text — <code>[user]</code> <code>[mention]</code> <code>[command]</code> and the usual placeholders all work, and the default is <code>[user] just triggered [command]</code>. A run that was blocked (paused, on cooldown, held by an intro, gated) never announces itself, and with no notify overlay picked it's a quiet no-op.</li>
         <li><b>⏸ Pause overlay.</b> A <b>scene group</b> that covers the stream the moment you hit <b>⏸ Pause</b> in the header, and clears on <b>▶ Resume</b>. Pick it in <b>Dashboard → Go Live Options → 🖼 Session Overlays</b>. The shipped <b>Pause</b> group is a full-frame black card reading <code>[operator] will be right back!</code>, drawn above everything else.</li>
         <li><b>Row icons</b> — every command / event / range row has <b>📋 Duplicate</b> (a clash-safe copy, e.g. <code>fill</code> → <code>fill-copy</code>), <b>💾 Save as template</b> (stashes it in <b>System → Templates</b> for reuse), and <b>✕ Delete</b>. To open or close a row, <b>click its title strip</b> — anywhere that isn't one of those buttons, a checkbox, a field or the <b>⋮⋮</b> drag handle. Click it again to close. In <b>System → Templates</b>, <b>＋ Add to Config</b> ports a saved template back in (auto-renaming on a clash).</li>
@@ -3359,6 +3372,10 @@ document.addEventListener('click', e=>{
   if(kind==='evt')   return toggleEvtOpen(+arg);
   if(kind==='poll')  return togglePollOpen(+arg);
   if(kind==='range') return toggleRangeExpand(+arg);
+  if(kind==='mg'){
+    if(mgOpen.has(arg)) mgOpen.delete(arg); else mgOpen.add(arg);
+    return renderMinigames();
+  }
   if(kind==='tier'){
     if(tierOpen.has(arg)) tierOpen.delete(arg); else tierOpen.add(arg);
     return renderCommands();
@@ -4416,42 +4433,126 @@ function pruneOrphanMemberships(){
 // independently. `arr` is the command field holding the rows ('fires' or 'fail_fires').
 // ---- minigame outcome tiers (score → message + device fires) ----
 let tierOpen = new Set();
-function gameTiersEditor(i, c){
-  const tiers = c.game_tiers||[];
+// Minigame PROFILES: a named game config that a `minigame` action calls. Two
+// blackjack profiles can differ in limits, luck and outcome tiers, and any
+// number of commands can call either.
+let minigameRows = [];
+let mgOpen = new Set();
+const MG_KINDS = [['pushluck','Push Your Luck'],['simon','Simon'],['balloon',"Don't Pop It"],
+                  ['rps','Rock Paper Scissors'],['slots','Slots'],['blackjack','Blackjack']];
+const MG_FIELDS = {
+  pushluck:[['pl_bust_start','Bust start %',15],['pl_bust_step','+% / pump',12],
+            ['pl_max_pumps','Max pumps',8],['pl_points','Points/pump',1]],
+  simon:[['sm_symbols','Symbols',4],['sm_max_rounds','Max rounds',8],['sm_reveal','Reveal (s)',3]],
+  balloon:[['bl_cells','Cells',9],['bl_pops','Balloons',3],['bl_points','Points/cell',1]],
+  rps:[['rps_wins','Rounds to win',3]],
+  slots:[['sl_symbols','Symbols',6]],
+  blackjack:[],
+};
+function mgSet(i,k,v){ const g=minigameRows[i]; if(!g) return; g[k]=v; scheduleSave(); renderMinigames(); }
+function mgCfg(i,k,v){ const g=minigameRows[i]; if(!g) return;
+  g.config=g.config||{}; g.config[k]=(v===''?'':+v); scheduleSave(); }
+function addMinigame(){
+  const id='mg:'+Date.now().toString(36)+Math.floor(Math.random()*4096).toString(36);
+  minigameRows.push({id, name:'', kind:'blackjack', config:{}, tiers:[], intro:''});
+  mgOpen.add(id); renderMinigames(); scheduleSave();
+}
+function delMinigame(i){
+  const g=minigameRows[i]||{};
+  const used=(commandRows||[]).filter(c=>(c.actions||[]).some(a=>a&&a.type==='minigame'&&(a.minigame===g.id||a.minigame===g.name)));
+  if(used.length && !confirm(`"${g.name||'this minigame'}" is played by ${used.length} command(s):\n\n${used.map(c=>'!'+c.name).join(', ')}\n\nDelete it anyway? Those rows will say "missing".`)) return;
+  minigameRows.splice(i,1); renderMinigames(); renderCommands(); scheduleSave();
+}
+function renderMinigames(){
+  const box=$('#minigames'); if(!box) return;
+  box.innerHTML = minigameRows.map((g,i)=>{
+    const open=mgOpen.has(g.id);
+    const kind=g.kind||'blackjack';
+    const used=(commandRows||[]).filter(c=>(c.actions||[]).some(a=>a&&a.type==='minigame'&&(a.minigame===g.id||a.minigame===g.name))).length;
+    const head=`<div class="row rowhead" data-rtog="mg" data-rarg="${esc(g.id)}" style="gap:10px;flex-wrap:nowrap">`+
+      `<b style="min-width:150px">${esc(g.name||'(unnamed)')}</b>`+
+      `<span class="muted" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">`+
+        `${esc((MG_KINDS.find(k=>k[0]===kind)||[,kind])[1])} · ${(g.tiers||[]).length} tier${(g.tiers||[]).length===1?'':'s'}`+
+        `${used?` · played by ${used} command${used===1?'':'s'}`:' · not used yet'}</span>`+
+      `<button class="ghost" title="Delete" onclick="event.stopPropagation();delMinigame(${i})">✕</button>`+
+    `</div>`;
+    if(!open) return `<div class="dev" style="flex-direction:column;align-items:stretch;gap:6px">${head}</div>`;
+    const cf=g.config||{};
+    return `<div class="dev" style="flex-direction:column;align-items:stretch;gap:8px">`+head+
+      `<div class="row" style="gap:12px;align-items:flex-end">`+
+        `<label class="field">Name <input value="${esc(g.name||'')}" placeholder="High Stakes BJ" style="width:200px" onchange="mgSet(${i},'name',this.value)"></label>`+
+        `<label class="field">Game <select style="width:190px" onchange="mgSet(${i},'kind',this.value)">`+
+          MG_KINDS.map(([v,l])=>`<option value="${v}" ${kind===v?'selected':''}>${esc(l)}</option>`).join('')+`</select></label>`+
+        `<label class="field" title="added to the final score before the tiers are matched">Luck <input type="number" step="0.5" value="${g.luck??''}" placeholder="0" style="width:80px" onchange="mgSet(${i},'luck',this.value===''?null:+this.value)"></label>`+
+      `</div>`+
+      ((MG_FIELDS[kind]||[]).length
+        ? `<div class="row" style="gap:12px;align-items:flex-end;flex-wrap:wrap">`+
+            (MG_FIELDS[kind]||[]).map(([k,lbl,dv])=>
+              `<label class="field">${esc(lbl)} <input type="number" step="0.5" value="${cf[k]??dv}" style="width:90px" onchange="mgCfg(${i},'${k}',this.value)"></label>`).join('')+
+          `</div>`
+        : `<span class="muted">this game has no extra settings</span>`)+
+      `<label class="field">Intro message <span class="muted">(shown with the ▶ Play button · [user] [mention])</span><input value="${esc(g.intro||'')}" onchange="mgSet(${i},'intro',this.value)"></label>`+
+      gameTiersEditor(`minigameRows[${i}].tiers`, g.tiers, 'renderMinigames', 'mg'+i)+
+    `</div>`;
+  }).join('') || '<div class="muted">no minigames yet — add one, then play it from any command with a <b>minigame</b> action row</div>';
+}
+function cleanMinigames(){
+  return minigameRows.filter(g=>(g.name||'').trim()).map(g=>({
+    id:g.id, name:(g.name||'').trim(), kind:g.kind||'blackjack',
+    config:g.config||{}, luck:(g.luck===''||g.luck==null)?null:+g.luck,
+    intro:g.intro||'',
+    tiers:(g.tiers||[]).map(t=>({op:t.op||'>=', min:+t.min||0, actions:cleanActionRows(t.actions)})),
+  }));
+}
+function gameTiersEditor(base, tiers, rr, keyid){
+  tiers = tiers || [];
   const rows = tiers.map((t,j)=>{
-    const key=`tier:${i}:${j}`;
+    const key=`tier:${keyid}:${j}`;
     const na=(t.actions||[]).length;
     if(!tierOpen.has(key)){
-      // COLLAPSED: one row — condition · gist · edit / delete
       const firstMsg=(((t.actions||[]).find(x=>x&&x.type==='message')||{}).message||'').split('\n')[0];
       const gist=[firstMsg, `${na} action${na===1?'':'s'}`].filter(Boolean).join(' · ');
       return `<div class="dev rowhead" data-rtog="tier" data-rarg="${key}" style="gap:8px">`+
         `<b style="min-width:110px;white-space:nowrap">score ${esc(t.op||'>=')} ${t.min??0}</b>`+
         `<span class="muted" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(gist)}</span>`+
-        `<button class="ghost" title="Delete" onclick="removeTier(${i},${j})">✕</button>`+
+        `<button class="ghost" title="Delete" onclick="removeTier('${base}',${j},'${rr}')">✕</button>`+
       `</div>`;
     }
     return `<div class="dev" style="flex-direction:column;align-items:stretch;gap:6px">`+
       `<div class="row rowhead" data-rtog="tier" data-rarg="${key}" style="gap:8px;align-items:center;flex-wrap:nowrap">`+
         `<span class="muted" style="white-space:nowrap">when score</span>`+
-        `<select style="width:70px" onchange="setTier(${i},${j},'op',this.value)">`+
+        `<select style="width:70px" onchange="setTier('${base}',${j},'op',this.value,'${rr}')">`+
           ['>=','>','=','!=','<','<='].map(o=>`<option value="${o}" ${(t.op||'>=')===o?'selected':''}>${o}</option>`).join('')+`</select>`+
-        `<input type="number" value="${t.min??0}" style="width:80px" onchange="setTier(${i},${j},'min',this.value)">`+
+        `<input type="number" value="${t.min??0}" style="width:80px" onchange="setTier('${base}',${j},'min',this.value,'${rr}')">`+
         `<div style="flex:1"></div>`+
-        `<button class="ghost" title="Delete" onclick="removeTier(${i},${j})">✕</button>`+
+        `<button class="ghost" title="Delete" onclick="removeTier('${base}',${j},'${rr}')">✕</button>`+
       `</div>`+
-      actionsSection('⚙️ Actions on this tier', `commandRows[${i}].game_tiers[${j}].actions`, 'renderCommands',
+      actionsSection('⚙️ Actions on this tier', `${base}[${j}].actions`, rr,
         t.actions, "{type:'message',message:''}",
-        'THE game’s entire outcome: message rows announce it (<code>[score]</code> <code>[game]</code> <code>[user]</code> work — embed away), fire rows credit the player, plus award / achievement / capacity / … No message row = the game finishes quietly.')+
+        'THE game\u2019s entire outcome: message rows announce it (<code>[score]</code> <code>[game]</code> <code>[user]</code> work), fires credit the player, and anything else the block can do.')+
     `</div>`;
   }).join('');
-  return `<div class="muted" style="margin:8px 0 4px">Outcome tiers <span class="muted">— among all tiers the final score matches, the <b>highest value</b> wins (add a <b>≥ 0</b> tier as the floor/loss).</span></div>`+
+  return `<div class="muted" style="margin:8px 0 4px">Outcome tiers <span class="muted">— among all tiers the final score matches, the <b>highest value</b> wins</span></div>`+
     (rows||'<div class="muted" style="margin-bottom:4px">no tiers yet</div>')+
-    `<button class="ghost" style="margin-top:6px" onclick="addTier(${i});tierOpen.add('tier:${i}:'+(commandRows[${i}].game_tiers.length-1))">+ Add tier</button>`;
+    `<button class="ghost" style="margin-top:6px" onclick="addTier('${base}','${rr}','${keyid}')">+ Add tier</button>`;
 }
-function setTier(i,j,field,val){ const t=(commandRows[i].game_tiers||[])[j]; if(!t) return; t[field]=(field==='min')?(val===''?0:+val):val; scheduleSave(); }
-function addTier(i){ commandRows[i].game_tiers=commandRows[i].game_tiers||[]; commandRows[i].game_tiers.push({op:'>=',min:0,actions:[]}); renderCommands(); scheduleSave(); }
-function removeTier(i,j){ (commandRows[i].game_tiers||[]).splice(j,1); renderCommands(); scheduleSave(); }
+function _atPath(base){ try{ return eval(base); }catch(e){ return null; } }
+function setTier(base,j,field,val,rr){
+  const t=(_atPath(base)||[])[j]; if(!t) return;
+  t[field]=(field==='min')?(val===''?0:+val):val;
+  scheduleSave(); if(window[rr]) window[rr]();
+}
+function addTier(base,rr,keyid){
+  const arr=_atPath(base); if(!arr) return;
+  arr.push({op:'>=',min:0,actions:[]});
+  tierOpen.add(`tier:${keyid}:${arr.length-1}`);
+  scheduleSave(); if(window[rr]) window[rr]();
+}
+function removeTier(base,j,rr){
+  const arr=_atPath(base); if(!arr) return;
+  arr.splice(j,1); scheduleSave(); if(window[rr]) window[rr]();
+}
+
 function renderCommands(){
   const box = $('#commands'); box.innerHTML='';
   if(!commandRows.length){ box.innerHTML='<div class="muted">No custom commands yet.</div>'; return; }
@@ -4475,33 +4576,16 @@ function renderCommands(){
         `<button class="ghost" title="Delete" onclick="delCommand(${i})">✕</button>`+
       `</div>`;
     if(open){
-      const typ=(c.type||'actions'), isGame=typ.indexOf('game-')===0;
       html +=
       `<div class="row" style="gap:12px;align-items:flex-end">`+
         `<label class="field">Name <input value="${esc(c.name||'')}" placeholder="spin" style="width:180px" onchange="renameCommand(${i}, this.value)"></label>`+
-        `<label class="field">Type <select style="width:210px" onchange="commandRows[${i}].type=this.value;renderCommands()">`+
-          [['actions','actions'],['game-pushluck','minigame · push luck'],['game-simon','minigame · simon'],['game-balloon','minigame · balloon'],['game-rps','minigame · rock paper scissors'],['game-slots','minigame · slots'],['game-blackjack','minigame · blackjack']].map(([v,l])=>`<option value="${v}" ${typ===v?'selected':''}>${l}</option>`).join('')+`</select></label>`+
       `</div>`+
-      (isGame?`<div class="row" style="gap:12px;align-items:flex-end;flex-wrap:nowrap">`:'')+
-        (typ==='game-pushluck'?`<label class="field">Bust start % <input type="number" min="0" max="100" value="${c.pl_bust_start??15}" style="width:80px" onchange="commandRows[${i}].pl_bust_start=+this.value"></label>`+
-          `<label class="field">+% / pump <input type="number" min="0" max="100" value="${c.pl_bust_step??12}" style="width:80px" onchange="commandRows[${i}].pl_bust_step=+this.value"></label>`+
-          `<label class="field">Max pumps <input type="number" min="1" value="${c.pl_max_pumps??8}" style="width:80px" onchange="commandRows[${i}].pl_max_pumps=+this.value"></label>`+
-          `<label class="field">Points/pump <input type="number" min="0" step="0.5" value="${c.pl_points??1}" style="width:90px" onchange="commandRows[${i}].pl_points=+this.value"></label>`:'')+
-        (typ==='game-simon'?`<label class="field">Symbols <input type="number" min="2" max="6" value="${c.sm_symbols??4}" style="width:80px" onchange="commandRows[${i}].sm_symbols=+this.value"></label>`+
-          `<label class="field">Max rounds <input type="number" min="1" value="${c.sm_max_rounds??8}" style="width:80px" onchange="commandRows[${i}].sm_max_rounds=+this.value"></label>`+
-          `<label class="field">Reveal (s) <input type="number" min="1" step="0.5" value="${c.sm_reveal??3}" style="width:80px" onchange="commandRows[${i}].sm_reveal=+this.value"></label>`:'')+
-        (typ==='game-balloon'?`<label class="field">Cells <input type="number" min="2" max="20" value="${c.bl_cells??9}" style="width:80px" onchange="commandRows[${i}].bl_cells=+this.value"></label>`+
-          `<label class="field">Balloons <input type="number" min="1" value="${c.bl_pops??3}" style="width:80px" onchange="commandRows[${i}].bl_pops=+this.value"></label>`+
-          `<label class="field">Points/cell <input type="number" min="0" step="0.5" value="${c.bl_points??1}" style="width:90px" onchange="commandRows[${i}].bl_points=+this.value"></label>`:'')+
-        (typ==='game-rps'?`<label class="field">Rounds to win <input type="number" min="1" value="${c.rps_wins??3}" style="width:90px" onchange="commandRows[${i}].rps_wins=+this.value"></label>`:'')+
-        (typ==='game-slots'?`<label class="field">Symbols <input type="number" min="2" max="8" value="${c.sl_symbols??6}" style="width:80px" title="more symbols = rarer wins" onchange="commandRows[${i}].sl_symbols=+this.value"></label>`:'')+
-      (isGame?`</div>`:'')+
       `<div class="muted" style="font-size:12px">${cmdRangeSummary(c.name)}</div>`+
       `<div class="row" style="gap:16px">`+
         `<label class="field" title="EXTRA restriction on top of range membership: even where the command is a member, it only responds while capacity is inside this band. 'All ranges' (default) = no extra gate.">Range gate <select onchange="commandRows[${i}].range_gate=this.value;scheduleSave()">${rangeGateOptions(c.range_gate)}</select></label>`+
         `<label class="row" style="gap:6px" title="only the Owner can type it — and it's callable by the bot internally (range-start, [!command], action blocks)"><input type="checkbox" ${c.owner_only?'checked':''} onchange="commandRows[${i}].owner_only=this.checked"> Owner/Bot Internal Only</label>`+
         `<label class="row" style="gap:6px"><input type="checkbox" ${c.hide_in_list?'checked':''} onchange="commandRows[${i}].hide_in_list=this.checked"> hide from command list</label>`+
-        (!isGame
+        (true
           ? `<label class="row" style="gap:6px" title="acknowledge on the caller's message with a reaction — cuts chat spam for rapid-fire commands (cross-server echo is skipped)"><input type="checkbox" ${c.react_only?'checked':''} onchange="commandRows[${i}].react_only=this.checked"> react to acknowledge</label>`+
             `<input value="${esc(c.react_emoji||'')}" placeholder="💨" maxlength="16" style="width:70px" title="emoji to react with (default 💨)" onchange="commandRows[${i}].react_emoji=this.value">`
           : '')+
@@ -4513,16 +4597,9 @@ function renderCommands(){
           : `<span class="muted">off — this command puts nothing on screen</span>`)+
       `</div>`+
       `<label class="field">Description <input value="${esc(c.description||'')}" placeholder="what it does (shown in the command list)" onchange="commandRows[${i}].description=this.value"></label>`+
-      (isGame
-        ? `<div class="row" style="gap:12px;align-items:flex-end">`+
-            `<label class="field" style="flex:1">Intro message <span class="muted">(shown with the ▶ Play button · [user] [mention])</span><input value="${esc(c.game_intro||'')}" onchange="commandRows[${i}].game_intro=this.value"></label>`+
-            `<label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" ${c.game_intro_embed?'checked':''} onchange="commandRows[${i}].game_intro_embed=this.checked;renderCommands();scheduleSave()"> embed</label>`+
-            (c.game_intro_embed?`<label class="field">Titlebar <input value="${esc(c.game_intro_title||'')}" placeholder="🎮 game" style="width:200px" onchange="commandRows[${i}].game_intro_title=this.value;scheduleSave()"></label>`:'')+
-          `</div>`+
-          gameTiersEditor(i, c)
-        : actionsSection('⚙️ Actions', `commandRows[${i}].actions`, 'renderCommands',
+      actionsSection('⚙️ Actions', `commandRows[${i}].actions`, 'renderCommands',
             c.actions, "{type:'fire',fire_mode:'seconds',seconds:3}",
-            'Run in order when the command is used. Fires credit the runner; the bot speaks through <b>message</b> rows (a fire/roll publishes <code>[secs]</code>/<code>[result]</code> for rows after it).'))+
+            'Run in order when the command is used. Fires credit the runner; the bot speaks through <b>message</b> rows. To play a minigame, add a <b>minigame</b> row — things before it run first, and everything after it runs when the player finishes.')+
       `<label class="field">Starts events <input value="${esc((c.start_events||[]).join(', '))}" placeholder="event names, comma-separated" onchange="commandRows[${i}].start_events=idList(this.value)"></label>`;
     }
     el.innerHTML = html;
@@ -4532,10 +4609,9 @@ function renderCommands(){
 function addCommand(){ commandRows.push({name:'',type:'actions',actions:[{type:'fire',fire_mode:'seconds',seconds:3}],enabled:true,owner_only:false,start_events:[],range_gate:'all',description:'',hide_in_list:false,react_only:false,react_emoji:'',game_intro:'',game_tiers:[]}); renderCommands(); renderRanges(); }
 function cleanCommands(){
   return commandRows.filter(c=>(c.name||'').trim()).map(c=>{
-    const typ=c.type||'actions', isGame=typ.indexOf('game-')===0;
     const o={
       name:(c.name||'').trim().replace(/^\W+/,'').replace(/\s+/g,''),  // no interior spaces — untypeable in chat
-      type: typ,
+      type: 'actions',
       enabled: c.enabled!==false, owner_only: !!c.owner_only,
       start_events: (c.start_events||[]).map(x=>x.trim()).filter(Boolean),
       range_gate: c.range_gate||'all',
@@ -4544,15 +4620,7 @@ function cleanCommands(){
       notify_enabled: !!c.notify_enabled,
       notify: (c.notify ?? '[user] just triggered [command]'),
     };
-    if(isGame){
-      Object.assign(o,{
-        pl_bust_start:c.pl_bust_start??15, pl_bust_step:c.pl_bust_step??12, pl_max_pumps:c.pl_max_pumps??8, pl_points:c.pl_points??1,
-        sm_symbols:c.sm_symbols??4, sm_max_rounds:c.sm_max_rounds??8, sm_reveal:c.sm_reveal??3,
-        bl_cells:c.bl_cells??9, bl_pops:c.bl_pops??3, bl_points:c.bl_points??1, rps_wins:c.rps_wins??3, sl_symbols:c.sl_symbols??6,
-        game_intro:c.game_intro||'', game_intro_embed:!!c.game_intro_embed, game_intro_title:c.game_intro_title||'',
-        game_tiers:(c.game_tiers||[]).map(t=>({op:t.op||'>=', min:+t.min||0, actions:cleanActionRows(t.actions)})),
-      });
-    } else {
+    {
       o.actions = cleanActionRows(c.actions);
     }
     return o;
@@ -4871,7 +4939,7 @@ function actionRow(base, rr, j, a, condLabels){
     cond=`<label class="field">Run <select onchange="${T('if_option')}=+this.value;scheduleSave()">${opts}</select></label>`;
   }
   const typeSel = `<select onchange="${T('type')}=this.value;${rr}();scheduleSave()">`+
-    ['message','broadcast','command','fire','roll','chance','var','if','repeat','random','group','label','goto','goto_if','cancel','capacity','wait','poll','competition','bonus_round','award','command_gate','overlay','overlay_kill','scene_group','scene_group_kill','camera','snapshot','update_overlay_text','start_timer','stop_timer','stop_devices','end_session'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select>`;
+    ['message','broadcast','command','fire','roll','chance','minigame','var','if','repeat','random','group','label','goto','goto_if','cancel','capacity','wait','poll','competition','bonus_round','award','command_gate','overlay','overlay_kill','scene_group','scene_group_kill','camera','snapshot','update_overlay_text','start_timer','stop_timer','stop_devices','end_session'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select>`;
   let fields=cond;
   if(typ==='wait')
     fields += `<label class="field">Seconds <input value="${esc(String(a.seconds??10))}" placeholder="10" title="a number or a [placeholder] like [winner_score]" style="width:110px" onchange="${T('seconds')}=this.value;scheduleSave()"></label>`;
@@ -4996,6 +5064,17 @@ function actionRow(base, rr, j, a, condLabels){
        ['resume','▶ let it run again'],['stop','⏹ stop the virtual camera']].map(([v,l])=>`<option value="${v}" ${(a.op||'freeze')===v?'selected':''}>${l}</option>`).join('')+
       `</select></label>`+
       `<span class="muted" style="align-self:center">freeze holds the last frame while overlays keep playing on top · quiet when no camera is running</span>`;
+  }
+  if(typ==='minigame'){
+    const opts = (minigameRows||[]).filter(g=>(g.name||'').trim());
+    const cur = a.minigame||a.game||'';
+    const hit = opts.find(g=>g.id===cur || (g.name||'').trim()===cur);
+    fields += `<label class="field" style="min-width:200px">Minigame <select style="width:100%" onchange="${T('minigame')}=this.value;scheduleSave();${rr}()">`+
+      `<option value="">— pick a minigame —</option>`+
+      opts.map(g=>`<option value="${esc(g.id)}" ${cur===g.id||cur===(g.name||'').trim()?'selected':''}>${esc(g.name)} · ${esc(g.kind||'?')}</option>`).join('')+
+      ((cur&&!hit)?`<option selected>${esc(cur)} (missing)</option>`:'')+
+      `</select></label>`+
+      `<span class="muted" style="align-self:center">posts its ▶ Play button and <b>pauses just this run</b> — the rows after it continue when that player finishes, with <code>[score]</code> <code>[game]</code> <code>[secs]</code> filled in. The game's own outcome tiers live on the <b>minigame</b> itself.</span>`;
   }
   if(typ==='scene_group' || typ==='scene_group_kill'){
     const sc = sceneGroupScope(), names = sceneGroupNames();
@@ -6265,10 +6344,11 @@ function applyState(st, full){
     if($('#eventCooldownMsg')) $('#eventCooldownMsg').value = st.event_cooldown_message||'';
     { const t = st.templates || {}; templatesData = {commands:t.commands||[], events:t.events||[], ranges:t.ranges||[], polls:t.polls||[], competitions:t.competitions||[], capevents:t.capevents||[]}; }
     broadcastRows = JSON.parse(JSON.stringify(st.broadcasts||[]));
+    minigameRows = JSON.parse(JSON.stringify(st.minigames||[]));
     prizeRows = JSON.parse(JSON.stringify(st.prizes||[]));
     chatButtons = JSON.parse(JSON.stringify(st.chat_buttons||[]));
     ownerCommands = JSON.parse(JSON.stringify(st.owner_commands||[]));
-    renderChatButtons();
+    renderChatButtons(); renderMinigames();
     // NEVER swap the scene data out from under an in-progress drag: stgDrag
     // holds a reference INTO scenesData, so replacing the array orphans it —
     // the overlay stops following the pointer and snaps back on release.
@@ -6470,6 +6550,7 @@ function gatherConfig(){
     event_in_process_message: $('#eventInProcessMsg') ? $('#eventInProcessMsg').value : '',
     event_cooldown_message: $('#eventCooldownMsg') ? $('#eventCooldownMsg').value : '',
     broadcasts: cleanBroadcasts(),
+    minigames: cleanMinigames(),
     notify_overlay: ($('#ovNotify')||{}).value||'',
     pause_overlay:  ($('#ovPause')||{}).value||'',
     always_on_enabled: $('#alwaysOnEnabled') ? $('#alwaysOnEnabled').checked : false,
