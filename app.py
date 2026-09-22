@@ -1384,6 +1384,77 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             raise web.HTTPBadRequest(text="device not found")
         return web.json_response(await engine.test_device(dev, 2.0))
 
+    # Every field that says WHERE a device is. A re-point writes the new
+    # vendor's fields and clears the rest, because set_state() dispatches on
+    # `vendor` and then reads that vendor's field directly — a leftover from
+    # the previous brand is at best confusing and at worst a KeyError.
+    _ADDRESS_FIELDS = ("host", "child_id", "device_id", "sku", "mac",
+                       "entity_id", "entity", "model")
+
+    async def repoint_device(request):
+        """Point an existing device at a DIFFERENT outlet.
+
+        The pump is the record: its id, name and calibration stay, so every
+        command, range, overlay and timer that references it keeps working.
+        Only the address changes. This is what you use when a plug gets
+        swapped — no relabelling the hardware, no recalibrating.
+        """
+        await guard(request)
+        b = await _json(request)
+        did = b.get("id")
+        cfg = config_store.load()
+        dev = next((d for d in cfg.get("devices", []) if d.get("id") == did), None)
+        if dev is None:
+            raise web.HTTPBadRequest(text="no such device")
+
+        # Mid-fire, the relay that's ON is the OLD one. Swapping the address
+        # now would send the abort somewhere else and leave it stuck on.
+        if engine.is_firing(did):
+            raise web.HTTPBadRequest(
+                text="that pump is firing right now — stop it first, "
+                     "otherwise the outlet it's using would be left on")
+
+        vendor = (b.get("vendor") or dev.get("vendor") or "kasa").strip().lower()
+        req = _VENDOR_REQ.get(vendor)
+        if req and not (b.get(req) or "").strip():
+            raise web.HTTPBadRequest(text=f"a {vendor} outlet needs {req}")
+
+        # already bound elsewhere? say so rather than quietly double-driving it
+        def addr(d):
+            return (str(d.get("vendor") or "kasa").lower(), str(d.get("host") or ""),
+                    str(d.get("child_id") or ""), str(d.get("device_id") or ""),
+                    str(d.get("mac") or ""), str(d.get("entity_id") or ""))
+        want = (vendor, str(b.get("host") or ""), str(b.get("child_id") or ""),
+                str(b.get("device_id") or ""), str(b.get("mac") or ""),
+                str(b.get("entity_id") or ""))
+        clash = next((d for d in cfg.get("devices", [])
+                      if d.get("id") != did and addr(d) == want), None)
+        if clash and not b.get("force"):
+            raise web.HTTPBadRequest(
+                text=f"that outlet is already used by \"{clash.get('name') or clash.get('label')}\" "
+                     f"— two pumps on one relay. Re-point that one first, or resend with force.")
+
+        was = device_control._ident(dev)
+        for k in _ADDRESS_FIELDS:
+            dev.pop(k, None)
+        for k in _ADDRESS_FIELDS:
+            v = b.get(k)
+            if v not in (None, ""):
+                dev[k] = v
+        dev["vendor"] = vendor
+        # `label` is the OUTLET's own name; `name` is what YOU called the pump.
+        # A re-point moves the pump, so the label follows and the name never does.
+        if (b.get("label") or "").strip():
+            dev["label"] = b["label"].strip()
+        dev["source"] = "repointed"
+
+        cfg = config_store.save(cfg)
+        engine.set_config(cfg)
+        device_control._dbg(f"REPOINT {did} {was} -> {device_control._ident(dev)} "
+                            f"vendor={vendor} (kept name={dev.get('name')!r} "
+                            f"cal={dev.get('calibration_seconds_to_100')})")
+        return web.json_response(_public_state(engine, botmgr))
+
     async def rename_device(request):
         """The ✏️ next to a device: give it a friendly name. Devices are
         referenced by id everywhere, so renaming is purely cosmetic and can't
@@ -2448,6 +2519,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/devices/off", device_off),
         web.post("/api/devices/type", set_device_type),
         web.post("/api/devices/rename", rename_device),
+        web.post("/api/devices/repoint", repoint_device),
         web.post("/api/devices/calibration", set_calibration),
         web.post("/api/upload", upload),
         web.post("/api/discord/avatar", set_avatar),

@@ -382,6 +382,11 @@ class Engine:
     def paused(self) -> bool:
         return self._paused
 
+    def is_firing(self, device_id: str | None) -> bool:
+        """Is this device mid-fire right now? Re-pointing one that is would
+        send its abort to the NEW outlet and leave the old relay stuck on."""
+        return bool(device_id) and str(device_id) in self._fires
+
     def _dev_lock(self, device_id) -> asyncio.Lock:
         return self._dev_locks.setdefault(str(device_id), asyncio.Lock())
 

@@ -672,26 +672,20 @@
         <a href="https://www.amazon.com/Kasa-Smart-HS103P2-Outlet-2-Pack/dp/B07B8W2KHZ/" target="_blank" rel="noopener" onclick="return openExternal('https://www.amazon.com/Kasa-Smart-HS103P2-Outlet-2-Pack/dp/B07B8W2KHZ/', event)">Kasa HS103P2 on Amazon ↗</a>
       </div>
 
-      <!-- per-vendor credentials (cloud brands) -->
-      <div id="vendorCredsWrap"></div>
+      <!-- your pumps first: this is the part you use every session -->
+      <div id="devices" style="margin-top:14px"></div>
 
-      <!-- add a device -->
-      <div style="border-top:1px solid var(--line);margin-top:14px;padding-top:14px">
-        <div class="row" style="gap:10px;align-items:flex-end">
-          <label class="field">Brand <select id="addVendor" onchange="onVendorChange()"></select></label>
-          <span id="addFields" class="row" style="gap:10px;align-items:flex-end"></span>
-          <button class="ghost" id="addDiscoverBtn" onclick="discoverVendor()">🔍 Discover</button>
-          <button class="ghost" id="addProbeBtn" onclick="probeByIp()" title="Ask one address directly what it is, and list every outlet on it. This is how you add a POWER STRIP whose outlets never appeared in Discover.">🎯 Add by IP</button>
-          <button onclick="addManual()">+ Add</button>
+      <!-- adding hardware is a once-in-a-while job, so it folds away -->
+      <details class="help" style="margin-top:14px"><summary><b style="font-size:1.02rem">➕ Add a device</b> <span class="muted" id="addDevPill"></span></summary>
+        <div class="hint" style="margin-top:8px;max-width:880px">Each brand below holds everything that brand needs — its credentials, its scan, and what the scan found. <b>Kasa is local</b> and needs no account. For a <b>power strip</b> whose outlets don't appear, use <b>🎯 Add by IP</b> inside the Kasa box: it asks that one address directly, which also gets past mesh APs and client isolation.</div>
+        <div id="vendorCredsWrap" style="margin-top:10px"></div>
+        <div class="row" style="gap:10px;margin-top:10px;align-items:center">
           <button class="ghost" onclick="importPD()">⇩ Import PumpDirect</button>
           <span class="muted" id="devMsg"></span>
         </div>
-        <div id="discovered" class="discovered"></div>
-      </div>
+      </details>
 
-      <!-- device list -->
-      <div id="devices" style="margin-top:14px"></div>
-      <div class="hint">The <b>active</b> device (radio) is what <code>!roll</code> fires. <b>Calibrate</b> = time how long the pump runs to fill to 100% (tap <b>Calibrate</b> → wait until full → tap <b>Full</b>; the elapsed seconds become <b>secs→100%</b>). Kasa is local (no account); other brands need their credentials above. Only <b>Kasa</b> is verified — the rest are ported from PumpDirect and unconfirmed.</div>
+      <div class="hint">A <b>pump</b> is the record — its name, its <b>secs→100% calibration</b>, and every command, range and overlay that points at it. The outlet it's plugged into is just an attribute: if a plug gets swapped, hit <b>🔌 Change outlet</b> and everything else stays put — no relabelling hardware, no recalibrating. The <b>active</b> device (radio) is what <code>!roll</code> fires. <b>Calibrate</b> = time how long the pump runs to fill to 100% (tap <b>Calibrate</b> → wait until full → tap <b>Full</b>; the elapsed seconds become <b>secs→100%</b>). Kasa is local (no account); other brands need their credentials above. Only <b>Kasa</b> is verified — the rest are ported from PumpDirect and unconfirmed.</div>
     </div>
 
 
@@ -5731,24 +5725,19 @@ let addDraft = {};
 let calTimers = {};       // device id -> {start, interval, btn} during a live calibration
 let credsRendered = false;
 
-function vendorOptions(){ return Object.entries(VENDORS).map(([v,m])=>`<option value="${v}">${esc(m.name)}</option>`).join(''); }
-function currentVendor(){ return ($('#addVendor')&&$('#addVendor').value)||'kasa'; }
-function onVendorChange(){ addDraft={}; renderAddFields(); $('#discovered').innerHTML=''; $('#devMsg').textContent=''; }
-function renderAddFields(){
-  const meta=VENDORS[currentVendor()]||VENDORS.kasa;
-  const b=$('#addDiscoverBtn'); if(b) b.style.display=meta.discover?'':'none';
-  // probing an address only means anything for the local-protocol brand
-  const pb=$('#addProbeBtn'); if(pb) pb.style.display=(currentVendor()==='kasa')?'':'none';
-  const fields=['label', ...meta.add];
-  $('#addFields').innerHTML = fields.map(f=>`<label class="field">${f} <input value="${esc(addDraft[f]||'')}" placeholder="${esc(FIELD_PH[f]||f)}" style="width:150px" oninput="addDraft['${f}']=this.value"></label>`).join('');
+// There is no Brand dropdown any more — each brand's box passes its own name,
+// so the fields you're typing into always belong to the brand you're looking at.
+// addDraft.__v remembers which box owns the current draft.
+function setAddDraft(v, f, val){
+  if(addDraft.__v!==v) addDraft={__v:v};
+  addDraft[f]=val;
 }
 let credsOpen = new Set();
 function toggleCred(v){ if(credsOpen.has(v)) credsOpen.delete(v); else credsOpen.add(v); renderVendorCreds(); }
 function renderVendorCreds(){
   const wrap=$('#vendorCredsWrap'); if(!wrap) return;
-  let html='<div class="muted" style="margin-bottom:8px">Brand credentials — expand only the brands you use (Kasa is local, needs none). Saved locally; values are never sent back to the page.</div>';
+  let html='';
   for(const [v,meta] of Object.entries(VENDORS)){
-    if(!meta.creds.length) continue;
     vendorsSet[v]=vendorsSet[v]||{};
     const open=credsOpen.has(v);
     // "set ✓" = a real credential is saved (dropdowns like the data center
@@ -5759,6 +5748,7 @@ function renderVendorCreds(){
         `<b>${esc(meta.name)}</b>${filled?' <span class="pill" style="padding:1px 8px;font-size:10px">set ✓</span>':''}`+
         `<div style="flex:1"></div><span class="muted">${open?'▾':'▸'}</span></div>`;
     if(open){
+      if(meta.creds.length) html+=`<div class="hint" style="margin:0">Saved locally; secrets are never sent back to the browser.</div>`;
       for(const [f,ph,label,options] of meta.creds){
         const secret=['password','accessSecret','token','apiKey','totpKey'].includes(f);
         const raw=vendorsSet[v][f];
@@ -5774,9 +5764,23 @@ function renderVendorCreds(){
         }
       }
     }
+    if(open){
+      // the brand's own add controls live WITH its credentials, so setting up
+      // a brand is one box rather than two unrelated corners of the page
+      html+=`<div class="row" style="gap:10px;align-items:flex-end;border-top:1px solid var(--line);padding-top:10px;margin-top:2px">`+
+        meta.add.map(f=>`<label class="field">${esc(f)} <input value="${esc((addDraft.__v===v&&addDraft[f])||'')}" placeholder="${esc(FIELD_PH[f]||f)}" style="width:150px" oninput="setAddDraft('${v}','${f}',this.value)"></label>`).join('')+
+        `<label class="field">name <input value="${esc((addDraft.__v===v&&addDraft.label)||'')}" placeholder="what you call it" style="width:150px" oninput="setAddDraft('${v}','label',this.value)"></label>`+
+        (meta.discover?`<button class="ghost" onclick="discoverVendor('${v}')">🔍 Scan</button>`:'')+
+        (v==='kasa'?`<button class="ghost" onclick="probeByIp('${v}')" title="Ask ONE address what it is and list every outlet on it — how you add a power strip whose outlets never showed up in a scan, or anything behind client isolation.">🎯 Add by IP</button>`:'')+
+        `<button onclick="addManual('${v}')">+ Add</button>`+
+      `</div>`+
+      `<div id="disc-${esc(v)}" class="discovered"></div>`;
+    }
     html+='</div>';
   }
   wrap.innerHTML=html;
+  const pill=$('#addDevPill');
+  if(pill) pill.textContent = `· ${(lastState.devices||[]).length} configured`;
 }
 async function setCred(v,f,val){
   try{
@@ -5805,16 +5809,24 @@ function renderDevices(st){
   }
   st.devices.forEach(d=>{
     const active = d.id===st.active_device_id;
-    const vendor = d.vendor||'kasa';
+    // legacy records (pre-vendor, imported from a LAN scan) have no vendor key
+    const vendor = (d.vendor||'kasa');
     const idf = [d.host,d.device_id,d.mac,d.entity_id].filter(Boolean)[0]||'';
+    // The PUMP is the record — its name, calibration and every command that
+    // references it. The outlet is just where it's plugged in today.
+    const outlet = [d.label && d.label!==(d.name||'') ? d.label : '',
+                    idf, d.child_id?('outlet '+String(d.child_id).slice(-2)):'',
+                    d.sku||''].filter(Boolean).join(' · ');
     const el=document.createElement('div');
     el.className='dev'+(active?' active':''); el.style.flexWrap='wrap';
     el.innerHTML =
       `<input type="radio" name="active" ${active?'checked':''} onchange="setActive('${d.id}')" style="width:auto">`+
       `<div class="grow"><div class="name">${esc(d.name||d.label)} `+
         `<button class="ghost" style="padding:1px 7px;font-size:12px;vertical-align:middle" title="rename this device" onclick="renameDev('${d.id}', ${JSON.stringify(d.name||d.label||'').replace(/"/g,'&quot;')})">✏️</button> `+
-        `<span class="pill" style="padding:2px 8px;font-size:11px">${esc(vendor)}</span></div>`+
-      `<div class="tag">${esc(idf)}${d.child_id?(' · outlet '+esc(d.child_id)):''}${d.sku?(' · '+esc(d.sku)):''} · ${esc(d.source||'')}</div></div>`+
+        `<span class="pill" style="padding:2px 8px;font-size:11px">${esc(vendor)}</span>`+
+        (d.child_id?` <span class="pill" style="padding:2px 8px;font-size:11px;border-color:var(--accent2)" title="one outlet of a power strip">strip outlet</span>`:'')+
+        `</div>`+
+      `<div class="tag">🔌 plugged into <b>${esc(outlet||'—')}</b></div></div>`+
       `<select style="width:88px" onchange="setDevType('${d.id}', this.value)" title="Pump drives capacity; Other just fires">`+
         `<option value="pump" ${(d.type||'pump')==='pump'?'selected':''}>Pump</option>`+
         `<option value="other" ${d.type==='other'?'selected':''}>Other</option>`+
@@ -5825,11 +5837,93 @@ function renderDevices(st){
       `<span id="ft-${esc(d.id)}" style="min-width:52px;color:var(--warn);font-weight:600"></span>`+
       `<button class="ghost warn" id="calbtn-${esc(d.id)}" onclick="toggleCal('${d.id}')" title="Run the pump and time it to 100%">Calibrate</button>`+
       `<button class="ghost" onclick="testDev('${d.id}')" title="2s on/off, no capacity">Test</button>`+
+      `<button class="ghost" onclick="repointDev('${d.id}')" title="This pump got moved to a different plug? Point it at the new outlet. Its name, calibration and every command that uses it stay exactly as they are.">🔌 Change outlet</button>`+
       `<button class="ghost" onclick="removeDev('${d.id}')">Remove</button>`;
     box.appendChild(el);
   });
 }
 // device endpoints share one wrapper so failures surface instead of vanishing
+// A pump is the record: id, name, calibration, and every command/range/overlay
+// that points at it. The outlet is an attribute. So when a plug gets swapped,
+// you re-point the pump instead of relabelling hardware or recalibrating.
+async function repointDev(id){
+  const d=(lastState.devices||[]).find(x=>x.id===id); if(!d) return;
+  const vendor=d.vendor||'kasa';
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;'+
+                   'display:flex;align-items:center;justify-content:center;padding:16px';
+  const nm=esc(d.name||d.label||id);
+  ov.innerHTML=`<div style="background:var(--panel);border:1px solid var(--line);`+
+      `border-radius:12px;padding:20px;max-width:560px;width:100%;max-height:80vh;overflow:auto">`+
+    `<h2 style="margin:0 0 4px">🔌 Change outlet</h2>`+
+    `<div class="hint" style="margin:0 0 12px"><b>${nm}</b> keeps its name, its `+
+      `<b>secs→100% calibration</b>, and every command, range and overlay that uses it. `+
+      `Only where it's plugged in changes.</div>`+
+    `<div class="row" style="gap:8px;margin-bottom:10px">`+
+      `<button id="rpScan">🔍 Scan for outlets</button>`+
+      `<button class="ghost" id="rpIp">🎯 Enter an address</button>`+
+      `<div style="flex:1"></div>`+
+      `<button class="ghost" id="rpCancel">Cancel</button></div>`+
+    `<div class="hint" id="rpMsg" style="margin:0 0 8px">Scan the network, or type the new plug's address.</div>`+
+    `<div id="rpList"></div>`+
+  `</div>`;
+  document.body.appendChild(ov);
+  const close=()=>ov.remove();
+  const msg=t=>{ const m=ov.querySelector('#rpMsg'); if(m) m.textContent=t; };
+
+  const show=list=>{
+    const box=ov.querySelector('#rpList');
+    const used=new Map((lastState.devices||[]).filter(x=>x.id!==id)
+      .map(x=>[`${x.host||''}|${x.child_id||''}`, x.name||x.label]));
+    const here=`${d.host||''}|${d.child_id||''}`;
+    box.innerHTML = list.map((o,i)=>{
+      const key=`${o.host||''}|${o.child_id||''}`;
+      const taken=used.get(key);
+      const current=key===here;
+      const sub=[o.host,o.model,o.child_id?('outlet '+String(o.child_id).slice(-2)):'']
+        .filter(Boolean).join(' · ');
+      return `<div class="dev">`+
+        `<div class="grow"><div class="name">${esc(o.label||o.host)}`+
+          (o.child_id?` <span class="pill" style="padding:1px 7px;font-size:10px">strip outlet</span>`:'')+
+        `</div><div class="tag">${esc(sub)}</div></div>`+
+        (current ? `<span class="muted">where it is now</span>`
+         : taken ? `<button class="ghost" data-i="${i}" data-force="1" title="already used by ${esc(taken)} — two pumps on one relay">used by ${esc(taken)}</button>`
+                 : `<button data-i="${i}">Use this</button>`)+
+      `</div>`;
+    }).join('') || '<div class="muted">nothing found</div>';
+    box.onclick=async e=>{
+      const b=e.target.closest('button[data-i]'); if(!b) return;
+      const o=list[+b.dataset.i];
+      if(b.dataset.force && !confirm(`That outlet is already used by another pump.\n\nPoint "${d.name||d.label}" at it anyway? Two pumps driving one relay is almost never what you want.`)) return;
+      msg('re-pointing…');
+      try{
+        const r=await api('/api/devices/repoint', {id, vendor:o.vendor||vendor,
+          host:o.host, child_id:o.child_id, device_id:o.device_id, sku:o.sku,
+          mac:o.mac, entity_id:o.entity_id, entity:o.entity, model:o.model,
+          label:o.label, force: b.dataset.force?1:0});
+        applyState(r, true); close();
+        toastMsg(`🔌 "${d.name||d.label}" now uses ${o.label||o.host}`);
+      }catch(err){ msg(String(err.message||err)); }
+    };
+  };
+
+  ov.querySelector('#rpCancel').onclick=close;
+  ov.onclick=e=>{ if(e.target===ov) close(); };
+  ov.querySelector('#rpScan').onclick=async()=>{
+    msg('scanning…');
+    try{ const list=await api('/api/devices/discover',{vendor}); show(list);
+         msg(`found ${list.length} — pick the one it's plugged into now`); }
+    catch(e){ msg(String(e.message||e)); }
+  };
+  ov.querySelector('#rpIp').onclick=async()=>{
+    const host=(prompt('Address of the plug it is in now:\n\ne.g. 192.168.1.50', d.host||'')||'').trim();
+    if(!host) return;
+    msg('asking '+host+'…');
+    try{ const list=await api('/api/devices/probe',{vendor, host}); show(list);
+         msg(`${list.length} outlet(s) at ${host}`); }
+    catch(e){ msg(String(e.message||e)); }
+  };
+}
 async function renameDev(id, cur){
   const nm = prompt('Rename this device\n(blank restores the original label):', cur||'');
   if(nm===null) return;
@@ -5863,51 +5957,110 @@ async function toggleCal(id){
     if(btn) btn.textContent='Full (0.0s)';
   }
 }
-async function addManual(){
-  const v=currentVendor();
-  try{ applyState(await api('/api/devices/add', {vendor:v, source:'manual', ...addDraft}), true); addDraft={}; renderAddFields(); $('#devMsg').textContent='added'; }
-  catch(e){ $('#devMsg').textContent='add failed: '+(e.message||e); }
+async function addManual(v){
+  const draft = (addDraft.__v===v) ? {...addDraft} : {};
+  delete draft.__v;
+  try{
+    applyState(await api('/api/devices/add', {vendor:v, source:'manual', ...draft}), true);
+    addDraft={}; renderVendorCreds(); $('#devMsg').textContent='added';
+  }catch(e){ $('#devMsg').textContent='add failed: '+(e.message||e); }
 }
 // Broadcast discovery can miss a device entirely (mesh APs, client isolation,
 // a separate VLAN) and some power strips answer the broadcast with a trimmed
 // record that omits their outlets. Asking one address directly always works.
-async function probeByIp(){
-  const v=currentVendor();
-  const guess=(addDraft.host||'').trim();
+async function probeByIp(v){
+  v = v || 'kasa';
+  const guess=((addDraft.__v===v&&addDraft.host)||'').trim();
   const host=(prompt('Address of the device (a power strip, or anything Discover missed):\n\ne.g. 192.168.1.50', guess)||'').trim();
   if(!host) return;
   $('#devMsg').textContent='asking '+host+'…';
   try{
     const list=await api('/api/devices/probe',{vendor:v, host});
-    renderDiscovered(list);
+    renderDiscovered(list, v);
     $('#devMsg').textContent = list.length===1
       ? `found 1 outlet at ${host}`
       : `found ${list.length} outlets at ${host} — add the ones you want`;
   }catch(e){ $('#devMsg').textContent=(e.message||e); }
 }
 // One renderer for both Discover and Add by IP.
-function renderDiscovered(list){
-  const box=$('#discovered'); box.innerHTML='';
+function renderDiscovered(list, vendor){
+  // results render inside the brand box that asked for them
+  const box=$('#disc-'+(vendor||'kasa')) || $('#discovered');
+  if(!box) return;
+  box.innerHTML='';
+  if(!list.length){ box.innerHTML='<div class="muted">nothing found</div>'; return; }
   const have=new Set((lastState.devices||[]).map(d=>`${d.host}|${d.child_id||''}`));
+  const added=d=>have.has(`${d.host}|${d.child_id||''}`);
+
+  // A power strip arrives as one entry per outlet, all sharing a host. Group
+  // them under the strip instead of listing six near-identical rows.
+  const groups=new Map();
   list.forEach(d=>{
-    const el=document.createElement('div'); el.className='dev';
-    const already=have.has(`${d.host}|${d.child_id||''}`);
-    const sub=[d.host,d.device_id,d.mac,d.entity_id,d.sku,d.model,
-               d.child_id&&('outlet '+String(d.child_id).slice(-2))].filter(Boolean).join(' · ');
-    el.innerHTML=`<div class="grow"><div class="name">${esc(d.label)}${d.child_id?' <span class="pill" style="padding:1px 8px;font-size:10px">strip outlet</span>':''}</div><div class="tag">${esc(sub)}</div></div>`+
-      (already ? `<span class="muted">already added</span>`
-               : `<button data-dev='${esc(JSON.stringify(d))}' onclick="addDisc(this)">Add</button>`);
-    box.appendChild(el);
+    const key=d.child_id ? ('strip:'+d.host) : ('one:'+(d.host||d.device_id||d.mac||d.entity_id||d.label));
+    if(!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(d);
   });
-  if(!list.length) box.innerHTML='<div class="muted">nothing found</div>';
+
+  const line=d=>[d.host,d.device_id,d.mac,d.entity_id,d.sku,d.model,
+                 d.child_id&&('outlet '+String(d.child_id).slice(-2))].filter(Boolean).join(' · ');
+  const addBtn=d=>added(d)
+    ? `<span class="muted">already added</span>`
+    : `<button data-dev='${esc(JSON.stringify(d))}' onclick="addDisc(this)">Add</button>`;
+
+  for(const [key, items] of groups){
+    if(!key.startsWith('strip:')){
+      const d=items[0];
+      const el=document.createElement('div'); el.className='dev';
+      el.innerHTML=`<div class="grow"><div class="name">${esc(d.label||d.host||'device')}</div>`+
+        `<div class="tag">${esc(line(d))}</div></div>`+addBtn(d);
+      box.appendChild(el);
+      continue;
+    }
+    const first=items[0];
+    const free=items.filter(d=>!added(d));
+    const head=document.createElement('div'); head.className='dev';
+    head.style.flexDirection='column'; head.style.alignItems='stretch'; head.style.gap='6px';
+    head.innerHTML=
+      `<div class="row" style="gap:8px;align-items:center">`+
+        `<div class="grow"><div class="name">🔌 ${esc(first.model||'Power strip')} `+
+          `<span class="pill" style="padding:1px 8px;font-size:10px">${items.length} outlets</span></div>`+
+          `<div class="tag">${esc(first.host)} · ${items.length-free.length} of ${items.length} already added</div></div>`+
+        (free.length
+          ? `<button class="ghost" data-all='${esc(JSON.stringify(free))}' onclick="addDiscAll(this)">Add all ${free.length}</button>`
+          : `<span class="muted">all added</span>`)+
+      `</div>`+
+      items.map(d=>
+        `<div class="row" style="gap:8px;align-items:center;padding-left:14px;border-left:2px solid var(--line)">`+
+          `<div class="grow"><div class="name" style="font-size:13px">${esc(d.label)}</div>`+
+          `<div class="tag">outlet ${esc(String(d.child_id).slice(-2))}</div></div>`+
+          addBtn(d)+
+        `</div>`).join('');
+    box.appendChild(head);
+  }
 }
-async function discoverVendor(){
-  const v=currentVendor();
-  $('#devMsg').textContent='discovering '+v+'…';
+// Add every outlet a strip still has free, in one go.
+async function addDiscAll(btn){
+  let list=[];
+  try{ list=JSON.parse(btn.getAttribute('data-all')||'[]'); }catch(e){ return; }
+  if(!list.length) return;
+  btn.disabled=true; $('#devMsg').textContent=`adding ${list.length} outlets…`;
+  let n=0, last=null;
+  for(const d of list){
+    // /api/devices/add returns the whole state, so the last one is current
+    try{ last=await api('/api/devices/add', {...d, source:'discovered', type:'pump'}); n++; }
+    catch(e){ $('#devMsg').textContent='add failed: '+(e.message||e); break; }
+  }
+  if(last) applyState(last, true);
+  $('#devMsg').textContent=`added ${n} outlet${n===1?'':'s'}`;
+}
+
+async function discoverVendor(v){
+  v = v || 'kasa';
+  $('#devMsg').textContent='scanning for '+v+' devices…';
   try{
     const list=await api('/api/devices/discover',{vendor:v});
     $('#devMsg').textContent=`found ${list.length}`;
-    renderDiscovered(list);
+    renderDiscovered(list, v);
   }catch(e){ $('#devMsg').textContent='discover failed: '+(e.message||e); }
 }
 // ---- Max Roll Prizes (list) ----
@@ -6192,8 +6345,6 @@ function applyState(st, full){
     renderDevices(st);
     vendorsSet = JSON.parse(JSON.stringify(st.vendors_set||{}));
     if(!credsRendered){                 // build vendor picker + creds once (avoids clobbering typing)
-      const av=$('#addVendor'); if(av) av.innerHTML=vendorOptions();
-      renderAddFields();
       renderVendorCreds();
       credsRendered=true;
     }

@@ -1,6 +1,6 @@
 {
-  "version": "3.59.0",
-  "versionCode": 141,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.59.0/discoflate-v3.59.0.apk",
-  "notes": "DiscoFlate v3.59.0 \u2014 Kasa POWER STRIPS now work. Discovery confirms every device over TCP instead of trusting the UDP broadcast reply, which strips often answer without listing their outlets, and a new \ud83c\udfaf Add by IP asks one address directly \u2014 so you can add a strip (or anything) that broadcast never reached."
+  "version": "3.60.0",
+  "versionCode": 142,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.60.0/discoflate-v3.60.0.apk",
+  "notes": "DiscoFlate v3.60.0 \u2014 the Devices tab is rebuilt around the PUMP, not the plug. \ud83d\udd0c Change outlet re-points a pump at a different plug while keeping its name, its calibration and every command that uses it \u2014 so a swapped plug no longer means relabelling hardware or recalibrating. Your pumps are at the top now; adding hardware folds away into one box per brand that owns its credentials, its scan and its results. Power strips group into a single entry with Add all."
 }
