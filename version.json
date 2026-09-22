@@ -1,6 +1,6 @@
 {
-  "version": "3.65.0",
-  "versionCode": 148,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.65.0/discoflate-v3.65.0.apk",
-  "notes": "DiscoFlate v3.65.0 \u2014 a SCENE is now the whole show. It owns its overlays, its commands, its triggers, its chat buttons, its wording and its limits, so picking a scene picks everything at once and a command can never point at a group from some other scene. Gameplay settings are gone as a separate idea \u2014 the Dashboard and Game tabs with them; everything they held lives on Scenes. Ships with a read-only 'DiscoFlate Default' to compare against and an editable 'Your Scene' to build on. Existing setups migrate into a scene of their own with nothing lost."
+  "version": "3.66.0",
+  "versionCode": 149,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.66.0/discoflate-v3.66.0.apk",
+  "notes": "DiscoFlate v3.66.0 \u2014 canvas and scene-lock fixes. Scoping the canvas to a scene group now actually clears the other groups off it (picking a group only moved the list before). Selecting an overlay from the list highlights it and lets you drag it even when something sits on top, while the canvas still previews the true stacking. Editing anything scene-scoped on the read-only DiscoFlate Default now tells you to switch to Your Scene instead of silently reverting. Intro countdown defaults to 15s."
 }

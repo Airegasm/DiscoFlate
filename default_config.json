@@ -5265,7 +5265,27 @@
           "competitions": [],
           "capevents": []
         }
-      }
+      },
+      "golive": {
+        "intro_enabled": true,
+        "stages": [
+          {
+            "group": "Intro",
+            "seconds": 15
+          }
+        ],
+        "seconds": 15,
+        "scene_group": "Intro",
+        "after_group": "Main",
+        "announce": "",
+        "announce_every": 0,
+        "announce_image": "",
+        "hold_commands": true,
+        "blackout": true,
+        "commands": []
+      },
+      "notify_overlay": "dfdefnotify",
+      "pause_overlay": "Pause"
     },
     {
       "name": "Your Scene",
@@ -7914,7 +7934,27 @@
           "competitions": [],
           "capevents": []
         }
-      }
+      },
+      "golive": {
+        "intro_enabled": true,
+        "stages": [
+          {
+            "group": "Intro",
+            "seconds": 15
+          }
+        ],
+        "seconds": 15,
+        "scene_group": "Intro",
+        "after_group": "Main",
+        "announce": "",
+        "announce_every": 0,
+        "announce_image": "",
+        "hold_commands": true,
+        "blackout": true,
+        "commands": []
+      },
+      "notify_overlay": "dfdefnotify",
+      "pause_overlay": "Pause"
     }
   ],
   "scene_globals": [],

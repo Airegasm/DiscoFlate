@@ -474,7 +474,7 @@ DEFAULTS = {
     # Placeholders: [intro_timer] counts down in messages and overlay text.
     "golive": {
         "intro_enabled": False,
-        "seconds": 60,              # 0 = hold until you press Start now
+        "seconds": 15,              # 0 = hold until you press Start now
         "scene_group": "",
         "announce": "",             # blank = say nothing
         "announce_image": "",       # posted WITH the first announcement only

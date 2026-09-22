@@ -189,7 +189,11 @@
   .rowhead button,.rowhead .draghandle{cursor:pointer}
   .stgItem{position:absolute;cursor:grab;outline:1px dashed rgba(255,255,255,.28);border-radius:4px}
   .stgItem img,.stgItem video{width:100%;display:block;pointer-events:none;border-radius:4px}
-  .stgItem.sel{outline:2px solid var(--accent);z-index:5}
+  .stgItem.sel{outline:2px solid var(--accent)}
+  /* the editing shell: same box as the overlay, but you only see the outline
+     and handles. The ghost gives it that box without drawing anything. */
+  .stgShell{background:transparent}
+  .stgShellGhost{opacity:0;pointer-events:none}
   .stgItem .wmock{pointer-events:none}
   .stgH{position:absolute;width:12px;height:12px;background:var(--accent);
         border:1px solid #06263a;border-radius:3px;z-index:6}
@@ -2483,6 +2487,7 @@ function renderStgCanvas(){
   const inScope = o => !stgGroupFilter
       || (stgGroupFilter===STG_UNGROUPED ? !(o.group||'').trim()
                                          : (o.group||'').trim()===stgGroupFilter);
+  let shell=null;                      // geometry of the selected overlay
   cv.innerHTML = (s.overlays||[]).filter(inScope).map(o=>{
     let inner='', box='';
     const fam = STG_FONTS[o.font||'bold']||STG_FONTS.bold;
@@ -2568,15 +2573,28 @@ function renderStgCanvas(){
     // out. Both multiply the item's own opacity rather than replacing it.
     const dim = stgGroupHidden(o.group) ? 0.18 : (o.visible ? 1 : 0.45);
     const hid = stgGroupHidden(o.group) ? 'filter:grayscale(1);' : '';
-    const handles = o.id===scnSelId
-      ? '<span class="stgRot">⟳</span>' +
-        ['nw','n','ne','w','e','sw','s','se'].map(h=>`<span class="stgH" data-h="${h}"></span>`).join('')
-      : '';
-    return `<div class="stgItem${o.id===scnSelId?' sel':''}" data-id="${esc(o.id)}" `+
-           `style="left:${(o.x*100).toFixed(2)}%;top:${(o.y*100).toFixed(2)}%;${box};${rot}${fl}`+
+    const geom = `left:${(o.x*100).toFixed(2)}%;top:${(o.y*100).toFixed(2)}%;${box};${rot}${fl}`;
+    // The SELECTED overlay gets a transparent editing shell above everything
+    // (below). It keeps its real z-index here so the canvas still previews the
+    // true stacking — the shell is what you grab and see the outline on.
+    if(o.id===scnSelId) shell = {geom, inner};
+    return `<div class="stgItem" data-id="${esc(o.id)}" `+
+           `style="${geom}`+
            `z-index:${Math.round(+o.z||0)+10};opacity:${(Math.max(0,Math.min(100,o.opacity??100))/100)*dim};${hid}">`+
-           `${inner}${handles}</div>`;
+           `${inner}</div>`;
   }).join('');
+  // Selecting from the list must highlight AND move it whatever sits on top,
+  // so the shell rides above every overlay. A copy of the content at opacity 0
+  // gives it the same box (a text overlay's height comes from its text), and
+  // the outline and handles are the only thing you actually see.
+  if(shell){
+    cv.innerHTML += `<div class="stgItem sel stgShell" data-id="${esc(scnSelId)}" `+
+      `style="${shell.geom}z-index:2147483000">`+
+      `<div class="stgShellGhost">${shell.inner}</div>`+
+      '<span class="stgRot">⟳</span>'+
+      ['nw','n','ne','w','e','sw','s','se'].map(h=>`<span class="stgH" data-h="${h}"></span>`).join('')+
+      '</div>';
+  }
 }
 let stgDrag=null;
 (function(){
@@ -2588,13 +2606,18 @@ let stgDrag=null;
     const o=(s.overlays||[]).find(x=>x.id===it.dataset.id); if(!o) return;
     if(scnSelId!==o.id){ scnSelId=o.id; renderStgCanvas(); renderStgProps(); }
     const R=cv.getBoundingClientRect();
-    const el=cv.querySelector(`.stgItem[data-id="${CSS.escape(o.id)}"]`);
+    // two elements share this id while selected: the overlay at its true depth
+    // (first in the DOM) and the editing shell above everything. Drag moves BOTH,
+    // or the outline and handles would stay behind.
+    const el=cv.querySelector(`.stgItem:not(.stgShell)[data-id="${CSS.escape(o.id)}"]`)
+           || cv.querySelector(`.stgItem[data-id="${CSS.escape(o.id)}"]`);
+    const shellEl=cv.querySelector(`.stgShell[data-id="${CSS.escape(o.id)}"]`);
     const hEl=e.target.closest('.stgH');
     const b=el?el.getBoundingClientRect():R;
     // offsetWidth/Height are the UNROTATED layout box — the right basis for resize
     const fw = el ? el.offsetWidth / R.width  : 0.1;
     const fh = el ? el.offsetHeight / R.height : 0.1;
-    stgDrag={o, el, R,
+    stgDrag={o, el, shellEl, R,
              handle: hEl ? hEl.dataset.h : null,
              rot:  !!e.target.closest('.stgRot'),
              box:{x:o.x, y:o.y, w:fw, h:fh},
@@ -2606,7 +2629,7 @@ let stgDrag=null;
   });
   cv.addEventListener('pointermove', e=>{
     if(!stgDrag) return;
-    const {o,el,R,handle,rot,box}=stgDrag;
+    const {o,el,shellEl,R,handle,rot,box}=stgDrag;
     // snap to the 5% grid; hold SHIFT to place freely
     const snapOn = ($('#stgGridOn')||{checked:true}).checked && !e.shiftKey;
     const SNAP = 0.05;
@@ -2616,7 +2639,9 @@ let stgDrag=null;
       let deg = Math.atan2(fy-stgDrag.cy, fx-stgDrag.cx)*180/Math.PI + 90;
       if(e.shiftKey) deg = Math.round(deg/15)*15;          // shift snaps to 15°
       o.rot = Math.round(((deg%360)+360)%360);
-      if(el){ el.style.transformOrigin='center center'; el.style.transform=`rotate(${o.rot}deg)`; }
+      for(const t of [el, shellEl]) if(t){
+        t.style.transformOrigin='center center'; t.style.transform=`rotate(${o.rot}deg)`;
+      }
       return;
     }
     if(handle){
@@ -2649,7 +2674,9 @@ let stgDrag=null;
     }
     o.x=Math.max(0,Math.min(0.98, snapOn ? Math.round((fx-stgDrag.dx)/SNAP)*SNAP : fx-stgDrag.dx));
     o.y=Math.max(0,Math.min(0.98, snapOn ? Math.round((fy-stgDrag.dy)/SNAP)*SNAP : fy-stgDrag.dy));
-    if(el){ el.style.left=(o.x*100)+'%'; el.style.top=(o.y*100)+'%'; }
+    for(const t of [el, shellEl]) if(t){
+      t.style.left=(o.x*100)+'%'; t.style.top=(o.y*100)+'%';
+    }
   });
   const up=()=>{ if(stgDrag){ stgDrag=null; renderStgCanvas(); renderStgProps(); scheduleSave(); } };
   cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
@@ -2747,7 +2774,20 @@ function stgMoveTo(id){
     if(b.dataset.g!==undefined) move(b.dataset.g);
   };
 }
-function stgSetGroupFilter(v){ stgGroupFilter=v; stgRemember(); renderStgContents(); }
+function stgSetGroupFilter(v){
+  stgGroupFilter=v; stgRemember();
+  // the CANVAS scopes too — picking "Main" must not leave Intro's overlays
+  // sitting on the stage. Without this repaint the filter only moved the list.
+  if(scnSelId){
+    const s=stgStage();
+    const still=((s&&s.overlays)||[]).some(o=>o.id===scnSelId && (
+      !stgGroupFilter ? true
+        : stgGroupFilter===STG_UNGROUPED ? !(o.group||'').trim()
+                                         : (o.group||'').trim()===stgGroupFilter));
+    if(!still) scnSelId=null;         // don't keep editing something off-stage
+  }
+  renderStgContents(); renderStgCanvas(); renderStgProps();
+}
 // A scene OWNS its group names (scene.groups), so a group can exist while it's
 // still empty and survives a reload. Names found on overlays are folded in too,
 // so scenes saved before this still work.
@@ -6618,7 +6658,7 @@ function showToDom(sc, st, force){
   if(force || !document.querySelector('#glStages select:focus, #glStages input:focus')){
     glStages = Array.isArray(g.stages) && g.stages.length
       ? g.stages.map(r=>({group:(r&&r.group)||'', seconds:Math.max(0,parseInt((r&&r.seconds)||0,10)||0)}))
-      : [{group:g.scene_group||'', seconds:Math.max(0,parseInt(g.seconds??60,10)||0)}];
+      : [{group:g.scene_group||'', seconds:Math.max(0,parseInt(g.seconds??15,10)||0)}];
   }
   const ga=$('#glAfter'); if(free(ga)) ga.dataset.want=g.after_group||'';
   const on=$('#ovNotify'); if(free(on)) on.dataset.want=sc.notify_overlay??st.notify_overlay??'';
@@ -6716,7 +6756,28 @@ function gatherConfig(){
   };
 }
 let saveT=null;
-function scheduleSave(){ if(!editingForms) return; clearTimeout(saveT); saveT=setTimeout(doSave, 400); }
+// The shipped baseline refuses every scene-scoped edit. Catch it HERE, at the
+// one door every field edit goes through, rather than letting the change look
+// like it took and get silently reverted by the server a second later.
+// Only the tabs that edit the scene are gated — Devices, Discord and System
+// are global and keep saving normally.
+function sceneLocked(){
+  if(!isBuiltinScene(stgStage())) return false;
+  const tab=(document.querySelector('.tab-btn.active')||{getAttribute:()=>''}).getAttribute('data-go');
+  return GAMEPLAY_TABS.includes(tab);
+}
+let _lockToastT=null;
+function sceneLockedToast(){
+  // one message per burst — typing a word must not fire a toast per keystroke
+  if(_lockToastT) return;
+  _lockToastT=setTimeout(()=>{ _lockToastT=null; }, 1500);
+  toastMsg('🔒 “'+(stgStage()||{}).name+'” is read-only. Switch to “Your Scene” and rename it, or make a new scene, then edit that.');
+}
+function scheduleSave(){
+  if(!editingForms) return;
+  if(sceneLocked()){ sceneLockedToast(); return; }
+  clearTimeout(saveT); saveT=setTimeout(doSave, 400);
+}
 // Autosave is debounced, so changing a setting and immediately hitting LIVE
 // (or any action the server reads config for) could act on the OLD value.
 // Flush anything pending first.
