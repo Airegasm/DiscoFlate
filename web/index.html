@@ -881,7 +881,7 @@
         <div style="flex:1"></div>
       </div>
       <div class="hint">A mode's switch enables/disables all its <b>commands and events</b> at once. Fill On/Off messages to
-        announce the change in the announce channel, or leave them blank to toggle quietly. Save a mode before
+        announce the change in your Announce channels, or leave them blank to toggle quietly. Save a mode before
         its switch goes live.</div>
       </details>
     </div>
@@ -973,7 +973,9 @@
           </div>
           <div class="hint" style="margin-top:0">The bot must be connected for the lists to fill — click ↻ after inviting it somewhere new.
             Events, milestones &amp; snapshots go to these same channels. Tick <b>Announce only</b> on one to make it
-            receive broadcasts without accepting commands — a spectator or announcements channel.</div>
+            <b>Listen</b> takes commands typed there; <b>Announce</b> posts events and milestones there.
+            Both on by default — untick <b>Listen</b> for a spectator channel, untick <b>Announce</b> to keep a
+            busy channel quiet, untick both to mute it without forgetting it.</div>
 
           <label class="field" style="margin-top:6px">Cross-server label <span class="muted">(used only where the actor isn't a member)</span>
             <input id="anonLabel" placeholder="Someone on another server"></label>
@@ -1283,8 +1285,8 @@
         <li><b>Video channels</b> — on desktop your feed shows <b>above the chat</b>: the live virtual-cam output (overlays included — exactly what viewers see), and <b>🔍 Detect</b> probes each attached camera for the sizes it really supports, portrait modes included. On the phone the video section becomes <b>🖥 VC Remote</b>: video calls run on your PC, and Connect links the app straight into the PC's panel (same Chat tab, buttons and camera controls, driving the PC) — enable <b>Remote access</b> + whitelist the phone's IP on the PC first; the phone's back button returns to the local app.</li>
         <li><b>The virtual camera is desktop-only.</b> Android has no way for an app to register a fake camera — that needs a system driver (root) — and Discord mobile only ever lists the real front/back cameras. On desktop, run DiscoFlate on the PC you join the call from and pick the virtual cam in Discord desktop's video settings.</li>
         <li><b>Overlays live on the PC.</b> The virtual camera is the camera home base — design scenes on the <b>Scenes</b> tab and they play into your Discord call from the PC. (A phone-hosted view exists at <code>/stage</code> for screen-share setups, but it's parked and not linked from the UI.)</li>
-        <li><b>Active tickbox</b> (Discord tab, on each listen channel) — untick one to <b>mute that channel completely</b>: the bot stops listening there <i>and</i> stops posting there, while keeping it registered so you can flip it back on. Unlike Isolate this is <b>per channel and persistent</b>, and it composes with Isolate. Untick every channel and the bot goes fully silent. A muted channel stays muted even if it's also your announce channel.</li>
-        <li><b>Isolate</b> (next to the channel picker) — while ticked, <b>every broadcast</b> (events, milestones, auto-reports, timers, cross-server echoes, owner-voice posts) goes <b>only to the channel selected here</b>, across every server. The <b>announce channel is suppressed too</b> while pinned, so it can't leak output into another server. The bot keeps <b>listening everywhere</b> — commands typed in other channels still run and reply there — and if the pinned channel isn't live it fails open rather than going silent. Switching channels while Isolate is on re-aims it.</li>
+        <li><b>Listen / Announce tickboxes</b> (Discord tab, on each channel) — two independent jobs, both on by default. <b>Listen</b> takes commands typed there; <b>Announce</b> posts events, milestones, auto-reports and pause/resume there. Untick <b>Listen</b> for a spectator or announcements channel that shows the show but ignores commands; untick <b>Announce</b> to keep a busy channel quiet while commands still work; untick both to mute it completely without forgetting it. Persistent and per channel, and it composes with Isolate.</li>
+        <li><b>Isolate</b> (next to the channel picker) — while ticked, <b>every broadcast</b> (events, milestones, auto-reports, timers, cross-server echoes, owner-voice posts) goes <b>only to the channel selected here</b>, across every server. Announce-ticked channels are suppressed too while pinned, so nothing leaks into another server. The bot keeps <b>listening everywhere</b> — commands typed in other channels still run and reply there — and if the pinned channel isn't live it fails open rather than going silent. Switching channels while Isolate is on re-aims it.</li>
         <li><b>🎭 Scenes tab</b> — design overlay scenes OBS-style. One picker: whichever scene is selected here <b>is the live scene</b>, the one the camera and every session overlay use. Pick a resolution, then drag overlays onto the canvas (◢ resizes, ⟳ rotates, Shift frees them from the 5% grid). The canvas previews at the <b>virtual cam's actual resolution</b>, so what you lay out is what viewers get.
           <br><b>Overlay kinds:</b> 🖼 Media (image or video, with chroma key for green-screen clips) · ▬ Solid (a flat colour block, full-frame by default — a backdrop with no image file) · 🅣 Text (multi-line, left/centre/right) · ⏳ Timer · 📊 Capacity Gauge · ⏱ Device Timers · 🗳 Poll Viewer (draws itself only while a poll runs) · 🔊 Audio (plays a sound on this machine; nothing is drawn on the stream).
           <br><b>Each overlay</b> is either <b>always-on</b> (part of the scene whenever it's live) or <b>callable</b> (played by an action, a button or a scene group — it ghosts on the canvas rather than vanishing, so you can still place it). Text placeholders <b>keep updating while they're on screen</b>, so <code>Starting in [intro_timer]s</code> or <code>[var:score]</code> ticks live without re-firing.
@@ -3915,29 +3917,38 @@ function renderListenTargets(){
   const box=$('#listenTargets'); if(!box) return;
   if(!listenTargets.length){ box.innerHTML='<div class="muted">No channels yet — pick a server + channel below and Add.</div>'; return; }
   box.innerHTML = listenTargets.map((t,i)=>{
-    const n=targetName(t), on = t.active!==false, ann = !!t.announce_only;
-    return `<div class="dev" style="${on?'':'opacity:.55'}">`+
-      `<label class="row" style="gap:6px;flex:0 0 auto" title="untick to mute this channel completely — no listening, no posting — without removing it">`+
-        `<input type="checkbox" ${on?'checked':''} style="width:auto" onchange="setListenActive(${i}, this.checked)"> `+
-        `<b style="font-size:12px;color:var(--dim)">Active</b></label>`+
-      `<label class="row" style="gap:6px;flex:0 0 auto" title="this channel RECEIVES every broadcast but ignores commands typed in it — a spectator / announcements channel">`+
-        `<input type="checkbox" ${ann?'checked':''} style="width:auto" onchange="setListenAnnounce(${i}, this.checked)"> `+
-        `<b style="font-size:12px;color:var(--dim)">Announce only</b></label>`+
+    const n=targetName(t), lis=chanDoes(t,'listen'), ann=chanDoes(t,'announce');
+    const dead = !lis && !ann;
+    const note = dead ? ' <span style="color:var(--warn)">· muted</span>'
+      : !lis ? ' <span style="color:var(--accent)">· announce only</span>'
+      : !ann ? ' <span style="color:var(--accent)">· commands only</span>' : '';
+    return `<div class="dev" style="${dead?'opacity:.55':''}">`+
+      `<label class="row" style="gap:6px;flex:0 0 auto" title="accept COMMANDS typed in this channel">`+
+        `<input type="checkbox" ${lis?'checked':''} style="width:auto" onchange="setChanJob(${i},'listen',this.checked)"> `+
+        `<b style="font-size:12px;color:var(--dim)">Listen</b></label>`+
+      `<label class="row" style="gap:6px;flex:0 0 auto" title="post BROADCASTS here — events, milestones, auto-reports, pause/resume">`+
+        `<input type="checkbox" ${ann?'checked':''} style="width:auto" onchange="setChanJob(${i},'announce',this.checked)"> `+
+        `<b style="font-size:12px;color:var(--dim)">Announce</b></label>`+
       `<div class="grow"><div class="name">${esc(n.gname)}</div>`+
       `<div class="tag">#${esc(n.cname)}${n.known?'':' <span style="color:var(--warn)">(connect the bot to resolve names)</span>'}`+
-      `${on?'':' <span style="color:var(--warn)">· muted</span>'}`+
-      `${ann?' <span style="color:var(--accent)">· announce only</span>':''}</div></div>`+
+      `${note}</div></div>`+
       `<button class="ghost" onclick="removeListenTarget(${i})">Remove</button></div>`;
   }).join('');
 }
-function setListenAnnounce(i, on){
-  if(!listenTargets[i]) return;
-  listenTargets[i].announce_only = !!on;
-  renderListenTargets(); saveDiscord();
+// A channel does two independent jobs, both on by default. Older configs
+// carried one `active` (both) or `announce_only` (announce without listen).
+function chanDoes(t, job){
+  if(!t) return false;
+  if(job in t) return !!t[job];
+  if(t.announce_only) return job==='announce';
+  return t.active!==false;
 }
-function setListenActive(i, on){
-  if(!listenTargets[i]) return;
-  listenTargets[i].active = !!on;
+function setChanJob(i, job, on){
+  const t=listenTargets[i]; if(!t) return;
+  // write BOTH so the pair is always explicit, never half-legacy
+  t.listen = job==='listen' ? !!on : chanDoes(t,'listen');
+  t.announce = job==='announce' ? !!on : chanDoes(t,'announce');
+  delete t.active; delete t.announce_only;
   renderListenTargets(); saveDiscord();
 }
 function addListenTarget(){
@@ -3945,7 +3956,9 @@ function addListenTarget(){
   if(!gid||!cid){ $('#listenState').textContent='pick a server AND channel first'; return; }
   if(listenTargets.some(t=>t.guild_id===gid && t.channel_id===cid)) return;
   const g=guildsCache.find(x=>x.id===gid), c=g&&g.channels.find(x=>x.id===cid);
-  listenTargets.push({guild_id:gid, guild_name:g?g.name:'', channel_id:cid, channel_name:c?c.name:'', active:true});
+  // a new channel does both jobs — that is what you almost always want
+  listenTargets.push({guild_id:gid, guild_name:g?g.name:'', channel_id:cid,
+                      channel_name:c?c.name:'', listen:true, announce:true});
   renderListenTargets(); saveDiscord();
 }
 function removeListenTarget(i){

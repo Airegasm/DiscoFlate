@@ -43,7 +43,7 @@ DEFAULT_PUMPDIRECT_PATH = os.path.normpath(
 
 # Schema version of the stored config. Bump it + add a _migrate step whenever a
 # key is renamed/moved, so old configs upgrade instead of silently stranding data.
-CONFIG_VERSION = 16
+CONFIG_VERSION = 17
 
 # The scene we ship read-only. It is the baseline every install can fall back
 # to and compare against, so nothing may write to it.
@@ -1514,6 +1514,19 @@ def _migrate(cfg: dict) -> dict:
                 # already accepted commands — leave it accepting them
                 hit.setdefault("announce_only", False)
             cfg["listen_targets"] = targets
+    if v < 17:
+        # v17: a channel does two independent jobs — take COMMANDS and receive
+        # BROADCASTS — so it gets a tickbox for each instead of one Active.
+        # active=False meant silent; announce_only meant broadcasts without
+        # commands; anything else did both.
+        for t in (cfg.get("listen_targets") or []):
+            if not isinstance(t, dict):
+                continue
+            on = bool(t.get("active", True))
+            ann_only = bool(t.pop("announce_only", False))
+            t["listen"] = bool(t.get("listen", on and not ann_only))
+            t["announce"] = bool(t.get("announce", on))
+            t.pop("active", None)
     cfg["config_version"] = CONFIG_VERSION
     return cfg
 

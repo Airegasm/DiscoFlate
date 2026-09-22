@@ -222,6 +222,20 @@ class BonusRoundView(discord.ui.View):
             pass
 
 
+def _does(t: dict, job: str) -> bool:
+    """Does this channel do `job` ('listen' or 'announce')?
+
+    Two independent tickboxes, both on by default. Older configs carried a
+    single `active` (both jobs) and briefly an `announce_only` (announce
+    without listen) — both are still honoured so nothing changes under anyone.
+    """
+    if job in t:
+        return bool(t[job])
+    if t.get("announce_only"):
+        return job == "announce"
+    return bool(t.get("active", True))
+
+
 class BotManager:
     def __init__(self, engine, get_config) -> None:
         self.engine = engine
@@ -494,9 +508,10 @@ class BotManager:
                       if str(t.get("guild_id") or "").strip()
                       and str(t.get("channel_id") or "").strip()]
         if configured:
-            # unticking every channel means SILENT — never fall through to the
+            # unticking BOTH jobs means SILENT — never fall through to the
             # legacy single channel, which would resurrect a surprise target
-            return [t for t in configured if t.get("active", True)]
+            return [t for t in configured
+                    if _does(t, "listen") or _does(t, "announce")]
         gid = str(cfg.get("listen_guild_id") or "").strip()
         cid = str(cfg.get("listen_channel_id") or "").strip()
         if gid and cid:
@@ -505,11 +520,10 @@ class BotManager:
 
     @staticmethod
     def _muted(cfg: dict) -> set:
-        """Channel ids whose Active tickbox is OFF — silenced everywhere,
-        including when one of them is also the announce channel."""
+        """Channel ids doing neither job — silenced everywhere."""
         return {str(t.get("channel_id"))
                 for t in (cfg.get("listen_targets") or [])
-                if not t.get("active", True)}
+                if not _does(t, "listen") and not _does(t, "announce")}
 
     def _isolated_to(self, cfg: dict) -> str | None:
         """The channel every broadcast is pinned to, or None. Fails open when
@@ -521,16 +535,14 @@ class BotManager:
         return iso if iso in known else None
 
     def _listen_targets(self, cfg: dict) -> list[dict]:
-        """Channels the bot accepts COMMANDS from. An announce-only channel is
-        watched and broadcast to, but typing in it does nothing — that is what
-        makes a spectator/announcements channel possible."""
-        return [t for t in self._targets(cfg) if not t.get("announce_only")]
+        """Channels the bot accepts COMMANDS from."""
+        return [t for t in self._targets(cfg) if _does(t, "listen")]
 
     def _broadcast_targets(self, cfg: dict) -> list[dict]:
         """Where broadcasts (events, milestones, echoes, owner voice) go. This
         is the ONLY place Isolate applies: pinned → just that channel, across
         every server."""
-        targets = self._targets(cfg)
+        targets = [t for t in self._targets(cfg) if _does(t, "announce")]
         iso = self._isolated_to(cfg)
         if iso is None:
             return targets
@@ -672,7 +684,7 @@ class BotManager:
         for t in self._targets(cfg):
             out[str(t["channel_id"])] = (f'{t.get("guild_name") or "?"} · '
                                          f'#{t.get("channel_name") or t["channel_id"]}'
-                                         + (" · announce only" if t.get("announce_only") else ""))
+                                         + ("" if _does(t, "listen") else " · announce only"))
         return out
 
     def _chan_kind(self, cid: str) -> str:
