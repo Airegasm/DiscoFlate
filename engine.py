@@ -287,7 +287,7 @@ class Engine:
             # has to post and its [!command]s fire, which takes real seconds
             # against Discord. The picture has to be black for that whole
             # stretch or the room goes out before the pre-show starts.
-            self._intro_pending = bool((cfg.get("golive") or {}).get("intro_enabled"))
+            self._intro_pending = bool(self.golive().get("intro_enabled"))
         elif self._listener_was and not now_on:
             # Deactivation KILLS EVERYTHING RUNNING: freeze the session clock at
             # its final value (the OFF message renders [uptime] right after),
@@ -1233,11 +1233,40 @@ class Engine:
                 await self.abort(reason=f"capacity event {name}")
             self._capev_tasks[key] = asyncio.create_task(self._run_capev(ev, key, name))
 
+    def live_scene(self) -> dict:
+        """The scene the session is running — the one picked on the Scenes tab."""
+        want = str(self.cfg.get("chat_scene") or "").strip().lower()
+        for sc in (self.cfg.get("scenes") or []):
+            if str(sc.get("name") or "").strip().lower() == want:
+                return sc
+        return {}
+
+    def golive(self) -> dict:
+        """Go Live options for the LIVE SCENE.
+
+        Intro stages name scene GROUPS, and groups belong to a scene — so one
+        global set of stages meant "Intro" resolved against whichever scene
+        happened to be linked, which is a different group in a different scene.
+        Each scene carries its own show. Falls back to the old top-level block
+        for a config that predates the split."""
+        g = (self.live_scene() or {}).get("golive")
+        return g if isinstance(g, dict) and g else (self.cfg.get("golive") or {})
+
+    def session_overlay(self, key: str) -> str:
+        """`notify_overlay` / `pause_overlay` for the live scene — same reason:
+        a pause overlay is a scene GROUP, so it belongs to a scene."""
+        sc = self.live_scene() or {}
+        # PRESENT wins, even when empty: a scene that deliberately has no pause
+        # overlay must not inherit a global one. Only an ABSENT key falls back.
+        if key in sc:
+            return str(sc.get(key) or "")
+        return str(self.cfg.get(key) or "")
+
     def intro_stages(self) -> list:
         """The pre-show as an ordered list of stages. A config written before
         stages existed still works — its single scene_group/seconds becomes a
         one-stage chain."""
-        g = self.cfg.get("golive") or {}
+        g = self.golive()
         rows = g.get("stages")
         out = []
         if isinstance(rows, list) and rows:
@@ -1282,7 +1311,7 @@ class Engine:
         """Open the pre-show: hold commands + events, play the intro scene
         group, and (optionally) count down. Returns False when Go Live is set
         to begin immediately, in which case the caller starts the game."""
-        g = self.cfg.get("golive") or {}
+        g = self.golive()
         if not g.get("intro_enabled"):
             self._intro_pending = False   # begin immediately: picture goes live
             return False
@@ -1323,7 +1352,7 @@ class Engine:
 
     async def _intro_loop(self, announce_cb) -> None:
         """Post/refresh the standby announcement and end the intro on time."""
-        g = self.cfg.get("golive") or {}
+        g = self.golive()
         msg = (g.get("announce") or "").strip()
         try:
             every = max(0.0, float(g.get("announce_every") or 0))
@@ -1367,7 +1396,7 @@ class Engine:
         t, self._intro_task = self._intro_task, None
         if t and not t.done():
             t.cancel()
-        g = self.cfg.get("golive") or {}
+        g = self.golive()
         cur = (self._intro_stages[self._intro_stage]
                if 0 <= self._intro_stage < len(self._intro_stages) else None)
         grp = (cur or {}).get("group") or (g.get("scene_group") or "").strip()
@@ -1411,14 +1440,14 @@ class Engine:
 
     def intro_allows(self, cmd_name: str) -> bool:
         """During the intro only the explicitly-allowed commands run."""
-        g = self.cfg.get("golive") or {}
+        g = self.golive()
         if not g.get("hold_commands", True):
             return True
         ok = {str(c).strip().lower() for c in (g.get("commands") or []) if str(c).strip()}
         return str(cmd_name or "").strip().lower() in ok
 
     def _intro_result(self, who: str, uid) -> dict:
-        tmpl = (self.cfg.get("golive") or {}).get("holding_message") or \
+        tmpl = self.golive().get("holding_message") or \
             "🎬 [mention], the show hasn't started yet — standing by ([intro_timer]s)."
         return {"ok": False, "reply": self.render(tmpl, {"user": who, "mention": who,
                                                          "uid": uid})}

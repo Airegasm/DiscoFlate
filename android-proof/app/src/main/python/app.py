@@ -316,15 +316,18 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         # preset NAMES only (the full data would bloat the 1s state poll). The
         # immutable built-in "Defaults" preset is always listed first.
         "preset_loaded": cfg.get("preset_loaded", ""),
-        "notify_overlay": cfg.get("notify_overlay", ""),
-        "pause_overlay": cfg.get("pause_overlay", ""),
+        "notify_overlay": engine.session_overlay("notify_overlay"),
+        # the RESOLVED show, not the frozen top-level block: a scene that has
+        # its own wins, one that doesn't still falls back. The UI reads the
+        # scene first and only uses these as the fallback, so they must agree.
+        "pause_overlay": engine.session_overlay("pause_overlay"),
         "scenes": cfg.get("scenes") or [],
         "minigames": cfg.get("minigames") or [],
         "scene_globals": cfg.get("scene_globals") or [],
         "scene_globals_meta": cfg.get("scene_globals_meta") or {},
         "chat_scene": cfg.get("chat_scene", ""),
         "vcam_mirror": bool(cfg.get("vcam_mirror", True)),
-        "golive": cfg.get("golive") or {},
+        "golive": engine.golive(),
         "chat_isolate": bool(cfg.get("chat_isolate")),
         "chat_isolate_channel": cfg.get("chat_isolate_channel", ""),
         "gameplay_presets": ([{"name": BUILTIN_PRESET_NAME, "builtin": True}]
@@ -511,7 +514,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         # message + its [!command]s post to Discord in between. Without this
         # the room went out for those seconds, every single go-live.
         if ((engine.intro_active() or engine.intro_pending())
-                and (cfg0.get("golive") or {}).get("blackout", True)):
+                and engine.golive().get("blackout", True)):
             return "intro"
         return "live"
     vcam.gate_cb = _picture_gate
@@ -629,13 +632,13 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         """The group picked as the PAUSE overlay. The session drives it, so it
         must never come up with the scene — only when you actually pause."""
         g = str(group or "").strip().lower()
-        return bool(g) and g == str(cfg0.get("pause_overlay") or "").strip().lower()
+        return bool(g) and g == engine.session_overlay("pause_overlay").strip().lower()
 
     def _intro_groups_allowed(cfg0) -> bool:
         """Intro groups only exist while Go Live is set to open with an intro.
         With that unticked they never mount and never play — which is what
         lets intro cards be ordinary always-on overlays."""
-        return bool((cfg0.get("golive") or {}).get("intro_enabled"))
+        return bool(engine.golive().get("intro_enabled"))
 
     def _scene_group(cfg0, scene_name, group):
         """Every overlay tagged with this group name, in the linked SCENE then
@@ -920,7 +923,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         scene_name = cfg0.get("chat_scene", "")
         linked = list((_find_scene(cfg0, scene_name) or {}).get("overlays") or [])
         linked += list(cfg0.get("scene_globals") or [])
-        want = str(cfg0.get("notify_overlay") or "").strip()
+        want = engine.session_overlay("notify_overlay").strip()
         if want:
             # An explicit id is explicit: honour it even when the overlay lives
             # in a scene the Chat tab isn't currently linked to — otherwise
@@ -954,7 +957,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         """Cover the stream while the session is paused, and uncover it on
         resume. It's an ordinary scene group — picked in Go Live Options."""
         cfg0 = config_store.load()
-        grp = str(cfg0.get("pause_overlay") or "").strip()
+        grp = engine.session_overlay("pause_overlay").strip()
         if not grp:
             return {"ok": True, "skipped": "no pause overlay set"}
         # Look in the linked scene first, then anywhere — the group you picked

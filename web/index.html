@@ -292,6 +292,14 @@
   /* operator Controls: every row a fixed 2-column grid (same template → columns
      line up). Every button the same width; fields sized to their content, NOT
      flex-stretched. */
+  /* operator controls in the Chat side panel: one feature per line, the
+     button at a fixed width so every row lines up in a narrow column */
+  .ctrlstack{display:flex;flex-direction:column;gap:7px}
+  .ctrlline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .ctrlline>button{flex:0 0 132px;text-align:left;padding:8px 10px;font-size:14px}
+  .ctrlbits{display:flex;gap:5px;align-items:center;flex:1;min-width:0}
+  .ctrlbits select{min-width:0;flex:1;min-height:34px}
+  .ctrlbits input[type=number]{width:62px;min-height:34px}
   .ctrlgrid{display:flex;flex-direction:column;gap:8px;align-items:start}
   .ctrlrow{display:grid;grid-template-columns:210px 210px;gap:12px;align-items:center}
   .ctrlrow>button{text-align:left}                 /* fills its 210px column */
@@ -327,7 +335,6 @@
   </header>
 
   <nav class="tabs" id="tabbar">
-    <button class="tab-btn" data-go="dashboard">Dashboard</button>
     <button class="tab-btn" data-go="chat">Chat</button>
     <button class="tab-btn" data-go="game">Game</button>
     <button class="tab-btn" data-go="stages">Scenes</button>
@@ -340,67 +347,6 @@
 
   <div class="grid">
     <!-- capacity -->
-    <div class="card" data-tab="dashboard">
-      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:14px">
-        <label class="field" style="margin:0">👤 Owner name <span class="muted">— who the <b>Controls</b> post as, and <code>[operator]</code> in messages (blank → bot's own Discord name)</span>
-          <input id="cooldownExemptNames" placeholder="AireGasm"></label>
-      </div>
-      <div id="updBanner" onclick="showTab('help')" title="Go to Help → Updates" style="display:none;cursor:pointer;background:var(--warn);color:#3a2a00;font-weight:700;border-radius:8px;padding:10px 14px;margin-bottom:14px;text-align:center">⬆️ Update available! (Click on the Help tab to update)</div>
-      <div class="row" style="justify-content:space-between;align-items:baseline;margin-bottom:6px">
-        <h2 style="margin:0">Capacity</h2>
-        <h2 style="margin:0">Pump Timer</h2>
-      </div>
-      <div class="row" style="justify-content:space-between;align-items:baseline">
-        <span class="big"><span id="capVal">0</span>%</span>
-        <span class="big"><span id="pumpTimerVal">0</span>s</span>
-      </div>
-      <div class="gauge" style="margin:12px 0"><div id="capBar"></div></div>
-      <div class="row" style="gap:8px;align-items:center;margin-bottom:10px">
-        <input type="range" id="capSlider" min="0" max="100" step="0.5" style="flex:1" oninput="setCapacity(this.value)">
-        <input type="number" id="capInput" min="0" max="100" step="0.5" style="width:78px" onchange="setCapacity(this.value)">
-        <span class="muted">set %</span>
-      </div>
-      <div class="row" style="align-items:center">
-        <div style="flex:1"><span class="muted">⏱ Session uptime:</span> <b id="uptimeVal">0s</b></div>
-        <button class="warn" onclick="if(confirm('Reset the session? Capacity → 0%, all cooldowns cleared, timed events re-armed, command-started events reverted.')) act('/api/session-reset')">↺ Session reset</button>
-      </div>
-
-      <!-- operator controls: fire real in-channel actions as the owner -->
-      <div style="border-top:1px solid var(--line);margin-top:16px;padding-top:14px">
-        <h2 style="margin-bottom:10px">Controls</h2>
-        <div class="ctrlgrid">
-          <div class="ctrlrow">
-            <button onclick="controlRoll()">🎲 Roll</button>
-            <span class="ctrlfield"><select id="ctrlDice"></select><span class="muted">d</span><select id="ctrlSides"></select></span>
-          </div>
-          <div class="ctrlrow">
-            <button id="ctrlPumpBtn" onclick="controlPump()">💨 Pump</button>
-            <span class="ctrlfield" style="gap:6px;flex-wrap:wrap">
-              <select id="ctrlPumpDev" style="min-width:120px" title="which pump to run"></select>
-              <label class="row" style="gap:4px;white-space:nowrap" title="untick to run it until you press STOP"><input type="checkbox" id="ctrlPumpTimed" checked style="width:auto" onchange="pumpUi()"> timed</label>
-              <input type="number" id="ctrlPump" value="5" min="1" step="0.5"><span class="muted" id="ctrlPumpSecsLbl">secs</span>
-            </span>
-          </div>
-          <div class="ctrlrow">
-            <button class="ghost" onclick="controlCapacity()">📊 Broadcast Capacity</button>
-          </div>
-          <div class="ctrlrow">
-            <button class="ghost" onclick="controlBroadcast()">📢 Broadcast Custom</button>
-            <select id="ctrlBroadcast" class="ctrlfield"></select>
-          </div>
-          <div class="ctrlrow">
-            <button class="ghost" onclick="controlPoll()">🗳 Start Poll</button>
-            <select id="ctrlPoll" class="ctrlfield"></select>
-          </div>
-          <div class="ctrlrow">
-            <button class="ghost" onclick="controlCleanup()">🧹 Cleanup</button>
-            <span class="ctrlfield"><input type="number" id="ctrlCleanup" value="1" min="1" max="100" step="1"><span class="muted">bot msgs</span></span>
-          </div>
-        </div>
-        <div class="row" style="margin-top:8px"><span class="muted" id="ctrlMsg"></span></div>
-        <div class="hint" id="ctrlHint">These post to your Discord channel <b>as the Owner</b> (set at the <b>top of this page</b>) — exactly as if that person typed the command. If the Owner is blank, they post as the <b>bot's own Discord name</b>. Only work when <b>Activation is on</b>, the <b>bot is connected</b>, and a <b>channel is selected</b>. <b>Cleanup</b> deletes the bot's own recent posts and works any time.</div>
-      </div>
-    </div>
 
     <!-- chat (owner cockpit) -->
     <div class="card span" data-tab="chat">
@@ -460,12 +406,37 @@
         </div>
         <div class="chatside">
           <div class="sidehead">Controls</div>
-          <div class="btngrid">
-            <button onclick="controlRoll()">🎲 Roll</button>
-            <button id="chatPumpBtn" onclick="controlPump()">💨 Pump</button>
-            <button class="ghost" onclick="controlCapacity()">📊 Capacity</button>
-            <button class="ghost" onclick="controlCleanup()">🧹 Cleanup</button>
+          <div class="ctrlstack">
+            <div class="ctrlline">
+              <button onclick="controlRoll()">🎲 Roll</button>
+              <span class="ctrlbits"><select id="ctrlDice"></select><span class="muted">d</span><select id="ctrlSides"></select></span>
+            </div>
+            <div class="ctrlline">
+              <button id="chatPumpBtn" onclick="controlPump()">💨 Pump</button>
+              <span class="ctrlbits">
+                <select id="ctrlPumpDev" title="which pump to run"></select>
+                <label class="row" style="gap:4px;white-space:nowrap" title="untick to run it until you press STOP"><input type="checkbox" id="ctrlPumpTimed" checked style="width:auto" onchange="pumpUi()"> timed</label>
+                <input type="number" id="ctrlPump" value="5" min="1" step="0.5"><span class="muted" id="ctrlPumpSecsLbl">secs</span>
+              </span>
+            </div>
+            <div class="ctrlline">
+              <button class="ghost" onclick="controlBroadcast()">📢 Broadcast</button>
+              <span class="ctrlbits"><select id="ctrlBroadcast"></select></span>
+            </div>
+            <div class="ctrlline">
+              <button class="ghost" onclick="controlPoll()">🗳 Poll</button>
+              <span class="ctrlbits"><select id="ctrlPoll"></select></span>
+            </div>
+            <div class="ctrlline">
+              <button class="ghost" onclick="controlCapacity()">📊 Capacity</button>
+              <span class="ctrlbits"></span>
+            </div>
+            <div class="ctrlline">
+              <button class="ghost" onclick="controlCleanup()">🧹 Cleanup</button>
+              <span class="ctrlbits"><input type="number" id="ctrlCleanup" value="1" min="1" max="100" step="1"><span class="muted">msgs</span></span>
+            </div>
           </div>
+          <div class="row" style="margin-top:4px"><span class="muted" id="ctrlMsg" style="font-size:12px"></span></div>
           <div class="sidehead" style="margin-top:12px">Buttons</div>
           <div class="btnscroll"><div class="btngrid" id="chatCustomBtns"></div></div>
           <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">
@@ -553,6 +524,91 @@
         <div class="hint" style="margin-top:6px">The universal overlay library — every file lives in <code>data/images</code>, so 🔁 Device Sync and ⬇ Export Scene bundle them automatically. Images up to 8MB, videos up to 96MB. Click a tile to pick it (when you got here from a picker).</div>
         <div id="mediaGrid" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px"></div>
       </div>
+    </div>
+
+    <!-- the show: both of these name scene GROUPS, so they live with the scene -->
+    <div class="card span" data-tab="stages">
+
+        <details class="help" style="margin-top:12px"><summary><b style="font-size:1.02rem">🎬 Go Live Options</b> <span class="muted" id="golivePill"></span></summary>
+          <div class="hint" style="margin-top:8px;max-width:860px">What happens when you flip <b>LIVE</b> on. Leave this off to <b>begin immediately</b>. Turn it on to open with an <b>intro</b>: a scene group plays, an announcement posts, and <b>commands stay held</b> until the intro ends — so nobody can play during the pre-show. Timed events wait too. <code>[intro_timer]</code> counts down in messages <i>and</i> in Text overlays.</div>
+          <label class="row" style="gap:8px;margin:10px 0"><input type="checkbox" id="glEnabled" onchange="scheduleSave();goliveUi()" style="width:auto"> <b>Open with an intro</b></label>
+          <div id="glBody" style="display:none">
+            <div class="sidehead" style="border:0;padding:0;margin:0 0 6px">Intro stages <span class="muted" style="font-weight:400">— played in order, then it resolves</span></div>
+            <div id="glStages"></div>
+            <div class="row" style="gap:8px;margin:6px 0 10px">
+              <button class="ghost" onclick="glStageAdd()">+ Add stage</button>
+              <span class="muted">each stage plays its scene group for its own length · <b>0</b> = wait for <b>⏭ Next</b></span>
+            </div>
+            <div class="row" style="gap:12px;align-items:flex-end">
+              <label class="field">Then switch to <span class="muted">(optional)</span> <select id="glAfter" style="width:170px" onchange="scheduleSave()"></select></label>
+              <label class="row" style="gap:6px" title="keep the picture black while the intro plays — untick to show the camera behind it"><input type="checkbox" id="glBlack" checked onchange="scheduleSave()" style="width:auto"> black during intro</label>
+              <label class="row" style="gap:6px"><input type="checkbox" id="glHold" checked onchange="scheduleSave()" style="width:auto"> hold commands</label>
+            </div>
+            <div class="row" style="gap:12px;align-items:flex-end;margin-top:8px">
+              <label class="field" style="flex:1;min-width:240px">Announcement <span class="muted">(blank = none · [intro_timer])</span>
+                <input id="glAnnounce" placeholder="🎬 Starting in [intro_timer] seconds!" style="width:100%" onchange="scheduleSave()"></label>
+              <label class="field">Repeat every <span class="muted">(secs · 0 = once)</span>
+                <input type="number" id="glEvery" min="0" step="5" value="0" style="width:100px" onchange="scheduleSave()"></label>
+            </div>
+            <div class="row" style="gap:8px;align-items:flex-end;margin-top:8px">
+              <label class="field" style="flex:1;min-width:220px;max-width:420px">Image <span class="muted">(optional · posts with the first announcement)</span>
+                <div class="row" style="gap:6px;flex-wrap:nowrap">
+                  <input id="glImage" placeholder="pick or type a filename from data/images" style="flex:1;min-width:0" onchange="scheduleSave()">
+                  <button class="ghost" title="pick from the media library" onclick="mediaBrowse(n=>{$('#glImage').value=n;scheduleSave();})">🗂</button>
+                  <button class="ghost" title="clear" onclick="$('#glImage').value='';scheduleSave()">✕</button>
+                </div></label>
+            </div>
+            <label class="field" style="margin-top:8px">Commands allowed during the intro <span class="muted">(comma-separated · everything else is held)</span>
+              <input id="glCmds" placeholder="signup, rules" style="width:100%;max-width:520px" onchange="scheduleSave()"></label>
+          </div>
+        </details>
+
+        <details class="help" style="margin-top:14px"><summary><b style="font-size:1.02rem">🖼 Session Overlays</b> <span class="muted" id="sessOvPill"></span></summary>
+          <div class="hint" style="margin-top:8px;max-width:860px">Two overlays the SESSION drives, rather than any one command. Both are designed on the <b>Scenes</b> tab like everything else — these just say which one to use.</div>
+          <div class="row" style="gap:12px;align-items:flex-end;margin-top:10px">
+            <label class="field">📣 Notify overlay <span class="muted">(a Text overlay)</span>
+              <select id="ovNotify" style="width:230px" onchange="scheduleSave();sessOvUi()"></select></label>
+            <span class="muted" id="ovNotifyText" style="flex:1;min-width:0"></span>
+          </div>
+          <div class="hint" style="margin-top:4px">Every command with <b>📣 notify overlay</b> ticked writes its own line to this one — you never need a second overlay per command.</div>
+          <div class="row" style="gap:12px;align-items:flex-end;margin-top:12px">
+            <label class="field">⏸ Pause overlay <span class="muted">(a scene group)</span>
+              <select id="ovPause" style="width:230px" onchange="scheduleSave();sessOvUi()"></select></label>
+            <span class="muted" id="ovPauseText" style="flex:1;min-width:0"></span>
+          </div>
+          <div class="hint" style="margin-top:4px">Plays on top of everything the moment you hit <b>⏸ Pause</b>, and clears on <b>▶ Resume</b>.</div>
+        </details>
+
+        
+    </div>
+
+    <!-- capacity: the number you watch while you run the session -->
+    <div class="card span" data-tab="chat">
+
+      <div style="background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:14px">
+        <label class="field" style="margin:0">👤 Owner name <span class="muted">— who the <b>Controls</b> post as, and <code>[operator]</code> in messages (blank → bot's own Discord name)</span>
+          <input id="cooldownExemptNames" placeholder="AireGasm"></label>
+      </div>
+      <div id="updBanner" onclick="showTab('help')" title="Go to Help → Updates" style="display:none;cursor:pointer;background:var(--warn);color:#3a2a00;font-weight:700;border-radius:8px;padding:10px 14px;margin-bottom:14px;text-align:center">⬆️ Update available! (Click on the Help tab to update)</div>
+      <div class="row" style="justify-content:space-between;align-items:baseline;margin-bottom:6px">
+        <h2 style="margin:0">Capacity</h2>
+        <h2 style="margin:0">Pump Timer</h2>
+      </div>
+      <div class="row" style="justify-content:space-between;align-items:baseline">
+        <span class="big"><span id="capVal">0</span>%</span>
+        <span class="big"><span id="pumpTimerVal">0</span>s</span>
+      </div>
+      <div class="gauge" style="margin:12px 0"><div id="capBar"></div></div>
+      <div class="row" style="gap:8px;align-items:center;margin-bottom:10px">
+        <input type="range" id="capSlider" min="0" max="100" step="0.5" style="flex:1" oninput="setCapacity(this.value)">
+        <input type="number" id="capInput" min="0" max="100" step="0.5" style="width:78px" onchange="setCapacity(this.value)">
+        <span class="muted">set %</span>
+      </div>
+      <div class="row" style="align-items:center">
+        <div style="flex:1"><span class="muted">⏱ Session uptime:</span> <b id="uptimeVal">0s</b></div>
+        <button class="warn" onclick="if(confirm('Reset the session? Capacity → 0%, all cooldowns cleared, timed events re-armed, command-started events reverted.')) act('/api/session-reset')">↺ Session reset</button>
+      </div>
+
     </div>
 
     <!-- overlay editors (Chat tab) -->
@@ -771,58 +827,10 @@
     </div>
 
     <!-- go live options -->
-    <div class="card" data-tab="dashboard">
-        <details class="help" style="margin-top:12px"><summary><b style="font-size:1.02rem">🎬 Go Live Options</b> <span class="muted" id="golivePill"></span></summary>
-          <div class="hint" style="margin-top:8px;max-width:860px">What happens when you flip <b>LIVE</b> on. Leave this off to <b>begin immediately</b>. Turn it on to open with an <b>intro</b>: a scene group plays, an announcement posts, and <b>commands stay held</b> until the intro ends — so nobody can play during the pre-show. Timed events wait too. <code>[intro_timer]</code> counts down in messages <i>and</i> in Text overlays.</div>
-          <label class="row" style="gap:8px;margin:10px 0"><input type="checkbox" id="glEnabled" onchange="scheduleSave();goliveUi()" style="width:auto"> <b>Open with an intro</b></label>
-          <div id="glBody" style="display:none">
-            <div class="sidehead" style="border:0;padding:0;margin:0 0 6px">Intro stages <span class="muted" style="font-weight:400">— played in order, then it resolves</span></div>
-            <div id="glStages"></div>
-            <div class="row" style="gap:8px;margin:6px 0 10px">
-              <button class="ghost" onclick="glStageAdd()">+ Add stage</button>
-              <span class="muted">each stage plays its scene group for its own length · <b>0</b> = wait for <b>⏭ Next</b></span>
-            </div>
-            <div class="row" style="gap:12px;align-items:flex-end">
-              <label class="field">Then switch to <span class="muted">(optional)</span> <select id="glAfter" style="width:170px" onchange="scheduleSave()"></select></label>
-              <label class="row" style="gap:6px" title="keep the picture black while the intro plays — untick to show the camera behind it"><input type="checkbox" id="glBlack" checked onchange="scheduleSave()" style="width:auto"> black during intro</label>
-              <label class="row" style="gap:6px"><input type="checkbox" id="glHold" checked onchange="scheduleSave()" style="width:auto"> hold commands</label>
-            </div>
-            <div class="row" style="gap:12px;align-items:flex-end;margin-top:8px">
-              <label class="field" style="flex:1;min-width:240px">Announcement <span class="muted">(blank = none · [intro_timer])</span>
-                <input id="glAnnounce" placeholder="🎬 Starting in [intro_timer] seconds!" style="width:100%" onchange="scheduleSave()"></label>
-              <label class="field">Repeat every <span class="muted">(secs · 0 = once)</span>
-                <input type="number" id="glEvery" min="0" step="5" value="0" style="width:100px" onchange="scheduleSave()"></label>
-            </div>
-            <div class="row" style="gap:8px;align-items:flex-end;margin-top:8px">
-              <label class="field" style="flex:1;min-width:220px;max-width:420px">Image <span class="muted">(optional · posts with the first announcement)</span>
-                <div class="row" style="gap:6px;flex-wrap:nowrap">
-                  <input id="glImage" placeholder="pick or type a filename from data/images" style="flex:1;min-width:0" onchange="scheduleSave()">
-                  <button class="ghost" title="pick from the media library" onclick="mediaBrowse(n=>{$('#glImage').value=n;scheduleSave();})">🗂</button>
-                  <button class="ghost" title="clear" onclick="$('#glImage').value='';scheduleSave()">✕</button>
-                </div></label>
-            </div>
-            <label class="field" style="margin-top:8px">Commands allowed during the intro <span class="muted">(comma-separated · everything else is held)</span>
-              <input id="glCmds" placeholder="signup, rules" style="width:100%;max-width:520px" onchange="scheduleSave()"></label>
-          </div>
-        </details>
 
-        <details class="help" style="margin-top:14px"><summary><b style="font-size:1.02rem">🖼 Session Overlays</b> <span class="muted" id="sessOvPill"></span></summary>
-          <div class="hint" style="margin-top:8px;max-width:860px">Two overlays the SESSION drives, rather than any one command. Both are designed on the <b>Scenes</b> tab like everything else — these just say which one to use.</div>
-          <div class="row" style="gap:12px;align-items:flex-end;margin-top:10px">
-            <label class="field">📣 Notify overlay <span class="muted">(a Text overlay)</span>
-              <select id="ovNotify" style="width:230px" onchange="scheduleSave();sessOvUi()"></select></label>
-            <span class="muted" id="ovNotifyText" style="flex:1;min-width:0"></span>
-          </div>
-          <div class="hint" style="margin-top:4px">Every command with <b>📣 notify overlay</b> ticked writes its own line to this one — you never need a second overlay per command.</div>
-          <div class="row" style="gap:12px;align-items:flex-end;margin-top:12px">
-            <label class="field">⏸ Pause overlay <span class="muted">(a scene group)</span>
-              <select id="ovPause" style="width:230px" onchange="scheduleSave();sessOvUi()"></select></label>
-            <span class="muted" id="ovPauseText" style="flex:1;min-width:0"></span>
-          </div>
-          <div class="hint" style="margin-top:4px">Plays on top of everything the moment you hit <b>⏸ Pause</b>, and clears on <b>▶ Resume</b>.</div>
-        </details>
-
-        <details class="help" style="margin-top:14px"><summary><b style="font-size:1.02rem">🏆 Leaderboards</b></summary>
+    <!-- leaderboards -->
+    <div class="card span" data-tab="game">
+<details class="help" style="margin-top:14px"><summary><b style="font-size:1.02rem">🏆 Leaderboards</b></summary>
         <div id="users"><div class="muted">No one has pumped yet.</div></div>
         <div class="row" style="margin-top:12px;gap:8px;align-items:center;flex-wrap:wrap">
           <span class="muted">Broadcast Top Pumpers:</span>
@@ -1108,6 +1116,19 @@
           <div id="tplCapEvts" style="margin-top:8px"></div></details>
       </details>
       </details>
+    </div>
+
+    <!-- activity log -->
+    <div class="card span" data-tab="system">
+
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:14px">
+        <h2 style="margin:0">Activity</h2>
+        <div class="row" style="gap:14px;align-items:center">
+          <label class="row" style="gap:6px" title="Hide the noisy device on/off telemetry from this log (still prints to the console)"><input type="checkbox" id="silenceOnOff" onchange="setSilence(this.checked)"> Silence ON/OFF calls</label>
+          <button class="ghost" onclick="copyLog(this)" style="padding:6px 12px">Copy Output</button>
+        </div>
+      </div>
+      <div class="log" id="log"></div>
     </div>
 
     <!-- help -->
@@ -1541,16 +1562,6 @@ esphome dashboard config/</code></pre>
     </div>
 
     <!-- log -->
-    <div class="card span" data-tab="dashboard">
-      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:14px">
-        <h2 style="margin:0">Activity</h2>
-        <div class="row" style="gap:14px;align-items:center">
-          <label class="row" style="gap:6px" title="Hide the noisy device on/off telemetry from this log (still prints to the console)"><input type="checkbox" id="silenceOnOff" onchange="setSilence(this.checked)"> Silence ON/OFF calls</label>
-          <button class="ghost" onclick="copyLog(this)" style="padding:6px 12px">Copy Output</button>
-        </div>
-      </div>
-      <div class="log" id="log"></div>
-    </div>
   </div>
 </div>
 
@@ -1580,8 +1591,8 @@ document.querySelectorAll('.tab-btn').forEach(b=>{
 let IS_ANDROID=false;
 try{ IS_ANDROID = new URLSearchParams(location.search).has('android') || !!(window.Android && window.Android.openUrl); }catch(e){}
 (function(){
-  let t='dashboard';
-  if(!IS_ANDROID){ try{ t=localStorage.getItem('df_tab')||'dashboard'; }catch(e){} }
+  let t='chat';
+  if(!IS_ANDROID){ try{ t=localStorage.getItem('df_tab')||'chat'; }catch(e){} }
   showTab(t);
 })();
 let allDevices = [];        // device list (for command targeting dropdowns)
@@ -3043,7 +3054,7 @@ function stgPick(i){
   stgGlobalMode=false;                 // picking a scene leaves the global pool
   stgCur=i; scnSelId=null; stgGroupFilter=''; stgPending.clear();
   stgSyncLive();                       // one picker: this IS the live scene
-  stgRemember(); renderStages(); goliveUi(); scheduleSave();
+  stgRemember(); renderStages(); showReload(); scheduleSave();
 }
 // Keep chat_scene pinned to whatever the Scenes tab has selected.
 function stgSyncLive(){
@@ -3061,7 +3072,7 @@ function stgEnsureDefault(){
 function stgAdd(){ const name=prompt('Scene name:','My Scene'); if(!name) return;
   scenesData.push({name:name.trim(), preset:'', width:1280, height:720, overlays:[]});
   stgCur=scenesData.length-1; scnSelId=null; stgSyncLive();
-  renderStages(); goliveUi(); scheduleSave(); }
+  renderStages(); showReload(); scheduleSave(); }
 function stgRename(){ if(stgGlobalMode) return toastMsg('the global pool has no name');
   const s=stgStage(); if(!s) return; const n=prompt('New name:', s.name||''); if(!n) return;
   if(chatSceneName===s.name) chatSceneName=n.trim();
@@ -3072,7 +3083,7 @@ function stgDelete(){ if(stgGlobalMode) return toastMsg('the global pool can\u20
   if(chatSceneName===s.name) chatSceneName='';
   scenesData.splice(stgCur,1); stgCur=scenesData.length?0:-1; scnSelId=null;
   stgSyncLive();
-  renderStages(); goliveUi(); scheduleSave(); }
+  renderStages(); showReload(); scheduleSave(); }
 // "Thing" -> "Thing copy" -> "Thing copy 2". Strips an existing copy suffix
 // first, so duplicating a duplicate never produces "copy copy".
 function copyName(name, taken){
@@ -3095,7 +3106,7 @@ function stgCopy(){
   scenesData.push(c);
   stgCur=scenesData.length-1; scnSelId=null; stgGroupFilter='';
   stgSyncLive();
-  stgRemember(); renderStages(); goliveUi(); scheduleSave();
+  stgRemember(); renderStages(); showReload(); scheduleSave();
   toastMsg(`📋 copied to "${n}"`);
 }
 function stgProp(k,v){ const s=stgStage(); if(s){ s[k]=v; scheduleSave(); } }
@@ -3166,7 +3177,7 @@ async function stgImport(inp){
     const j=await r.json();
     if(!j.ok){ toastMsg('⚠ '+(j.error||'import failed')); return; }
     applyState(j, true);
-    stgCur = scenesData.findIndex(s=>s.name===j.name); scnSelId=null; renderStages();
+    stgCur = scenesData.findIndex(s=>s.name===j.name); scnSelId=null; renderStages(); showReload();
     toastMsg('✅ imported "'+j.name+'"');
   }catch(e){ toastMsg('⚠ '+(e.message||e)); }
   inp.value='';
@@ -6364,30 +6375,9 @@ function applyState(st, full){
     // Go Live picker below asks for them, and with no scene selected it
     // silently built an empty list.
     stgRestore();
-    { const g=st.golive||{};
-      const set=(id,v)=>{ const el=$(id); if(el && document.activeElement!==el){
-        if(el.type==='checkbox') el.checked=!!v; else el.value=(v??''); } };
-      set('#glEnabled', g.intro_enabled);
-      set('#glHold', g.hold_commands!==false); set('#glBlack', g.blackout!==false); set('#glAnnounce', g.announce||'');
-      set('#glEvery', g.announce_every??0); set('#glImage', g.announce_image||'');
-      set('#glCmds', (g.commands||[]).join(', '));
-      // stages, with the pre-stages shape folded in so old configs still work
-      if(!document.querySelector('#glStages select:focus, #glStages input:focus')){
-        const rows = Array.isArray(g.stages) && g.stages.length
-          ? g.stages.map(r=>({group:(r&&r.group)||'', seconds:Math.max(0,parseInt((r&&r.seconds)||0,10)||0)}))
-          : [{group:g.scene_group||'', seconds:Math.max(0,parseInt(g.seconds??60,10)||0)}];
-        glStages = rows;
-      }
-      const ga=$('#glAfter'); if(ga && document.activeElement!==ga) ga.dataset.want=g.after_group||'';
-      const on=$('#ovNotify'); if(on && document.activeElement!==on) on.dataset.want=st.notify_overlay||'';
-      const op=$('#ovPause');  if(op && document.activeElement!==op)  op.dataset.want=st.pause_overlay||'';
-      goliveUi();
-      if(ga && ga.dataset.want!==undefined && document.activeElement!==ga) ga.value=ga.dataset.want;
-      const p=$('#golivePill');
-      if(p) p.textContent = g.intro_enabled
-        ? `intro · ${(+g.seconds||0)?(+g.seconds+'s'):'manual'}${g.scene_group?' · '+g.scene_group:''}`
-        : 'begins immediately';
-    }
+    // Go Live and the session overlays belong to the SCENE: their stages and
+    // the pause overlay name scene GROUPS, which are per-scene.
+    showToDom((st.scenes||[])[stgCur] || (st.scenes||[]).find(x=>x.name===st.chat_scene) || {}, st, false);
     // the pre-show banner + Start-now button
     { const intro=st.intro, b=$('#introNow'), nx=$('#introNext');
       if(b) b.style.display = intro ? '' : 'none';
@@ -6483,6 +6473,68 @@ function fallbackCopy(text,done){
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 // ---- auto-save: every config field persists on change, no buttons needed ----
+// The show is edited on the Scenes tab, so it saves INTO the scene being
+// edited rather than into one global block that every scene would share.
+// Push ONE scene's show into the Go Live / session-overlay fields. Called on
+// every state poll, and — critically — whenever the selected scene changes,
+// because the very next autosave writes these fields back into whatever scene
+// is selected. Without the reload, picking scene B would stamp A's show on it.
+// force=true on a deliberate switch: overwrite even the focused field, since
+// the value under the cursor belongs to the scene we just left.
+function showToDom(sc, st, force){
+  sc = sc||{}; st = st||{};
+  const g = sc.golive || st.golive || {};
+  const free = el => el && (force || document.activeElement!==el);
+  const set=(id,v)=>{ const el=$(id); if(free(el)){
+    if(el.type==='checkbox') el.checked=!!v; else el.value=(v??''); } };
+  set('#glEnabled', g.intro_enabled);
+  set('#glHold', g.hold_commands!==false); set('#glBlack', g.blackout!==false);
+  set('#glAnnounce', g.announce||'');
+  set('#glEvery', g.announce_every??0); set('#glImage', g.announce_image||'');
+  set('#glCmds', (g.commands||[]).join(', '));
+  // stages, with the pre-stages shape folded in so old configs still work
+  if(force || !document.querySelector('#glStages select:focus, #glStages input:focus')){
+    glStages = Array.isArray(g.stages) && g.stages.length
+      ? g.stages.map(r=>({group:(r&&r.group)||'', seconds:Math.max(0,parseInt((r&&r.seconds)||0,10)||0)}))
+      : [{group:g.scene_group||'', seconds:Math.max(0,parseInt(g.seconds??60,10)||0)}];
+  }
+  const ga=$('#glAfter'); if(free(ga)) ga.dataset.want=g.after_group||'';
+  const on=$('#ovNotify'); if(free(on)) on.dataset.want=sc.notify_overlay??st.notify_overlay??'';
+  const op=$('#ovPause');  if(free(op))  op.dataset.want=sc.pause_overlay??st.pause_overlay??'';
+  goliveUi();
+  if(ga && ga.dataset.want!==undefined && free(ga)) ga.value=ga.dataset.want;
+  const p=$('#golivePill');
+  if(p) p.textContent = g.intro_enabled
+    ? `intro · ${(+g.seconds||0)?(+g.seconds+'s'):'manual'}${g.scene_group?' · '+g.scene_group:''}`
+    : 'begins immediately';
+}
+// Reload the show from the scene now selected, before any save can clobber it.
+function showReload(){ showToDom(scenesData[stgCur]||{}, {}, true); }
+function _scenesWithShow(){
+  // Commit the show to the LIVE model first, then hand back a copy to POST.
+  // Writing only into the copy left scenesData holding the old values, so the
+  // next save (a scene switch fires one) wrote them straight back over the edit.
+  const sc = scenesData[stgCur];
+  if(sc){
+    sc.golive = {
+      intro_enabled: $('#glEnabled')?$('#glEnabled').checked:false,
+      stages: glStages.map(st=>({group:st.group||'', seconds:Math.max(0,+st.seconds||0)})),
+      // kept in step so a scene written here still opens in an older build
+      seconds: Math.max(0, +(glStages[0]||{}).seconds||0),
+      scene_group: (glStages[0]||{}).group||'',
+      after_group: ($('#glAfter')||{}).value||'',
+      announce: ($('#glAnnounce')||{}).value||'',
+      announce_every: Math.max(0, parseInt(($('#glEvery')||{}).value,10)||0),
+      announce_image: ($('#glImage')||{}).value||'',
+      hold_commands: $('#glHold')?$('#glHold').checked:true,
+      blackout: $('#glBlack')?$('#glBlack').checked:true,
+      commands: idList(($('#glCmds')||{}).value||''),
+    };
+    sc.notify_overlay = ($('#ovNotify')||{}).value||'';
+    sc.pause_overlay  = ($('#ovPause')||{}).value||'';
+  }
+  return JSON.parse(JSON.stringify(scenesData||[]));
+}
 function gatherConfig(){
   return {
     command_prefix: $('#prefix').value||'!',
@@ -6500,23 +6552,9 @@ function gatherConfig(){
     pump_embed:$('#pumpEmbed')?$('#pumpEmbed').checked:false, pump_title:$('#pumpTitle')?$('#pumpTitle').value:'',
     pump_message: $('#pumpMsg') ? $('#pumpMsg').value : '',
     listen_targets:listenTargets, announce_channel_id: announceChanId,
-    scenes: scenesData, scene_globals: sceneGlobals, chat_scene: chatSceneName,
+    scenes: _scenesWithShow(), scene_globals: sceneGlobals, chat_scene: chatSceneName,
     scene_globals_meta: globalsMeta,
     chat_isolate: $('#chatIso')?$('#chatIso').checked:false, chat_isolate_channel: chatIsoChan,
-    golive: {
-      intro_enabled: $('#glEnabled')?$('#glEnabled').checked:false,
-      stages: glStages.map(st=>({group:st.group||'', seconds:Math.max(0,+st.seconds||0)})),
-      // kept in step so a config written here still opens in an older build
-      seconds: Math.max(0, +(glStages[0]||{}).seconds||0),
-      scene_group: (glStages[0]||{}).group||'',
-      after_group: ($('#glAfter')||{}).value||'',
-      announce: ($('#glAnnounce')||{}).value||'',
-      announce_every: Math.max(0, parseInt(($('#glEvery')||{}).value,10)||0),
-      announce_image: ($('#glImage')||{}).value||'',
-      hold_commands: $('#glHold')?$('#glHold').checked:true,
-      blackout: $('#glBlack')?$('#glBlack').checked:true,
-      commands: idList(($('#glCmds')||{}).value||''),
-    },
     anon_user_label:$('#anonLabel').value,
     allow_dms:$('#allowDms').checked,
     allow:{user_ids:idList($('#allowUsers').value)},
@@ -6551,8 +6589,6 @@ function gatherConfig(){
     event_cooldown_message: $('#eventCooldownMsg') ? $('#eventCooldownMsg').value : '',
     broadcasts: cleanBroadcasts(),
     minigames: cleanMinigames(),
-    notify_overlay: ($('#ovNotify')||{}).value||'',
-    pause_overlay:  ($('#ovPause')||{}).value||'',
     always_on_enabled: $('#alwaysOnEnabled') ? $('#alwaysOnEnabled').checked : false,
     always_on_commands: alwaysOnList,
   };

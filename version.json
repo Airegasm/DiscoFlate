@@ -1,6 +1,6 @@
 {
-  "version": "3.63.0",
-  "versionCode": 146,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.63.0/discoflate-v3.63.0.apk",
-  "notes": "DiscoFlate v3.63.0 \u2014 minigames become PROFILES and the command 'type' dropdown is gone. A command plays a game with a minigame ACTION row, so it can fire a pump and post before the game and carry on after it. Only that one player's run waits. Two profiles of the same game can differ completely. Your existing game commands migrate automatically, and the shipped Basic Overlays scene now reaches existing configs too, not just fresh installs."
+  "version": "3.64.0",
+  "versionCode": 147,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.64.0/discoflate-v3.64.0.apk",
+  "notes": "DiscoFlate v3.64.0 \u2014 the Dashboard is gone and its parts moved to where they're used: Go Live Options and the session overlays now live on Scenes and belong to the SCENE, Leaderboards moved to Game, the Activity log to System, and the capacity slider and operator controls to Chat. Each scene carries its own intro, after-group, notify overlay and pause overlay, so switching scenes switches the whole show \u2014 no more one global intro pointing at groups that only exist in another scene. Existing configs migrate: your live scene inherits your current settings verbatim."
 }

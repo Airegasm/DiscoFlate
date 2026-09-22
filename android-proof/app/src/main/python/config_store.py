@@ -1284,6 +1284,23 @@ def _migrate(cfg: dict) -> dict:
                  if str(sc.get("name") or "").strip().lower() not in have]
         if added:
             cfg["scenes"] = list(cfg.get("scenes") or []) + copy.deepcopy(added)
+        # Go Live stages and the pause overlay name scene GROUPS, and a group
+        # belongs to a scene — so one global block meant "Intro" resolved
+        # against whichever scene happened to be linked. Each scene carries its
+        # own show now. The scene that's currently live inherits what has been
+        # running; the others start with the intro OFF rather than springing
+        # one you never configured.
+        live = str(cfg.get("chat_scene") or "").strip().lower()
+        g = cfg.get("golive") or {}
+        for sc in (cfg.get("scenes") or []):
+            if isinstance(sc.get("golive"), dict):
+                continue
+            mine = str(sc.get("name") or "").strip().lower() == live
+            sc["golive"] = copy.deepcopy(g) if mine else {**copy.deepcopy(g),
+                                                          "intro_enabled": False}
+            if mine:
+                sc.setdefault("notify_overlay", cfg.get("notify_overlay") or "")
+                sc.setdefault("pause_overlay", cfg.get("pause_overlay") or "")
     cfg["config_version"] = CONFIG_VERSION
     return cfg
 
