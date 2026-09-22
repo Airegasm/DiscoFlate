@@ -373,6 +373,9 @@ DEFAULTS = {
     # with their media files.
     "scenes": [],
     "scene_globals": [],   # overlay items callable from every scene
+    # Group metadata for that pool, mirroring a scene's own shape — so an
+    # empty global group survives a reload the same way a scene's does.
+    "scene_globals_meta": {"groups": [], "hidden_groups": [], "intro_groups": []},
     "chat_scene": "",      # the Scene linked to the Chat tab's video section
     # Which Gameplay Preset the live gameplay was last LOADED from. A readout
     # only: loading copies a preset into the live config, and editing the tabs

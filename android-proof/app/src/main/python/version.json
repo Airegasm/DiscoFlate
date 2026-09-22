@@ -1,6 +1,6 @@
 {
-  "version": "3.60.0",
-  "versionCode": 142,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.60.0/discoflate-v3.60.0.apk",
-  "notes": "DiscoFlate v3.60.0 \u2014 the Devices tab is rebuilt around the PUMP, not the plug. \ud83d\udd0c Change outlet re-points a pump at a different plug while keeping its name, its calibration and every command that uses it \u2014 so a swapped plug no longer means relabelling hardware or recalibrating. Your pumps are at the top now; adding hardware folds away into one box per brand that owns its credentials, its scan and its results. Power strips group into a single entry with Add all."
+  "version": "3.61.0",
+  "versionCode": 143,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.61.0/discoflate-v3.61.0.apk",
+  "notes": "DiscoFlate v3.61.0 \u2014 global overlays become global SCENE GROUPS. A Scoped / \ud83c\udf10 Global toggle sits above the group list, and global overlays are now designed through the same list, the same canvas and the same options as scoped ones. The cramped X%/Y%/W% section at the bottom of the Scenes tab is gone."
 }

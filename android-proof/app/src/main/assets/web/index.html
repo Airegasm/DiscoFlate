@@ -504,6 +504,13 @@
             <div class="stglist" id="stgPalette"></div>
           </div>
           <div class="stgpane">
+            <div class="row" style="gap:4px;align-items:center;margin-bottom:6px" title="SCOPED groups belong to this scene. GLOBAL groups are callable from every scene — the same list, the same canvas, the same options.">
+              <button class="gpill" id="stgScopeScoped" onclick="stgSetGlobal(false)">Scoped</button>
+              <button class="gpill" id="stgScopeGlobal" onclick="stgSetGlobal(true)">🌐 Global</button>
+              <div style="flex:1"></div>
+              <span class="muted" id="stgScopeNote" style="font-size:11px"></span>
+            </div>
+            <div class="hint" id="stgScopeHint" style="margin:0 0 7px;font-size:11px"></div>
             <div class="row" style="gap:6px;align-items:center;margin-bottom:7px;flex-wrap:nowrap">
               <select id="stgGroupPick" style="flex:1;min-width:0" onchange="stgSetGroupFilter(this.value)"></select>
               <button class="ghost pmini" id="stgGroupEye" title="hide/show this whole group" onclick="stgGroupHide()">👁</button>
@@ -516,7 +523,7 @@
             <div class="stglist" id="stgContents"></div>
           </div>
         </div>
-        <div class="hint" style="margin:8px 0 0">Drag on the canvas snaps to the <b>5% grid</b> — hold <b>Shift</b> to place freely, or untick <b>grid &amp; snap</b>. Add from the left. The right-hand list shows one <b>scene group</b> at a time — pick it in the dropdown, or <b>All overlays</b>; <b>➕✏️🗑</b> create, rename and delete groups (deleting a group keeps its overlays, just untagged). Anything you add while a group is selected <b>joins that group</b>, and a group fires as a batch from a <code>scene_group</code> action. Overlay kinds include <b>▬ Solid</b> — a flat colour block, full-frame by default, for a backdrop behind a scene group (no image file needed). Rows are the draw stack, front first: <b>👁</b> always-on vs callable (a callable one <b>ghosts</b> on the canvas rather than vanishing, so you can still place it), <b>▲▼</b> front/back, <b>⚙</b> options, <b>−</b> remove. On the canvas: drag to place, <b>◢</b> resize, <b>⟳</b> rotate.</div>
+        <div class="hint" style="margin:8px 0 0">Drag on the canvas snaps to the <b>5% grid</b> — hold <b>Shift</b> to place freely, or untick <b>grid &amp; snap</b>. Add from the left. The right-hand list shows one <b>scene group</b> at a time — pick it in the dropdown, or <b>All overlays</b>; <b>➕✏️🗑</b> create, rename and delete groups (deleting a group keeps its overlays, just untagged). Anything you add while a group is selected <b>joins that group</b>, and a group fires as a batch from a <code>scene_group</code> action. The list on the right has a <b>Scoped / 🌐 Global</b> toggle: <b>Scoped</b> groups belong to this scene, <b>Global</b> groups are callable from every scene — same list, same canvas, same options, so a global overlay is designed exactly like any other. Globals are always <b>callable</b> (the camera only mounts the live scene's always-on overlays), and a global group fires alongside a scene group of the <b>same name</b>. Overlay kinds include <b>▬ Solid</b> — a flat colour block, full-frame by default, for a backdrop behind a scene group (no image file needed). Rows are the draw stack, front first: <b>👁</b> always-on vs callable (a callable one <b>ghosts</b> on the canvas rather than vanishing, so you can still place it), <b>▲▼</b> front/back, <b>⚙</b> options, <b>−</b> remove. On the canvas: drag to place, <b>◢</b> resize, <b>⟳</b> rotate.</div>
         <div class="stgstage">
           <div id="stgCanvas"></div>
           <div class="stgside">
@@ -528,10 +535,6 @@
         </div>
         <div id="stgProps" style="margin-top:8px"></div>
       </div>
-      <details class="help" style="margin-top:14px"><summary><b>🌐 Global overlays</b> <span class="muted">(callable from every stage)</span></summary>
-        <div id="stgGlobalRows" style="margin-top:8px"></div>
-        <button class="ghost" style="margin-top:6px" onclick="mediaBrowse(n=>{sceneGlobals.push(stgNewItem('media',n,false));renderStgGlobals();sceneButtonsRefresh();scheduleSave()})">➕ Add global overlay</button>
-      </details>
     </div>
 
     <!-- overlay media browser (Stages tab + pickers) -->
@@ -2217,6 +2220,9 @@ function stgNewItem(kind, media, visible){
     o.font = 'bold'; o.bg = '';
   }
   if(kind==='text') o.text = 'New text';
+  // A global overlay is always CALLABLE: the camera only mounts the live
+  // scene's always-on overlays, so an always-on global would never appear.
+  if(typeof stgGlobalMode!=='undefined' && stgGlobalMode) o.visible = false;
   // a Solid lands as a full-frame black backdrop — the usual reason to add one
   if(kind==='solid'){ o.x=0; o.y=0; o.w=1; o.h=1; o.color='#000000'; o.z=-5; }
   // a sound cue: fired, never drawn — the canvas marker is just a handle
@@ -2233,7 +2239,45 @@ function stgNewItem(kind, media, visible){
 const STG_FONTS={sans:'system-ui,-apple-system,sans-serif',bold:'system-ui,sans-serif',
   serif:'Georgia,serif',mono:'ui-monospace,Menlo,monospace',
   script:'"Segoe Script","Brush Script MT",cursive'};
-function stgStage(){ return scenesData[stgCur]||null; }
+// GLOBAL overlays are edited exactly like a scene's: same canvas, same
+// palette, same group list, same options. They're just stored in their own
+// pool (scene_globals) and callable from every scene rather than one.
+let stgGlobalMode = false;
+let globalsMeta = {groups:[], hidden_groups:[], intro_groups:[]};
+function globalScene(){
+  globalsMeta.groups = globalsMeta.groups || [];
+  globalsMeta.hidden_groups = globalsMeta.hidden_groups || [];
+  globalsMeta.intro_groups = globalsMeta.intro_groups || [];
+  const live = scenesData.find(x=>x.name===chatSceneName) || scenesData[stgCur] || {};
+  return {
+    name: '🌐 Global', __global: true,
+    // globals play into whatever scene is live, so they preview at its size
+    width: live.width || 1920, height: live.height || 1080,
+    overlays: sceneGlobals,
+    groups: globalsMeta.groups,
+    hidden_groups: globalsMeta.hidden_groups,
+    intro_groups: globalsMeta.intro_groups,
+  };
+}
+function stgStage(){ return stgGlobalMode ? globalScene() : (scenesData[stgCur]||null); }
+function stgSetGlobal(on){
+  stgGlobalMode = !!on;
+  scnSelId = null; stgGroupFilter = '';
+  stgRemember();
+  renderStages(); goliveUi();
+}
+function stgScopeUi(){
+  const sc=$('#stgScopeScoped'), gl=$('#stgScopeGlobal'), note=$('#stgScopeNote');
+  if(sc) sc.classList.toggle('on', !stgGlobalMode);
+  if(gl) gl.classList.toggle('on', stgGlobalMode);
+  if(note) note.textContent = stgGlobalMode
+    ? `${sceneGlobals.length} overlay${sceneGlobals.length===1?'':'s'} · callable from every scene`
+    : '';
+  const box=$('#stgScopeHint');
+  if(box) box.textContent = stgGlobalMode
+    ? 'Global overlays are callable from every scene. They are always callable (never always-on) — the camera only mounts the live scene\u2019s always-on overlays. A global group fires alongside a scene group of the SAME NAME, so give them distinct names unless you want both.'
+    : '';
+}
 // The Scenes tab remembers what you were working on across reloads: which
 // scene, which group filter, and whether the grid is on. Scenes are stored by
 // NAME because indices shift as scenes are added, removed or renamed.
@@ -2266,6 +2310,7 @@ function trigRestore(){
   }
 }
 function stgRemember(){
+  try{ localStorage.setItem('df_scene_global', stgGlobalMode ? '1' : ''); }catch(e){}
   try{
     const s=stgStage();
     localStorage.setItem('df_scene', s ? (s.name||'') : '');
@@ -2273,6 +2318,7 @@ function stgRemember(){
   }catch(e){}
 }
 function stgRestore(){
+  try{ stgGlobalMode = !!localStorage.getItem('df_scene_global'); }catch(e){}
   // chat_scene is the saved truth for which scene is live; the localStorage
   // memory below is only a fallback for a config that never set one.
   if(chatSceneName){
@@ -2307,6 +2353,14 @@ function renderStages(){
     || '<option value="-1">— none yet —</option>';
   const s = stgStage();
   $('#stgEditor').style.display = s ? '' : 'none';
+  stgScopeUi();
+  // the scene picker and its icons aren't about the global pool
+  for(const id of ['#scnSel','#stgSceneIcons']){
+    const el=$(id); if(el) el.style.opacity = stgGlobalMode ? '.45' : '';
+  }
+  { const r=$('#stgRes'); if(r) r.disabled = stgGlobalMode;
+    const rl=r&&r.closest&&r.closest('label'); if(rl) rl.style.opacity = stgGlobalMode?'.45':'';
+    if(rl) rl.title = stgGlobalMode ? 'globals preview at whatever scene is live' : ''; }
   if(s){
     $('#stgRes').value = `${s.width||1280}x${s.height||720}`;
     renderStgPalette(); renderStgCanvas(); renderStgGroups(); renderStgContents(); renderStgProps();
@@ -3016,6 +3070,7 @@ function stgItemDel(){ const s=stgStage(); if(!s) return;
   s.overlays=(s.overlays||[]).filter(x=>x.id!==scnSelId); scnSelId=null;
   renderStgCanvas(); renderStgGroups(); renderStgContents(); renderStgProps(); sceneButtonsRefresh(); scheduleSave(); }
 function stgPick(i){
+  stgGlobalMode=false;                 // picking a scene leaves the global pool
   stgCur=i; scnSelId=null; stgGroupFilter=''; stgPending.clear();
   stgSyncLive();                       // one picker: this IS the live scene
   stgRemember(); renderStages(); goliveUi(); scheduleSave();
@@ -3037,10 +3092,12 @@ function stgAdd(){ const name=prompt('Scene name:','My Scene'); if(!name) return
   scenesData.push({name:name.trim(), preset:'', width:1280, height:720, overlays:[]});
   stgCur=scenesData.length-1; scnSelId=null; stgSyncLive();
   renderStages(); goliveUi(); scheduleSave(); }
-function stgRename(){ const s=stgStage(); if(!s) return; const n=prompt('New name:', s.name||''); if(!n) return;
+function stgRename(){ if(stgGlobalMode) return toastMsg('the global pool has no name');
+  const s=stgStage(); if(!s) return; const n=prompt('New name:', s.name||''); if(!n) return;
   if(chatSceneName===s.name) chatSceneName=n.trim();
   s.name=n.trim(); renderStages(); scheduleSave(); }
-function stgDelete(){ const s=stgStage(); if(!s) return;
+function stgDelete(){ if(stgGlobalMode) return toastMsg('the global pool can\u2019t be deleted — remove its overlays instead');
+  const s=stgStage(); if(!s) return;
   if(!confirm(`Delete scene "${s.name}"? Its media stays in the library.`)) return;
   if(chatSceneName===s.name) chatSceneName='';
   scenesData.splice(stgCur,1); stgCur=scenesData.length?0:-1; scnSelId=null;
@@ -3058,6 +3115,7 @@ function copyName(name, taken){
 // Clash-safe copy of the whole scene. Overlay ids are regenerated so the two
 // scenes can't fight over the same layer slots or notify/pause targets.
 function stgCopy(){
+  if(stgGlobalMode) return toastMsg('switch to a scene to copy it');
   const s=stgStage(); if(!s){ toastMsg('nothing to copy'); return; }
   const n=copyName(s.name||'Scene', scenesData.map(x=>x.name||''));
   const c=JSON.parse(JSON.stringify(s));
@@ -3071,7 +3129,8 @@ function stgCopy(){
   toastMsg(`📋 copied to "${n}"`);
 }
 function stgProp(k,v){ const s=stgStage(); if(s){ s[k]=v; scheduleSave(); } }
-function stgResPick(){ const s=stgStage(); if(!s) return;
+function stgResPick(){ if(stgGlobalMode) return;   // globals follow the live scene
+  const s=stgStage(); if(!s) return;
   const [w,h]=$('#stgRes').value.split('x').map(Number); s.width=w; s.height=h;
   renderStgCanvas(); scheduleSave(); }
 function stgAddMedia(n){ const s=stgStage(); if(!s){ toastMsg('create a scene first'); return; }
@@ -3080,22 +3139,6 @@ function stgAddMedia(n){ const s=stgStage(); if(!s){ toastMsg('create a scene fi
 function stgAddWidget(kind){ const s=stgStage(); if(!s){ toastMsg('create a scene first'); return; }
   const o=stgNewItem(kind,''); stgApplyGroup(o); (s.overlays=s.overlays||[]).push(o);
   scnSelId=o.id; renderStgCanvas(); renderStgGroups(); renderStgContents(); renderStgProps(); scheduleSave(); }
-function renderStgGlobals(){
-  const box=$('#stgGlobalRows'); if(!box) return;
-  box.innerHTML = sceneGlobals.map((o,i)=>
-    `<div class="row ovedit">`+
-    `<label class="field">Label <input value="${esc(o.label||'')}" style="width:130px" onchange="sceneGlobals[${i}].label=this.value;sceneButtonsRefresh();scheduleSave()"></label>`+
-    `<span class="pill" style="max-width:170px;overflow:hidden;text-overflow:ellipsis">${esc(o.media||'—')}</span>`+
-    `<button class="ghost" onclick="mediaBrowse(n=>{sceneGlobals[${i}].media=n;renderStgGlobals();scheduleSave()})">🗂</button>`+
-    `<label class="field">Mode <select style="width:96px" onchange="sceneGlobals[${i}].mode=this.value;scheduleSave()">${['timed','hold','once'].map(m=>`<option ${o.mode===m?'selected':''}>${m}</option>`).join('')}</select></label>`+
-    `<label class="field">Secs <input type="number" min="0.5" step="0.5" value="${o.seconds??5}" style="width:66px" onchange="sceneGlobals[${i}].seconds=+this.value;scheduleSave()"></label>`+
-    `<label class="field">X% <input type="number" min="0" max="100" value="${Math.round((o.x??0.35)*100)}" style="width:60px" onchange="sceneGlobals[${i}].x=(+this.value||0)/100;scheduleSave()"></label>`+
-    `<label class="field">Y% <input type="number" min="0" max="100" value="${Math.round((o.y??0.35)*100)}" style="width:60px" onchange="sceneGlobals[${i}].y=(+this.value||0)/100;scheduleSave()"></label>`+
-    `<label class="field">W% <input type="number" min="4" max="100" value="${Math.round((o.w??0.3)*100)}" style="width:60px" onchange="sceneGlobals[${i}].w=Math.max(0.04,(+this.value||30)/100);scheduleSave()"></label>`+
-    `<label class="field">Layer <input value="${esc(o.layer||'')}" style="width:76px" onchange="sceneGlobals[${i}].layer=this.value;scheduleSave()"></label>`+
-    `<button class="ghost" onclick="sceneGlobals.splice(${i},1);renderStgGlobals();sceneButtonsRefresh();scheduleSave()">✕</button>`+
-    `</div>`).join('') || '<span class="muted">no global overlays yet</span>';
-}
 // ---- universal media browser -------------------------------------------
 let mediaPickKind='';   // '', 'audio' or 'visual' — filters the browser
 function mediaBrowse(cb, kind){ mediaPickCb=cb||null; mediaPickKind=kind||'';
@@ -6275,6 +6318,9 @@ function applyState(st, full){
     if(!stgDrag){
       scenesData = JSON.parse(JSON.stringify(st.scenes||[]));
       sceneGlobals = JSON.parse(JSON.stringify(st.scene_globals||[]));
+      { const m = st.scene_globals_meta || {};
+        globalsMeta = {groups: m.groups||[], hidden_groups: m.hidden_groups||[],
+                       intro_groups: m.intro_groups||[]}; }
       chatSceneName = st.chat_scene||'';
     }
     // Decide which scene is current BEFORE anything reads its groups — the
@@ -6326,7 +6372,7 @@ function applyState(st, full){
     if($('#chatIso') && document.activeElement!==$('#chatIso')) $('#chatIso').checked = !!st.chat_isolate;
     gpPresetNames = (st.gameplay_presets||[]).map(p=>p.name).filter(Boolean);
     presetLoadedName = st.preset_loaded||'';
-    renderStages(); renderStgGlobals();
+    renderStages();
     goliveUi();          // groups are known now — refresh the intro picker
     renderCommands();
     renderAlwaysOn();
@@ -6418,6 +6464,7 @@ function gatherConfig(){
     pump_message: $('#pumpMsg') ? $('#pumpMsg').value : '',
     listen_targets:listenTargets, announce_channel_id: announceChanId,
     scenes: scenesData, scene_globals: sceneGlobals, chat_scene: chatSceneName,
+    scene_globals_meta: globalsMeta,
     chat_isolate: $('#chatIso')?$('#chatIso').checked:false, chat_isolate_channel: chatIsoChan,
     golive: {
       intro_enabled: $('#glEnabled')?$('#glEnabled').checked:false,

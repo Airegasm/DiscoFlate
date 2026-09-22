@@ -320,6 +320,7 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "pause_overlay": cfg.get("pause_overlay", ""),
         "scenes": cfg.get("scenes") or [],
         "scene_globals": cfg.get("scene_globals") or [],
+        "scene_globals_meta": cfg.get("scene_globals_meta") or {},
         "chat_scene": cfg.get("chat_scene", ""),
         "vcam_mirror": bool(cfg.get("vcam_mirror", True)),
         "golive": cfg.get("golive") or {},
@@ -1065,7 +1066,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                     "pause_embed", "pause_title",
                     "system_buffer_seconds", "cooldown_message", "pumptimer_message", "pump_message",
                     "roll", "prizes", "owner_commands", "chat_buttons",
-                    "scenes", "scene_globals", "chat_scene",
+                    "scenes", "scene_globals", "scene_globals_meta", "chat_scene",
                     "notify_overlay", "pause_overlay",
                     "golive",
                     "chat_isolate", "chat_isolate_channel",
@@ -2313,6 +2314,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                                   "gameplay_presets": cfg.get("gameplay_presets") or [],
                                   "scenes": cfg.get("scenes") or [],
                                   "scene_globals": cfg.get("scene_globals") or [],
+                                  "scene_globals_meta": cfg.get("scene_globals_meta") or {},
                                   "media": media})
 
     async def sync_push(request):
@@ -2417,9 +2419,13 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             merged["gameplay_presets"] = inc_p + [
                 p for p in (merged.get("gameplay_presets") or [])
                 if (p.get("name") or "").strip().lower() not in names]
-        for k in ("scenes", "scene_globals"):   # stage designs ride along too
+        for k in ("scenes", "scene_globals"):   # scene designs ride along too
             if isinstance(data.get(k), list):
                 merged[k] = data[k]
+        # the global pool's group names are a dict, not a list — without this
+        # a synced device would keep the overlays but lose their groups
+        if isinstance(data.get("scene_globals_meta"), dict):
+            merged["scene_globals_meta"] = data["scene_globals_meta"]
         cfg = config_store.save(config_store._coerce_numbers(merged))
         engine.set_config(cfg)
         return web.json_response({"ok": True, "from_version": data.get("version"),

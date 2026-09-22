@@ -2846,6 +2846,11 @@
     }
   ],
   "scene_globals": [],
+  "scene_globals_meta": {
+    "groups": [],
+    "hidden_groups": [],
+    "intro_groups": []
+  },
   "chat_scene": "Basic Overlays",
   "preset_loaded": "",
   "golive": {
