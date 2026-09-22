@@ -942,16 +942,27 @@ class BotManager:
             await self.broadcast(res["reply"], None)
         return res
 
-    async def operator_pump(self, who: str, seconds: float) -> dict:
+    async def operator_pump(self, who: str, seconds: float,
+                            device_id: str | None = None,
+                            untimed: bool = False) -> dict:
+        """The Chat tab's Pump button. `device_id` picks which pump (None =
+        the active one). `untimed` runs it until STOP instead of for a set
+        number of seconds — the hardware has no 'on forever', so it takes the
+        session's hard cap and relies on the abort."""
         cfg = self.get_config()
         err = self._operator_ready(cfg)
         if err:
             return {"ok": False, "error": err}
         who = (who or "").strip() or self._bot_name()
-        seconds = float(seconds)
-        res = await self.engine.fire(seconds, reason=f"pump by {who}")
+        seconds = self._UNTIMED_SECS if untimed else float(seconds)
+        res = await self.engine.fire(seconds, reason=f"pump by {who}",
+                                     device_id=device_id or None)
+        if res.get("ok") and untimed:
+            # "just on" has no duration to announce — saying "3600 seconds have
+            # been added" would be a lie, so this one stays quiet until STOP.
+            return res
         if res.get("ok"):
-            target = self.engine._active_id()
+            target = device_id or self.engine._active_id()
             default = ("**[secs]** seconds have been added to the pump timer, and will "
                        "increase [operator]'s volume by **+[secs2capacity]%**\n"
                        "Current Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s")
@@ -963,6 +974,14 @@ class BotManager:
             msg = self.engine.render(tmpl, extra)
             await self.broadcast(msg, None, embed=self._cfg_embed(cfg, "pump", msg, "💨 Pump"))
         return res
+
+    _UNTIMED_SECS = 3600.0    # "on until STOP" — the abort is what really ends it
+
+    async def operator_pump_stop(self, who: str = "") -> dict:
+        """Stop whatever the pump is doing, whichever device it was. This is
+        NOT the session pause — it just ends the fire."""
+        await self.engine.abort(reason=f"stop by {(who or '').strip() or self._bot_name()}")
+        return {"ok": True, "stopped": True}
 
     async def operator_stop(self, who: str) -> dict:
         """STOP = pause the whole session. Deliberately NOT gated on

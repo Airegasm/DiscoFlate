@@ -89,7 +89,6 @@ _DEFAULT_LIST_KEYS = {
     "prizes": lambda p: ((p.get("name") if isinstance(p, dict) else "") or "").strip().lower(),
     "owner_commands": lambda o: (o.get("name") or "").strip().lower(),
     "chat_buttons": lambda bt: (bt.get("label") or "").strip().lower(),
-    "overlay_buttons": lambda bt: (bt.get("label") or "").strip().lower(),
     "modes": lambda m: (m.get("name") or "").strip().lower(),
     "events": lambda e: (e.get("name") or "").strip().lower(),
     "capacity_events": lambda e: ((e.get("name") or "").strip() or str(e.get("at") or "")).lower(),
@@ -113,7 +112,7 @@ _GAMEPLAY_KEYS = [
     "cooldown_message",
     "capacity_embed", "capacity_title", "pumptimer_embed", "pumptimer_title",
     "cooldown_embed", "cooldown_title", "pump_embed", "pump_title",
-    "commands", "broadcasts", "modes", "prizes", "owner_commands", "chat_buttons", "overlay_buttons",
+    "commands", "broadcasts", "modes", "prizes", "owner_commands", "chat_buttons",
     # Game tab
     "cooldown_seconds", "auto_report",
     "listener_message_on", "listener_message_off",
@@ -136,7 +135,6 @@ _GAMEPLAY_LIST_KEYS = {
     "prizes": lambda p: ((p.get("name") if isinstance(p, dict) else "") or "").strip().lower(),
     "owner_commands": lambda o: (o.get("name") or "").strip().lower(),
     "chat_buttons": lambda bt: (bt.get("label") or "").strip().lower(),
-    "overlay_buttons": lambda bt: (bt.get("label") or "").strip().lower(),
     "events": lambda e: (e.get("name") or "").strip().lower(),
     "capacity_events": lambda e: ((e.get("name") or "").strip() or str(e.get("at") or "")).lower(),
     "polls": lambda p: (p.get("name") or "").strip().lower(),
@@ -266,7 +264,6 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "prizes": cfg.get("prizes", []),
         "owner_commands": cfg.get("owner_commands", []),
         "chat_buttons": cfg.get("chat_buttons", []),
-        "overlay_buttons": cfg.get("overlay_buttons", []),
         "capacity_ranges": cfg.get("capacity_ranges", []),
         "commands": cfg.get("commands", []),
         "always_on_enabled": cfg.get("always_on_enabled", False),
@@ -318,6 +315,9 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "version": VERSION,
         # preset NAMES only (the full data would bloat the 1s state poll). The
         # immutable built-in "Defaults" preset is always listed first.
+        "preset_loaded": cfg.get("preset_loaded", ""),
+        "notify_overlay": cfg.get("notify_overlay", ""),
+        "pause_overlay": cfg.get("pause_overlay", ""),
         "scenes": cfg.get("scenes") or [],
         "scene_globals": cfg.get("scene_globals") or [],
         "chat_scene": cfg.get("chat_scene", ""),
@@ -493,6 +493,26 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     vcam.set_mirror(config_store.load().get("vcam_mirror", False))
     # overlay text keeps re-rendering its placeholders while it's on screen
     vcam.render_cb = lambda t: engine.render(t)
+
+    def _picture_gate() -> str:
+        """What the camera is allowed to send, asked fresh every frame:
+          'off'   — session isn't LIVE: a genuinely black screen, no overlays
+                    at all, so you can start the camera and get set up first
+          'intro' — LIVE with the pre-show running: black picture, and only
+                    what the intro plays; the scene's always-on overlays wait
+          'live'  — the real picture and every overlay
+        """
+        cfg0 = engine.cfg or {}
+        if not cfg0.get("listener_enabled"):
+            return "off"
+        # 'pending' matters: LIVE flips on BEFORE start_intro runs, and the ON
+        # message + its [!command]s post to Discord in between. Without this
+        # the room went out for those seconds, every single go-live.
+        if ((engine.intro_active() or engine.intro_pending())
+                and (cfg0.get("golive") or {}).get("blackout", True)):
+            return "intro"
+        return "live"
+    vcam.gate_cb = _picture_gate
     net["vcam"] = vcam
     # live game state for stage widgets (capacity gauge / pump timer);
     # camera.py throttles how often it calls this
@@ -583,13 +603,37 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     # (always recorded, so a Stage page shows the current scene the moment it
     # opens). Ok when either surface is actually watched; quiet skip otherwise.
     def _group_hidden(scn, group) -> bool:
-        """A group the operator muted on the Scenes tab: it doesn't come up
-        with the scene and a scene_group action won't play it."""
+        """A group switched OFF on the Scenes tab. It means "not on the stream
+        right now", so it doesn't come up when the scene loads — but firing it
+        explicitly still works, because that's an explicit instruction."""
         g = str(group or "").strip().lower()
         if not g:
             return False
         return any(str(x).strip().lower() == g
                    for x in ((scn or {}).get("hidden_groups") or []))
+
+    def _group_is_intro(scn, group) -> bool:
+        """A group flagged 🎬 INTRO on the Scenes tab: it belongs to the
+        pre-show and nothing else."""
+        g = str(group or "").strip().lower()
+        if not g:
+            return False
+        return any(str(x).strip().lower() == g
+                   for x in ((scn or {}).get("intro_groups") or []))
+
+    _ON_TOP_BASE = 1000   # "on top": above any z you'd set by hand
+
+    def _group_is_pause(cfg0, group) -> bool:
+        """The group picked as the PAUSE overlay. The session drives it, so it
+        must never come up with the scene — only when you actually pause."""
+        g = str(group or "").strip().lower()
+        return bool(g) and g == str(cfg0.get("pause_overlay") or "").strip().lower()
+
+    def _intro_groups_allowed(cfg0) -> bool:
+        """Intro groups only exist while Go Live is set to open with an intro.
+        With that unticked they never mount and never play — which is what
+        lets intro cards be ordinary always-on overlays."""
+        return bool((cfg0.get("golive") or {}).get("intro_enabled"))
 
     def _scene_group(cfg0, scene_name, group):
         """Every overlay tagged with this group name, in the linked SCENE then
@@ -599,14 +643,14 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         if not g:
             return []
         scn = _find_scene(cfg0, scene_name)
-        if _group_hidden(scn, g):
-            return []
+        if _group_is_intro(scn, g) and not _intro_groups_allowed(cfg0):
+            return []      # intro group, but Go Live isn't opening with one
         pool = (list((scn or {}).get("overlays") or [])
                 + list(cfg0.get("scene_globals") or []))
         return [o for o in pool if str(o.get("group") or "").strip().lower() == g]
 
     def _overlay_action(spec: dict) -> dict:
-        mode = (spec.get("mode") or "timed")
+        mode = spec.get("mode") or "timed"   # may be refined per-item below
         # A SCENE GROUP: fire or kill a whole named set at once. Empty group =
         # quiet no-op, same rule as a missing overlay id.
         if spec.get("group"):
@@ -622,11 +666,15 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             # two scenes may reuse "intro" for completely different looks.
             items = _scene_group(cfg0, scene_name, spec.get("group"))
             if not items:
-                why = ("is hidden" if _group_hidden(_find_scene(cfg0, scene_name),
-                                                    spec.get("group")) else "is empty")
+                scn0 = _find_scene(cfg0, scene_name)
+                if _group_is_intro(scn0, spec.get("group")) and not _intro_groups_allowed(cfg0):
+                    why = "is an INTRO group and Go Live isn't opening with an intro"
+                else:
+                    why = "is empty"
                 return {"ok": True, "skipped": f"scene group '{spec.get('group')}' {why}"}
             for it in items:
                 sub = {k: v for k, v in spec.items() if k != "group"}
+                sub["on_top"] = spec.get("on_top")
                 sub["id"] = it.get("id")
                 sub["stage"] = scene_name
                 if mode != "clear" and not spec.get("mode"):
@@ -651,8 +699,18 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                         break
             if found is None:
                 return {"ok": True, "skipped": f"overlay {oid} not in any scene"}
-            if _group_hidden(_find_scene(cfg0, scene_name), found.get("group")):
-                return {"ok": True, "skipped": f"group '{found.get('group')}' is hidden"}
+            scn_ = _find_scene(cfg0, scene_name)
+            if _group_is_intro(scn_, found.get("group")) and not _intro_groups_allowed(cfg0):
+                return {"ok": True,
+                        "skipped": f"group '{found.get('group')}' is an intro group "
+                                   f"and Go Live isn't set to open with an intro"}
+            if (found.get("kind") or "") == "audio":
+                # A sound cue: nothing is composited, it just plays here. Fires
+                # from a group like any other overlay, so an intro can open with
+                # a sting without a second mechanism.
+                if spec.get("mode") == "clear":
+                    return {"ok": True, "skipped": "audio cues can't be cleared"}
+                return _play_audio(found.get("media"), found.get("volume"))
             lay = found.get("layer") or f"itm-{found.get('id')}"
             if spec.get("mode") == "update":      # update_overlay_text
                 txt = _bake(spec.get("text"), spec.get("ctx"))
@@ -666,9 +724,11 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                 _timer_op(found.get("id"), spec.get("timer") or "start",
                           seconds=spec.get("seconds"), configured=found.get("seconds"))
                 return {"ok": True}
-            # the design carries its own mode/duration; the action row may override
+            # An ALWAYS-ON overlay holds until something clears it — its
+            # mode/seconds fields are meaningless (the panel doesn't even show
+            # them), so firing one as a 5-second timed layer was just wrong.
             if not spec.get("mode"):
-                mode = found.get("mode") or "timed"
+                mode = "hold" if found.get("visible") else (found.get("mode") or "timed")
             if spec.get("seconds") in (None, "", 0):
                 spec = {**spec, "seconds": found.get("seconds")}
             spec = {**spec, "mode": mode, "layer": lay}
@@ -676,11 +736,17 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                 vcam.clear_overlays(lay, fade_out=spec.get("fade_out"))
                 stg.clear(lay)
                 return {"ok": True}
+            if spec.get("on_top"):
+                # Keep the group's own internal order, just move the whole set
+                # above everything else on screen.
+                found = {**found, "z": _ON_TOP_BASE + int(found.get("z") or 0)}
             if (found.get("kind") or "media") != "media":
                 item_ = {**found,
                          "fade_in": spec.get("fade_in") or found.get("fade_in"),
                          "fade_out": spec.get("fade_out") or found.get("fade_out")}
                 # bake [user]/[mention]/… from the firing command or event
+                if spec.get("text") is not None:
+                    item_["text"] = spec["text"]
                 ctx_ = spec.get("ctx")
                 if ctx_:
                     for k_ in ("text", "label", "fmt_on", "fmt_off"):
@@ -752,12 +818,17 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         picture, or let it run again. `start` repeats however you last started
         it from the Chat tab (device, size, fps, linked scene)."""
         op = (op or "").lower()
+        if op in ("black", "blackout"):
+            return vcam.set_blackout(True)
+        if op in ("unblack", "reveal"):
+            return vcam.set_blackout(False)
         if op == "freeze":
             return vcam.set_frozen(True)
         if op in ("resume", "unfreeze"):
             return vcam.set_frozen(False)
         if op == "stop":
             vcam.set_frozen(False)
+            vcam.set_blackout(False)
             await asyncio.get_event_loop().run_in_executor(None, vcam.stop)
             return {"ok": True}
         if op == "start":
@@ -779,11 +850,15 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             for o in ((scn or {}).get("overlays") or []):
                 if not o.get("visible") or _group_hidden(scn, o.get("group")):
                     continue
+                if _group_is_intro(scn, o.get("group")):
+                    continue     # the pre-show mounts these, not the camera
+                if _group_is_pause(cfg0, o.get("group")):
+                    continue     # pausing mounts these, not the camera
                 lay = o.get("layer") or f"itm-{o.get('id')}"
                 if (o.get("kind") or "media") != "media":
                     if o.get("kind") == "timer" and o.get("autostart"):
                         _timer_op(o.get("id"), "start", configured=o.get("seconds"))
-                    vcam.add_item(o, layer=lay)
+                    vcam.add_item(o, layer=lay, always_on=True)
                 elif o.get("media"):
                     vcam.fire_overlay(o["media"], mode="hold", layer=lay,
                                       scale=o.get("w"), x=o.get("x"), y=o.get("y"),
@@ -795,6 +870,98 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                                       chroma_soft=o.get("chroma_soft"))
             return {"ok": True, "scene": scene}
         return {"ok": False, "error": f"unknown camera op '{op}'"}
+
+    def _play_audio(name: str, volume=None) -> dict:
+        """Play a sound cue on THIS machine's default output. It never touches
+        the video pipe — route your system audio into Discord (a loopback /
+        monitor source) if you want viewers to hear it."""
+        fn = os.path.basename(str(name or "").strip())
+        if not fn:
+            return {"ok": False, "error": "no audio file set"}
+        path = fn if os.path.isabs(fn) else os.path.join(IMAGES_DIR, fn)
+        if not os.path.isfile(path):
+            return {"ok": False, "error": f"no such audio file: {fn}"}
+        try:
+            vol = max(0.0, min(1.0, float(volume) / 100.0)) if volume is not None else 1.0
+        except (TypeError, ValueError):
+            vol = 1.0
+        for exe, argv in (
+            ("ffplay",  ["-nodisp", "-autoexit", "-loglevel", "quiet",
+                         "-volume", str(int(vol * 100)), path]),
+            ("paplay",  [f"--volume={int(vol * 65536)}", path]),
+            ("afplay",  ["-v", f"{vol:.2f}", path]),
+            ("cvlc",    ["--play-and-exit", "--intf", "dummy",
+                         f"--gain={vol:.2f}", path]),
+            ("aplay",   [path]),
+        ):
+            if shutil.which(exe):
+                try:
+                    subprocess.Popen([exe, *argv],
+                                     stdout=subprocess.DEVNULL,
+                                     stderr=subprocess.DEVNULL)
+                    return {"ok": True, "player": exe, "file": fn}
+                except OSError as e:  # noqa: PERF203 — try the next player
+                    engine._log("error", f"audio: {exe} failed ({e})")
+        return {"ok": False,
+                "error": "no audio player found — install ffmpeg (ffplay) or "
+                         "pulseaudio-utils (paplay)"}
+
+    def _notify_overlay(cfg0):
+        """The ONE overlay every command's notification reuses: whichever
+        overlay in the linked scene (or the globals) has its layer slot set to
+        `notify`. Nothing to designate per command, nothing to duplicate."""
+        scene_name = cfg0.get("chat_scene", "")
+        linked = list((_find_scene(cfg0, scene_name) or {}).get("overlays") or [])
+        linked += list(cfg0.get("scene_globals") or [])
+        want = str(cfg0.get("notify_overlay") or "").strip()
+        if want:
+            # An explicit id is explicit: honour it even when the overlay lives
+            # in a scene the Chat tab isn't currently linked to — otherwise
+            # switching scenes silently kills every command's notification.
+            every = list(linked)
+            for sc in (cfg0.get("scenes") or []):
+                every += list(sc.get("overlays") or [])
+            for o in every:
+                if str(o.get("id") or "") == want:
+                    return o
+        for o in linked:    # legacy: an overlay whose layer slot says "notify"
+            if str(o.get("layer") or "").strip().lower() == "notify":
+                return o
+        return None
+
+    async def _notify_action(text: str, ctx: dict) -> dict:
+        """Play a command's notification line on the shared notify overlay.
+        Quiet no-op when the scene has no notify overlay — the same rule every
+        other camera-dependent action follows."""
+        cfg0 = config_store.load()
+        o = _notify_overlay(cfg0)
+        if o is None:
+            return {"ok": False, "error": "no overlay has its layer set to 'notify'"}
+        return _overlay_action({"id": o.get("id"), "stage": cfg0.get("chat_scene", ""),
+                                "mode": "timed",
+                                "seconds": o.get("seconds") or 5,
+                                "text": text, "ctx": ctx})
+    engine.notify_cb = _notify_action
+
+    async def _pause_overlay(on: bool) -> dict:
+        """Cover the stream while the session is paused, and uncover it on
+        resume. It's an ordinary scene group — picked in Go Live Options."""
+        cfg0 = config_store.load()
+        grp = str(cfg0.get("pause_overlay") or "").strip()
+        if not grp:
+            return {"ok": True, "skipped": "no pause overlay set"}
+        # Look in the linked scene first, then anywhere — the group you picked
+        # is the group you meant, whichever scene you built it in.
+        owner = cfg0.get("chat_scene", "")
+        if not _scene_group(cfg0, owner, grp):
+            for sc in (cfg0.get("scenes") or []):
+                if any(str(o.get("group") or "").strip().lower() == grp.lower()
+                       for o in (sc.get("overlays") or [])):
+                    owner = sc.get("name") or ""
+                    break
+        return _overlay_action({"group": grp, "stage": owner,
+                                "mode": "clear" if not on else ""})
+    engine.pause_overlay_cb = _pause_overlay
 
     async def _snapshot_action(caption: str) -> dict:
         """The `snapshot` action: grab the CURRENT virtual-camera frame —
@@ -844,6 +1011,11 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         # IP-whitelist + host-pinning gates can obtain it.
         html = html.replace("<head>", f'<head><meta name="df-auth" content="{secret}">', 1)
         resp = web.Response(text=html, content_type="text/html")
+        # Never let a browser hold a stale panel: the UI ships as one file
+        # that changes every update, and a cached copy silently mixes old
+        # JavaScript with a new server — which reads as random features
+        # breaking rather than as a cache. It's a local read; costs nothing.
+        resp.headers["Cache-Control"] = "no-store, must-revalidate"
         resp.set_cookie("df_auth", secret, httponly=True, samesite="Strict", path="/")
         return resp
 
@@ -864,7 +1036,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     # Minimum shape per key — a patch with the wrong container type is refused
     # (a malformed import/tab can't put a string where the engine expects a list).
     _TYPE_FLOOR = {"commands": list, "events": list, "modes": list, "prizes": list,
-                   "owner_commands": list, "chat_buttons": list, "overlay_buttons": list,
+                   "owner_commands": list, "chat_buttons": list,
                    "scenes": list, "scene_globals": list,
                    "capacity_events": list, "polls": list, "competitions": list,
                    "capacity_ranges": list, "listen_targets": list, "broadcasts": list,
@@ -892,8 +1064,9 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                     "cooldown_embed", "cooldown_title", "pump_embed", "pump_title",
                     "pause_embed", "pause_title",
                     "system_buffer_seconds", "cooldown_message", "pumptimer_message", "pump_message",
-                    "roll", "prizes", "owner_commands", "chat_buttons", "overlay_buttons",
+                    "roll", "prizes", "owner_commands", "chat_buttons",
                     "scenes", "scene_globals", "chat_scene",
+                    "notify_overlay", "pause_overlay",
                     "golive",
                     "chat_isolate", "chat_isolate_channel",
                     "capacity_ranges", "commands", "modes", "events",
@@ -1281,7 +1454,16 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         await guard(request)
         b = await _json(request)
         return web.json_response(await botmgr.operator_pump(
-            (b.get("who") or "").strip(), _num(b.get("seconds")) or 5.0))
+            (b.get("who") or "").strip(), _num(b.get("seconds")) or 5.0,
+            device_id=(b.get("device_id") or None),
+            untimed=bool(b.get("untimed"))))
+
+    async def control_pump_stop(request):
+        """Stop the pump — NOT the session pause. Whatever is firing, ends."""
+        await guard(request)
+        b = await _json(request)
+        return web.json_response(
+            await botmgr.operator_pump_stop((b.get("who") or "").strip()))
 
     async def control_stop(request):
         await guard(request)
@@ -1291,6 +1473,11 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     async def end_intro(request):
         """The Chat tab's 'Start now' — close the pre-show early and begin."""
         await guard(request)
+        b = await _json(request)
+        if b.get("next") and await engine.intro_next():
+            # walk the chain: this stage ends, the next one plays
+            return web.json_response({"ok": True, "advanced": True,
+                                      **_public_state(engine, botmgr)})
         ended = await engine.end_intro(reason="operator")
         return web.json_response({"ok": True, "ended": ended,
                                   **_public_state(engine, botmgr)})
@@ -1406,6 +1593,10 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             # the collapse is idempotent and cheap
             data = config_store._collapse_v10(dict(data))
             merged = _gameplay_merge(cfg, data, "replace")
+            # Remember WHICH preset the live gameplay came from. A load is
+            # one-way — editing the tabs afterwards never writes back — so the
+            # panel shows this as a readout, not as a link you can re-point.
+            merged["preset_loaded"] = name
             cfg = config_store.save(config_store._coerce_numbers(merged))
             engine.set_config(cfg)
         elif action == "delete":
@@ -1568,15 +1759,20 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         # linked Stage design: put its always-on items on the compositor
         scene_name = (b.get("stage") or "").strip()
         if st["running"] and scene_name:
-            scn = _find_scene(config_store.load(), scene_name)
+            cfg_now = config_store.load()
+            scn = _find_scene(cfg_now, scene_name)
             for o in ((scn or {}).get("overlays") or []):
                 if not o.get("visible") or _group_hidden(scn, o.get("group")):
                     continue
+                if _group_is_intro(scn, o.get("group")):
+                    continue     # the pre-show mounts these, not the camera
+                if _group_is_pause(cfg_now, o.get("group")):
+                    continue     # pausing mounts these, not the camera
                 lay = o.get("layer") or f"itm-{o.get('id')}"
                 if (o.get("kind") or "media") != "media":
                     if o.get("kind") == "timer" and o.get("autostart"):
                         _timer_op(o.get("id"), "start", configured=o.get("seconds"))
-                    vcam.add_item(o, layer=lay)   # text / gauge / timer(s)
+                    vcam.add_item(o, layer=lay, always_on=True)
                 elif o.get("media"):
                     vcam.fire_overlay(o["media"], mode="hold", layer=lay,
                                       scale=o.get("w"), x=o.get("x"), y=o.get("y"),
@@ -1586,7 +1782,8 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                                       chroma_on=o.get("chroma_on"), chroma=o.get("chroma"),
                                       chroma_tol=o.get("chroma_tol"),
                                       chroma_soft=o.get("chroma_soft"),
-                                      opacity=o.get("opacity"), delay=o.get("delay"))
+                                      opacity=o.get("opacity"), delay=o.get("delay"),
+                                      always_on=True)
         return web.json_response({"ok": st["running"], **st})
 
     async def camera_detect(request):
@@ -1726,7 +1923,10 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             "id": b.get("id"), "stage": b.get("stage") or "",
             "media": b.get("media") or b.get("image"), "seconds": b.get("seconds"),
             "pos": b.get("pos"), "scale": b.get("scale"),
-            "mode": b.get("mode") or "timed", "layer": b.get("layer"),
+            # pass mode through UNSET when the caller didn't give one — the
+            # router needs to tell "unspecified" from an explicit "timed", or
+            # an always-on overlay can never be recognised as a hold
+            "mode": b.get("mode"), "layer": b.get("layer"),
             "x": b.get("x"), "y": b.get("y"),
             "fade_in": b.get("fade_in"), "fade_out": b.get("fade_out"),
             "timer": b.get("timer"), "ctx": b.get("ctx"), "group": b.get("group"),
@@ -1745,6 +1945,11 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             html = fh.read()
         html = html.replace("<head>", f'<head><meta name="df-auth" content="{secret}">', 1)
         resp = web.Response(text=html, content_type="text/html")
+        # Never let a browser hold a stale panel: the UI ships as one file
+        # that changes every update, and a cached copy silently mixes old
+        # JavaScript with a new server — which reads as random features
+        # breaking rather than as a cache. It's a local read; costs nothing.
+        resp.headers["Cache-Control"] = "no-store, must-revalidate"
         resp.set_cookie("df_auth", secret, httponly=True, samesite="Strict", path="/")
         return resp
 
@@ -1766,6 +1971,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         return web.FileResponse(path)
 
     # ---- Stages: media browser + stage designs (Stages tab) -----------------
+    _AUDIO_EXTS = (".mp3", ".wav", ".ogg", ".m4a", ".flac", ".opus", ".aac")
     _VIDEO_EXTS = (".mp4", ".webm", ".mov", ".mkv", ".avi", ".m4v")
 
     async def media_list(request):
@@ -1775,8 +1981,10 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             for n in sorted(os.listdir(IMAGES_DIR)):
                 p = os.path.join(IMAGES_DIR, n)
                 if os.path.isfile(p):
+                    ext_ = os.path.splitext(n)[1].lower()
                     out.append({"name": n, "size": os.path.getsize(p),
-                                "video": os.path.splitext(n)[1].lower() in _VIDEO_EXTS})
+                                "video": ext_ in _VIDEO_EXTS,
+                                "audio": ext_ in _AUDIO_EXTS})
         except FileNotFoundError:
             pass
         return web.json_response({"ok": True, "media": out})
@@ -2033,7 +2241,8 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             raise web.HTTPBadRequest(text="expected a 'file' field")
         ext = os.path.splitext(field.filename or "")[1].lower()
         video = ext in (".mp4", ".webm", ".mov", ".mkv", ".avi", ".m4v")
-        if ext not in (".png", ".jpg", ".jpeg", ".gif", ".webp") and not video:
+        audio = ext in _AUDIO_EXTS
+        if ext not in (".png", ".jpg", ".jpeg", ".gif", ".webp") and not video and not audio:
             raise web.HTTPBadRequest(text="unsupported media type")
         name = f"{uuid.uuid4().hex}{ext}"
         dest = os.path.join(IMAGES_DIR, name)
@@ -2044,7 +2253,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                 if not chunk:
                     break
                 size += len(chunk)
-                cap = (96 if video else 8) * 1024 * 1024   # 8 MB images / 96 MB videos
+                cap = (96 if video else 24 if audio else 8) * 1024 * 1024   # 8 MB images / 24 MB audio / 96 MB video
                 if size > cap:
                     fh.close()
                     os.remove(dest)
@@ -2054,46 +2263,6 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         # the data dir at send time, so configs stay portable and the page never
         # learns the install path); `url` is for the UI preview.
         return web.json_response({"path": f"images/{name}", "url": f"/images/{name}"})
-
-    async def snapshot(request):
-        await guard(request)
-        os.makedirs(IMAGES_DIR, exist_ok=True)
-        reader = await request.multipart()
-        caption = ""
-        dest = None
-        while True:
-            field = await reader.next()
-            if field is None:
-                break
-            if field.name == "caption":
-                caption = (await field.text() or "").strip()
-            elif field.name == "file":
-                dest = os.path.join(IMAGES_DIR, f"snap-{uuid.uuid4().hex}.jpg")
-                size = 0
-                with open(dest, "wb") as fh:
-                    while True:
-                        chunk = await field.read_chunk()
-                        if not chunk:
-                            break
-                        size += len(chunk)
-                        if size > 8 * 1024 * 1024:
-                            fh.close(); os.remove(dest)
-                            raise web.HTTPRequestEntityTooLarge(max_size=8 * 1024 * 1024, actual_size=size)
-                        fh.write(chunk)
-        if dest is None:
-            raise web.HTTPBadRequest(text="no image received")
-        # Post to every active listen channel, then remove the temp file.
-        text = engine.render(caption) if caption else ""
-        try:
-            await botmgr.broadcast(text, dest)
-            engine._log("bot", f"snapshot sent{' + caption' if caption else ''}")
-        finally:
-            try:
-                os.remove(dest)
-            except OSError:
-                pass
-        channels = len(botmgr._targets(config_store.load()))
-        return web.json_response({"ok": True, "channels": channels})
 
     async def set_avatar(request):
         await guard(request)
@@ -2157,7 +2326,6 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/devices/rename", rename_device),
         web.post("/api/devices/calibration", set_calibration),
         web.post("/api/upload", upload),
-        web.post("/api/snapshot", snapshot),
         web.post("/api/discord/avatar", set_avatar),
         web.post("/api/abort", abort),
         web.post("/api/capacity", set_capacity),
@@ -2168,6 +2336,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/session-reset", session_reset),
         web.post("/api/control/roll", control_roll),
         web.post("/api/control/pump", control_pump),
+        web.post("/api/control/pump-stop", control_pump_stop),
         web.post("/api/control/stop", control_stop),
         web.post("/api/control/resume", control_resume),
         web.post("/api/control/end-intro", end_intro),

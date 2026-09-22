@@ -60,6 +60,16 @@ class VirtualCam:
         # its end — that's cosmetic and local, not what viewers get.
         self._mirror = False
         self._frozen = False       # hold the last camera frame (outro freeze)
+        # Blackout: the CAMERA picture is suppressed but overlays still draw on
+        # top — so an intro can play over black without leaking your room.
+        self._black = False
+        # () -> 'live' | 'intro' | 'off'. app.py ties this to LIVE, and it's
+        # asked every frame so it can never drift:
+        #   'live'  — the camera picture, every overlay
+        #   'intro' — black picture; only what the pre-show fires is drawn,
+        #             the scene's always-on overlays stay down
+        #   'off'   — a genuinely black screen: no picture, NO overlays
+        self.gate_cb = None
         self._raw = None           # the last frame read from the webcam
         # () -> {"capacity","firing","remaining","device_timers":[...]} for widgets
         self.state_cb = None
@@ -82,7 +92,32 @@ class VirtualCam:
                 "info": self._info, "device": self._device,
                 "width": self._size[0], "height": self._size[1], "fps": self._fps,
                 "mirror": self._mirror, "frozen": self._frozen,
+                "blackout": self._black or self._gate_mode() != "live",
+                "gate": self._gate_mode(),
                 "overlays": len(self._overlays)}
+
+    def _gate_mode(self) -> str:
+        if self.gate_cb is None:
+            return "live"
+        try:
+            m = self.gate_cb()
+        except Exception:  # noqa: BLE001 — never let a bad gate kill the feed
+            return "live"
+        if m is True:
+            return "live"
+        if m is False:
+            return "off"
+        return str(m or "live")
+
+    def _gate_open(self) -> bool:
+        return self._gate_mode() == "live" 
+
+    def set_blackout(self, on: bool) -> dict:
+        """Black out the camera image while STILL compositing overlays over
+        it. Going live to an intro uses this so viewers never see the room
+        before the show starts."""
+        self._black = bool(on)
+        return {"ok": True, "blackout": self._black}
 
     def set_frozen(self, on: bool) -> dict:
         """Freeze-frame: stop pulling new webcam frames and keep compositing
@@ -268,7 +303,8 @@ class VirtualCam:
                 self._queued.clear()
         return {"ok": True, "dropped": n}
 
-    def add_item(self, item: dict, seconds=None, layer: str | None = None) -> dict:
+    def add_item(self, item: dict, seconds=None, layer: str | None = None,
+                 always_on: bool = False) -> dict:
         """A DRAWN overlay layer — text / capacity_gauge / pump_timer — rendered
         fresh each frame from `item` (its full style: color/size/font/bg/rot/
         orient/flash) plus live game state. Named layers replace, like media."""
@@ -288,7 +324,7 @@ class VirtualCam:
                "fade_in": item.get("fade_in"), "fade_out": item.get("fade_out"),
                "anim": item.get("anim"), "anim_dir": item.get("anim_dir"),
                "queue": item.get("queue"), "delay": item.get("delay"),
-               "born": time.monotonic()}
+               "always_on": always_on, "born": time.monotonic()}
         return self._admit(ent, key)
 
     def add_widget(self, widget: str, x=None, y=None, w=None,
@@ -302,7 +338,8 @@ class VirtualCam:
                      x=None, y=None, rot=None, flash=None, h=None,
                      fade_in=None, fade_out=None, anim=None, anim_dir=None,
                      queue=None, chroma_on=None, chroma=None, chroma_tol=None,
-                     chroma_soft=None, z=None, opacity=None, delay=None) -> dict:
+                     chroma_soft=None, z=None, opacity=None, delay=None,
+                     always_on=False) -> dict:
         """Show a MEDIA layer over the camera. `media` = an image (PNG alpha
         welcome) or a video file from data/images (or an absolute path).
         mode: "timed"  = shown/looping for `seconds`
@@ -336,6 +373,7 @@ class VirtualCam:
                  "fade_in": fade_in, "fade_out": fade_out, "born": time.monotonic(),
                  "anim": anim, "anim_dir": anim_dir, "queue": queue,
                  "z": z, "opacity": opacity, "delay": delay,
+                 "always_on": always_on,
                  "chroma_on": chroma_on, "chroma": chroma,
                  "chroma_tol": chroma_tol, "chroma_soft": chroma_soft,
                  "until": (time.monotonic() + secs) if mode == "timed" else None}
@@ -629,9 +667,27 @@ class VirtualCam:
         self._rtxt[txt] = (out, now)
         return out
 
+    def _solid_sprite(self, item: dict, W: int, H: int):
+        """A flat rectangle of `color` sized by w/h — a backdrop card, a
+        letterbox bar, a plate under a lower third. Exists so a scene can
+        carry a full-frame background WITHOUT shipping an image file."""
+        try:
+            bw = max(1, int(W * float(item.get("w") or 1.0)))
+            bh = max(1, int(H * float(item.get("h") or 1.0)))
+        except (TypeError, ValueError):
+            bw, bh = W, H
+        sp = np.zeros((bh, bw, 4), np.uint8)
+        sp[:, :, :3] = self._bgr(item.get("color"), (0, 0, 0))
+        sp[:, :, 3] = 255          # layer opacity is applied later, per-frame
+        return sp
+
     def _render_item(self, item: dict, W: int, H: int):
         """RGBA sprite for a non-media overlay, or None to draw nothing."""
         kind = str(item.get("kind") or "text")
+        if kind == "audio":
+            return None          # a sound cue draws nothing — by design
+        if kind == "solid":
+            return self._solid_sprite(item, W, H)
         st = self._get_state()
         if kind == "capacity_gauge":
             try:
@@ -792,7 +848,23 @@ class VirtualCam:
         roi[:] = (ov[:, :, :3].astype("float32") * a
                   + roi.astype("float32") * (1.0 - a)).astype("uint8")
 
-    def _composite(self, frame):
+    def _reap_only(self) -> None:
+        """Expire timed overlays while nothing is being drawn, so a blacked-out
+        stretch doesn't leave a backlog to dump on screen when it lifts."""
+        now = time.monotonic()
+        with self._lock:
+            dead = [o for o in self._overlays
+                    if o.get("dead") or (o.get("until") and o["until"] <= now)]
+            self._overlays = [o for o in self._overlays if o not in dead]
+        for o in dead:
+            cap = o.get("cap")
+            if cap is not None:
+                try:
+                    cap.release()
+                except Exception:  # noqa: BLE001
+                    pass
+
+    def _composite(self, frame, intro: bool = False):
         now = time.monotonic()
         with self._lock:
             dead = [o for o in self._overlays
@@ -830,6 +902,8 @@ class VirtualCam:
                 return 0.0
         ovs.sort(key=_z)        # stable: equal z keeps fire order (newest on top)
         for o in ovs:
+            if intro and o.get("always_on"):
+                continue                       # pre-show: the scene stays down
             if o.get("start_at") and now < o["start_at"]:
                 continue                       # staggered — not its turn yet
             # flash: N seconds visible, N hidden (0/blank = always visible)
@@ -940,7 +1014,15 @@ class VirtualCam:
                             self._err = "camera read failed (unplugged / in use?)"
                             break
                         self._raw = frame
-                    frame = self._composite(frame[:H, :W])
+                    frame = frame[:H, :W]
+                    mode = self._gate_mode()
+                    if self._black or mode != "live":
+                        frame = np.zeros_like(frame)
+                    if mode == "off":
+                        # a real black screen — nothing painted on it at all
+                        self._reap_only()
+                    else:
+                        frame = self._composite(frame, intro=(mode == "intro"))
                     if self._mirror:
                         # Flip the FINISHED frame (camera + overlays together).
                         # Discord mirrors your own self-view and offers no way

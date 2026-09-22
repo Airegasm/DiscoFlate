@@ -252,7 +252,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udd25 **[user]** cashed out a huge **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                "message": "\ud83d\udd25 **[user]** cashed out a huge **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
               }
             ]
           }
@@ -354,7 +354,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
               }
             ]
           },
@@ -370,7 +370,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83c\udfc6 **[user]** got a PERFECT SCORE **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                "message": "\ud83c\udfc6 **[user]** got a PERFECT SCORE **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
               }
             ]
           }
@@ -456,7 +456,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
               }
             ]
           },
@@ -526,7 +526,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udc80 **[user]** got swept by the bot in rock, paper, scissors. \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                "message": "\ud83d\udc80 **[user]** got swept by the bot in rock, paper, scissors.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
               }
             ]
           },
@@ -971,7 +971,7 @@
   "auto_report": {
     "enabled": true,
     "seconds": 300,
-    "message": "[Bot Report] **[operator]'s DiscoFlate Inflation Bot is now LIVE! ([uptime])**\n\n[announce] - Current Capacity: **[capacity]%**\n[capacity_bar]\n\n**[help_cmd]** for a list of commands.\n\n\n",
+    "message": "\ud83d\udccb **Bot Report** \u2014 **[operator]'s DiscoFlate Inflation Bot is now LIVE! ([uptime])**\n\n[announce] - Current Capacity: **[capacity]%**\n[capacity_bar]\n\n**[syscom_help]** for a list of commands.",
     "embed": false,
     "title": ""
   },
@@ -1166,7 +1166,7 @@
       "max": 110,
       "dice": 2,
       "sides": 4,
-      "announce": "\ud83d\udea8 [operator] is at the absolute brink, creaking and ready to pop. Any minute now! ",
+      "announce": "\ud83d\udea8 [operator] is at the absolute brink, creaking and ready to pop. Any minute now!",
       "milestone": "**MILESTONE:** \ud83d\udea8 [operator] is going to pop at any second! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
       "image": "",
       "cooldowns": {
@@ -1192,7 +1192,7 @@
       "is_end": true,
       "enabled": true,
       "end_only": false,
-      "final_message": "\ud83d\udca5 **BOOOOM!!** \nCongradulations! [operator] has popped!\n\n[off_message]"
+      "final_message": "\ud83d\udca5 **BOOOOM!!**\nCongratulations! [operator] has popped!\n\n[off_message]"
     }
   ],
   "commands": [
@@ -1232,7 +1232,9 @@
           "type": "message",
           "message": "\ud83d\udca8 [mention] used [prefix]fill - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
         }
-      ]
+      ],
+      "notify_enabled": true,
+      "notify": "[user] just triggered [command]"
     },
     {
       "name": "inflate",
@@ -1270,7 +1272,9 @@
           "type": "message",
           "message": "\ud83d\udca8 [mention] used [prefix]inflate - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
         }
-      ]
+      ],
+      "notify_enabled": true,
+      "notify": "[user] just triggered [command]"
     },
     {
       "name": "pump",
@@ -1308,7 +1312,9 @@
           "type": "message",
           "message": "\ud83d\udca8 [mention] used [prefix]pump - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
         }
-      ]
+      ],
+      "notify_enabled": true,
+      "notify": "[user] just triggered [command]"
     },
     {
       "name": "squeeze",
@@ -1346,7 +1352,9 @@
           "type": "message",
           "message": "\ud83d\udca8 [mention] used [prefix]squeeze - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
         }
-      ]
+      ],
+      "notify_enabled": true,
+      "notify": "[user] just triggered [command]"
     },
     {
       "name": "tease",
@@ -1384,7 +1392,9 @@
           "type": "message",
           "message": "\ud83d\udca8 [mention] used [prefix]tease - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
         }
-      ]
+      ],
+      "notify_enabled": true,
+      "notify": "[user] just triggered [command]"
     },
     {
       "name": "topup",
@@ -1422,7 +1432,9 @@
           "type": "message",
           "message": "\ud83d\udca8 [mention] used [prefix]topup - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
         }
-      ]
+      ],
+      "notify_enabled": true,
+      "notify": "[user] just triggered [command]"
     },
     {
       "name": "agtoss",
@@ -1472,7 +1484,9 @@
             }
           ]
         }
-      ]
+      ],
+      "notify_enabled": true,
+      "notify": "[user] just triggered [command]"
     },
     {
       "name": "agroulette",
@@ -1506,7 +1520,9 @@
           "type": "message",
           "message": "**[user]** spins the roulette wheel\u2026 [user] can use this command [cmd_remain] more times."
         }
-      ]
+      ],
+      "notify_enabled": true,
+      "notify": "[user] just triggered [command]"
     },
     {
       "name": "agpushluck",
@@ -1589,11 +1605,13 @@
             },
             {
               "type": "message",
-              "message": "\ud83d\udd25 **[user]** cashed out a huge **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+              "message": "\ud83d\udd25 **[user]** cashed out a huge **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         }
-      ]
+      ],
+      "notify_enabled": true,
+      "notify": "[user] just triggered [command]"
     },
     {
       "name": "agsimon",
@@ -1692,7 +1710,7 @@
             },
             {
               "type": "message",
-              "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+              "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
@@ -1708,11 +1726,13 @@
             },
             {
               "type": "message",
-              "message": "\ud83c\udfc6 **[user]** got a PERFECT SCORE **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+              "message": "\ud83c\udfc6 **[user]** got a PERFECT SCORE **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         }
-      ]
+      ],
+      "notify_enabled": true,
+      "notify": "[user] just triggered [command]"
     },
     {
       "name": "agpopit",
@@ -1795,7 +1815,7 @@
             },
             {
               "type": "message",
-              "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**! \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+              "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
@@ -1815,7 +1835,9 @@
             }
           ]
         }
-      ]
+      ],
+      "notify_enabled": true,
+      "notify": "[user] just triggered [command]"
     },
     {
       "name": "agrps",
@@ -1866,7 +1888,7 @@
             },
             {
               "type": "message",
-              "message": "\ud83d\udc80 **[user]** got swept by the bot in rock, paper, scissors. \n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+              "message": "\ud83d\udc80 **[user]** got swept by the bot in rock, paper, scissors.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
@@ -1902,7 +1924,9 @@
             }
           ]
         }
-      ]
+      ],
+      "notify_enabled": true,
+      "notify": "[user] just triggered [command]"
     },
     {
       "name": "agpull",
@@ -1989,7 +2013,9 @@
             }
           ]
         }
-      ]
+      ],
+      "notify_enabled": true,
+      "notify": "[user] just triggered [command]"
     },
     {
       "name": "agblackjack",
@@ -2092,7 +2118,9 @@
             }
           ]
         }
-      ]
+      ],
+      "notify_enabled": true,
+      "notify": "[user] just triggered [command]"
     },
     {
       "name": "agroll",
@@ -2105,9 +2133,11 @@
         },
         {
           "type": "message",
-          "message": "\ud83c\udfb2 [mention] rolled **[dice]** and they landed on **[result]**\n**[secs]** seconds have been added to the pump timer, and will increase  [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+          "message": "\ud83c\udfb2 [mention] rolled **[dice]** and they landed on **[result]**\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
         }
-      ]
+      ],
+      "notify_enabled": true,
+      "notify": "[user] just triggered [command]"
     },
     {
       "name": "superpump",
@@ -2127,7 +2157,9 @@
           "type": "message",
           "message": "\u2728 [mention] used the prize!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
         }
-      ]
+      ],
+      "notify_enabled": true,
+      "notify": "[user] just triggered [command]"
     }
   ],
   "always_on_enabled": true,
@@ -2509,12 +2541,9 @@
   ],
   "broadcasts": [
     {
-      "name": "Plugged",
-      "message": "\u26a0\ufe0f **NOTICE:** \ud83d\udd0c [operator]'s air pump tube is currently fitted with an **inflatable enema retention nozzle** \nThis means that they will **not** be able to release **any pressure** during this session!\n"
-    },
-    {
-      "name": "NoCap",
-      "message": "\u26a0\ufe0f **NOTICE:** \ud83c\udf88\ud83d\udca5 This is an **uncapped inflation session** and over-inflating is **strongly encouraged**\n\n**Pump first, ask permission never.**"
+      "name": "Announcement",
+      "message": "\ud83d\udce2 **Announcement from [operator]**\n\nYour message goes here \u2014 placeholders work: capacity is **[capacity]%** [capacity_bar], and commands are listed with [syscom_help].",
+      "enabled": true
     }
   ],
   "prizes": [
@@ -2583,22 +2612,255 @@
   "pumpdirect_path": "/home/saintorphan/Projects/PumpDirect/data/devices.json",
   "owner_commands": [],
   "chat_buttons": [],
-  "overlay_buttons": [],
   "chat_isolate": false,
   "chat_isolate_channel": "",
   "vcam_mirror": false,
-  "scenes": [],
+  "scenes": [
+    {
+      "name": "Basic Overlays",
+      "width": 1920,
+      "height": 1080,
+      "overlays": [
+        {
+          "id": "dfdefcapgauge",
+          "label": "",
+          "kind": "capacity_gauge",
+          "media": "",
+          "x": 0.0033,
+          "y": 0.0201,
+          "w": 0.35,
+          "mode": "timed",
+          "seconds": 5,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": true,
+          "group": "Main",
+          "z": 0,
+          "opacity": 100,
+          "delay": 0
+        },
+        {
+          "id": "dfdefdevtimer",
+          "label": "",
+          "kind": "device_timers",
+          "media": "",
+          "x": 0.0,
+          "y": 0.1,
+          "w": 0.35,
+          "mode": "timed",
+          "seconds": 5,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": true,
+          "group": "Main",
+          "z": 0,
+          "opacity": 100,
+          "delay": 0,
+          "size": 0.04,
+          "color": "#ffffff",
+          "font": "bold",
+          "bg": "",
+          "fmt_on": "[name] [secs]s",
+          "fmt_off": "[name] idle",
+          "show_idle": true
+        },
+        {
+          "id": "dfdefhelptext",
+          "label": "",
+          "kind": "text",
+          "media": "",
+          "x": 0.7933,
+          "y": 0.0201,
+          "w": 0.35,
+          "mode": "timed",
+          "seconds": 5,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": true,
+          "group": "Main",
+          "z": 0,
+          "opacity": 100,
+          "delay": 0,
+          "size": 0.05,
+          "color": "#ffffff",
+          "font": "bold",
+          "bg": "",
+          "text": "[syscom_help]"
+        },
+        {
+          "id": "dfdefpollview",
+          "label": "",
+          "kind": "poll_viewer",
+          "media": "",
+          "x": 0.7022,
+          "y": 0.7369,
+          "w": 0.2889,
+          "mode": "timed",
+          "seconds": 5,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": true,
+          "group": "Main",
+          "z": 0,
+          "opacity": 100,
+          "delay": 0,
+          "h": 0.2483,
+          "size": 0.06,
+          "color": "#f4a828",
+          "bg": "#12121a",
+          "results_secs": 8,
+          "fade_out": 0.6
+        },
+        {
+          "id": "dfdefintrobg",
+          "label": "Intro backdrop",
+          "kind": "solid",
+          "media": "",
+          "x": 0.0,
+          "y": 0.0,
+          "w": 1.0,
+          "mode": "hold",
+          "seconds": 5,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": true,
+          "group": "Intro",
+          "z": -5,
+          "opacity": 100,
+          "delay": 0,
+          "h": 1.0,
+          "color": "#000000"
+        },
+        {
+          "id": "dfdefintrotxt",
+          "label": "Intro countdown",
+          "kind": "text",
+          "media": "",
+          "x": 0.1,
+          "y": 0.44,
+          "w": 0.8,
+          "mode": "hold",
+          "seconds": 5,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": true,
+          "group": "Intro",
+          "z": 0,
+          "opacity": 100,
+          "delay": 0,
+          "size": 0.055,
+          "color": "#ffffff",
+          "font": "bold",
+          "bg": "",
+          "align": "center",
+          "text": "[owner]'s DiscoFlate stream will begin in [intro_timer]"
+        },
+        {
+          "id": "dfdefnotify",
+          "label": "Notification",
+          "kind": "text",
+          "media": "",
+          "x": 0.1,
+          "y": 0.86,
+          "w": 0.8,
+          "mode": "timed",
+          "seconds": 5,
+          "layer": "notify",
+          "rot": 0,
+          "flash": 0,
+          "visible": false,
+          "group": "Main",
+          "z": 20,
+          "opacity": 100,
+          "delay": 0,
+          "size": 0.045,
+          "color": "#ffffff",
+          "font": "bold",
+          "bg": "#12121aCC",
+          "align": "center",
+          "text": "[user] just triggered [command]",
+          "fade_out": 0.4
+        },
+        {
+          "id": "dfdefpausebg",
+          "label": "Pause backdrop",
+          "kind": "solid",
+          "media": "",
+          "x": 0.0,
+          "y": 0.0,
+          "w": 1.0,
+          "mode": "hold",
+          "seconds": 5,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": false,
+          "group": "Pause",
+          "z": 900,
+          "opacity": 100,
+          "delay": 0,
+          "h": 1.0,
+          "color": "#000000"
+        },
+        {
+          "id": "dfdefpausetxt",
+          "label": "Pause message",
+          "kind": "text",
+          "media": "",
+          "x": 0.1,
+          "y": 0.45,
+          "w": 0.8,
+          "mode": "hold",
+          "seconds": 5,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": false,
+          "group": "Pause",
+          "z": 901,
+          "opacity": 100,
+          "delay": 0,
+          "size": 0.06,
+          "color": "#ffffff",
+          "font": "bold",
+          "bg": "",
+          "align": "center",
+          "text": "[operator] will be right back!"
+        }
+      ],
+      "hidden_groups": [],
+      "groups": [
+        "Intro",
+        "Main",
+        "Pause"
+      ],
+      "intro_groups": [
+        "Intro"
+      ]
+    }
+  ],
   "scene_globals": [],
-  "chat_scene": "",
+  "chat_scene": "Basic Overlays",
+  "preset_loaded": "",
   "golive": {
-    "intro_enabled": false,
-    "seconds": 60,
-    "scene_group": "",
+    "intro_enabled": true,
+    "seconds": 15,
+    "scene_group": "Intro",
     "announce": "",
     "announce_image": "",
     "announce_every": 0,
     "hold_commands": true,
-    "commands": []
+    "commands": [],
+    "after_group": "Main",
+    "blackout": true
   },
-  "vcam_last": {}
+  "vcam_last": {},
+  "pause_overlay": "Pause",
+  "notify_overlay": "dfdefnotify"
 }

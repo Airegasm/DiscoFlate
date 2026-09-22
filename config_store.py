@@ -246,7 +246,6 @@ DEFAULTS = {
     "chat_buttons": [],
     # Overlay actions (Chat tab, VIDEO channels): buttons that play a timed
     # image layer over the virtual camera. Each: {label, image, seconds, pos, scale}
-    "overlay_buttons": [],
 
     # Modes group several commands under one switch. Toggling a mode enables/
     # disables its member commands and optionally posts a message.
@@ -375,6 +374,15 @@ DEFAULTS = {
     "scenes": [],
     "scene_globals": [],   # overlay items callable from every scene
     "chat_scene": "",      # the Scene linked to the Chat tab's video section
+    # Which Gameplay Preset the live gameplay was last LOADED from. A readout
+    # only: loading copies a preset into the live config, and editing the tabs
+    # afterwards never writes back to it.
+    "preset_loaded": "",
+    # Two overlays the SESSION drives (picked in Dashboard -> Go Live Options):
+    # notify_overlay = the ONE Text overlay every command's 📣 line writes to;
+    # pause_overlay  = a scene GROUP played over everything while paused.
+    "notify_overlay": "",
+    "pause_overlay": "",
 
     # Go Live options (Dashboard). Switching LIVE on can open with an INTRO
     # instead of starting the game immediately: an optional scene group plays,
@@ -389,6 +397,8 @@ DEFAULTS = {
         "announce": "",             # blank = say nothing
         "announce_image": "",       # posted WITH the first announcement only
         "announce_every": 0,        # repeat/edit interval, 0 = post once
+        "after_group": "",          # scene group to play once the intro ends
+        "blackout": True,           # black the camera until the intro ends
         "hold_commands": True,
         "commands": [],             # allowed anyway during the intro
     },

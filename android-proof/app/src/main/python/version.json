@@ -1,6 +1,6 @@
 {
-  "version": "3.56.2",
-  "versionCode": 138,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.56.2/discoflate-v3.56.2.apk",
-  "notes": "DiscoFlate v3.56.2 — the Go Live intro dropdown was built before the page had decided which scene was current, so it came up empty or half-filled no matter how many groups you had. It now waits for that, and lists EVERY scene's groups labelled by scene rather than only the Chat-linked one. If no scene is linked to Chat, an intro group still plays — the server finds whichever scene owns it instead of quietly doing nothing."
+  "version": "3.57.0",
+  "versionCode": 139,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.57.0/discoflate-v3.57.0.apk",
+  "notes": "DiscoFlate v3.57.0 \u2014 Commands and Events merge into one TRIGGERS tab of collapsible sections; rows open by clicking their title strip (the \u270f\ufe0f button is gone). Scenes gain Solid and Audio overlays, \u25b6 Move To, scene + group duplicate, intro-flagged groups, and a canvas that previews at the virtual cam's real resolution. Go Live plays a CHAIN of intro stages. Every command can put its own line on one shared notify overlay, and pausing covers the stream with a pause card. Turning a scene group off now means off the STREAM \u2014 firing it still plays it. The Camera tab is gone (the snapshot action already posts the composited frame). Chat renders Discord formatting."
 }

@@ -98,7 +98,9 @@
   /* a label containing more than one control lays them out in a row */
   .pfield.inline{flex-direction:row;align-items:center;gap:5px;flex-wrap:nowrap}
   .pfield.inline>span{align-self:center}
-  .pmini{padding:0 8px;height:var(--h);line-height:var(--h)}
+  /* icon-only button. --h is only set inside .pfield, so it needs a fallback
+     or the height silently collapses everywhere else it is used. */
+  .pmini{padding:0 10px;height:var(--h,38px);line-height:var(--h,38px);font-size:15px}
   .pcol{width:46px;height:var(--h);padding:2px}
   .prange{width:120px;height:var(--h);padding:0;accent-color:var(--accent)}
   .pval{font-size:12px;color:var(--dim);min-width:38px}
@@ -123,6 +125,22 @@
   .stgrow button{padding:2px 8px;font-size:13px;line-height:1.4}
   @media(max-width:820px){ .stglists{grid-template-columns:1fr} }
   /* Chat tab: log on the left, a stacked button panel on the right third */
+  /* the virtual-cam controls: settings on one line, actions on the next, so
+     nine controls stop fighting over a single row */
+  .vcamrow{flex-wrap:wrap}
+  .vcamprev{width:100%;max-width:720px;aspect-ratio:16/9;object-fit:contain;
+            background:#05070b;border-radius:12px;margin-top:10px;
+            border:1px solid var(--line)}
+  /* Discord markdown in the chat log */
+  .codemd{background:#0c0f16;border:1px solid var(--line);border-radius:5px;
+          padding:1px 5px;font-family:ui-monospace,Menlo,monospace;font-size:.92em}
+  pre.codemd{display:block;padding:8px 10px;margin:4px 0;white-space:pre-wrap;
+             overflow-x:auto}
+  .submd{font-size:.82em;color:var(--dim)}
+  .quotemd{border-left:3px solid var(--line);padding-left:8px;color:var(--dim);
+           display:inline-block}
+  .spoil{background:var(--dim);color:transparent;border-radius:3px;cursor:pointer}
+  .spoil:hover{background:transparent;color:inherit}
   .chatsplit{display:grid;grid-template-columns:2fr 1fr;gap:12px;align-items:start;margin-top:10px}
   .chatmain{min-width:0}
   .chatside{min-width:0;border:1px solid var(--line);border-radius:10px;
@@ -141,6 +159,15 @@
   /* Stages tab: the design canvas + draggable overlay items */
   #stgCanvas{position:relative;background:#05070b;border:1px solid var(--line);
              border-radius:8px;overflow:hidden;touch-action:none;width:100%;max-width:900px}
+  /* the canvas keeps its own settings beside it, not stranded above the lists */
+  .stgstage{display:flex;gap:14px;align-items:flex-start;margin-top:8px}
+  .stgstage>#stgCanvas{flex:1 1 auto;min-width:0}
+  .stgstage .stgside{flex:0 0 165px;display:flex;flex-direction:column;gap:12px;
+                     padding-top:2px}
+  @media(max-width:860px){
+    .stgstage{flex-direction:column}
+    .stgstage .stgside{flex:none;width:100%;flex-direction:row;align-items:flex-end;gap:14px}
+  }
   /* layout grid: a line every 5%, brighter every 25%, brightest on the centre.
      Percentages (not pixels) so it means the same at any scene resolution. */
   #stgCanvas.grid{background-image:
@@ -150,6 +177,16 @@
       repeating-linear-gradient(to bottom, rgba(255,255,255,.14) 0 1px, transparent 1px 25%),
       linear-gradient(to right,  transparent calc(50% - 1px), rgba(120,190,255,.30) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px)),
       linear-gradient(to bottom, transparent calc(50% - 1px), rgba(120,190,255,.30) calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px))}
+  .audiomark{display:flex;align-items:center;gap:6px;padding:3px 8px;border-radius:6px;
+             background:rgba(10,12,18,.72);border:1px dashed var(--accent);color:#fff;
+             font-size:12px;white-space:nowrap}
+  .audiomark .nm{opacity:.85}
+  /* a row's title strip: click the dead space to open/close it */
+  .rowhead{cursor:pointer}
+  .rowhead:hover{background:rgba(255,255,255,.035)}
+  .rowhead input,.rowhead select,.rowhead textarea,.rowhead button,
+  .rowhead label,.rowhead .draghandle{cursor:auto}
+  .rowhead button,.rowhead .draghandle{cursor:pointer}
   .stgItem{position:absolute;cursor:grab;outline:1px dashed rgba(255,255,255,.28);border-radius:4px}
   .stgItem img,.stgItem video{width:100%;display:block;pointer-events:none;border-radius:4px}
   .stgItem.sel{outline:2px solid var(--accent);z-index:5}
@@ -263,13 +300,9 @@
   .ctrlrow .ctrlfield select{width:64px}            /* small dice/sides dropdowns */
   .ctrlrow .ctrlfield input{width:90px}             /* numeric inputs (uniform) */
   @media(max-width:520px){ .ctrlrow{grid-template-columns:140px 1fr} select.ctrlfield{width:100%} }
-  /* one universal manual-save bar, fixed to the bottom of every page (autosave
-     already persists everything — this is a redundant belt-and-suspenders). */
-  #saveBar{position:fixed;left:0;right:0;bottom:0;z-index:9990;display:flex;gap:12px;
-    align-items:center;justify-content:center;padding:8px;background:var(--panel);
-    border-top:1px solid var(--line);box-shadow:0 -2px 8px rgba(0,0,0,.18)}
-  #saveBar button{min-width:180px}
-  body{padding-bottom:58px}
+  /* Save all lives in the header next to Pause/Resume — autosave already
+     persists everything, so this is a belt-and-suspenders, not a footer. */
+  #saveAllBtn[disabled],#ctrlStopBtn[disabled]{opacity:.4;cursor:not-allowed}
   .draghandle{cursor:grab;user-select:none;color:var(--dim);font-size:16px;line-height:1;padding:0 2px;letter-spacing:-2px}
   .draghandle:active{cursor:grabbing}
 </style>
@@ -285,7 +318,9 @@
     <span class="pill" id="takeoverPill" style="display:none;background:var(--accent);color:#04202a;font-weight:700;cursor:pointer" onclick="takeoverRelease()" title="You are driving the OTHER device — Activation, Mock and every setting you change here belong to it. Tap to return to this device's own DiscoFlate.">🖥 CONTROLLING THE PC — changes apply THERE · ↩ Release</span>
     <span class="muted" id="saveStatus" style="transition:opacity .3s;opacity:0;color:var(--accent2)">saved ✓</span>
     <div class="toggles">
-      <button class="bad" id="ctrlStopBtn" onclick="controlStop()" style="padding:7px 14px" title="Pause the whole session: pumps off, events + games cancelled, commands latched until Resume">🛑 Stop</button>
+      <button class="ghost" id="saveAllBtn" onclick="saveAllNow()" style="padding:7px 14px" title="Everything autosaves as you edit — this is a manual, save-everything safety">💾 Save all</button>
+      <span class="muted" id="saveBarStatus" style="min-width:0"></span>
+      <button class="bad" id="ctrlStopBtn" onclick="controlStop()" style="padding:7px 14px" title="Pause the whole session: pumps off, events + games cancelled, commands latched until Resume">⏸ Pause</button>
       <span class="tgl"><span class="muted">Mock</span><label class="switch"><input type="checkbox" id="mock"><span class="slider"></span></label></span>
       <span class="tgl"><span style="font-weight:700;color:var(--text)">LIVE</span><label class="switch"><input type="checkbox" id="listener"><span class="slider"></span></label></span>
     </div>
@@ -294,15 +329,13 @@
   <nav class="tabs" id="tabbar">
     <button class="tab-btn" data-go="dashboard">Dashboard</button>
     <button class="tab-btn" data-go="chat">Chat</button>
-    <button class="tab-btn" data-go="stages">Scenes</button>
-    <button class="tab-btn" data-go="discord">Discord</button>
-    <button class="tab-btn" data-go="devices">Devices</button>
-    <button class="tab-btn" data-go="snapshot">Camera</button>
     <button class="tab-btn" data-go="game">Game</button>
-    <button class="tab-btn" data-go="commands">Commands</button>
-    <button class="tab-btn" data-go="help">Help</button>
-    <button class="tab-btn" data-go="events">Events</button>
+    <button class="tab-btn" data-go="stages">Scenes</button>
+    <button class="tab-btn" data-go="triggers">Triggers</button>
+    <button class="tab-btn" data-go="devices">Devices</button>
+    <button class="tab-btn" data-go="discord">Discord</button>
     <button class="tab-btn" data-go="system">System</button>
+    <button class="tab-btn" data-go="help">Help</button>
   </nav>
 
   <div class="grid">
@@ -327,34 +360,6 @@
         <input type="number" id="capInput" min="0" max="100" step="0.5" style="width:78px" onchange="setCapacity(this.value)">
         <span class="muted">set %</span>
       </div>
-      <details class="help" style="margin-top:12px"><summary><b style="font-size:1.02rem">🎬 Go Live Options</b> <span class="muted" id="golivePill"></span></summary>
-        <div class="hint" style="margin-top:8px;max-width:860px">What happens when you flip <b>LIVE</b> on. Leave this off to <b>begin immediately</b>. Turn it on to open with an <b>intro</b>: a scene group plays, an announcement posts, and <b>commands stay held</b> until the intro ends — so nobody can play during the pre-show. Timed events wait too. <code>[intro_timer]</code> counts down in messages <i>and</i> in Text overlays.</div>
-        <label class="row" style="gap:8px;margin:10px 0"><input type="checkbox" id="glEnabled" onchange="scheduleSave();goliveUi()" style="width:auto"> <b>Open with an intro</b></label>
-        <div id="glBody" style="display:none">
-          <div class="row" style="gap:12px;align-items:flex-end">
-            <label class="field">Length <span class="muted">(secs · 0 = until you say)</span>
-              <input type="number" id="glSecs" min="0" step="5" value="60" style="width:100px" onchange="scheduleSave()"></label>
-            <label class="field">Intro scene group <select id="glGroup" style="width:180px" onchange="scheduleSave()"></select></label>
-            <label class="row" style="gap:6px"><input type="checkbox" id="glHold" checked onchange="scheduleSave()" style="width:auto"> hold commands</label>
-          </div>
-          <div class="row" style="gap:12px;align-items:flex-end;margin-top:8px">
-            <label class="field" style="flex:1;min-width:240px">Announcement <span class="muted">(blank = none · [intro_timer])</span>
-              <input id="glAnnounce" placeholder="🎬 Starting in [intro_timer] seconds!" style="width:100%" onchange="scheduleSave()"></label>
-            <label class="field">Repeat every <span class="muted">(secs · 0 = once)</span>
-              <input type="number" id="glEvery" min="0" step="5" value="0" style="width:100px" onchange="scheduleSave()"></label>
-          </div>
-          <div class="row" style="gap:8px;align-items:flex-end;margin-top:8px">
-            <label class="field" style="flex:1;min-width:220px;max-width:420px">Image <span class="muted">(optional · posts with the first announcement)</span>
-              <div class="row" style="gap:6px;flex-wrap:nowrap">
-                <input id="glImage" placeholder="pick or type a filename from data/images" style="flex:1;min-width:0" onchange="scheduleSave()">
-                <button class="ghost" title="pick from the media library" onclick="mediaBrowse(n=>{$('#glImage').value=n;scheduleSave();})">🗂</button>
-                <button class="ghost" title="clear" onclick="$('#glImage').value='';scheduleSave()">✕</button>
-              </div></label>
-          </div>
-          <label class="field" style="margin-top:8px">Commands allowed during the intro <span class="muted">(comma-separated · everything else is held)</span>
-            <input id="glCmds" placeholder="signup, rules" style="width:100%;max-width:520px" onchange="scheduleSave()"></label>
-        </div>
-      </details>
       <div class="row" style="align-items:center">
         <div style="flex:1"><span class="muted">⏱ Session uptime:</span> <b id="uptimeVal">0s</b></div>
         <button class="warn" onclick="if(confirm('Reset the session? Capacity → 0%, all cooldowns cleared, timed events re-armed, command-started events reverted.')) act('/api/session-reset')">↺ Session reset</button>
@@ -369,8 +374,12 @@
             <span class="ctrlfield"><select id="ctrlDice"></select><span class="muted">d</span><select id="ctrlSides"></select></span>
           </div>
           <div class="ctrlrow">
-            <button onclick="controlPump()">💨 Pump</button>
-            <span class="ctrlfield"><input type="number" id="ctrlPump" value="5" min="1" step="0.5"><span class="muted">secs</span></span>
+            <button id="ctrlPumpBtn" onclick="controlPump()">💨 Pump</button>
+            <span class="ctrlfield" style="gap:6px;flex-wrap:wrap">
+              <select id="ctrlPumpDev" style="min-width:120px" title="which pump to run"></select>
+              <label class="row" style="gap:4px;white-space:nowrap" title="untick to run it until you press STOP"><input type="checkbox" id="ctrlPumpTimed" checked style="width:auto" onchange="pumpUi()"> timed</label>
+              <input type="number" id="ctrlPump" value="5" min="1" step="0.5"><span class="muted" id="ctrlPumpSecsLbl">secs</span>
+            </span>
           </div>
           <div class="ctrlrow">
             <button class="ghost" onclick="controlCapacity()">📊 Broadcast Capacity</button>
@@ -398,28 +407,27 @@
       <h2>💬 Chat</h2>
       <div class="row" style="gap:10px;align-items:flex-end">
         <label class="field">Channel <select id="chatChan" style="width:280px" onchange="chatSwitch()"></select></label>
-        <button id="introNow" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700" onclick="endIntroNow()" title="end the pre-show and start the session right now">🎬 Start now</button>
+        <button id="introNext" style="display:none;background:var(--accent);color:#04202a;font-weight:700" onclick="introNextStage()" title="finish this intro stage and play the next one">⏭ Next stage</button><button id="introNow" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700" onclick="endIntroNow()" title="end the pre-show and start the session right now">🎬 Start now</button>
         <label class="row" style="gap:6px" title="while checked, ALL broadcasts (events, announcements, timers) go ONLY to this channel — other live channels still get their direct command replies"><input type="checkbox" id="chatIso" style="width:auto" onchange="chatIsoChanged()"> <b>Isolate</b></label>
-        <div style="flex:1"></div>
-        <button onclick="controlRoll()">🎲 Roll</button>
-        <button onclick="controlPump()">💨 Pump</button>
-        <button class="ghost" onclick="controlCapacity()">📊 Capacity</button>
-        <button class="ghost" onclick="controlCleanup()">🧹 Cleanup</button>
       </div>
       <div id="overlaySec" style="display:none;border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
-        <div class="row" id="vcamCtrls" style="gap:12px;align-items:flex-end">
+        <div id="vcamCtrls">
+         <div class="row vcamrow" style="gap:12px;align-items:flex-end">
           <b style="white-space:nowrap">🎥 Video channel</b>
-          <label class="field">Scene <select id="chatSceneSel" style="width:160px" onchange="chatSceneChanged()"></select></label>
+          <span class="muted" style="white-space:nowrap" title="the scene selected on the Scenes tab — that one picker drives everything">Scene: <b id="chatSceneName" style="color:var(--text)">—</b></span>
           <label class="field">Camera <select id="vcamDev" style="width:150px" onchange="vcamDevPick()"><option value="0">0</option></select></label>
           <label class="field">Size <select id="vcamRes" style="width:130px">
             <option>1280x720</option><option>1920x1080</option><option>640x480</option>
             <option>720x1280</option><option>1080x1920</option></select></label>
           <label class="row" style="gap:5px" title="Discord mirrors your own video tile and can't be told not to — so your overlays read backwards TO YOU there, while viewers see them correctly. Tick this to cancel that: your Discord tile reads right, but viewers then see everything mirrored. The preview above is always what viewers get."><input type="checkbox" id="vcamMirror" style="width:auto" onchange="vcamMirrorSet()"> 🪞 Mirror</label>
-          <button class="ghost" onclick="vcamDetect()">🔍 Detect</button>
-          <button class="ghost" onclick="vcamDriver()" title="check the virtual-camera driver; offers a one-click install when it's missing">🩺 Driver</button>
+         </div>
+         <div class="row vcamrow" style="gap:8px;align-items:center;margin-top:8px">
           <button onclick="vcamStart()">▶ Start virtual cam</button>
           <button class="ghost" onclick="vcamStop()">⏹ Stop</button>
+          <button class="ghost" onclick="vcamDetect()">🔍 Detect</button>
+          <button class="ghost" onclick="vcamDriver()" title="check the virtual-camera driver; offers a one-click install when it's missing">🩺 Driver</button>
           <span class="muted" id="vcamMsg" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
+         </div>
         </div>
         <div class="hint" id="vcamDrvHint" style="display:none"></div>
         <!-- phone: video runs on the PC — this links straight into its panel -->
@@ -432,8 +440,8 @@
           <div class="hint">Video calls run on your <b>PC</b> (virtual camera + Discord desktop). Connect links this app straight into your PC's DiscoFlate panel — its Chat tab is this same cockpit (chat, Custom Buttons, overlay buttons, camera controls), all driving the PC. One-time PC setup: <b>System → Remote access</b> → enable + whitelist this phone's IP. Your phone's <b>back button</b> returns here.</div>
         </div>
         <!-- desktop: the composited virtual-cam output, above the chat (what viewers see) -->
-        <img id="vcamPrev" alt="" style="display:none;width:100%;max-width:480px;border-radius:12px;margin-top:8px;border:1px solid var(--line)">
-        <video id="vcamSelf" autoplay muted playsinline style="display:none;width:100%;max-width:480px;border-radius:12px;margin-top:8px;border:1px solid var(--line)"></video>
+        <img id="vcamPrev" alt="" class="vcamprev" style="display:none">
+        <video id="vcamSelf" autoplay muted playsinline class="vcamprev" style="display:none;border:1px solid var(--line)"></video>
         <div class="hint">Start it, then pick the <b>virtual camera</b> as your webcam in Discord's voice &amp; video settings — overlays play on top of your live feed, OBS-style; the preview above shows exactly what viewers see — trust it over your own Discord tile, which Discord always mirrors (so your overlays look backwards <i>to you</i> there while viewers see them correctly; 🪞 <b>Mirror</b> cancels that at the cost of mirroring what viewers get). <b>🔍 Detect</b> lists the sizes each attached camera really supports (portrait included). The system driver (OBS's on Windows / <code>v4l2loopback</code> on Linux) is a one-time setup — <b>🩺 Driver</b> checks for it and installs it for you. The virtual cam is <b>desktop-only</b>: Android apps can't register a camera device for Discord mobile — on the phone this section becomes <b>🖥 VC Remote</b> instead (or use the 🎭 Stage + screen share for phone-only sessions).</div>
         <!-- the overlay buttons live in the Chat tab's side panel now;
              phone Stage parked (PC is the camera home base) -->
@@ -449,7 +457,14 @@
           <div class="row" style="margin-top:4px;flex-wrap:nowrap"><span class="muted" id="chatPerm" style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span><div style="flex:1"></div><span class="muted" id="chatMsg"></span></div>
         </div>
         <div class="chatside">
-          <div class="sidehead">Buttons</div>
+          <div class="sidehead">Controls</div>
+          <div class="btngrid">
+            <button onclick="controlRoll()">🎲 Roll</button>
+            <button id="chatPumpBtn" onclick="controlPump()">💨 Pump</button>
+            <button class="ghost" onclick="controlCapacity()">📊 Capacity</button>
+            <button class="ghost" onclick="controlCleanup()">🧹 Cleanup</button>
+          </div>
+          <div class="sidehead" style="margin-top:12px">Buttons</div>
           <div class="btnscroll"><div class="btngrid" id="chatCustomBtns"></div></div>
           <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">
             <button class="ghost" style="flex:1" onclick="openOverlay('btnOverlay')">🔧 Buttons</button>
@@ -458,9 +473,7 @@
           <div id="sideOverlays" style="display:none;margin-top:12px;border-top:1px solid var(--line);padding-top:10px">
             <div class="sidehead">Overlays</div>
             <div class="btnscroll"><div class="btngrid" id="stageBtns"></div></div>
-            <div class="btnscroll" style="margin-top:6px"><div class="btngrid" id="overlayBtns"></div></div>
             <div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">
-              <button class="ghost" style="flex:1" onclick="openOverlay('ovbOverlay')">🔧 Overlays</button>
               <button class="ghost" style="flex:1" onclick="api('/api/overlay/clear',{})">🧹 Clear</button>
             </div>
           </div>
@@ -475,23 +488,16 @@
       <div class="hint">Design overlay <b>scenes</b> for video calls, OBS-style: pick a resolution, drag overlays onto the canvas, mark each one <b>always-on</b> or <b>callable</b>. Link a Gameplay Preset so the whole bundle travels together. The Chat tab's 🎥 section links a chat to a stage — its callable overlays become one-tap buttons there, and ▶ Start virtual cam (or the phone's 🎭 Stage view) puts the always-on items live. Everything autosaves.</div>
       <div class="row" style="gap:8px;align-items:flex-end;margin-top:8px">
         <label class="field">Scene <select id="scnSel" style="width:200px" onchange="stgPick(+this.value)"></select></label>
-        <button class="ghost" onclick="stgAdd()">➕ New</button>
-        <button class="ghost" onclick="stgRename()">✏️ Rename</button>
-        <button class="ghost" onclick="stgDelete()">🗑 Delete</button>
-        <button class="ghost" onclick="mediaBrowse(null)">🗂 Media browser</button>
+        <button class="ghost pmini" onclick="stgAdd()" title="new scene">➕</button>
+        <button class="ghost pmini" onclick="stgCopy()" title="duplicate this scene, overlays and all">📋</button>
+        <button class="ghost pmini" onclick="stgRename()" title="rename this scene">✏️</button>
+        <button class="ghost pmini" onclick="stgDelete()" title="delete this scene (its media stays in the library)">🗑</button>
+        <button class="ghost pmini" onclick="mediaBrowse(null)" title="media browser">🗂</button>
         <div style="flex:1"></div>
-        <button class="ghost" onclick="stgSend()" title="send every scene + its media to your other DiscoFlate over Wi-Fi (no file juggling)">📡 Send to device</button>
         <button class="ghost" onclick="stgExport()">⬇ Export Scene</button>
         <label class="ghost" style="padding:8px 12px;border:1px solid var(--line);border-radius:8px;cursor:pointer">⬆ Import Scene<input type="file" accept=".zip,.dfscene.zip" style="display:none" onchange="stgImport(this)"></label>
       </div>
       <div id="stgEditor" style="display:none;margin-top:10px">
-        <div class="row" style="gap:12px;align-items:flex-end">
-          <label class="field">Linked Gameplay Preset <select id="stgPreset" style="width:220px" onchange="stgProp('preset', this.value)"></select></label>
-          <label class="field">Resolution <select id="stgRes" style="width:130px" onchange="stgResPick()">
-            <option>1280x720</option><option>1920x1080</option><option>640x480</option>
-            <option>720x1280</option><option>1080x1920</option></select></label>
-          <label class="row" style="gap:6px" title="show a 5% grid and snap to it — hold Shift while dragging to place freely"><input type="checkbox" id="stgGridOn" checked style="width:auto" onchange="stgGridToggle()"> grid &amp; snap</label>
-        </div>
         <div class="stglists">
           <div class="stgpane">
             <div class="sidehead">Add an overlay</div>
@@ -501,15 +507,25 @@
             <div class="row" style="gap:6px;align-items:center;margin-bottom:7px;flex-wrap:nowrap">
               <select id="stgGroupPick" style="flex:1;min-width:0" onchange="stgSetGroupFilter(this.value)"></select>
               <button class="ghost pmini" id="stgGroupEye" title="hide/show this whole group" onclick="stgGroupHide()">👁</button>
+              <button class="ghost pmini" id="stgGroupIntro" title="mark this group as an INTRO" onclick="stgGroupIntroToggle()">🎬</button>
               <button class="ghost pmini" title="new scene group" onclick="stgGroupNew()">➕</button>
+              <button class="ghost pmini" title="duplicate this group and everything in it" onclick="stgGroupCopy()">📋</button>
               <button class="ghost pmini" title="rename this group" onclick="stgGroupRename()">✏️</button>
               <button class="ghost pmini" title="delete this group (its overlays stay, untagged)" onclick="stgGroupDelete()">🗑</button>
             </div>
             <div class="stglist" id="stgContents"></div>
           </div>
         </div>
-        <div class="hint" style="margin:8px 0 0">Drag on the canvas snaps to the <b>5% grid</b> — hold <b>Shift</b> to place freely, or untick <b>grid &amp; snap</b>. Add from the left. The right-hand list shows one <b>scene group</b> at a time — pick it in the dropdown, or <b>All overlays</b>; <b>➕✏️🗑</b> create, rename and delete groups (deleting a group keeps its overlays, just untagged). Anything you add while a group is selected <b>joins that group</b>, and a group fires as a batch from a <code>scene_group</code> action. Rows are the draw stack, front first: <b>👁</b> always-on vs callable, <b>▲▼</b> front/back, <b>⚙</b> options, <b>−</b> remove. On the canvas: drag to place, <b>◢</b> resize, <b>⟳</b> rotate.</div>
-        <div id="stgCanvas" style="margin-top:8px"></div>
+        <div class="hint" style="margin:8px 0 0">Drag on the canvas snaps to the <b>5% grid</b> — hold <b>Shift</b> to place freely, or untick <b>grid &amp; snap</b>. Add from the left. The right-hand list shows one <b>scene group</b> at a time — pick it in the dropdown, or <b>All overlays</b>; <b>➕✏️🗑</b> create, rename and delete groups (deleting a group keeps its overlays, just untagged). Anything you add while a group is selected <b>joins that group</b>, and a group fires as a batch from a <code>scene_group</code> action. Overlay kinds include <b>▬ Solid</b> — a flat colour block, full-frame by default, for a backdrop behind a scene group (no image file needed). Rows are the draw stack, front first: <b>👁</b> always-on vs callable (a callable one <b>ghosts</b> on the canvas rather than vanishing, so you can still place it), <b>▲▼</b> front/back, <b>⚙</b> options, <b>−</b> remove. On the canvas: drag to place, <b>◢</b> resize, <b>⟳</b> rotate.</div>
+        <div class="stgstage">
+          <div id="stgCanvas"></div>
+          <div class="stgside">
+            <label class="field">Resolution <select id="stgRes" style="width:100%" onchange="stgResPick()">
+              <option>1280x720</option><option>1920x1080</option><option>640x480</option>
+              <option>720x1280</option><option>1080x1920</option></select></label>
+            <label class="row" style="gap:6px" title="show a 5% grid and snap to it — hold Shift while dragging to place freely"><input type="checkbox" id="stgGridOn" checked style="width:auto" onchange="stgGridToggle()"> grid &amp; snap</label>
+          </div>
+        </div>
         <div id="stgProps" style="margin-top:8px"></div>
       </div>
       <details class="help" style="margin-top:14px"><summary><b>🌐 Global overlays</b> <span class="muted">(callable from every stage)</span></summary>
@@ -556,19 +572,6 @@
         <div class="hint" style="margin-top:6px">Message macros that post <b>attributed to the Owner</b> (“<b>Owner:</b> …”) instead of as the bot. Fire one as <code>#name</code> — from the Chat box, typed in Discord (<b>owner only</b>), from a Custom Button, or from any action block's <b>command</b> row. Placeholders work; everything autosaves.</div>
         <div id="ocRows" style="margin-top:10px"></div>
         <button class="ghost" style="margin-top:8px" onclick="ownerCommands.push({name:'',message:''});renderOcEditor();scheduleSave()">+ Add owner command</button>
-      </div>
-    </div>
-
-    <div class="overlay" id="ovbOverlay">
-      <div class="page">
-        <div class="row" style="gap:10px;flex-wrap:nowrap">
-          <h2 style="margin:0">🔧 Overlay actions</h2>
-          <div style="flex:1"></div>
-          <button class="ghost" onclick="closeOverlay('ovbOverlay')">✕</button>
-        </div>
-        <div class="hint" style="margin-top:6px">Buttons shown on the Chat tab when the selected channel is a <b>video</b> channel. Each plays an image (PNG with transparency works best) over the virtual camera for N seconds. Everything autosaves. The full overlay/scene system will build on these.</div>
-        <div id="ovbRows" style="margin-top:10px"></div>
-        <button class="ghost" style="margin-top:8px" onclick="overlayButtons.push({label:'',image:'',seconds:5,pos:'center',scale:0.5});renderOvbEditor();renderOverlayButtons();scheduleSave()">+ Add overlay action</button>
       </div>
     </div>
 
@@ -690,46 +693,35 @@
       <div class="hint">The <b>active</b> device (radio) is what <code>!roll</code> fires. <b>Calibrate</b> = time how long the pump runs to fill to 100% (tap <b>Calibrate</b> → wait until full → tap <b>Full</b>; the elapsed seconds become <b>secs→100%</b>). Kasa is local (no account); other brands need their credentials above. Only <b>Kasa</b> is verified — the rest are ported from PumpDirect and unconfirmed.</div>
     </div>
 
-    <!-- snapshot -->
-    <div class="card span" data-tab="snapshot">
-      <h2>📷 Camera</h2>
-      <div class="row" style="gap:12px;align-items:flex-end;flex-wrap:wrap">
-        <label class="field" style="min-width:220px">Camera
-          <select id="camSelect" onchange="startCamera(this.value)"><option value="">— start camera to list —</option></select>
-        </label>
-        <button class="ghost" onclick="startCamera()">▶ Start / allow camera</button>
-        <button class="ghost" onclick="stopCamera()">■ Stop</button>
-        <label class="row" style="gap:6px"><input type="checkbox" id="camMirror" onchange="applyPreviewTransform()"> mirror</label>
-        <label class="row" style="gap:6px">zoom <input type="range" id="camZoomSlider" min="1" max="5" step="0.1" value="1" style="width:120px" oninput="setZoom(+this.value)"><span id="camZoomLabel" class="muted" style="min-width:34px">1.0×</span></label>
-        <span class="muted" id="camMsg"></span>
-      </div>
-      <div id="camWrap" style="margin-top:12px;position:relative;background:#000;border:1px solid var(--line);border-radius:10px;overflow:hidden;width:100%;max-width:300px;aspect-ratio:9/16;touch-action:none">
-        <video id="camPreview" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;display:block;transform-origin:center center"></video>
-        <button id="snapBtn" onclick="snapPhoto()" title="Snap photo" style="position:absolute;bottom:14px;left:50%;transform:translateX(-50%);width:60px;height:60px;border-radius:50%;background:#fff;border:4px solid rgba(0,0,0,.4);cursor:pointer;padding:0;box-shadow:0 2px 10px rgba(0,0,0,.5)"></button>
-      </div>
-      <div class="hint" style="margin-top:6px">Pinch (or the zoom slider) to zoom — on phones with an ultra-wide lens the slider goes below 1× to zoom <b>out</b> · tap the white button to snap. <span id="snapMsg" style="color:var(--accent2)"></span></div>
-
-      <!-- captured photo → review, then send or discard -->
-      <div id="snapReview" style="display:none;margin-top:14px;border-top:1px solid var(--line);padding-top:14px">
-        <div class="muted" style="margin-bottom:6px">Snapshot — send it or discard</div>
-        <div style="background:#000;border:1px solid var(--line);border-radius:10px;overflow:hidden;width:100%;max-width:300px;aspect-ratio:9/16">
-          <img id="snapImg" alt="snapshot" style="width:100%;height:100%;object-fit:cover;display:block">
-        </div>
-        <label class="field" style="margin-top:10px;max-width:480px">Caption <span class="muted">(optional — placeholders work)</span>
-          <input id="snapCaption" placeholder="e.g. [operator] is at [capacity]% [capacity_bar]"></label>
-        <div class="row" style="margin-top:10px">
-          <button onclick="sendSnapshot()">📤 Send to server</button>
-          <button class="warn" onclick="discardSnap()">🗑 Discard</button>
-        </div>
-      </div>
-      <div class="hint">Lists this machine's cameras. Snapshots post to every channel the bot is listening in. Grant camera permission when the browser asks.</div>
-      <canvas id="snapCanvas" style="display:none"></canvas>
-    </div>
 
 
     <!-- automation: cooldown + auto-report + activation messages -->
+    <!-- gameplay presets (moved off System: a preset IS gameplay) -->
     <div class="card span" data-tab="game">
-      <h2>Limits &amp; announcements</h2>
+      <details class="help"><summary><h2>📦 Gameplay Presets</h2></summary>
+      <div class="row" style="gap:8px;align-items:center;margin-top:8px"><span class="muted">Currently loaded:</span><span id="stgPresetNow" class="pill" title="Which preset the live gameplay was last LOADED from. Read-only: loading copies a preset into the live config, and editing the tabs afterwards never writes back to it.">—</span></div>
+      <div class="hint" style="margin-top:8px;max-width:860px">Saved snapshots of your whole <b>Game, Commands, Events &amp; Templates</b> — swap between whole setups instantly. Your ongoing edits autosave to the <b>live</b> config as always; a preset only changes when you <b>Save</b> or <b>Update</b> it. Presets never include your token, devices, or server settings, so preset files are safe to share. <b>Defaults (built-in)</b> is the shipped starter setup — load it any time; it can't be edited, renamed, or deleted.</div>
+      <div class="row" style="margin-top:10px;gap:8px;align-items:center;flex-wrap:wrap">
+      <button onclick="presetSaveCurrent()">💾 Save Current to Preset</button>
+      <div style="flex-basis:100%;height:0"></div>
+      <select id="presetSel" style="min-width:200px"></select>
+      <button class="ghost" onclick="presetLoad()">▶ Load</button>
+      <button class="ghost" onclick="presetUpdate()">⟳ Update</button>
+      <button class="ghost" title="Rename this preset" onclick="presetRename()">✏️</button>
+      <button class="ghost" onclick="presetExport()">⬇ Export</button>
+      <button class="ghost bad" onclick="presetDelete()">✕</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+      <button onclick="$('#importPresetFile').click()">⬆ Import Preset File</button>
+      <input type="file" id="importPresetFile" accept="application/json,.json" style="display:none" onchange="importPresetFile(this)">
+      <span class="muted" id="presetMsg"></span>
+      </div>
+      <div class="hint" style="margin-top:8px"><b>Load</b> swaps all four tabs to the selected preset (your live edits are replaced). <b>Update</b> overwrites the selected preset with your current settings. <b>Export</b> saves it as a shareable file; <b>Import Preset File</b> brings one in under a name you choose.</div>
+      </details>
+    </div>
+
+    <div class="card span" data-tab="game">
+      <details class="help"><summary><h2>Limits &amp; announcements</h2></summary>
       <label class="row" style="gap:8px;margin-bottom:8px"><input type="checkbox" id="outputHeaders" style="width:auto"> <b>Display output headers</b>
         <span class="muted">— prefix each command / minigame / event message with a <code>[label · user]</code> tag so interleaved output stays readable (cross-server shows <code>ANON</code>).</span></label>
       <label class="row" style="gap:8px;margin-bottom:12px"><input type="checkbox" id="richOutput" style="width:auto"> <b>Rich status embeds</b>
@@ -786,25 +778,77 @@
       </div>
       <div class="row" style="margin-top:12px">
         <span class="muted">Placeholders: <code>[capacity] [capacity_bar] [commands]</code> … see <b>Help</b>. Enter = newline.</span></div>
+      </details>
     </div>
 
-    <!-- leaderboards -->
+    <!-- go live options -->
     <div class="card" data-tab="dashboard">
-      <h2>Leaderboards</h2>
-      <div id="users"><div class="muted">No one has pumped yet.</div></div>
-      <div class="row" style="margin-top:12px;gap:8px;align-items:center;flex-wrap:wrap">
-        <span class="muted">Broadcast Top Pumpers:</span>
-        <button class="ghost" onclick="controlLeaderboard()">🏆 Current</button>
-        <button class="ghost" title="Reset the current-session Top Pumpers" onclick="if(confirm('Reset the current-session Top Pumpers & tracked list? Lifetime is untouched.')) act('/api/reset-session-leaderboard')">🗑</button>
-        <button class="ghost" onclick="controlLeaderboardLife()">🏆 Lifetime</button>
-        <button class="ghost" title="Wipe the all-time leaderboard" onclick="if(confirm('Wipe the ALL-TIME leaderboard? This can\'t be undone.')) act('/api/reset-lifetime')">🗑</button>
-      </div>
-      <div class="hint">Posts the Top Pumpers to your channel (same as the <code>leaderboard</code> / <code>toppumpers-life</code> commands) — needs Activation on + a channel selected. The 🗑 next to each resets that board: <b>Current</b> clears this session's pumpers &amp; tracked list; <b>Lifetime</b> wipes the persistent all-time board.</div>
+        <details class="help" style="margin-top:12px"><summary><b style="font-size:1.02rem">🎬 Go Live Options</b> <span class="muted" id="golivePill"></span></summary>
+          <div class="hint" style="margin-top:8px;max-width:860px">What happens when you flip <b>LIVE</b> on. Leave this off to <b>begin immediately</b>. Turn it on to open with an <b>intro</b>: a scene group plays, an announcement posts, and <b>commands stay held</b> until the intro ends — so nobody can play during the pre-show. Timed events wait too. <code>[intro_timer]</code> counts down in messages <i>and</i> in Text overlays.</div>
+          <label class="row" style="gap:8px;margin:10px 0"><input type="checkbox" id="glEnabled" onchange="scheduleSave();goliveUi()" style="width:auto"> <b>Open with an intro</b></label>
+          <div id="glBody" style="display:none">
+            <div class="sidehead" style="border:0;padding:0;margin:0 0 6px">Intro stages <span class="muted" style="font-weight:400">— played in order, then it resolves</span></div>
+            <div id="glStages"></div>
+            <div class="row" style="gap:8px;margin:6px 0 10px">
+              <button class="ghost" onclick="glStageAdd()">+ Add stage</button>
+              <span class="muted">each stage plays its scene group for its own length · <b>0</b> = wait for <b>⏭ Next</b></span>
+            </div>
+            <div class="row" style="gap:12px;align-items:flex-end">
+              <label class="field">Then switch to <span class="muted">(optional)</span> <select id="glAfter" style="width:170px" onchange="scheduleSave()"></select></label>
+              <label class="row" style="gap:6px" title="keep the picture black while the intro plays — untick to show the camera behind it"><input type="checkbox" id="glBlack" checked onchange="scheduleSave()" style="width:auto"> black during intro</label>
+              <label class="row" style="gap:6px"><input type="checkbox" id="glHold" checked onchange="scheduleSave()" style="width:auto"> hold commands</label>
+            </div>
+            <div class="row" style="gap:12px;align-items:flex-end;margin-top:8px">
+              <label class="field" style="flex:1;min-width:240px">Announcement <span class="muted">(blank = none · [intro_timer])</span>
+                <input id="glAnnounce" placeholder="🎬 Starting in [intro_timer] seconds!" style="width:100%" onchange="scheduleSave()"></label>
+              <label class="field">Repeat every <span class="muted">(secs · 0 = once)</span>
+                <input type="number" id="glEvery" min="0" step="5" value="0" style="width:100px" onchange="scheduleSave()"></label>
+            </div>
+            <div class="row" style="gap:8px;align-items:flex-end;margin-top:8px">
+              <label class="field" style="flex:1;min-width:220px;max-width:420px">Image <span class="muted">(optional · posts with the first announcement)</span>
+                <div class="row" style="gap:6px;flex-wrap:nowrap">
+                  <input id="glImage" placeholder="pick or type a filename from data/images" style="flex:1;min-width:0" onchange="scheduleSave()">
+                  <button class="ghost" title="pick from the media library" onclick="mediaBrowse(n=>{$('#glImage').value=n;scheduleSave();})">🗂</button>
+                  <button class="ghost" title="clear" onclick="$('#glImage').value='';scheduleSave()">✕</button>
+                </div></label>
+            </div>
+            <label class="field" style="margin-top:8px">Commands allowed during the intro <span class="muted">(comma-separated · everything else is held)</span>
+              <input id="glCmds" placeholder="signup, rules" style="width:100%;max-width:520px" onchange="scheduleSave()"></label>
+          </div>
+        </details>
+
+        <details class="help" style="margin-top:14px"><summary><b style="font-size:1.02rem">🖼 Session Overlays</b> <span class="muted" id="sessOvPill"></span></summary>
+          <div class="hint" style="margin-top:8px;max-width:860px">Two overlays the SESSION drives, rather than any one command. Both are designed on the <b>Scenes</b> tab like everything else — these just say which one to use.</div>
+          <div class="row" style="gap:12px;align-items:flex-end;margin-top:10px">
+            <label class="field">📣 Notify overlay <span class="muted">(a Text overlay)</span>
+              <select id="ovNotify" style="width:230px" onchange="scheduleSave();sessOvUi()"></select></label>
+            <span class="muted" id="ovNotifyText" style="flex:1;min-width:0"></span>
+          </div>
+          <div class="hint" style="margin-top:4px">Every command with <b>📣 notify overlay</b> ticked writes its own line to this one — you never need a second overlay per command.</div>
+          <div class="row" style="gap:12px;align-items:flex-end;margin-top:12px">
+            <label class="field">⏸ Pause overlay <span class="muted">(a scene group)</span>
+              <select id="ovPause" style="width:230px" onchange="scheduleSave();sessOvUi()"></select></label>
+            <span class="muted" id="ovPauseText" style="flex:1;min-width:0"></span>
+          </div>
+          <div class="hint" style="margin-top:4px">Plays on top of everything the moment you hit <b>⏸ Pause</b>, and clears on <b>▶ Resume</b>.</div>
+        </details>
+
+        <details class="help" style="margin-top:14px"><summary><b style="font-size:1.02rem">🏆 Leaderboards</b></summary>
+        <div id="users"><div class="muted">No one has pumped yet.</div></div>
+        <div class="row" style="margin-top:12px;gap:8px;align-items:center;flex-wrap:wrap">
+          <span class="muted">Broadcast Top Pumpers:</span>
+          <button class="ghost" onclick="controlLeaderboard()">🏆 Current</button>
+          <button class="ghost" title="Reset the current-session Top Pumpers" onclick="if(confirm('Reset the current-session Top Pumpers & tracked list? Lifetime is untouched.')) act('/api/reset-session-leaderboard')">🗑</button>
+          <button class="ghost" onclick="controlLeaderboardLife()">🏆 Lifetime</button>
+          <button class="ghost" title="Wipe the all-time leaderboard" onclick="if(confirm('Wipe the ALL-TIME leaderboard? This can\'t be undone.')) act('/api/reset-lifetime')">🗑</button>
+        </div>
+        <div class="hint">Posts the Top Pumpers to your channel (same as the <code>leaderboard</code> / <code>toppumpers-life</code> commands) — needs Activation on + a channel selected. The 🗑 next to each resets that board: <b>Current</b> clears this session's pumpers &amp; tracked list; <b>Lifetime</b> wipes the persistent all-time board.</div>
+        </details>
     </div>
 
     <!-- capacity ranges -->
     <div class="card span" data-tab="game">
-      <h2>Capacity ranges</h2>
+      <details class="help"><summary><h2>Capacity ranges</h2></summary>
       <details class="help" style="margin-bottom:14px"><summary><b style="font-size:1.02rem">⚡ Always-On commands</b></summary>
         <label class="row" style="gap:8px;margin:4px 0 8px"><input type="checkbox" id="alwaysOnEnabled" style="width:auto" onchange="renderAlwaysOn();scheduleSave()"> Enable — commands added here work in <b>every</b> range (bypassing per-range membership)</label>
         <div id="alwaysOnBox"></div>
@@ -823,10 +867,11 @@
         🏁 <b>End Sequence</b> = a range with a final threshold; reaching it posts a final message then ends &amp; resets the
         session (no activation-off message). <b>End</b> = just that terminal threshold, no buildup. Capacity may tick
         <b>above 100%</b> up to the End threshold. Only one End / End Sequence is allowed, and nothing comes after it.</div>
+      </details>
     </div>
 
     <!-- system commands + roll/cooldown settings (one section) -->
-    <div class="card span" data-tab="commands">
+    <div class="card span" data-tab="triggers">
       <details class="help"><summary><h2>System commands</h2></summary>
       <div class="row" style="gap:16px;align-items:flex-end;margin-top:8px">
         <label class="field">Prefix <input id="prefix" value="!" style="width:60px"></label>
@@ -880,8 +925,8 @@
     </div>
 
     <!-- custom commands -->
-    <div class="card span" data-tab="commands">
-      <h2>Custom commands</h2>
+    <div class="card span" data-tab="triggers">
+      <details class="help"><summary><h2>Custom commands</h2></summary>
       <div id="commands"></div>
       <div class="row" style="margin-top:10px">
         <button class="ghost" onclick="addCommand()">+ Add command</button>
@@ -890,22 +935,24 @@
       <div class="hint">A command = its gates + an <b>action block</b> run in order when it's typed: <b>fire</b> (fixed seconds or until a %), <b>roll</b> (blank dice = the range's dice &amp; luck), <b>chance</b> (a gamble with nested win/miss blocks), <b>message</b> (how the bot replies — put it after the rows that produce <code>[secs]</code>/<code>[result]</code>), <b>award</b>, <b>command_gate</b>, and more.
         The <b>minigame</b> types post a <b>▶ Play</b> button; the player plays privately and the final <b>score → tier</b> broadcasts (tiers can fire, run actions, even count toward a Perfect Prize).
         A command works once it's in a <b>range</b> (Game → Capacity ranges) or in <b>⚡ Always-On</b> — range values (cooldown, fire seconds/device, dice, luck) always override the command's own. See the <b>Help</b> tab for placeholders.</div>
+      </details>
     </div>
 
     <!-- broadcasts -->
-    <div class="card span" data-tab="commands">
-      <h2>Broadcasts</h2>
+    <div class="card span" data-tab="triggers">
+      <details class="help"><summary><h2>Broadcasts</h2></summary>
       <div id="broadcasts"></div>
       <div class="row" style="margin-top:10px">
         <button class="ghost" onclick="addBroadcast()">+ Add broadcast</button>
         <div style="flex:1"></div>
       </div>
       <div class="hint">Preset messages you can fire from the <b>Dashboard → Controls</b> (“Broadcast Custom”). Placeholders work (<code>[capacity]</code>, <code>[operator]</code>, …). Posted to your channel as the owner.</div>
+      </details>
     </div>
 
     <!-- modes -->
-    <div class="card span" data-tab="commands">
-      <h2>Modes</h2>
+    <div class="card span" data-tab="triggers">
+      <details class="help"><summary><h2>Modes</h2></summary>
       <div id="modes"></div>
       <div class="row" style="margin-top:10px">
         <button class="ghost" onclick="addMode()">+ Add mode</button>
@@ -914,11 +961,12 @@
       <div class="hint">A mode's switch enables/disables all its <b>commands and events</b> at once. Fill On/Off messages to
         announce the change in the announce channel, or leave them blank to toggle quietly. Save a mode before
         its switch goes live.</div>
+      </details>
     </div>
 
     <!-- timed events -->
-    <div class="card span" data-tab="events">
-      <details class="help" open><summary><h2>⏱ Timed events</h2></summary>
+    <div class="card span" data-tab="triggers">
+      <details class="help"><summary><h2>⏱ Timed events</h2></summary>
       <div id="events"></div>
       <div class="row" style="margin-top:10px">
         <button class="ghost" onclick="addEvent()">+ Add event</button>
@@ -940,7 +988,7 @@
     </div>
 
     <!-- capacity events -->
-    <div class="card span" data-tab="events">
+    <div class="card span" data-tab="triggers">
       <details class="help"><summary><h2>📈 Capacity events</h2></summary>
       <div class="hint" style="margin-top:8px;max-width:860px">One-shot triggers that fire the moment capacity reaches a threshold (<b>1–999%</b>; above 100% only happens inside an End Sequence's buildup). They operate <b>independently of ranges</b> — while one runs, its restrictions <b>take precedence over normal ranges</b> — but the <b>End / End Sequence overrules them</b>: nothing triggers after the end fires, and the session end cancels any running capacity event. One-shot per session (re-armed by Session reset / Activation).</div>
       <div id="capEvents"></div>
@@ -953,7 +1001,7 @@
     </div>
 
     <!-- polls -->
-    <div class="card span" data-tab="events">
+    <div class="card span" data-tab="triggers">
       <details class="help"><summary><h2>🗳 Polls</h2></summary>
       <div class="row" style="gap:10px;align-items:flex-end;margin-top:8px">
         <label class="field">Poll vote command <span class="muted">(only active while a poll runs)</span>
@@ -970,7 +1018,7 @@
     </div>
 
     <!-- competitions -->
-    <div class="card span" data-tab="events">
+    <div class="card span" data-tab="triggers">
       <details class="help"><summary><h2>🏁 Competitions</h2></summary>
       <div class="hint" style="max-width:880px;margin-top:8px">A competition is an <b>action</b> (start it from any action block). Fully <b>button-driven</b>: players press <b>Enter Challenge</b> on the embed and roll privately — the rolls you define below, in order (complete them all to qualify). Results post all at once; highest score wins by the <b>Win by</b> metric. Winner / no-winner outcomes are <b>action blocks</b> — e.g. an embed message row, <code>fire [winner_score]</code>, <b>award</b> a bonus command, or <b>command_gate</b> everyone else. <i>Race &amp; raffle are being redesigned and will return.</i> Placeholders: <code>[winner]</code> <code>[winner_score]</code> <code>[runnerup]</code> <code>[total_score]</code> <code>[results]</code>.</div>
       <div id="competitions" style="margin-top:10px"></div>
@@ -982,7 +1030,7 @@
     </div>
 
     <!-- bonus rounds -->
-    <div class="card span" data-tab="events">
+    <div class="card span" data-tab="triggers">
       <details class="help"><summary><h2>🤝 Bonus Rounds</h2></summary>
       <div class="hint" style="max-width:880px">A Bonus Round is a <b>teamwork cash-in</b>, started by a <b>bonus_round</b> action. First bank amounts with an <b>award</b> action (volume secs/%) (pump <b>seconds</b> or <b>capacity %</b>, on <code>[winner]</code>/<code>[range_leader]</code>/<code>[session_leader]</code>/…). The round posts an embed with a <b>Confirm</b> button for bonus holders; once the needed holders confirm (<b>all</b>, or just the <b>top holder</b>) before the timer, your action block runs with the pooled <code>[total_bonus_secs]</code> / <code>[total_bonus_pct]</code> — then the banks are spent. Use <code>fire [total_bonus_secs]</code> or <code>add % [total_bonus_pct]</code> to apply them.</div>
       <div id="bonusRounds" style="margin-top:10px"></div>
@@ -996,7 +1044,7 @@
     <!-- templates -->
     <!-- system -->
     <div class="card span" data-tab="system">
-      <h2>System</h2>
+      <details class="help"><summary><h2>System</h2></summary>
 
       <!-- full-config backup (token included) -->
       <div class="hint" style="margin-top:0"><b>Full backup</b> — saves <b>everything</b> incl. your token, devices &amp; server settings to <code>discoflate-backup.json</code>. <b>Uninstalling the app erases everything</b>, so keep a backup. ⚠️ Includes your bot token — keep it private.</div>
@@ -1007,25 +1055,6 @@
         <span class="muted" id="backupMsg"></span>
       </div>
 
-      <details class="help" style="margin-top:16px"><summary><b style="font-size:1.02rem">📦 Gameplay Presets</b></summary>
-        <div class="hint" style="margin-top:8px;max-width:860px">Saved snapshots of your whole <b>Game, Commands, Events &amp; Templates</b> — swap between whole setups instantly. Your ongoing edits autosave to the <b>live</b> config as always; a preset only changes when you <b>Save</b> or <b>Update</b> it. Presets never include your token, devices, or server settings, so preset files are safe to share. <b>Defaults (built-in)</b> is the shipped starter setup — load it any time; it can't be edited, renamed, or deleted.</div>
-        <div class="row" style="margin-top:10px;gap:8px;align-items:center;flex-wrap:wrap">
-          <button onclick="presetSaveCurrent()">💾 Save Current to Preset</button>
-          <div style="flex-basis:100%;height:0"></div>
-          <select id="presetSel" style="min-width:200px"></select>
-          <button class="ghost" onclick="presetLoad()">▶ Load</button>
-          <button class="ghost" onclick="presetUpdate()">⟳ Update</button>
-          <button class="ghost" title="Rename this preset" onclick="presetRename()">✏️</button>
-          <button class="ghost" onclick="presetExport()">⬇ Export</button>
-          <button class="ghost bad" onclick="presetDelete()">✕</button>
-        </div>
-        <div class="row" style="margin-top:8px">
-          <button onclick="$('#importPresetFile').click()">⬆ Import Preset File</button>
-          <input type="file" id="importPresetFile" accept="application/json,.json" style="display:none" onchange="importPresetFile(this)">
-          <span class="muted" id="presetMsg"></span>
-        </div>
-        <div class="hint" style="margin-top:8px"><b>Load</b> swaps all four tabs to the selected preset (your live edits are replaced). <b>Update</b> overwrites the selected preset with your current settings. <b>Export</b> saves it as a shareable file; <b>Import Preset File</b> brings one in under a name you choose.</div>
-      </details>
 
       <details class="help" style="margin-top:16px"><summary><b style="font-size:1.02rem">📡 Remote Access (LAN)</b> <span class="pill" id="raPill" style="display:none;padding:2px 10px;font-size:11px"></span></summary>
         <div class="hint" style="margin-top:8px;max-width:820px">Control DiscoFlate from another device on your network — e.g. use an <b>iPhone as the remote</b> while the app runs here. OFF (default) = the server listens on this machine only; nothing else on the network can even connect. ON = it listens on the LAN, and <b>only the devices whose IPs you whitelist below</b> may talk to it (everyone else is refused at the door). An empty whitelist means <b>no</b> remote device gets in.</div>
@@ -1056,6 +1085,7 @@
           <label class="field" style="flex:1;min-width:180px;max-width:320px">Other device's address <input id="syncAddr" placeholder="192.168.1.50:8765"></label>
           <button onclick="syncPull()">⬇ Pull from there</button>
           <button onclick="syncPush()">⬆ Push to there</button>
+          <button class="ghost" onclick="stgSend()" title="send every scene + its media to that device over Wi-Fi (no file juggling)">📡 Send scenes</button>
         </div>
         <div class="row" style="margin-top:6px"><span class="muted" id="syncMsg"></span></div>
       </details>
@@ -1075,6 +1105,7 @@
           <div id="tplComps" style="margin-top:8px"></div></details>
         <details class="help"><summary><b>Capacity Events</b> (<span id="tplCapEvtCount">0</span>)</summary>
           <div id="tplCapEvts" style="margin-top:8px"></div></details>
+      </details>
       </details>
     </div>
 
@@ -1104,7 +1135,7 @@
         <li><b>Perfect Prizes</b> — N perfect rolls (or any named achievement, e.g. a blackjack 21) runs an unlock action block for the earner — typically awarding a limited-charge bonus command. Re-earnable, range-gateable.</li>
         <li><b>End sequences</b> — let capacity run past 100% to a final burst threshold with its own entry milestone and final message/image.</li>
         <li><b>Timed events, modes, leaderboard, per-user cooldowns, anti-spam buffer,</b> and multi-server support with anonymized cross-server echoes.</li>
-        <li><b>Camera</b> — capture a webcam frame (Snapshot) and post it to the channel; the Chat tab's 🎥 section runs the virtual-camera overlay pipe for video calls. Heads-up: while the virtual cam runs it holds the physical webcam, so browser snapshots from that same camera may be busy.</li>
+        <li><b>Snapshots</b> — the <b>snapshot</b> action grabs the <b>current virtual-camera frame, overlays and all</b>, and posts it to the channel. Fire it from any action block (commands, events, ranges…) with an optional caption. It needs the virtual cam running — the Chat tab's 🎥 section starts it — and is quiet when it isn't.</li>
         <li><b>Operator Controls</b> — dashboard buttons (Roll, Stop, Pump, Broadcast Capacity/Users) that fire real in-channel actions <i>as the owner</i>, exactly as if they'd typed the command.</li>
         <li><b>Mock mode</b> — run the whole game with no hardware at all; set the virtual pump's calibration on the Devices tab.</li>
       </ul>
@@ -1142,7 +1173,9 @@
         <li><b>Range gate</b> — an EXTRA capacity band on top of range membership; useful for granted bonus commands.</li>
         <li><b>Description</b> — shown next to the command in <code>[commands]</code>.</li>
         <li><b>Starts events</b> — comma-separated names of (off-by-default) timed events this command switches on temporarily. They revert on Session reset / app restart.</li>
-        <li><b>Row icons</b> — every command / event / range row has <b>📋 Duplicate</b> (a clash-safe copy, e.g. <code>fill</code> → <code>fill-copy</code>), <b>💾 Save as template</b> (stashes it in <b>System → Templates</b> for reuse), <b>✏️ Edit</b> (expand/collapse), and <b>✕ Delete</b>. In <b>System → Templates</b>, <b>＋ Add to Config</b> ports a saved template back in (auto-renaming on a clash).</li>
+        <li><b>📣 Notify overlay (per command).</b> One overlay serves every command. Design a <b>Text</b> overlay on the <b>Scenes</b> tab, then pick it in <b>Dashboard → Go Live Options → 🖼 Session Overlays</b>; each command's own line plays on it when the command runs. Tick <b>📣 notify overlay</b> on a command and edit its text — <code>[user]</code> <code>[mention]</code> <code>[command]</code> and the usual placeholders all work, and the default is <code>[user] just triggered [command]</code>. A run that was blocked (paused, on cooldown, held by an intro, gated) never announces itself, and with no notify overlay picked it's a quiet no-op.</li>
+        <li><b>⏸ Pause overlay.</b> A <b>scene group</b> that covers the stream the moment you hit <b>⏸ Pause</b> in the header, and clears on <b>▶ Resume</b>. Pick it in <b>Dashboard → Go Live Options → 🖼 Session Overlays</b>. The shipped <b>Pause</b> group is a full-frame black card reading <code>[operator] will be right back!</code>, drawn above everything else.</li>
+        <li><b>Row icons</b> — every command / event / range row has <b>📋 Duplicate</b> (a clash-safe copy, e.g. <code>fill</code> → <code>fill-copy</code>), <b>💾 Save as template</b> (stashes it in <b>System → Templates</b> for reuse), and <b>✕ Delete</b>. To open or close a row, <b>click its title strip</b> — anywhere that isn't one of those buttons, a checkbox, a field or the <b>⋮⋮</b> drag handle. Click it again to close. In <b>System → Templates</b>, <b>＋ Add to Config</b> ports a saved template back in (auto-renaming on a clash).</li>
       </ul>
       <div class="hint" style="max-width:820px"><b>⚠️ Two-step setup — this trips people up:</b> creating a command does <b>nothing</b> on its own. It only works after you either <b>add it to a range</b> (Game → <b>Capacity ranges</b> → open a range → “<b>+ Add command to this range</b>”) or put it in <b>⚡ Always-On</b> — never both: a range-bound command leaves Always-On automatically. Per range you set its <b>cooldown</b>, <b>max uses/person</b>, <b>scope</b>, and (for fire commands) a <b>Fire override</b> — <b>range values always beat the command's own</b>, so one <code>!pump</code> can drive different pumps for different lengths in different bands.</div>
       <div class="hint" style="max-width:820px"><b>Example — a <code>!spin</code> command:</b> Commands tab → <b>+ Add command</b> → Name <code>spin</code>, then in its block add a <b>roll</b> row (Dice blank = the range's dice) and a <b>message</b> row <code>🌀 [user] spun [dice] = [result] → +[secs2capacity]%</code>. Then Game → Capacity ranges → open the <b>66–100%</b> range → <b>+ Add command to this range</b> → <code>!spin</code>, and set Max/person <code>3</code>, Cooldown <code>30</code>, Scope <b>per-user</b>. Now <code>!spin</code> is live only in the top band.</div>
@@ -1217,8 +1250,8 @@
         <li><b>🏷 label / goto / goto_if / group</b> — jump around inside a block instead of nesting deeper. Drop a <b>label</b> (or name a <b>group</b>), then <b>goto</b> it; <b>goto_if</b> jumps only when its conditions pass, which is how you build retry loops and skip-aheads. Jumping to a <b>label</b> resumes after it; jumping to a named <b>group</b> runs that group and then carries on. Jumps are capped at 2000 per block, and an unknown label is a quiet no-op.</li>
         <li><b>🛑 cancel</b> — stops every <i>other</i> running action block (events mid-loop, waits, overlapping commands) while this one carries on. The panic button when things overlap.</li>
         <li><b>"once" tickbox</b> — on any action row. That row fires a <b>single time per session</b> and is skipped afterwards, resetting on session reset. Each command keeps its own memory, so the same row in two places doesn't share a count.</li>
-        <li><b>🎬 Go Live Options (Dashboard)</b> — flipping <b>LIVE</b> on can open with an <b>intro</b> instead of starting the game. A scene group plays, an optional announcement posts (repeating and refreshing if you want), and <b>commands stay held</b> the whole time — anyone who tries gets a polite standby reply instead of pumping during your pre-show. Timed events wait too. You can allow specific commands through (a signup, say). Set a length, or set it to <b>0</b> and the intro waits until you press <b>🎬 Start now</b> in the Chat tab — that button appears only while an intro is running and shows the countdown. Flipping LIVE off mid-intro cancels it cleanly. <code>[intro_timer]</code> counts down in messages <i>and</i> in Text overlays. The announcement can carry an <b>image</b> (picked from the media library), posted with the first message.</li>
-        <li><b>Hiding a scene group</b> — the <b>👁</b> beside the group dropdown mutes the whole group: it stops coming up with the scene, a <code>scene_group</code> action won't play it, and even firing one of its overlays individually is ignored. Its overlays grey out on the canvas so you can still see where they sit. Click again to bring it back. Handy for building a group you aren't ready to use, or dropping a segment from a show without deleting it.</li>
+        <li><b>🎬 Go Live Options (Dashboard)</b> — flipping <b>LIVE</b> on can open with an <b>intro</b> instead of starting the game. A scene group plays, an optional announcement posts (repeating and refreshing if you want), and <b>commands stay held</b> the whole time — anyone who tries gets a polite standby reply instead of pumping during your pre-show. Timed events wait too. You can allow specific commands through (a signup, say). Set a length, or set it to <b>0</b> and the intro waits until you press <b>🎬 Start now</b> in the Chat tab — that button appears only while an intro is running and shows the countdown. Flipping LIVE off mid-intro cancels it cleanly. <b>The camera sends black whenever the session isn't LIVE</b> — so you can start it, pick it in Discord and get set up without anyone seeing the room — and it stays black through the intro (untick <b>black during intro</b> if you'd rather show the camera behind it). Overlays draw on top of the black either way. <code>[intro_timer]</code> counts down in messages <i>and</i> in Text overlays. The announcement can carry an <b>image</b> (picked from the media library), posted with the first message.</li>
+        <li><b>Turning a scene group off</b> — the <b>👁</b> beside the group dropdown takes the whole group <b>off the stream</b>: it goes away immediately and doesn't come up when the scene loads. It is <b>not</b> a mute — firing it (a button, an event, a <code>scene_group</code> action) still plays it, which is exactly how an on-demand group like fireworks or an outro works: leave it off, fire it when you want it. Its overlays grey out on the canvas so you can still see where they sit. Click again to put it back on. Handy for building a group you aren't ready to use, or dropping a segment from a show without deleting it.</li>
         <li><b>🎬 Scene groups</b> — there's no separate place to create one: on the <b>Scenes</b> tab, click an overlay and type a name into its <b>Scene group</b> box (say <code>intro</code>) — the group exists the moment an overlay carries that name, and the box autocompletes names you already use. Every group in the scene is listed under the canvas with its overlay count; click one to jump to it. Then <b>scene_group</b> plays the whole set at once and <b>scene_group_kill</b> clears it. Each overlay keeps its own mode, position and fades. Firing a group that has no overlays does nothing at all.</li>
         <li><b>🗂 Layer order</b> — every overlay has a <b>layer order</b> number (with ⬆/⬇ buttons): higher draws on top. Equal numbers keep fire order, so the newest still lands above. The designer canvas stacks the same way it will on the feed.</li>
         <li><b>🔁 repeat</b> — run a nested block <b>a fixed number of times</b> (the count can be a placeholder) or <b>until conditions pass</b>. <code>[loop_i]</code> is the round number. Loops are hard-capped at 500 rounds so a mistake can't wedge the bot.</li>
@@ -1229,7 +1262,7 @@
         <li><b>Command pacing.</b> Plug commands are paced per device — cloud vendors (Govee, Tuya, Wyze) at most one ON every 2s, LAN vendors every 0.5s — so a burst of events can't get you throttled or banned by a vendor's API. <b>Turning a device OFF is never delayed</b>, at any time: it's a safety operation and always goes straight through.</li>
         <li><b>Renaming devices</b> — the ✏️ next to any device on the Devices tab. Purely cosmetic: everything references devices by id, so renaming can't break commands, ranges or overlays. Leave it blank to restore the original vendor label.</li>
         <li><b>🖥 Take over the PC session (System tab, phone app).</b> Hands the whole app over to your PC's DiscoFlate — every tab, not just Chat — so you drive the PC instance as if you were sitting at it, while the PC stays the bot and the camera home base. A <b>🖥 CONTROLLING PC · ↩ Release</b> chip sits in the header the whole time; tap it (or the back button) to return to this phone's own instance. Needs Remote access enabled + this phone whitelisted on the PC. If both installs share a bot token, takeover offers to switch <b>this</b> device's Activation off first, so commands don't get answered twice.</li>
-        <li><b>🔁 Device Sync (System tab)</b> keeps both installs matching over Wi-Fi — the whole gameplay setup (commands, events, buttons, saved Gameplay Presets), <b>all your Stages</b>, and <b>the overlay images/videos</b> they use. <b>⬇ Pull</b> brings the other device's setup here; <b>⬆ Push</b> sends this one's over — so a Stage built on the phone lands on the PC without export/import or walking over. The <b>Stages tab</b> has a <b>📡 Send to device</b> shortcut for the same thing. Push asks the other device to fetch from this one, so <b>Remote access must be on at both ends</b>, each whitelisting the other's IP. Same-name-same-size files are skipped; tokens, devices and network settings never sync.</li>
+        <li><b>🔁 Device Sync (System tab)</b> keeps both installs matching over Wi-Fi — the whole gameplay setup (commands, events, buttons, saved Gameplay Presets), <b>all your Stages</b>, and <b>the overlay images/videos</b> they use. <b>⬇ Pull</b> brings the other device's setup here; <b>⬆ Push</b> sends this one's over — so a Stage built on the phone lands on the PC without export/import or walking over. <b>📡 Send scenes</b> (beside them) pushes just your scenes and their media. Push asks the other device to fetch from this one, so <b>Remote access must be on at both ends</b>, each whitelisting the other's IP. Same-name-same-size files are skipped; tokens, devices and network settings never sync.</li>
         <li><b>The permission line</b> (under the send box) shows the bot's rights in the scoped channel live: 🚫 = it can't post there (Send disables, the missing permissions are listed) · ⚠ no Manage Webhooks = owner posts fall back to the bot-prefixed style · ⚠ no Read Message History = the mirror starts from now (no backfill).</li>
       </ul>
       <h3 style="margin:14px 0 6px">Granting Manage Webhooks on a server the bot already joined</h3>
@@ -1365,7 +1398,8 @@ esphome dashboard config/</code></pre>
           <table><tbody>
             <tr><td><code>[user]</code></td><td>the person's name (plain text)</td></tr>
             <tr><td><code>[mention]</code></td><td>@pings the person (a real Discord mention)</td></tr>
-            <tr><td><code>[operator]</code></td><td>the bot operator's name</td></tr>
+            <tr><td><code>[command]</code></td><td>the command that fired, with its prefix (e.g. <code>!fill</code>) — available in a command's <b>📣 notify overlay</b> line and its cooldown reply</td></tr>
+            <tr><td><code>[operator]</code> <code>[owner]</code></td><td>the bot operator's name (set on the Dashboard; blank → the bot's own Discord name). <code>[owner]</code> is the same value — it just reads better in stream copy.</td></tr>
             <tr><td><code>[winner]</code> / <code>[winner_score]</code></td><td>the most recent competition's winner and their winning score</td></tr>
             <tr><td><code>[runnerup]</code> / <code>[runnerup_score]</code></td><td>the most recent competition's 2nd place and their score</td></tr>
             <tr><td><code>[total_score]</code></td><td>combined dice total of ALL finishers in the competition (live during a run, final afterward) — pairs with a roll-off's "Add ALL totals"</td></tr>
@@ -1388,6 +1422,7 @@ esphome dashboard config/</code></pre>
             <tr><td><code>[session_leader]</code> / <code>[session_leader_score]</code></td><td>the top pumper this whole session and their capacity % — use <code>[session_leader]</code> as a target for an end-of-session special prize</td></tr>
             <tr><td><code>[on_message]</code> / <code>[off_message]</code></td><td>the configured Activation ON / OFF message text (rendered), for reuse in other messages</td></tr>
             <tr><td><code>[prefix]</code> <code>[capacity_cmd]</code> <code>[leaderboard_cmd]</code> <code>[pumptimer_cmd]</code></td><td>the system command names (e.g. <code>!capacity</code>)</td></tr>
+            <tr><td><code>[syscom_capacity]</code> <code>[syscom_help]</code> <code>[syscom_leaderboard]</code> <code>[syscom_leaderboard_life]</code> <code>[syscom_pumptimer]</code> <code>[syscom_vote]</code> <code>[syscom_enter]</code></td><td>every system command, <b>prefix included</b> and following any rename — e.g. <code>[syscom_help]</code> → <code>!aghelp</code>. Works in overlay text too, so a Text overlay can say “<code>[syscom_help]</code> for commands”.</td></tr>
             <tr><td><code>[count]</code> <code>[goal]</code> <code>[remaining]</code> <code>[counter]</code> <code>[prize]</code></td><td>Perfect Prize progress (in prize messages/blocks)</td></tr>
           </tbody></table>
         </div>
@@ -1465,11 +1500,6 @@ esphome dashboard config/</code></pre>
 </div>
 
 <div id="appfooter" style="text-align:center;padding:14px 8px 24px;color:var(--dim);font-size:12px;opacity:.75">© 2026 AireGasm</div>
-
-<div id="saveBar">
-  <button onclick="saveAllNow()" title="Everything autosaves as you edit — this is a manual, save-everything safety">💾 Save all</button>
-  <span class="muted" id="saveBarStatus"></span>
-</div>
 
 <script>
 const $ = s => document.querySelector(s);
@@ -1559,162 +1589,6 @@ async function saveCfg(patch){
   }finally{ pendingRev--; }
 }
 
-// ---- snapshot / camera (uses this machine's cameras via the browser) ----
-let camStream = null, camZoom = 1, snapBlob = null, snapBlobUrl = null;
-// Native camera zoom: many phones expose a real zoom capability whose MIN can be
-// below 1× (the ultra-wide lens) — that's how the stock app "zooms out". We drive
-// it via applyConstraints (optical/hybrid, incl. zoom-out); only when the track
-// has no zoom capability (most desktop webcams) do we fall back to CSS digital
-// zoom-IN (1–5×). camZoomNative decides which.
-let camTrack = null, camZoomNative = false, camZoomMin = 1, camZoomMax = 5, camZoomStep = 0.1;
-function _zoomClamp(v){ return Math.max(camZoomMin, Math.min(camZoomMax, v)); }
-async function setZoom(v){
-  camZoom = _zoomClamp(+v || camZoomMin);
-  const zs=$('#camZoomSlider'); if(zs && +zs.value!==camZoom) zs.value=camZoom;
-  const zl=$('#camZoomLabel'); if(zl) zl.textContent=camZoom.toFixed(1)+'×';
-  if(camZoomNative && camTrack){
-    try{ await camTrack.applyConstraints({advanced:[{zoom:camZoom}]}); }catch(e){}
-  }
-  applyPreviewTransform();
-}
-function setSnapMsg(t){ const m=$('#snapMsg'); if(m) m.textContent=t; }
-async function listCameras(selected){
-  try{
-    const devs = await navigator.mediaDevices.enumerateDevices();
-    const cams = devs.filter(d=>d.kind==='videoinput');
-    const sel=$('#camSelect');
-    sel.innerHTML = cams.length ? cams.map((c,idx)=>`<option value="${esc(c.deviceId)}" ${c.deviceId===selected?'selected':''}>${esc(c.label||('Camera '+(idx+1)))}</option>`).join('')
-      : `<option value="">no cameras found</option>`;
-  }catch(e){}
-}
-// The zoom capability (min/max) can be absent right after getUserMedia — the
-// front camera especially only reports it once the track is fully live. Wait for
-// the preview's metadata, then poll getCapabilities() briefly until zoom shows.
-async function _readZoomCaps(track, video){
-  if(!track || !track.getCapabilities) return null;
-  try{
-    if(video && video.readyState < 1){
-      await new Promise(r=>{ video.addEventListener('loadedmetadata', r, {once:true}); setTimeout(r, 1500); });
-    }
-  }catch(e){}
-  for(let i=0;i<10;i++){
-    let c={}; try{ c=track.getCapabilities()||{}; }catch(e){}
-    if(c.zoom && typeof c.zoom.min==='number' && typeof c.zoom.max==='number') return c.zoom;
-    await new Promise(r=>setTimeout(r, 150));   // ~1.5s total grace for the track to populate
-  }
-  return null;
-}
-async function startCamera(deviceId){
-  stopCamera();
-  try{
-    // Default to the REAR camera (the good sensor — parity with the stock camera
-    // app); the dropdown can pick front + Mirror for selfies. ALWAYS request a
-    // high resolution — WITHOUT this the browser hands back ~640×480, which is
-    // why captures used to look terrible. The camera gives the best it supports
-    // up to the ideal; we downscale (never upscale) at snap time.
-    const HD = {width:{ideal:3840}, height:{ideal:2160}};
-    const constraints = { audio:false, video: deviceId
-      ? {deviceId:{exact:deviceId}, ...HD}
-      : {facingMode:{ideal:'environment'}, ...HD} };
-    camStream = await navigator.mediaDevices.getUserMedia(constraints);
-    $('#camPreview').srcObject = camStream;
-    camTrack = camStream.getVideoTracks()[0] || null;
-    // Detect the track's REAL zoom range (min can be <1 = ultra-wide / zoom OUT).
-    // CRUCIAL: the zoom capability — especially on the FRONT camera — is often
-    // NOT populated the instant getUserMedia resolves; it appears once the track
-    // is live. So wait for readiness and poll before deciding. Fall back to CSS
-    // digital zoom-in (1–5×) only if the camera truly has no zoom capability.
-    const zs=$('#camZoomSlider');
-    const zoomCap = await _readZoomCaps(camTrack, $('#camPreview'));
-    if(zoomCap && zoomCap.max>zoomCap.min){
-      camZoomNative = true;
-      camZoomMin = zoomCap.min; camZoomMax = zoomCap.max;
-      camZoomStep = zoomCap.step || Math.max(0.1, (zoomCap.max-zoomCap.min)/100);
-      const cur = (camTrack.getSettings && camTrack.getSettings().zoom) || 1;
-      if(zs){ zs.min=camZoomMin; zs.max=camZoomMax; zs.step=camZoomStep; }
-      await setZoom(_zoomClamp(cur));
-    } else {
-      camZoomNative = false; camZoomMin=1; camZoomMax=5; camZoomStep=0.1;
-      if(zs){ zs.min=1; zs.max=5; zs.step=0.1; }
-      await setZoom(1);
-    }
-    $('#camMsg').textContent = camZoomNative
-      ? `camera on · zoom ${camZoomMin.toFixed(1)}–${camZoomMax.toFixed(1)}×` : 'camera on';
-    await listCameras(deviceId || (camTrack && camTrack.getSettings?.().deviceId));
-  }catch(e){
-    $('#camMsg').textContent = 'camera error: '+(e.message||e.name);
-  }
-}
-function stopCamera(){
-  if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; }
-  camTrack=null;
-  const v=$('#camPreview'); if(v) v.srcObject=null;
-  const m=$('#camMsg'); if(m) m.textContent='';
-}
-function applyPreviewTransform(){
-  const v=$('#camPreview'); if(!v) return;
-  // Native zoom is real (in the video frame already) → don't CSS-scale; only the
-  // digital fallback scales the preview. Mirror always applies.
-  const scale = camZoomNative ? 1 : camZoom;
-  const mir=($('#camMirror')&&$('#camMirror').checked)?' scaleX(-1)':'';
-  v.style.transform = `scale(${scale})${mir}`;
-}
-// Pinch-to-zoom on the preview (touch). Slider handles desktop. Both route
-// through setZoom, which drives native optical zoom (incl. zoom-out) when available.
-(function(){
-  const wrap=$('#camWrap'); if(!wrap) return;
-  let startDist=0, startZoom=1;
-  const D=t=>Math.hypot(t[0].clientX-t[1].clientX, t[0].clientY-t[1].clientY);
-  wrap.addEventListener('touchstart', e=>{ if(e.touches.length===2){ startDist=D(e.touches); startZoom=camZoom; e.preventDefault(); } }, {passive:false});
-  wrap.addEventListener('touchmove', e=>{ if(e.touches.length===2 && startDist>0){
-    setZoom(startZoom*(D(e.touches)/startDist)); e.preventDefault();
-  } }, {passive:false});
-  wrap.addEventListener('touchend', e=>{ if(e.touches.length<2) startDist=0; });
-})();
-// Snap the CURRENT view to a portrait (9:16) image matching the preview + zoom,
-// then show it below for review before sending.
-function snapPhoto(){
-  const v=$('#camPreview'); if(!camStream || !v.videoWidth){ setSnapMsg('start the camera first'); return; }
-  const vw=v.videoWidth, vh=v.videoHeight, arT=9/16;
-  // object-fit:cover crop of the video into 9:16 (what the preview shows)…
-  let sw, sh;
-  if(vw/vh > arT){ sh=vh; sw=vh*arT; } else { sw=vw; sh=vw/arT; }
-  // …then centre-crop by the zoom factor — ONLY for the digital fallback. Native
-  // zoom is already baked into the video frame, so don't crop again.
-  const z = camZoomNative ? 1 : Math.max(1, camZoom||1); sw/=z; sh/=z;
-  const sx=(vw-sw)/2, sy=(vh-sh)/2;
-  // Output at the cropped region's NATIVE resolution (never upscale), capped so
-  // files stay under the 8 MB send limit. ~8× the old hard 720×1280 at best.
-  const MAX_W=2160;
-  const OUT_W=Math.max(1, Math.min(MAX_W, Math.round(sw))), OUT_H=Math.round(OUT_W*16/9);
-  const cv=$('#snapCanvas'); cv.width=OUT_W; cv.height=OUT_H;
-  const ctx=cv.getContext('2d');
-  ctx.imageSmoothingQuality='high';
-  if($('#camMirror').checked){ ctx.translate(OUT_W,0); ctx.scale(-1,1); }
-  ctx.drawImage(v, sx, sy, sw, sh, 0, 0, OUT_W, OUT_H);
-  cv.toBlob(blob=>{
-    if(!blob){ setSnapMsg('snap failed'); return; }
-    if(snapBlobUrl) URL.revokeObjectURL(snapBlobUrl);
-    snapBlob=blob; snapBlobUrl=URL.createObjectURL(blob);
-    $('#snapImg').src=snapBlobUrl; $('#snapReview').style.display=''; setSnapMsg('📸 snapped — review below');
-    $('#snapReview').scrollIntoView({behavior:'smooth', block:'nearest'});
-  }, 'image/jpeg', 0.92);
-}
-function discardSnap(){
-  if(snapBlobUrl){ URL.revokeObjectURL(snapBlobUrl); snapBlobUrl=null; }
-  snapBlob=null; const im=$('#snapImg'); if(im) im.src=''; $('#snapReview').style.display='none'; setSnapMsg('');
-}
-async function sendSnapshot(){
-  if(!snapBlob){ setSnapMsg('snap a photo first'); return; }
-  setSnapMsg('sending…');
-  const fd=new FormData(); fd.append('file', snapBlob, 'snapshot.jpg'); fd.append('caption', ($('#snapCaption')&&$('#snapCaption').value)||'');
-  try{
-    const r=await (await fetch('/api/snapshot',{method:'POST',body:fd})).json();
-    if(r.ok){ setSnapMsg(`sent to ${r.channels} channel${r.channels===1?'':'s'} ✓`);
-      if(snapBlobUrl) URL.revokeObjectURL(snapBlobUrl); snapBlob=null; snapBlobUrl=null; $('#snapReview').style.display='none'; }
-    else setSnapMsg('send failed');
-  }catch(e){ setSnapMsg('send failed'); }
-}
 let capT=null;
 function setCapacity(v){ clearTimeout(capT); capT=setTimeout(()=>api('/api/capacity',{value:parseFloat(v)||0}), 120); }
 // ---- operator controls (post to the channel as the owner) ----
@@ -1737,7 +1611,41 @@ async function ctl(path, body){
 async function controlRoll(){ ctl('/api/control/roll', {dice:+$('#ctrlDice').value, sides:+$('#ctrlSides').value}); }
 let sessionPaused = false;
 async function controlStop(){ ctl(sessionPaused ? '/api/control/resume' : '/api/control/stop', {}); }
-async function controlPump(){ ctl('/api/control/pump', {seconds: parseFloat($('#ctrlPump').value)||5}); }
+// The Pump button is a TOGGLE. While anything is firing it reads STOP and
+// ends the run — whichever device it was, timed or not. STOP is deliberately
+// not the session pause; it just stops the pump.
+function pumpFiring(){
+  return ((lastState||{}).device_timers||[]).some(d=>d.firing);
+}
+function pumpUi(){
+  const firing = pumpFiring();
+  for(const id of ['#ctrlPumpBtn','#chatPumpBtn']){
+    const b=$(id); if(!b) continue;
+    b.textContent = firing ? '⏹ STOP' : '💨 Pump';
+    b.classList.toggle('bad', firing);
+    b.title = firing ? 'stop the pump that is running' : 'run the selected pump';
+  }
+  const timed = $('#ctrlPumpTimed') ? $('#ctrlPumpTimed').checked : true;
+  const n=$('#ctrlPump'), l=$('#ctrlPumpSecsLbl');
+  if(n) n.style.display = timed ? '' : 'none';
+  if(l) l.textContent = timed ? 'secs' : 'runs until STOP';
+}
+function pumpDevUi(){
+  const sel=$('#ctrlPumpDev'); if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML = cmdDeviceOpts(cur);
+  if(cur) sel.value=cur;
+}
+async function controlPump(){
+  if(pumpFiring()){ await ctl('/api/control/pump-stop', {}); pumpUi(); return; }
+  const timed = $('#ctrlPumpTimed') ? $('#ctrlPumpTimed').checked : true;
+  await ctl('/api/control/pump', {
+    device_id: ($('#ctrlPumpDev') && $('#ctrlPumpDev').value) || null,
+    seconds: parseFloat($('#ctrlPump') ? $('#ctrlPump').value : 5) || 5,
+    untimed: !timed,
+  });
+  pumpUi();
+}
 
 // ---- Chat tab (owner cockpit) ----
 let chatLast = '';    // newest message id rendered for the current channel
@@ -1761,11 +1669,36 @@ function chatActive(){
 function chatSwitch(){ chatLast=''; const el=$('#chatLog'); if(el) el.innerHTML='<div class="muted">loading…</div>'; chatVideoUi(); chatPoll(true);
   // Isolate follows the active channel: switching while checked re-aims it
   if($('#chatIso')&&$('#chatIso').checked){ chatIsoChan=$('#chatChan').value||''; scheduleSave(); } }
+// Render the Discord markdown that actually shows up in our messages, so the
+// log reads the way the channel does instead of showing **raw asterisks**.
+// The input is ALREADY html-escaped by esc() — this only ever ADDS tags, and
+// code spans are pulled out first so nothing inside them gets formatted.
+function chatMd(t){
+  const code=[];
+  const keep = c => { code.push(c); return '@@DFCODE' + (code.length-1) + '@@'; };
+  t = t.replace(/```(?:[a-zA-Z]*\n)?([\s\S]*?)```/g, (m,c)=>keep('<pre class="codemd">'+c+'</pre>'));
+  t = t.replace(/`([^`\n]+)`/g,                      (m,c)=>keep('<code class="codemd">'+c+'</code>'));
+  t = t.replace(/\|\|([\s\S]+?)\|\|/g, '<span class="spoil" title="spoiler - click to reveal">$1</span>');
+  t = t.replace(/\*\*\*([\s\S]+?)\*\*\*/g, '<b><i>$1</i></b>');
+  t = t.replace(/\*\*([\s\S]+?)\*\*/g, '<b>$1</b>');
+  t = t.replace(/__([\s\S]+?)__/g, '<u>$1</u>');
+  t = t.replace(/~~([\s\S]+?)~~/g, '<s>$1</s>');
+  t = t.replace(/(^|[^\w*])\*([^*\n]+)\*(?![\w*])/g, '$1<i>$2</i>');
+  t = t.replace(/(^|[^\w_])_([^_\n]+)_(?![\w_])/g,   '$1<i>$2</i>');
+  t = t.split('\n').map(l=>
+      /^-#\s/.test(l)     ? '<span class="submd">'+l.replace(/^-#\s/,'')+'</span>'
+    : /^&gt;\s/.test(l)   ? '<span class="quotemd">'+l.replace(/^&gt;\s/,'')+'</span>'
+    : /^#{1,3}\s/.test(l) ? '<b>'+l.replace(/^#{1,3}\s/,'')+'</b>'
+    : l).join('\n');
+  t = t.replace(/\n/g,'<br>');
+  t = t.replace(/@@DFCODE(\d+)@@/g, (m,i)=>code[+i]);
+  return t;
+}
 function chatRender(entries, replaceAll){
   const el=$('#chatLog'); if(!el) return;
   const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 40;
   const html = entries.map(m=>
-    `<div><span class="t">${esc(m.t)}</span> <b style="color:${m.bot?'var(--accent2)':'var(--text)'}">${esc(m.author)}</b> ${esc(m.text).replace(/\n/g,'<br>')}</div>`).join('');
+    `<div><span class="t">${esc(m.t)}</span> <b style="color:${m.bot?'var(--accent2)':'var(--text)'}">${esc(m.author)}</b> ${chatMd(esc(m.text))}</div>`).join('');
   if(replaceAll) el.innerHTML = html || '<div class="muted">nothing here yet</div>';
   else el.insertAdjacentHTML('beforeend', html);
   if(atBottom || replaceAll) el.scrollTop = el.scrollHeight;
@@ -1849,17 +1782,40 @@ function ownerCmdOpts(sel){
     names.map(n=>`<option value="${esc(n)}" ${sel===n?'selected':''}>#${esc(n)}</option>`).join('')+
     ((sel&&!names.includes(sel))?`<option value="${esc(sel)}" selected>#${esc(sel)} (missing)</option>`:'');
 }
+// A custom button can aim at a callable overlay, or at a whole scene group,
+// in the scene the Chat tab is linked to (plus the globals).
+function overlayNameOpts(sel){
+  const sc = scenesData.find(x=>x.name===chatSceneName);
+  const items = [...(sc?(sc.overlays||[]).filter(o=>!o.visible):[]),
+                 ...sceneGlobals.filter(o=>!o.visible)];
+  return `<option value="">— pick an overlay —</option>`+
+    items.map(o=>{
+      const nm = o.label || o.text || o.media || o.kind || 'overlay';
+      return `<option value="${esc(o.id)}" ${sel===o.id?'selected':''}>${esc(String(nm).split('\n')[0].slice(0,40))}</option>`;
+    }).join('')+
+    ((sel&&!items.some(o=>o.id===sel))?`<option value="${esc(sel)}" selected>${esc(sel)} (missing)</option>`:'');
+}
+function groupNameOpts(sel){
+  const sc = scenesData.find(x=>x.name===chatSceneName);
+  const gs = sc ? [...new Set([...(Array.isArray(sc.groups)?sc.groups:[]),
+      ...(sc.overlays||[]).map(o=>(o.group||'').trim()).filter(Boolean)])].sort() : [];
+  return `<option value="">— pick a scene group —</option>`+
+    gs.map(n=>`<option value="${esc(n)}" ${sel===n?'selected':''}>🎬 ${esc(n)}</option>`).join('')+
+    ((sel&&!gs.includes(sel))?`<option value="${esc(sel)}" selected>${esc(sel)} (missing)</option>`:'');
+}
 function renderChatBtnEditor(){
   const box=$('#chatBtnRows'); if(!box) return;
   box.innerHTML = chatButtons.map((b,i)=>{
     const kind=b.kind||'command';
     const tgt = kind==='poll' ? pollNameOpts(b.name)
               : kind==='owner' ? ownerCmdOpts(b.name)
+              : kind==='overlay' ? overlayNameOpts(b.name)
+              : kind==='group' ? groupNameOpts(b.name)
               : cmdNameOpts(b.name);
     return `<div class="row ovedit">`+
       `<label class="field">Label <input value="${esc(b.label||'')}" placeholder="🔥 Blast" style="width:170px" onchange="chatButtons[${i}].label=this.value;renderChatButtons();scheduleSave()"></label>`+
       `<label class="field">Does <select style="width:150px" onchange="chatButtons[${i}].kind=this.value;chatButtons[${i}].name='';renderChatBtnEditor();scheduleSave()">`+
-        [['command','fire a !command'],['poll','start a poll'],['owner','post #owner cmd']].map(([v,l])=>`<option value="${v}" ${kind===v?'selected':''}>${l}</option>`).join('')+`</select></label>`+
+        [['command','fire a !command'],['poll','start a poll'],['owner','post #owner cmd'],['overlay','play an overlay'],['group','play a scene group']].map(([v,l])=>`<option value="${v}" ${kind===v?'selected':''}>${l}</option>`).join('')+`</select></label>`+
       `<label class="field grow">Target <select style="width:100%" onchange="chatButtons[${i}].name=this.value;scheduleSave()">${tgt}</select></label>`+
       `<button class="ghost" onclick="chatButtons.splice(${i},1);renderChatBtnEditor();renderChatButtons();scheduleSave()">✕</button>`+
     `</div>`;
@@ -1872,7 +1828,17 @@ function renderChatButtons(){
 }
 async function chatButtonRun(i){
   const b=chatButtons[i]; if(!b||!(b.name||'').trim()) return;
-  if((b.kind||'command')==='poll'){ ctl('/api/control/poll', {name:b.name}); return; }
+  const kind=b.kind||'command';
+  if(kind==='poll'){ ctl('/api/control/poll', {name:b.name}); return; }
+  if(kind==='overlay' || kind==='group'){
+    try{
+      const body = kind==='group' ? {stage:chatSceneName, group:b.name}
+                                  : {stage:chatSceneName, id:b.name};
+      const r = await api('/api/overlay/fire', body);
+      $('#chatMsg').textContent = r.ok ? (r.skipped?('· '+r.skipped):'') : ('⚠ '+(r.error||'overlay failed'));
+    }catch(e){ $('#chatMsg').textContent='⚠ '+(e.message||e); }
+    return;
+  }
   const cid=$('#chatChan')&&$('#chatChan').value;
   if(!cid){ $('#chatMsg').textContent='⚠ pick a channel first'; return; }
   const pf = b.kind==='owner' ? '#' : (($('#prefix')&&$('#prefix').value)||'!');
@@ -1896,7 +1862,6 @@ function renderOcEditor(){
     `</div>`).join('') || '<div class="muted">no owner commands yet</div>';
 }
 // ---- video channels: virtual camera + overlay actions ----
-let overlayButtons = [];
 let chatChanKinds = {};
 function chatIsVideo(){ const cid=$('#chatChan')&&$('#chatChan').value; return chatChanKinds[cid]==='voice'; }
 function chatVideoUi(){
@@ -1909,6 +1874,7 @@ function chatVideoUi(){
 async function vcamSectionInit(){
   try{
     const st = await api('/api/camera/status', {});
+    vcamLiveSet(st);
     if(st.android){
       // phone: no virtual cam possible — video runs on the PC; offer VC Remote
       const c=$('#vcamCtrls'); if(c) c.style.display='none';
@@ -1921,6 +1887,15 @@ async function vcamSectionInit(){
     }
     if(st.running){ $('#vcamMsg').textContent='🟢 '+(st.info||'running'); vcamPreviewStart(); }
   }catch(e){}
+}
+// The resolution the virtual cam is actually running at. The Scenes canvas
+// previews at THIS, so overlay sizes on the canvas match the outgoing feed.
+let vcamLive = {w:0, h:0};
+function vcamLiveSet(st){
+  const w = +(st&&st.running ? st.width : 0)||0, h = +(st&&st.running ? st.height : 0)||0;
+  if(w===vcamLive.w && h===vcamLive.h) return;
+  vcamLive = {w, h};
+  if(typeof renderStgCanvas==='function') renderStgCanvas();
 }
 let vcamModes = {};   // device index -> ["WxH", ...] from 🔍 Detect
 async function vcamDetect(){
@@ -1971,13 +1946,17 @@ async function vcamDriver(){
   }catch(e){ m.textContent='⚠ '+(e.message||e); }
 }
 async function vcamStart(){
+  await flushSave();          // the camera applies the scene as saved
   const [w,h]=($('#vcamRes').value||'1280x720').split('x').map(Number);
   $('#vcamMsg').textContent='starting…';
   try{
     const r = await api('/api/camera/start', {device:+$('#vcamDev').value||0, width:w, height:h, fps:30,
       stage:chatSceneName, mirror:$('#vcamMirror')?$('#vcamMirror').checked:false});
-    $('#vcamMsg').textContent = r.ok ? ('🟢 ' + (r.info||'running') + ' — pick the virtual camera in Discord') : ('⚠ ' + (r.error||'failed'));
-    if(r.ok) vcamPreviewStart();
+    $('#vcamMsg').textContent = r.ok
+      ? ('🟢 ' + (r.info||'running') + ' — pick the virtual camera in Discord'
+         + (r.blackout ? ' · sending BLACK until LIVE is on' : ''))
+      : ('⚠ ' + (r.error||'failed'));
+    if(r.ok){ vcamLiveSet(r); vcamPreviewStart(); }
   }catch(e){ $('#vcamMsg').textContent='⚠ '+(e.message||e); }
 }
 async function vcamMirrorSet(){
@@ -2049,10 +2028,16 @@ async function syncPush(){
 }
 // Stages tab shortcut: same push, reported inline
 async function stgSend(){
-  let a='';
-  try{ a = localStorage.getItem('df_sync')||''; }catch(e){}
-  a = (prompt('Send all scenes + media to which device?\n(its address, e.g. 192.168.1.50:8765)', a)||'').trim();
-  if(!a) return;
+  // It lives in System -> Device Sync now, right next to that address field,
+  // so use it rather than prompting for an address that's already on screen.
+  const f=$('#syncAddr');
+  let a=(f && f.value || '').trim();
+  if(!a){ try{ a = localStorage.getItem('df_sync')||''; }catch(e){} }
+  if(!a){
+    a = (prompt('Send all scenes + media to which device?\n(its address, e.g. 192.168.1.50:8765)', '')||'').trim();
+    if(!a) return;
+    if(f) f.value=a;
+  }
   try{ localStorage.setItem('df_sync', a); }catch(e){}
   toastMsg('⏳ sending scenes + media…');
   try{
@@ -2109,50 +2094,9 @@ function vcRemoteConnect(){
   // chip you can't tell whose Activation/Mock/config you're actually changing
   location.href = a + '/?takeover=1';
 }
-function renderOverlayButtons(){
-  const box=$('#overlayBtns'); if(!box) return;
-  box.innerHTML = overlayButtons.filter(b=>(b.label||'').trim()&&(b.image||'').trim())
-    .map(b=>`<button onclick="overlayFire(${overlayButtons.indexOf(b)})">${esc(b.label)}</button>`).join('')
-    || '<span class="muted">no overlay actions yet — add some with 🔧</span>';
-}
-async function overlayFire(i){
-  const b=overlayButtons[i]; if(!b) return;
-  try{
-    const r = await api('/api/overlay/fire', {image:b.image, seconds:+b.seconds||5, pos:b.pos||'center', scale:+b.scale||0.5});
-    $('#vcamMsg').textContent = r.ok ? '' : ('⚠ ' + (r.error||'overlay failed'));
-  }catch(e){ $('#vcamMsg').textContent='⚠ '+(e.message||e); }
-}
-async function ovbUpload(i, input){
-  const f=input.files[0]; if(!f) return;
-  const fd=new FormData(); fd.append('file', f);
-  try{
-    const resp = await fetch('/api/upload', {method:'POST', body:fd});
-    if(!resp.ok){ toastMsg('⚠ upload failed'); return; }
-    const j = await resp.json();
-    overlayButtons[i].image = j.path || j.url || '';
-    renderOvbEditor(); renderOverlayButtons(); scheduleSave();
-  }catch(e){ toastMsg('⚠ '+(e.message||e)); }
-}
-function renderOvbEditor(){
-  const box=$('#ovbRows'); if(!box) return;
-  box.innerHTML = overlayButtons.map((b,i)=>
-    `<div class="row ovedit">`+
-      `<label class="field">Label <input value="${esc(b.label||'')}" placeholder="💥 Boom" style="width:150px" onchange="overlayButtons[${i}].label=this.value;renderOverlayButtons();scheduleSave()"></label>`+
-      `<label class="field grow">Image <div class="row" style="gap:6px;flex-wrap:nowrap">`+
-        `<input value="${esc(b.image||'')}" placeholder="upload or filename from data/images" style="flex:1;min-width:0" onchange="overlayButtons[${i}].image=this.value;renderOverlayButtons();scheduleSave()">`+
-        `<label class="ghost" style="padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid var(--line)">⇧<input type="file" accept="image/*" style="display:none" onchange="ovbUpload(${i}, this)"></label>`+
-      `</div></label>`+
-      `<label class="field">Secs <input type="number" min="0.5" step="0.5" value="${b.seconds??5}" style="width:70px" onchange="overlayButtons[${i}].seconds=+this.value;scheduleSave()"></label>`+
-      `<label class="field">Position <select style="width:130px" onchange="overlayButtons[${i}].pos=this.value;scheduleSave()">`+
-        ['center','top','bottom','left','right','top-left','top-right','bottom-left','bottom-right'].map(p=>`<option value="${p}" ${(b.pos||'center')===p?'selected':''}>${p}</option>`).join('')+`</select></label>`+
-      `<label class="field">Width <select style="width:90px" onchange="overlayButtons[${i}].scale=+this.value;scheduleSave()">`+
-        [[0.25,'25%'],[0.5,'50%'],[0.75,'75%'],[1,'100%']].map(([v,l])=>`<option value="${v}" ${(+b.scale||0.5)===v?'selected':''}>${l}</option>`).join('')+`</select></label>`+
-      `<button class="ghost" onclick="overlayButtons.splice(${i},1);renderOvbEditor();renderOverlayButtons();scheduleSave()">✕</button>`+
-    `</div>`).join('') || '<div class="muted">no overlay actions yet</div>';
-}
 // ================= Stages: OBS-style overlay designer =================
 let scenesData=[], sceneGlobals=[], stgCur=-1, scnSelId=null, mediaPickCb=null;
-let chatSceneName='', chatIsoChan='', gpPresetNames=[];
+let chatSceneName='', chatIsoChan='', gpPresetNames=[], presetLoadedName='';
 function metaAuth(){ return (document.querySelector('meta[name="df-auth"]')||{}).content||''; }
 // Overlays an action can call: the Chat-linked stage first, then the rest,
 // then globals — grouped so it's obvious where each one lives.
@@ -2225,6 +2169,10 @@ function stgNewItem(kind, media, visible){
     o.font = 'bold'; o.bg = '';
   }
   if(kind==='text') o.text = 'New text';
+  // a Solid lands as a full-frame black backdrop — the usual reason to add one
+  if(kind==='solid'){ o.x=0; o.y=0; o.w=1; o.h=1; o.color='#000000'; o.z=-5; }
+  // a sound cue: fired, never drawn — the canvas marker is just a handle
+  if(kind==='audio'){ o.w=0.10; o.volume=100; o.visible=false; o.mode='once'; }
   if(kind==='capacity_gauge'){ o.orient='h'; o.show_pct=true; }
   if(kind==='pump_timer'){ o.fmt_on='PUMP [secs]s'; o.fmt_off='PUMP idle'; }
   if(kind==='device_timers'){ o.fmt_on='[name] [secs]s'; o.fmt_off='[name] idle'; o.show_idle=true; }
@@ -2241,6 +2189,34 @@ function stgStage(){ return scenesData[stgCur]||null; }
 // The Scenes tab remembers what you were working on across reloads: which
 // scene, which group filter, and whether the grid is on. Scenes are stored by
 // NAME because indices shift as scenes are added, removed or renamed.
+// ---- Triggers tab: nine sections, all closed, whichever you open is kept ----
+// Keyed by the section's own heading text, so reordering or renaming a card
+// can't hand its remembered state to a different section.
+function trigSections(){
+  return [...document.querySelectorAll('[data-tab="triggers"] > details.help')];
+}
+function trigKey(d){
+  const h=d.querySelector('summary h2');
+  return (h ? h.textContent : '').trim();
+}
+function trigRemember(){
+  try{
+    const open=trigSections().filter(d=>d.open).map(trigKey).filter(Boolean);
+    localStorage.setItem('df_trig_open', JSON.stringify(open));
+  }catch(e){}
+}
+function trigRestore(){
+  let open=[];
+  try{ open=JSON.parse(localStorage.getItem('df_trig_open')||'[]'); }catch(e){}
+  if(!Array.isArray(open)) open=[];
+  for(const d of trigSections()){
+    d.open = open.includes(trigKey(d));
+    if(!d.dataset.trigWired){
+      d.dataset.trigWired='1';
+      d.addEventListener('toggle', trigRemember);
+    }
+  }
+}
 function stgRemember(){
   try{
     const s=stgStage();
@@ -2249,6 +2225,20 @@ function stgRemember(){
   }catch(e){}
 }
 function stgRestore(){
+  // chat_scene is the saved truth for which scene is live; the localStorage
+  // memory below is only a fallback for a config that never set one.
+  if(chatSceneName){
+    const i=scenesData.findIndex(x=>(x.name||'')===chatSceneName);
+    if(i>=0){
+      stgCur=i;
+      let grp=''; try{ grp=localStorage.getItem('df_scene_group')||''; }catch(e){}
+      const sc=scenesData[i];
+      const has=(Array.isArray(sc.groups) && sc.groups.some(g=>g===grp))
+             || (sc.overlays||[]).some(o=>(o.group||'').trim()===grp);
+      stgGroupFilter=(grp && (has || grp===STG_UNGROUPED)) ? grp : '';
+      return;
+    }
+  }
   let want='', grp='';
   try{ want=localStorage.getItem('df_scene')||''; grp=localStorage.getItem('df_scene_group')||''; }catch(e){}
   if(want){
@@ -2270,8 +2260,6 @@ function renderStages(){
   const s = stgStage();
   $('#stgEditor').style.display = s ? '' : 'none';
   if(s){
-    $('#stgPreset').innerHTML = '<option value="">(live settings)</option>'+
-      gpPresetNames.map(n=>`<option ${s.preset===n?'selected':''}>${esc(n)}</option>`).join('');
     $('#stgRes').value = `${s.width||1280}x${s.height||720}`;
     renderStgPalette(); renderStgCanvas(); renderStgGroups(); renderStgContents(); renderStgProps();
   }
@@ -2280,10 +2268,23 @@ function renderStages(){
 function renderStgCanvas(){
   const s=stgStage(), cv=$('#stgCanvas'); if(!cv) return;
   if(!s){ cv.innerHTML=''; return; }
-  cv.style.aspectRatio = `${s.width||1280} / ${s.height||720}`;
+  // Preview at the resolution the VIRTUAL CAM is actually sending, so what you
+  // lay out here is what viewers get. Falls back to the scene's own resolution
+  // when the camera isn't running.
+  const PW = vcamLive.w || s.width || 1280, PH = vcamLive.h || s.height || 720;
+  cv.style.aspectRatio = `${PW} / ${PH}`;
   cv.classList.toggle('grid', ($('#stgGridOn')||{checked:true}).checked);
-  const CH = cv.clientHeight || 400;   // px per 1.0 of `size`
-  cv.innerHTML = (s.overlays||[]).map(o=>{
+  // `size` is a fraction of FRAME HEIGHT (camera.py: px = H * size). Derive the
+  // canvas height from its WIDTH and that aspect instead of measuring it —
+  // clientHeight is 0 whenever the tab hasn't been laid out yet, and the old
+  // 400px fallback quietly drew every text overlay at the wrong size.
+  const CH = Math.max(1, (cv.clientWidth || 800) * (PH / PW));   // px per 1.0 of `size`
+  // Scoping a scene group scopes the CANVAS too — you're laying out that group,
+  // so everything else gets out of the way. Pick "all" to see the whole scene.
+  const inScope = o => !stgGroupFilter
+      || (stgGroupFilter===STG_UNGROUPED ? !(o.group||'').trim()
+                                         : (o.group||'').trim()===stgGroupFilter);
+  cv.innerHTML = (s.overlays||[]).filter(inScope).map(o=>{
     let inner='', box='';
     const fam = STG_FONTS[o.font||'bold']||STG_FONTS.bold;
     const fs = Math.max(7, (o.size||0.06)*CH);
@@ -2343,6 +2344,15 @@ function renderStgCanvas(){
               `${(o.bg||'').trim()?`background:${esc(o.bg)}`:'text-shadow:0 1px 3px #000,0 0 2px #000'}">`+
               `${esc(txt).replace(/\\n|\n/g,'<br>')||'&nbsp;'}</div>`;
       box = 'width:auto';   // text sizes itself
+    } else if(o.kind==='audio'){
+      const nm = o.label || o.media || 'sound';
+      inner = `<div class="audiomark" title="plays a sound — nothing is drawn on the stream">`+
+              `<span style="font-size:${Math.max(12, fs*0.9)}px">🔊</span>`+
+              `<span class="nm">${esc(String(nm).slice(0,28))}</span></div>`;
+      box = 'width:auto';
+    } else if(o.kind==='solid'){
+      inner = `<div style="width:100%;height:100%;background:${esc(o.color||'#000000')}"></div>`;
+      box = `width:${(o.w*100).toFixed(2)}%;height:${((o.h??1)*100).toFixed(2)}%`;
     } else {
       const hbox = o.h ? `;height:${(o.h*100).toFixed(2)}%` : '';
       const fit = o.h ? 'height:100%;object-fit:fill' : '';
@@ -2353,14 +2363,19 @@ function renderStgCanvas(){
     }
     const rot = o.rot ? `transform:rotate(${o.rot}deg);transform-origin:center center;` : '';
     const fl  = o.flash ? `animation:dfflash ${(+o.flash||1)*2}s steps(1,end) infinite;` : '';
-    const hid = stgGroupHidden(o.group) ? 'opacity:.18;filter:grayscale(1);' : '';
+    // Never remove anything from the canvas — you have to be able to place and
+    // edit it. A CALLABLE overlay (🚫) ghosts back, because it isn't part of the
+    // scene until something fires it; a HIDDEN GROUP ghosts further and greys
+    // out. Both multiply the item's own opacity rather than replacing it.
+    const dim = stgGroupHidden(o.group) ? 0.18 : (o.visible ? 1 : 0.45);
+    const hid = stgGroupHidden(o.group) ? 'filter:grayscale(1);' : '';
     const handles = o.id===scnSelId
       ? '<span class="stgRot">⟳</span>' +
         ['nw','n','ne','w','e','sw','s','se'].map(h=>`<span class="stgH" data-h="${h}"></span>`).join('')
       : '';
     return `<div class="stgItem${o.id===scnSelId?' sel':''}" data-id="${esc(o.id)}" `+
            `style="left:${(o.x*100).toFixed(2)}%;top:${(o.y*100).toFixed(2)}%;${box};${rot}${fl}`+
-           `z-index:${Math.round(+o.z||0)+10};opacity:${Math.max(0,Math.min(100,o.opacity??100))/100};${hid}">`+
+           `z-index:${Math.round(+o.z||0)+10};opacity:${(Math.max(0,Math.min(100,o.opacity??100))/100)*dim};${hid}">`+
            `${inner}${handles}</div>`;
   }).join('');
 }
@@ -2439,12 +2454,25 @@ let stgDrag=null;
   });
   const up=()=>{ if(stgDrag){ stgDrag=null; renderStgCanvas(); renderStgProps(); scheduleSave(); } };
   cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  // Text is sized from the canvas WIDTH, so a width change (opening the tab
+  // for the first time, resizing the window) has to redraw or the preview
+  // keeps the old scale. Width only — our own aspectRatio write changes the
+  // height, and reacting to that would loop.
+  if(window.ResizeObserver){
+    let lastW = 0;
+    new window.ResizeObserver(()=>{
+      const w = cv.clientWidth|0;
+      if(w && w!==lastW && !stgDrag){ lastW = w; renderStgCanvas(); }
+    }).observe(cv);
+  }
 })();
 // What scene groups exist in THIS scene, and what's in them. A group isn't
 // created anywhere special — it exists as soon as an overlay is tagged with
 // its name — so this makes that visible instead of implied.
 const OV_KINDS = [
   ['media','🖼','Media','image or video from the library'],
+  ['solid','▬','Solid','a flat colour block — backdrop, bar or plate'],
+  ['audio','🔊','Audio','plays a sound — nothing appears on the stream'],
   ['text','🅣','Text','multi-line, live placeholders'],
   ['timer','⏳','Timer','a countdown you start and stop'],
   ['capacity_gauge','📊','Capacity Gauge','live fill bar'],
@@ -2474,6 +2502,52 @@ const STG_UNGROUPED='\u0000none';
 function stgApplyGroup(o){
   if(stgGroupFilter && stgGroupFilter!==STG_UNGROUPED) o.group=stgGroupFilter;
 }
+// ➦ Move to — retag one overlay into another group in THIS scene, without
+// opening its settings. Also offers a brand-new group, so you can pull items
+// out into one as you build.
+function stgMoveTo(id){
+  const s=stgStage(); if(!s) return;
+  const o=(s.overlays||[]).find(x=>x.id===id); if(!o) return;
+  const cur=(o.group||'').trim();
+  const others=stgSceneGroups().filter(g=>g!==cur);
+  const nm=String(o.label||o.text||o.media||o.kind||'overlay').split('\n')[0].slice(0,40);
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;'+
+                   'display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML=`<div style="background:var(--panel);border:1px solid var(--line);`+
+      `border-radius:12px;padding:20px;max-width:440px;width:100%">`+
+    `<h2 style="margin:0 0 4px">Move to scene group</h2>`+
+    `<div class="hint" style="margin:0 0 14px">${esc(nm)} — currently `+
+      (cur?`in <b>${esc(cur)}</b>`:`<b>ungrouped</b>`)+`</div>`+
+    `<div class="row" style="gap:8px;flex-wrap:wrap">`+
+      others.map(g=>`<button data-g="${esc(g)}">🎬 ${esc(g)}</button>`).join('')+
+      (cur?`<button data-g="" class="ghost">— no group —</button>`:'')+
+      `<button data-new="1" class="ghost">＋ New group…</button>`+
+    `</div>`+
+    `<div class="row" style="margin-top:14px;justify-content:flex-end">`+
+      `<button class="ghost" data-cancel="1">Cancel</button></div>`+
+  `</div>`;
+  document.body.appendChild(ov);
+  const close=()=>ov.remove();
+  const move=g=>{
+    close();
+    o.group=g||'';
+    if(g){ const list=stgGroupList(); if(list && !list.includes(g)) list.push(g); }
+    renderStgCanvas(); renderStgGroups(); renderStgContents(); renderStgProps();
+    sceneButtonsRefresh(); scheduleSave();
+    toastMsg(g?`moved to “${g}”`:'moved out of its group');
+  };
+  ov.onclick=e=>{
+    if(e.target===ov || e.target.dataset.cancel) return close();
+    const b=e.target.closest('button'); if(!b) return;
+    if(b.dataset.new!==undefined){
+      const n=(prompt('New scene group name:')||'').trim();
+      if(n) move(n);
+      return;
+    }
+    if(b.dataset.g!==undefined) move(b.dataset.g);
+  };
+}
 function stgSetGroupFilter(v){ stgGroupFilter=v; stgRemember(); renderStgContents(); }
 // A scene OWNS its group names (scene.groups), so a group can exist while it's
 // still empty and survives a reload. Names found on overlays are folded in too,
@@ -2499,7 +2573,7 @@ function renderStgGroupPick(){
   const un=all.filter(o=>!(o.group||'').trim()).length;
   sel.innerHTML =
     `<option value="">📋 All overlays (${all.length})</option>`+
-    groups.map(g=>`<option value="${esc(g)}" ${stgGroupFilter===g?'selected':''}>${stgGroupHidden(g)?'🚫':'🎬'} ${esc(g)} (${all.filter(o=>(o.group||'').trim()===g).length})${stgGroupHidden(g)?' — hidden':''}</option>`).join('')+
+    groups.map(g=>`<option value="${esc(g)}" ${stgGroupFilter===g?'selected':''}>${stgGroupHidden(g)?'🚫':stgGroupIsIntro(g)?'🎬':'📁'} ${esc(g)} (${all.filter(o=>(o.group||'').trim()===g).length})${stgGroupHidden(g)?' — hidden':stgGroupIsIntro(g)?' — intro':''}</option>`).join('')+
     `<option value="${STG_UNGROUPED}" ${stgGroupFilter===STG_UNGROUPED?'selected':''}>— ungrouped (${un}) —</option>`;
   sel.value = stgGroupFilter;
   const eye=$('#stgGroupEye');
@@ -2508,13 +2582,23 @@ function renderStgGroupPick(){
     const hid  = real && stgGroupHidden(stgGroupFilter);
     eye.textContent = hid ? '🚫' : '👁';
     eye.style.opacity = real ? 1 : .35;
-    eye.title = !real ? 'pick a group to hide it'
-              : hid ? `"${stgGroupFilter}" is hidden — click to show`
-                    : `hide "${stgGroupFilter}" (it stops playing)`;
+    eye.title = !real ? 'pick a group first'
+              : hid ? `"${stgGroupFilter}" is OFF the stream — click to put it on`
+                    : `take "${stgGroupFilter}" off the stream (it still plays when something fires it)`;
+  }
+  const itr=$('#stgGroupIntro');
+  if(itr){
+    const real = stgGroupFilter && stgGroupFilter!==STG_UNGROUPED;
+    const on = real && stgGroupIsIntro(stgGroupFilter);
+    itr.style.opacity = real ? (on?1:.45) : .2;
+    itr.title = !real ? 'pick a group to mark it as an intro'
+              : on ? `"${stgGroupFilter}" is an INTRO group — only plays during the pre-show. Click to make it normal`
+                   : `mark "${stgGroupFilter}" as an INTRO group (only plays during the pre-show)`;
   }
 }
-// A hidden group is skipped everywhere: it doesn't come up with the scene and
-// a scene_group action won't play it. Stored per scene so it survives a reload.
+// Group visibility is about the STREAM, not about the code: an off group isn't
+// on screen and doesn't come up when the scene loads, but firing it explicitly
+// (a button, an event, a scene_group action) still plays it. Stored per scene.
 function stgHiddenGroups(){
   const s=stgStage(); if(!s) return [];
   if(!Array.isArray(s.hidden_groups)) s.hidden_groups=[];
@@ -2523,13 +2607,62 @@ function stgHiddenGroups(){
 function stgGroupHidden(name){
   return stgHiddenGroups().some(g=>String(g).trim().toLowerCase()===String(name||'').trim().toLowerCase());
 }
+// An INTRO group only ever appears during the pre-show. It is never mounted
+// when the camera starts and a scene_group action won't play it unless Go Live
+// is actually set to open with an intro — so intro cards can be plain always-on
+// overlays without leaking into a session that never ran an intro.
+function stgIntroGroups(){
+  const s=stgStage(); if(!s) return [];
+  if(!Array.isArray(s.intro_groups)) s.intro_groups=[];
+  return s.intro_groups;
+}
+function stgGroupIsIntro(name){
+  return stgIntroGroups().some(g=>String(g).trim().toLowerCase()===String(name||'').trim().toLowerCase());
+}
+function stgGroupIntroToggle(){
+  const s=stgStage(); if(!s) return;
+  if(!stgGroupFilter || stgGroupFilter===STG_UNGROUPED){ toastMsg('pick a group first'); return; }
+  const g=stgIntroGroups(), i=g.findIndex(x=>String(x).trim().toLowerCase()===stgGroupFilter.toLowerCase());
+  if(i>=0) g.splice(i,1); else g.push(stgGroupFilter);
+  renderStgGroupPick(); renderStgContents(); renderStgCanvas(); goliveUi(); scheduleSave();
+  toastMsg(i>=0 ? `"${stgGroupFilter}" is a normal group again`
+                : `🎬 "${stgGroupFilter}" is an INTRO group — it only plays during the pre-show`);
+}
+// Copy every overlay tagged with the selected group into a new group. Useful
+// for Intro -> Intro2 chains, where stage two is stage one with one thing moved.
+function stgGroupCopy(){
+  const s=stgStage(); if(!s) return;
+  if(!stgGroupFilter || stgGroupFilter===STG_UNGROUPED){ toastMsg('pick a group first'); return; }
+  const src=(s.overlays||[]).filter(o=>(o.group||'').trim()===stgGroupFilter);
+  const n=copyName(stgGroupFilter, stgSceneGroups());
+  src.forEach(o=>{
+    const c=JSON.parse(JSON.stringify(o));
+    c.id='o'+Date.now().toString(36)+Math.floor(Math.random()*46656).toString(36);
+    c.group=n; if(c.layer) c.layer='';
+    s.overlays.push(c);
+  });
+  const list=stgGroupList(); if(list && !list.includes(n)) list.push(n);
+  if(stgGroupIsIntro(stgGroupFilter)) stgIntroGroups().push(n);   // a copy of an intro is an intro
+  stgGroupFilter=n; stgRemember();
+  renderStgGroupPick(); renderStgContents(); renderStgCanvas(); renderStgGroups();
+  goliveUi(); scheduleSave();
+  toastMsg(`📋 "${n}" — ${src.length} overlay${src.length===1?'':'s'} copied`);
+}
 function stgGroupHide(){
   const s=stgStage(); if(!s) return;
   if(!stgGroupFilter || stgGroupFilter===STG_UNGROUPED){ toastMsg('pick a group to hide'); return; }
   const h=stgHiddenGroups(), i=h.findIndex(g=>String(g).trim().toLowerCase()===stgGroupFilter.toLowerCase());
-  if(i>=0) h.splice(i,1); else h.push(stgGroupFilter);
+  const showing = i>=0;                       // it was hidden; we're turning it ON
+  if(showing) h.splice(i,1); else h.push(stgGroupFilter);
   renderStgGroupPick(); renderStgContents(); renderStgCanvas(); scheduleSave();
-  toastMsg(i>=0 ? `👁 "${stgGroupFilter}" shown` : `🚫 "${stgGroupFilter}" hidden — it won't play`);
+  // Hiding is about the STREAM, so act on it now rather than at the next camera
+  // start — the switch you just flipped should be what viewers see.
+  const grp=stgGroupFilter;
+  api('/api/overlay/fire', showing ? {stage:s.name, group:grp}
+                                   : {stage:s.name, group:grp, mode:'clear'})
+    .catch(()=>{});
+  toastMsg(showing ? `👁 "${grp}" on the stream`
+                   : `🚫 "${grp}" off the stream — it still plays when something fires it`);
 }
 function stgGroupNew(){
   const s=stgStage(); if(!s){ toastMsg('create a scene first'); return; }
@@ -2552,6 +2685,8 @@ function stgGroupRename(){
   // a hidden group keeps its state through a rename
   const hid=stgHiddenGroups(), hi=hid.findIndex(g=>String(g).toLowerCase()===stgGroupFilter.toLowerCase());
   if(hi>=0) hid[hi]=n;
+  const itr=stgIntroGroups(), ii=itr.findIndex(g=>String(g).toLowerCase()===stgGroupFilter.toLowerCase());
+  if(ii>=0) itr[ii]=n;
   stgGroupFilter=n; stgRemember();
   renderStgGroupPick(); renderStgContents(); renderStgGroups(); goliveUi(); scheduleSave();
 }
@@ -2566,6 +2701,8 @@ function stgGroupDelete(){
             if(i>=0) list.splice(i,1); }
   const hid=stgHiddenGroups(), hi=hid.findIndex(g=>String(g).toLowerCase()===stgGroupFilter.toLowerCase());
   if(hi>=0) hid.splice(hi,1);
+  const itr=stgIntroGroups(), ii=itr.findIndex(g=>String(g).toLowerCase()===stgGroupFilter.toLowerCase());
+  if(ii>=0) itr.splice(ii,1);
   stgGroupFilter=''; stgRemember();
   renderStgGroupPick(); renderStgContents(); renderStgGroups(); goliveUi(); scheduleSave();
 }
@@ -2590,7 +2727,13 @@ function renderStgContents(){
     .map(({o,i})=>{
       const nm=o.label||o.text||o.media||OV_KINDS.find(x=>x[0]===(o.kind||'media'))?.[2]||o.kind;
       return `<div class="stgrow${o.id===scnSelId?' sel':''}" onclick="stgSelect('${esc(o.id)}')">`+
-        `<button class="ghost" style="opacity:${o.visible?1:.4}" title="${o.visible?'always on — click to make it callable instead':'callable — click to make it always on'}" onclick="event.stopPropagation();stgItemVis('${esc(o.id)}')">${o.visible?'👁':'🚫'}</button>`+
+        `<button class="ghost" style="opacity:${o.visible?1:.4}" title="${
+          o.kind==='poll_viewer'
+            ? (o.visible?'always on — mounted for the scene; it shows itself only while a poll runs. Click to make it callable instead'
+                        :'callable — nothing shows unless an action mounts it first. Click to make it always on')
+            : (o.visible?'always on — click to make it callable instead'
+                        :'callable — click to make it always on')
+        }" onclick="event.stopPropagation();stgItemVis('${esc(o.id)}')">${o.visible?'👁':'🚫'}</button>`+
         `<span>${ico(o.kind)}</span>`+
         `<span class="nm">${esc(String(nm).split('\n')[0].slice(0,34))}</span>`+
         ((o.group||'').trim()?`<span class="tag">${stgGroupHidden(o.group)?'🚫':'🎬'} ${esc(o.group.trim())}</span>`:'')+
@@ -2598,6 +2741,7 @@ function renderStgContents(){
 
         `<button class="ghost" title="move up (draws in front)" onclick="event.stopPropagation();stgReorder('${esc(o.id)}',1)">▲</button>`+
         `<button class="ghost" title="move down (draws behind)" onclick="event.stopPropagation();stgReorder('${esc(o.id)}',-1)">▼</button>`+
+        `<button class="ghost" title="move to another scene group" onclick="event.stopPropagation();stgMoveTo('${esc(o.id)}')">➦</button>`+
         `<button class="ghost" title="settings" onclick="event.stopPropagation();stgSelect('${esc(o.id)}')">⚙</button>`+
         `<button class="ghost" title="remove from the scene" onclick="event.stopPropagation();stgRemove('${esc(o.id)}')">−</button>`+
       `</div>`;
@@ -2654,7 +2798,7 @@ function renderStgGroups(){
 function stgPickGroup(name){
   const s=stgStage(); if(!s) return;
   const hit=(s.overlays||[]).find(o=>(o.group||'').trim()===name);
-  if(hit){ stgSelId=hit.id; renderStgCanvas(); renderStgProps(); }
+  if(hit){ scnSelId=hit.id; renderStgCanvas(); renderStgProps(); }
 }
 function renderStgProps(){
   const s=stgStage(), box=$('#stgProps'); if(!box) return;
@@ -2662,7 +2806,8 @@ function renderStgProps(){
   if(!o){ box.innerHTML='<div class="muted">no overlay selected — pick one from the list or the canvas</div>'; return; }
   const kind=o.kind||'media', isMedia=kind==='media', isGauge=kind==='capacity_gauge',
         isText=kind==='text', isPoll=kind==='poll_viewer', isTimer=kind==='timer',
-        isDev=kind==='device_timers'||kind==='pump_timer';
+        isDev=kind==='device_timers'||kind==='pump_timer',
+        isSolid=kind==='solid', isAudio=kind==='audio';
   // Keep labels SHORT and on one line — a wrapping label makes its field taller
   // than its neighbours and the whole row goes ragged. Detail lives in `title`.
   // two or more controls under one label go side by side, not stacked
@@ -2720,6 +2865,15 @@ function renderStgProps(){
       F('Height %', num('h',Math.round((o.h??0.3)*100),8,100,1))+
       F('Card bg', `<input type="range" min="0" max="255" step="5" value="${o.bg_opacity??220}" class="prange" oninput="this.nextElementSibling.textContent=Math.round(this.value/2.55)+'%'" onchange="stgItemSet('bg_opacity',+this.value)"><span class="pval">${Math.round((o.bg_opacity??220)/2.55)}%</span>`,
         'how solid the card background is');
+  if(isAudio)
+    content = F('Sound', `<span class="pmedia">${esc(o.media||'—')}</span>`+
+      `<button class="ghost" title="pick a sound from the media library" onclick="mediaBrowse(n=>stgItemSet('media',n), 'audio')">🗂</button>`, 'mp3 / wav / ogg / m4a / flac / opus')+
+      F('Volume %', num('volume',o.volume??100,0,100,5,84))+
+      `<span class="muted">Plays on THIS machine's speakers — nothing is drawn on the stream. Route your system audio into Discord if viewers should hear it.</span>`;
+  if(isSolid)
+    content = F('Width %', num('w',Math.round((o.w??1)*100),1,100,1))+
+      F('Height %', num('h',Math.round((o.h??1)*100),1,100,1))+
+      `<span class="muted">a flat block of colour — full frame by default, so it works as a backdrop behind a scene group</span>`;
   if(isMedia)
     content = F('Width %', num('w',Math.round((o.w??0.3)*100),4,100,1))+
       F('Height %', `<input type="number" min="2" max="100" step="1" value="${o.h?Math.round(o.h*100):''}" placeholder="auto" style="width:84px" onchange="stgItemSet('h', this.value===''?null:+this.value)">`,'blank keeps the aspect ratio')+
@@ -2730,7 +2884,11 @@ function renderStgProps(){
 
   // ---- style (drawn overlays) ------------------------------------------ //
   let style='';
-  if(!isMedia && !isPoll){
+  if(isAudio){
+    style = '';
+  } else if(isSolid){
+    style = F('Colour', `<input type="color" value="${esc(o.color||'#000000')}" class="pcol" onchange="stgItemSet('color',this.value)">`);
+  } else if(!isMedia && !isPoll){
     const bgOn=(o.bg||'').trim();
     style = F(isGauge?'Fill':'Colour', `<input type="color" value="${esc(o.color||(isGauge?'#2ecc71':'#ffffff'))}" class="pcol" onchange="stgItemSet('color',this.value)">`)+
       (isGauge?'':F('Font', sel('font',['sans','bold','serif','mono','script'],o.font||'bold',104))+
@@ -2754,9 +2912,19 @@ function renderStgProps(){
     `<span class="muted">at x ${((o.x||0)*100).toFixed(0)}% · y ${((o.y||0)*100).toFixed(0)}%</span>`;
 
   // ---- firing ----------------------------------------------------------- //
-  const fire = `<span class="muted">${o.visible?'Always on — part of the scene while it is live.':'Callable — plays when an action or button fires it.'}</span>`+
+  // A Poll Viewer gates ITSELF — it draws nothing unless a poll is running —
+  // so always-on/callable decides whether it's MOUNTED, not whether it shows.
+  const fire = `<span class="muted">${o.kind==='poll_viewer'
+      ? (o.visible
+         ? 'Always on — mounted for the whole scene, and it draws itself only while a poll is running (plus its results window). This is the one you want.'
+         : 'Callable — only mounted after an action fires it, so a poll that starts beforehand shows nothing. Use this only to limit polls to one segment.')
+      : o.visible
+      ? 'Always on — up whenever the scene is live, and HOLDS when a scene group plays it.'
+      : 'Callable — plays when an action, button or scene group fires it.'}</span>`+
     (o.visible?'':F('Mode', sel('mode',['timed','hold','once'],o.mode||'timed',92))+
-      ((o.mode||'timed')==='timed'?F('Secs', num('seconds',o.seconds??5,0.5,600,0.5)):''))+
+      ((o.mode||'timed')==='timed'
+        ? F('Secs', num('seconds',o.seconds??5,0.5,600,0.5),'how long it stays before it clears itself')
+        : `<span class="muted">${(o.mode||'timed')==='hold'?'stays until something clears it':'plays through once, then goes'}</span>`))+
     F('Replaces', `<input value="${esc(o.layer||'')}" placeholder="(nothing)" style="width:110px" onchange="stgItemSet('layer',this.value)">`,
       'a named slot: firing another overlay with this same name REPLACES this one. Nothing to do with draw order — use ▲▼ in the list for that.')+
     `<span class="muted">draw order: ▲▼ in the list (currently ${Math.round(+o.z||0)})</span>`;
@@ -2799,7 +2967,17 @@ function stgItemDup(){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===
 function stgItemDel(){ const s=stgStage(); if(!s) return;
   s.overlays=(s.overlays||[]).filter(x=>x.id!==scnSelId); scnSelId=null;
   renderStgCanvas(); renderStgGroups(); renderStgContents(); renderStgProps(); sceneButtonsRefresh(); scheduleSave(); }
-function stgPick(i){ stgCur=i; scnSelId=null; stgGroupFilter=''; stgPending.clear(); stgRemember(); renderStages(); }
+function stgPick(i){
+  stgCur=i; scnSelId=null; stgGroupFilter=''; stgPending.clear();
+  stgSyncLive();                       // one picker: this IS the live scene
+  stgRemember(); renderStages(); goliveUi(); scheduleSave();
+}
+// Keep chat_scene pinned to whatever the Scenes tab has selected.
+function stgSyncLive(){
+  const s=stgStage();
+  const n=s ? (s.name||'') : '';
+  if(chatSceneName!==n){ chatSceneName=n; sceneButtonsRefresh(); }
+}
 // "or default if no scenes": overlay options always have a stage to live in
 function stgEnsureDefault(){
   if(scenesData.length) return false;
@@ -2809,7 +2987,8 @@ function stgEnsureDefault(){
 }
 function stgAdd(){ const name=prompt('Scene name:','My Scene'); if(!name) return;
   scenesData.push({name:name.trim(), preset:'', width:1280, height:720, overlays:[]});
-  stgCur=scenesData.length-1; scnSelId=null; renderStages(); scheduleSave(); }
+  stgCur=scenesData.length-1; scnSelId=null; stgSyncLive();
+  renderStages(); goliveUi(); scheduleSave(); }
 function stgRename(){ const s=stgStage(); if(!s) return; const n=prompt('New name:', s.name||''); if(!n) return;
   if(chatSceneName===s.name) chatSceneName=n.trim();
   s.name=n.trim(); renderStages(); scheduleSave(); }
@@ -2817,7 +2996,32 @@ function stgDelete(){ const s=stgStage(); if(!s) return;
   if(!confirm(`Delete scene "${s.name}"? Its media stays in the library.`)) return;
   if(chatSceneName===s.name) chatSceneName='';
   scenesData.splice(stgCur,1); stgCur=scenesData.length?0:-1; scnSelId=null;
-  renderStages(); scheduleSave(); }
+  stgSyncLive();
+  renderStages(); goliveUi(); scheduleSave(); }
+// "Thing" -> "Thing copy" -> "Thing copy 2". Strips an existing copy suffix
+// first, so duplicating a duplicate never produces "copy copy".
+function copyName(name, taken){
+  const root=String(name||'').replace(/\s+copy(\s+\d+)?$/i,'').trim() || 'untitled';
+  const has=n=>taken.some(t=>String(t).toLowerCase()===n.toLowerCase());
+  let n=root+' copy', i=2;
+  while(has(n)) n=`${root} copy ${i++}`;
+  return n;
+}
+// Clash-safe copy of the whole scene. Overlay ids are regenerated so the two
+// scenes can't fight over the same layer slots or notify/pause targets.
+function stgCopy(){
+  const s=stgStage(); if(!s){ toastMsg('nothing to copy'); return; }
+  const n=copyName(s.name||'Scene', scenesData.map(x=>x.name||''));
+  const c=JSON.parse(JSON.stringify(s));
+  c.name=n;
+  (c.overlays||[]).forEach(o=>{ o.id='o'+Date.now().toString(36)+Math.floor(Math.random()*46656).toString(36);
+                                if(o.layer) o.layer=''; });
+  scenesData.push(c);
+  stgCur=scenesData.length-1; scnSelId=null; stgGroupFilter='';
+  stgSyncLive();
+  stgRemember(); renderStages(); goliveUi(); scheduleSave();
+  toastMsg(`📋 copied to "${n}"`);
+}
 function stgProp(k,v){ const s=stgStage(); if(s){ s[k]=v; scheduleSave(); } }
 function stgResPick(){ const s=stgStage(); if(!s) return;
   const [w,h]=$('#stgRes').value.split('x').map(Number); s.width=w; s.height=h;
@@ -2845,18 +3049,23 @@ function renderStgGlobals(){
     `</div>`).join('') || '<span class="muted">no global overlays yet</span>';
 }
 // ---- universal media browser -------------------------------------------
-function mediaBrowse(cb){ mediaPickCb=cb||null; openOverlay('mediaOverlay'); mediaLoad(); }
+let mediaPickKind='';   // '', 'audio' or 'visual' — filters the browser
+function mediaBrowse(cb, kind){ mediaPickCb=cb||null; mediaPickKind=kind||'';
+  openOverlay('mediaOverlay'); mediaLoad(); }
 async function mediaLoad(){
   const g=$('#mediaGrid'); g.innerHTML='<span class="muted">loading…</span>';
   try{
     const r=await api('/api/media/list',{});
-    g.innerHTML=(r.media||[]).map(m=>{
+    const want=(r.media||[]).filter(m=>
+      mediaPickKind==='audio' ? m.audio : mediaPickKind==='visual' ? !m.audio : true);
+    g.innerHTML=want.map(m=>{
       const kb = m.size>1048576 ? (m.size/1048576).toFixed(1)+'MB' : Math.max(1,Math.round(m.size/1024))+'KB';
       return `<div class="mediaTile" onclick="mediaPicked('${esc(m.name)}')">`+
-        (m.video?`<div class="vid">🎬</div>`:`<img src="/images/${encodeURIComponent(m.name)}" loading="lazy">`)+
+        (m.audio?`<div class="vid">🔊</div>`:m.video?`<div class="vid">🎬</div>`:`<img src="/images/${encodeURIComponent(m.name)}" loading="lazy">`)+
         `<div class="nm">${esc(m.name)} · ${kb}</div>`+
         `<span class="del" onclick="event.stopPropagation();mediaDel('${esc(m.name)}')">✕</span></div>`;
-    }).join('') || '<span class="muted">library is empty — upload something</span>';
+    }).join('') || `<span class="muted">${mediaPickKind==='audio'
+      ? 'no sounds in the library yet — upload an mp3/wav/ogg' : 'library is empty — upload something'}</span>`;
   }catch(e){ g.innerHTML='<span class="muted">⚠ '+(e.message||e)+'</span>'; }
 }
 function mediaPicked(n){ if(mediaPickCb){ const cb=mediaPickCb; mediaPickCb=null; closeOverlay('mediaOverlay'); cb(n); } }
@@ -2902,12 +3111,14 @@ async function stgImport(inp){
   inp.value='';
 }
 // ---- Chat tab: stage link + one-tap bundle buttons + isolate --------------
+// The Chat tab used to have its OWN scene picker, so "the scene you're editing"
+// and "the scene that's live" could disagree — which silently broke anything
+// keyed off the live scene (notify overlay, pause overlay, camera start).
+// There is one picker now, on the Scenes tab, and it sets both.
 function renderChatSceneSel(){
-  const sel=$('#chatSceneSel'); if(!sel) return;
-  sel.innerHTML = '<option value="">(no stage)</option>'+
-    scenesData.map(s=>`<option ${s.name===chatSceneName?'selected':''}>${esc(s.name)}</option>`).join('');
+  const lbl=$('#chatSceneName');
+  if(lbl) lbl.textContent = chatSceneName || '(no scene)';
 }
-function chatSceneChanged(){ chatSceneName=$('#chatSceneSel').value; sceneButtonsRefresh(); scheduleSave(); }
 function sceneButtonsRefresh(){
   const box=$('#stageBtns'); if(!box) return;
   const s = scenesData.find(x=>x.name===chatSceneName);
@@ -2928,18 +3139,133 @@ async function sceneFire(id){
 function openStagePage(){
   location.href='/stage'+(chatSceneName?('?stage='+encodeURIComponent(chatSceneName)):'');
 }
+// Go Live plays a CHAIN of intro stages: Intro -> Intro2 -> ... -> resolve.
+// Each row is a scene group plus how long it holds (0 = until you press Next).
+let glStages = [];
+function glStageRows(){
+  const box=$('#glStages'); if(!box) return;
+  box.innerHTML = glStages.map((st,i)=>
+    `<div class="row" style="gap:8px;align-items:flex-end;margin-bottom:6px">`+
+      `<span class="muted" style="min-width:58px">Stage ${i+1}</span>`+
+      `<label class="field"><select data-gls="${i}" style="width:170px" onchange="glStageSet(${i},'group',this.value)"></select></label>`+
+      `<label class="field">Length <input type="number" min="0" step="5" value="${+st.seconds||0}" style="width:90px" onchange="glStageSet(${i},'seconds',this.value)"></label>`+
+      `<button class="ghost" title="move earlier" ${i===0?'disabled':''} onclick="glStageMove(${i},-1)">▲</button>`+
+      `<button class="ghost" title="move later" ${i===glStages.length-1?'disabled':''} onclick="glStageMove(${i},1)">▼</button>`+
+      `<button class="ghost" title="remove this stage" onclick="glStageDel(${i})">✕</button>`+
+    `</div>`).join('') || '<span class="muted">no stages yet — add one</span>';
+  // fill each row's picker with the INTRO-flagged groups, like the old one did
+  glStages.forEach((st,i)=>{
+    const sel=box.querySelector(`select[data-gls="${i}"]`); if(!sel) return;
+    sel.innerHTML = glGroupOptions(st.group||'', true);
+    sel.value = st.group||'';
+  });
+}
+function glStageSet(i,k,v){
+  if(!glStages[i]) return;
+  glStages[i][k] = k==='seconds' ? Math.max(0, parseInt(v,10)||0) : v;
+  scheduleSave(); if(k!=='seconds') glStageRows();
+}
+function glStageAdd(){ glStages.push({group:'',seconds:15}); glStageRows(); scheduleSave(); }
+function glStageDel(i){ glStages.splice(i,1); glStageRows(); scheduleSave(); }
+function glStageMove(i,d){
+  const j=i+d; if(j<0||j>=glStages.length) return;
+  [glStages[i],glStages[j]]=[glStages[j],glStages[i]];
+  glStageRows(); scheduleSave();
+}
+// Every scene's groups as <optgroup>s, filtered to intro / non-intro.
+function glGroupOptions(cur, wantIntro){
+  const isIntro=(sc,n)=>(Array.isArray(sc.intro_groups)?sc.intro_groups:[])
+    .some(g=>String(g).trim().toLowerCase()===n.trim().toLowerCase());
+  const seen=new Set();
+  let html='<option value="">— none —</option>';
+  scenesData.forEach(sc=>{
+    const gs=[...new Set([...(Array.isArray(sc.groups)?sc.groups:[]),
+      ...(sc.overlays||[]).map(o=>(o.group||'').trim()).filter(Boolean)])]
+      .filter(n=>isIntro(sc,n)===wantIntro).sort();
+    if(!gs.length) return;
+    html+=`<optgroup label="${esc(sc.name||'scene')}">`+
+      gs.map(n=>{ seen.add(n); return `<option ${n===cur?'selected':''}>${esc(n)}</option>`; }).join('')+
+      `</optgroup>`;
+  });
+  const gg=[...new Set(sceneGlobals.map(o=>(o.group||'').trim()).filter(Boolean))].sort();
+  if(gg.length && !wantIntro) html+=`<optgroup label="Global overlays">`+
+    gg.map(n=>{ seen.add(n); return `<option ${n===cur?'selected':''}>${esc(n)}</option>`; }).join('')+`</optgroup>`;
+  if(cur && !seen.has(cur)) html+=`<option selected>${esc(cur)}</option>`;
+  return html;
+}
+// The two overlays the SESSION drives: the shared notify line, and the card
+// that covers the stream while you're paused. Both are picked here and stored
+// in the config, so nothing depends on remembering a magic layer name.
+function sessOvUi(){
+  const sc = stgStage() || scenesData.find(x=>x.name===chatSceneName) || null;
+
+  const ns=$('#ovNotify');
+  if(ns){
+    const items = [...((sc&&sc.overlays)||[]), ...sceneGlobals]
+      .filter(o=>(o.kind||'')==='text');
+    const cur = ns.dataset.want ?? ns.value ?? '';
+    ns.innerHTML = '<option value="">— none —</option>'+
+      items.map(o=>{
+        const nm=o.label||o.text||o.id;
+        return `<option value="${esc(o.id)}" ${cur===o.id?'selected':''}>${esc(String(nm).split('\n')[0].slice(0,44))}</option>`;
+      }).join('')+
+      ((cur && !items.some(o=>o.id===cur))?`<option value="${esc(cur)}" selected>${esc(cur)} (missing)</option>`:'');
+    if(cur) ns.value=cur;
+    delete ns.dataset.want;
+    const hit=items.find(o=>o.id===ns.value);
+    const t=$('#ovNotifyText');
+    if(t) t.textContent = hit ? ('“'+String(hit.text||'').split('\n')[0].slice(0,80)+'”')
+                              : (ns.value ? '⚠ that overlay is not in this scene any more'
+                                          : 'no overlay set — commands with 📣 ticked do nothing');
+  }
+
+  const ps=$('#ovPause');
+  if(ps){
+    const gs = sc ? [...new Set([...(Array.isArray(sc.groups)?sc.groups:[]),
+        ...(sc.overlays||[]).map(o=>(o.group||'').trim()).filter(Boolean)])].sort() : [];
+    const cur = ps.dataset.want ?? ps.value ?? '';
+    ps.innerHTML = '<option value="">— none —</option>'+
+      gs.map(n=>`<option ${n===cur?'selected':''}>${esc(n)}</option>`).join('')+
+      ((cur && !gs.includes(cur))?`<option selected>${esc(cur)}</option>`:'');
+    if(cur) ps.value=cur;
+    delete ps.dataset.want;
+    const inGroup = sc ? (sc.overlays||[]).filter(o=>(o.group||'').trim()===ps.value) : [];
+    const txt = inGroup.filter(o=>(o.kind||'')==='text')
+                       .map(o=>String(o.text||'').split('\n')[0]).filter(Boolean)[0];
+    const t=$('#ovPauseText');
+    if(t) t.textContent = !ps.value ? 'no overlay set — pausing shows nothing'
+      : txt ? ('“'+txt.slice(0,80)+'” · '+inGroup.length+' overlay'+(inGroup.length===1?'':'s'))
+            : (inGroup.length+' overlay'+(inGroup.length===1?'':'s')+' in this group');
+  }
+  const pill=$('#sessOvPill');
+  if(pill){
+    const n=$('#ovNotify'), p=$('#ovPause');
+    const bits=[]; if(n&&n.value) bits.push('notify'); if(p&&p.value) bits.push('pause');
+    pill.textContent = bits.length ? '· '+bits.join(' + ') : '· none set';
+  }
+}
 function goliveUi(){
   const on=$('#glEnabled')&&$('#glEnabled').checked;
   const b=$('#glBody'); if(b) b.style.display = on?'':'none';
-  const sel=$('#glGroup');
+  glStageRows();
+  sessOvUi();
+  for(const which of ['#glAfter']){
+  const sel=$(which);
   if(sel){
     // Offer EVERY scene's groups, labelled by scene — scoping this to one
     // scene meant a group you could plainly see just wasn't in the list.
     const cur=sel.dataset.want ?? sel.value ?? '';
     const seen=new Set();
     let html='<option value="">— none —</option>';
+    // The INTRO picker offers only groups flagged 🎬 intro; "Then switch to"
+    // offers only the normal ones, because switching to another intro is
+    // never what you want.
+    const wantIntro = which==='#glGroup';
+    const isIntro=(sc,n)=>(Array.isArray(sc.intro_groups)?sc.intro_groups:[])
+      .some(g=>String(g).trim().toLowerCase()===n.trim().toLowerCase());
     const groupsOf=sc=>[...new Set([...(Array.isArray(sc.groups)?sc.groups:[]),
-      ...(sc.overlays||[]).map(o=>(o.group||'').trim()).filter(Boolean)])].sort();
+      ...(sc.overlays||[]).map(o=>(o.group||'').trim()).filter(Boolean)])]
+      .filter(n=>isIntro(sc,n)===wantIntro).sort();
     scenesData.forEach(sc=>{
       const gs=groupsOf(sc); if(!gs.length) return;
       html+=`<optgroup label="${esc(sc.name||'scene')}">`+
@@ -2953,8 +3279,15 @@ function goliveUi(){
     sel.innerHTML=html;
     if(cur) sel.value=cur;
   }
+  }
+}
+async function introNextStage(){
+  try{ const r=await api('/api/control/end-intro',{next:true}); applyState(r,false);
+       toastMsg(r.advanced ? '⏭ next intro stage' : '🎬 intro ended — the session is live'); }
+  catch(e){ toastMsg('⚠ '+(e.message||e)); }
 }
 async function endIntroNow(){
+  await flushSave();
   try{ const r=await api('/api/control/end-intro',{}); applyState(r,false);
        toastMsg('🎬 intro ended — the session is live'); }
   catch(e){ toastMsg('⚠ '+(e.message||e)); }
@@ -2964,6 +3297,30 @@ function chatIsoChanged(){
   scheduleSave();
 }
 setInterval(()=>chatPoll(false), 2000);
+// Click a row's TITLE STRIP to open or close it — no ✏️ button. Anything
+// genuinely interactive sitting in the strip (the enable checkbox, a name
+// field, 📋 💾 ✕, the drag handle) keeps its own click; only dead strip area
+// toggles, so you can still work the controls without the row folding shut.
+document.addEventListener('click', e=>{
+  if(!e.target.closest) return;
+  const head = e.target.closest('[data-rtog]');
+  if(!head) return;
+  if(e.target.closest('button,input,select,textarea,a,label,.draghandle')) return;
+  const kind = head.dataset.rtog, arg = head.dataset.rarg;
+  if(kind==='cmd')   return toggleCmdOpen(+arg);
+  if(kind==='evt')   return toggleEvtOpen(+arg);
+  if(kind==='poll')  return togglePollOpen(+arg);
+  if(kind==='range') return toggleRangeExpand(+arg);
+  if(kind==='tier'){
+    if(tierOpen.has(arg)) tierOpen.delete(arg); else tierOpen.add(arg);
+    return renderCommands();
+  }
+  if(kind==='act'){
+    if(actOpen.has(arg)) actOpen.delete(arg); else actOpen.add(arg);
+    const fn = window[head.dataset.rrr];
+    if(typeof fn==='function') fn();
+  }
+});
 document.addEventListener('click', e=>{
   const t = e.target.closest && e.target.closest('.tab-btn');
   if(!t) return;
@@ -3009,6 +3366,7 @@ function renderBroadcasts(){
     const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap='6px';
     el.innerHTML =
       `<div class="row" style="gap:8px">`+
+        `<label class="row" style="gap:5px" title="Active — an inactive broadcast is hidden from the Dashboard dropdown and a broadcast action skips it"><input type="checkbox" ${b.enabled!==false?'checked':''} style="width:auto" onchange="broadcastRows[${i}].enabled=this.checked;renderBroadcastDropdown();scheduleSave()"> active</label>`+
         `<input value="${esc(b.name||'')}" placeholder="name (shown in the dropdown)" style="width:240px" onchange="broadcastRows[${i}].name=this.value;renderBroadcastDropdown()">`+
         `<div style="flex:1"></div>`+
         `<button class="ghost" onclick="delBroadcast(${i})">✕</button>`+
@@ -3017,16 +3375,16 @@ function renderBroadcasts(){
     box.appendChild(el);
   });
 }
-function addBroadcast(){ broadcastRows.push({name:'',message:''}); renderBroadcasts(); renderBroadcastDropdown(); scheduleSave(); }
+function addBroadcast(){ broadcastRows.push({name:'',message:'',enabled:true}); renderBroadcasts(); renderBroadcastDropdown(); scheduleSave(); }
 function delBroadcast(i){ const b=broadcastRows[i]||{}; if(!confirm(`Delete broadcast "${b.name||'(unnamed)'}"? This can't be undone.`)) return; broadcastRows.splice(i,1); renderBroadcasts(); renderBroadcastDropdown(); scheduleSave(); }
-function cleanBroadcasts(){ return broadcastRows.filter(b=>(b.name||'').trim()||(b.message||'').trim()).map(b=>({name:(b.name||'').trim(), message:b.message||''})); }
+function cleanBroadcasts(){ return broadcastRows.filter(b=>(b.name||'').trim()||(b.message||'').trim()).map(b=>({name:(b.name||'').trim(), message:b.message||'', enabled:b.enabled!==false})); }
 async function saveBroadcasts(){ await saveCfg({broadcasts: cleanBroadcasts()}); }
 function renderBroadcastDropdown(){
   const sel=$('#ctrlBroadcast'); if(!sel) return;
   const prev=sel.value;
-  const opts = broadcastRows.filter(b=>(b.name||'').trim());
+  const opts = broadcastRows.filter(b=>(b.name||'').trim() && b.enabled!==false);
   sel.innerHTML = opts.length ? opts.map(b=>`<option value="${esc(b.name)}">${esc(b.name)}</option>`).join('')
-                              : `<option value="">(no broadcasts — add on Commands)</option>`;
+                              : `<option value="">(no active broadcasts — add one on Triggers)</option>`;
   if(prev) sel.value = prev;
 }
 
@@ -3157,6 +3515,11 @@ async function importConfigFile(input){
 let presetNames = [];
 function setPresetMsg(t){ const m=$('#presetMsg'); if(m){ m.textContent=t; clearTimeout(m._t); m._t=setTimeout(()=>{ if(m) m.textContent=''; }, 4000); } }
 function renderPresets(){
+  // Read-only: a preset LOAD is one-way, so this says where the live gameplay
+  // came from rather than offering a link you can re-point.
+  const pn=$('#stgPresetNow');
+  if(pn){ pn.textContent = presetLoadedName || '(live settings — no preset loaded)';
+          pn.style.opacity = presetLoadedName ? '' : '.65'; }
   const sel=$('#presetSel'); if(!sel) return;
   const prev=sel.value;
   sel.innerHTML = presetNames.length ? presetNames.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')
@@ -3296,6 +3659,7 @@ async function pullUpdates(){
 }
 
 $('#listener').addEventListener('change', async e => {
+  await flushSave();          // don't go live on a half-saved Go Live setup
   await apiRev('/api/listener', {enabled: e.target.checked}); refresh();
 });
 $('#mock').addEventListener('change', async e => {
@@ -3603,13 +3967,12 @@ function renderRanges(){
     } else {
       const preview = (r.announce||'').replace(/\n/g,' ').slice(0,60);
       html =
-      `<div class="row" style="gap:12px">`+
+      `<div class="row rowhead" data-rtog="range" data-rarg="${i}" style="gap:12px">`+
         `<label class="field">From % <select onchange="setRangeMin(${i}, this.value)">${pctOptions(r.min)}</select></label>`+
         `<label class="field">To % <select onchange="setRangeMax(${i}, this.value)">${pctOptions(r.max)}</select></label>`+
         `<span class="muted" style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(preview)||'<i>no announce</i>'}</span>`+
         `<button class="ghost" title="Duplicate" onclick="copyRange(${i})">📋</button>`+
         `<button class="ghost" title="Save as template" onclick="saveTemplate('ranges',${i})">💾</button>`+
-        `<button class="ghost" title="${open?'Collapse':'Edit'}" onclick="toggleRangeExpand(${i})">${open?'▾':'✏️'}</button>`+
         `<button class="ghost" title="Delete" onclick="delRange(${i})">✕</button>`+
       `</div>`;
       if(open){
@@ -3659,7 +4022,7 @@ function renderRanges(){
           ? `<input type="number" value="${cd.fire_seconds??''}" min="0" step="0.5" style="width:70px" placeholder="cmd" title="override the command's fire seconds in this range (blank = the command's own)" onchange="setRangeCmd(${i},'${key}','fire_seconds',this.value)"><span class="muted">s@</span>`+
             `<select style="max-width:140px" title="override the fire's device in this range" onchange="setRangeCmd(${i},'${key}','fire_device',this.value)">`+
               `<option value="">(command's own)</option>`+
-              allDevices.map(d=>`<option value="${esc(d.id)}" ${cd.fire_device===d.id?'selected':''}>${esc(d.label)}</option>`).join('')+
+              allDevices.map(d=>`<option value="${esc(d.id)}" ${cd.fire_device===d.id?'selected':''}>${esc(devName(d))}</option>`).join('')+
             `</select>`
           : `<span class="muted">—</span>`;
         // the 🎲 row is the RANGE's dice+luck (used by any roll action with blank
@@ -3891,9 +4254,13 @@ function cmdRangeSummary(name){
     : `Not in any range yet — add it under a range in <b>Game → Capacity ranges</b> to make it usable.`;
 }
 // Device dropdown options for command device pickers (module-level so the fires editor can reuse it).
+// What a device is CALLED: the rename from the Devices tab wins, falling back
+// to the vendor's own label. Every device dropdown goes through this, so a
+// rename shows up in fire actions and range settings too, not just on Devices.
+function devName(d){ return (d && ((d.name||'').trim() || d.label)) || ''; }
 function cmdDeviceOpts(sel){
   return `<option value="">(active pump)</option>`+
-    allDevices.map(d=>`<option value="${esc(d.id)}" ${sel===d.id?'selected':''}>${esc(d.label)}</option>`).join('');
+    allDevices.map(d=>`<option value="${esc(d.id)}" ${sel===d.id?'selected':''}>${esc(devName(d))}</option>`).join('');
 }
 // Walk every row of an action block (and its nested blocks) with fn.
 function _walkActs(arr, fn){
@@ -3985,21 +4352,19 @@ function gameTiersEditor(i, c){
       // COLLAPSED: one row — condition · gist · edit / delete
       const firstMsg=(((t.actions||[]).find(x=>x&&x.type==='message')||{}).message||'').split('\n')[0];
       const gist=[firstMsg, `${na} action${na===1?'':'s'}`].filter(Boolean).join(' · ');
-      return `<div class="dev" style="gap:8px">`+
+      return `<div class="dev rowhead" data-rtog="tier" data-rarg="${key}" style="gap:8px">`+
         `<b style="min-width:110px;white-space:nowrap">score ${esc(t.op||'>=')} ${t.min??0}</b>`+
         `<span class="muted" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(gist)}</span>`+
-        `<button class="ghost" title="Edit" onclick="tierOpen.add('${key}');renderCommands()">✏️</button>`+
         `<button class="ghost" title="Delete" onclick="removeTier(${i},${j})">✕</button>`+
       `</div>`;
     }
     return `<div class="dev" style="flex-direction:column;align-items:stretch;gap:6px">`+
-      `<div class="row" style="gap:8px;align-items:center;flex-wrap:nowrap">`+
+      `<div class="row rowhead" data-rtog="tier" data-rarg="${key}" style="gap:8px;align-items:center;flex-wrap:nowrap">`+
         `<span class="muted" style="white-space:nowrap">when score</span>`+
         `<select style="width:70px" onchange="setTier(${i},${j},'op',this.value)">`+
           ['>=','>','=','!=','<','<='].map(o=>`<option value="${o}" ${(t.op||'>=')===o?'selected':''}>${o}</option>`).join('')+`</select>`+
         `<input type="number" value="${t.min??0}" style="width:80px" onchange="setTier(${i},${j},'min',this.value)">`+
         `<div style="flex:1"></div>`+
-        `<button class="ghost" title="Collapse" onclick="tierOpen.delete('${key}');renderCommands()">▾</button>`+
         `<button class="ghost" title="Delete" onclick="removeTier(${i},${j})">✕</button>`+
       `</div>`+
       actionsSection('⚙️ Actions on this tier', `commandRows[${i}].game_tiers[${j}].actions`, 'renderCommands',
@@ -4018,7 +4383,7 @@ function renderCommands(){
   const box = $('#commands'); box.innerHTML='';
   if(!commandRows.length){ box.innerHTML='<div class="muted">No custom commands yet.</div>'; return; }
   const deviceOpts=(sel)=>`<option value="">(active pump)</option>`+
-    allDevices.map(d=>`<option value="${esc(d.id)}" ${sel===d.id?'selected':''}>${esc(d.label)}</option>`).join('');
+    allDevices.map(d=>`<option value="${esc(d.id)}" ${sel===d.id?'selected':''}>${esc(devName(d))}</option>`).join('');
   commandRows.forEach((c,i)=>{
     const open = cmdOpen.has(i);
     const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap=open?'10px':'0px';
@@ -4028,13 +4393,12 @@ function renderCommands(){
     const meta = [(c.type||'').indexOf('game-')===0 ? c.type.replace('game-','🎮 ') : '',
                   c.owner_only ? 'owner-only' : ''].filter(Boolean).join(' · ');
     let html =
-      `<div class="row" style="gap:10px;flex-wrap:nowrap">`+
+      `<div class="row rowhead" data-rtog="cmd" data-rarg="${i}" style="gap:10px;flex-wrap:nowrap">`+
         `<label class="row" style="gap:5px" title="enabled"><input type="checkbox" ${c.enabled!==false?'checked':''} onchange="toggleCmd(${i}, this.checked)"></label>`+
         `<b style="min-width:120px">${pf}${esc(c.name||'(unnamed)')}</b>`+
         `<span class="muted" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(meta)}</span>`+
         `<button class="ghost" title="Duplicate" onclick="copyCommand(${i})">📋</button>`+
         `<button class="ghost" title="Save as template" onclick="saveTemplate('commands',${i})">💾</button>`+
-        `<button class="ghost" title="${open?'Collapse':'Edit'}" onclick="toggleCmdOpen(${i})">${open?'▾':'✏️'}</button>`+
         `<button class="ghost" title="Delete" onclick="delCommand(${i})">✕</button>`+
       `</div>`;
     if(open){
@@ -4069,6 +4433,12 @@ function renderCommands(){
             `<input value="${esc(c.react_emoji||'')}" placeholder="💨" maxlength="16" style="width:70px" title="emoji to react with (default 💨)" onchange="commandRows[${i}].react_emoji=this.value">`
           : '')+
       `</div>`+
+      `<div class="row" style="gap:10px;align-items:flex-end">`+
+        `<label class="row" style="gap:6px;white-space:nowrap" title="Show a line on the shared NOTIFY overlay when this command runs. One overlay serves every command — set an overlay's Layer slot to 'notify' on the Scenes tab; without one this does nothing."><input type="checkbox" ${c.notify_enabled?'checked':''} onchange="commandRows[${i}].notify_enabled=this.checked;renderCommands();scheduleSave()"> 📣 notify overlay</label>`+
+        (c.notify_enabled
+          ? `<label class="field grow"><input value="${esc(c.notify??'[user] just triggered [command]')}" placeholder="[user] just triggered [command]" style="width:100%" title="[user] [mention] [command] and the usual placeholders work" onchange="commandRows[${i}].notify=this.value;scheduleSave()"></label>`
+          : `<span class="muted">off — this command puts nothing on screen</span>`)+
+      `</div>`+
       `<label class="field">Description <input value="${esc(c.description||'')}" placeholder="what it does (shown in the command list)" onchange="commandRows[${i}].description=this.value"></label>`+
       (isGame
         ? `<div class="row" style="gap:12px;align-items:flex-end">`+
@@ -4098,6 +4468,8 @@ function cleanCommands(){
       range_gate: c.range_gate||'all',
       description: c.description||'', hide_in_list: !!c.hide_in_list,
       react_only: !!c.react_only, react_emoji: (c.react_emoji||'').trim(),
+      notify_enabled: !!c.notify_enabled,
+      notify: (c.notify ?? '[user] just triggered [command]'),
     };
     if(isGame){
       Object.assign(o,{
@@ -4179,13 +4551,12 @@ function renderEvents(){
     const summary = [mode, `${nact} action${nact===1?'':'s'}`, (mode!=='once' && e.max_repeats)?('×'+e.max_repeats):'', e.every?('every '+e.every+'s'):'']
       .filter(Boolean).join(' · ');
     let html =
-      `<div class="row" style="gap:10px;flex-wrap:nowrap">`+
+      `<div class="row rowhead" data-rtog="evt" data-rarg="${i}" style="gap:10px;flex-wrap:nowrap">`+
         `<label class="row" style="gap:5px" title="enabled"><input type="checkbox" ${e.enabled!==false?'checked':''} onchange="eventRows[${i}].enabled=this.checked"></label>`+
         `<b style="min-width:120px">${esc(e.name||'(unnamed)')}</b>`+
         `<span class="muted" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(summary)}</span>`+
         `<button class="ghost" title="Duplicate" onclick="copyEvent(${i})">📋</button>`+
         `<button class="ghost" title="Save as template" onclick="saveTemplate('events',${i})">💾</button>`+
-        `<button class="ghost" title="${open?'Collapse':'Edit'}" onclick="toggleEvtOpen(${i})">${open?'▾':'✏️'}</button>`+
         `<button class="ghost" title="Delete" onclick="delEvent(${i})">✕</button>`+
       `</div>`;
     if(open){
@@ -4405,12 +4776,11 @@ function actionRow(base, rr, j, a, condLabels){
   if(!actOpen.has(rowKey)){
     // COLLAPSED: one row — handle · type · gist · duplicate / edit / delete
     const bA=esc(base), kA=esc(rowKey);
-    return `<div class="dev" style="gap:8px" ondragover="actDragOver(event)" ondrop="actDrop(event,'${bA}',${j},'${rr}')">`+
+    return `<div class="dev rowhead" data-rtog="act" data-rarg="${kA}" data-rrr="${rr}" style="gap:8px" ondragover="actDragOver(event)" ondrop="actDrop(event,'${bA}',${j},'${rr}')">`+
       `<span class="draghandle" draggable="true" title="Drag to reorder" ondragstart="actDragStart(event,'${bA}',${j})" ondragend="actDragEnd(event)">⋮⋮</span>`+
       `<b style="min-width:110px">${esc(typ)}${a.once?' <span class="muted" style="font-weight:400">·once</span>':''}</b>`+
       `<span class="muted" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(actGist(a))}</span>`+
       `<button class="ghost" title="Duplicate" onclick="actCopy('${bA}',${j},'${rr}')">📋</button>`+
-      `<button class="ghost" title="Edit" onclick="actOpen.add('${kA}');${rr}()">✏️</button>`+
       `<button class="ghost" title="Delete" onclick="${base}.splice(${j},1);${rr}();scheduleSave()">✕</button>`+
     `</div>`;
   }
@@ -4548,7 +4918,8 @@ function actionRow(base, rr, j, a, condLabels){
   }
   if(typ==='camera'){
     fields += `<label class="field">Do <select style="width:200px" onchange="${T('op')}=this.value;scheduleSave()">`+
-      [['start','⏺ start the virtual camera'],['freeze','❄ freeze the picture'],
+      [['start','⏺ start the virtual camera'],['black','⬛ black out the picture'],
+       ['reveal','👁 reveal the picture'],['freeze','❄ freeze the picture'],
        ['resume','▶ let it run again'],['stop','⏹ stop the virtual camera']].map(([v,l])=>`<option value="${v}" ${(a.op||'freeze')===v?'selected':''}>${l}</option>`).join('')+
       `</select></label>`+
       `<span class="muted" style="align-self:center">freeze holds the last frame while overlays keep playing on top · quiet when no camera is running</span>`;
@@ -4564,6 +4935,9 @@ function actionRow(base, rr, j, a, condLabels){
       ((a.group && !names.includes(a.group))?`<option selected>${esc(a.group)} (not in this scene)</option>`:'')+
       `</select></label>`+
       `<label class="field">Fade ${typ==='scene_group'?'in':'out'} <input value="${esc(String(typ==='scene_group'?(a.fade_in??0):(a.fade_out??0)))}" style="width:70px" onchange="${T(typ==='scene_group'?'fade_in':'fade_out')}=this.value;scheduleSave()"></label>`+
+      (typ==='scene_group'
+        ? `<label class="row" style="gap:6px;align-self:center;white-space:nowrap" title="draw this group ABOVE everything already on screen, keeping its own internal order"><input type="checkbox" ${a.on_top?'checked':''} style="width:auto" onchange="${T('on_top')}=this.checked;scheduleSave()"> ⬆ on top</label>`
+        : '')+
       `<span class="muted" style="align-self:center">${typ==='scene_group'?'plays every overlay tagged with that group':'clears the whole group · quiet if none are up'} · scoped to <b>${esc(sc.sceneName||'—')}</b></span>`;
   }
   if(typ==='update_overlay_text'){
@@ -4732,12 +5106,11 @@ function actionRow(base, rr, j, a, condLabels){
   // header: handle · type · note · buttons pinned right (never wraps);
   // the type's fields get their own tidy row below.
   return `<div class="dev" style="flex-direction:column;align-items:stretch;gap:6px" ondragover="actDragOver(event)" ondrop="actDrop(event,'${bAttr}',${j},'${rr}')">`+
-    `<div class="row" style="gap:8px;flex-wrap:nowrap;align-items:center">`+
+    `<div class="row rowhead" data-rtog="act" data-rarg="${kAttr}" data-rrr="${rr}" style="gap:8px;flex-wrap:nowrap;align-items:center">`+
     `<span class="draghandle" draggable="true" title="Drag to reorder" ondragstart="actDragStart(event,'${bAttr}',${j})" ondragend="actDragEnd(event)">⋮⋮</span>`+
     typeSel+ onceBox+
     `<div style="flex:1"></div>`+
     `<button class="ghost" title="Duplicate" onclick="actCopy('${bAttr}',${j},'${rr}')">📋</button>`+
-    `<button class="ghost" title="Collapse" onclick="actOpen.delete('${kAttr}');${rr}()">▾</button>`+
     `<button class="ghost" title="Delete" onclick="${base}.splice(${j},1);${rr}();scheduleSave()">✕</button></div>`+
     (fields?`<div class="row" style="gap:12px;align-items:flex-end">${fields}</div>`:'')+
     msg+nested+`</div>`;
@@ -4826,10 +5199,9 @@ function renderPolls(){
     const el=document.createElement('div'); el.className='dev'; el.style.flexDirection='column'; el.style.alignItems='stretch'; el.style.gap=open?'10px':'0px';
     const nopts=(p.options||[]).length;
     let html =
-      `<div class="row" style="gap:10px;flex-wrap:nowrap">`+
+      `<div class="row rowhead" data-rtog="poll" data-rarg="${i}" style="gap:10px;flex-wrap:nowrap">`+
         `<b style="min-width:120px">${esc(p.name||'(unnamed)')}</b>`+
         `<span class="muted" style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(p.title||'')} · ${nopts} option${nopts===1?'':'s'} · ${p.duration??60}s</span>`+
-        `<button class="ghost" title="${open?'Collapse':'Edit'}" onclick="togglePollOpen(${i})">${open?'▾':'✏️'}</button>`+
         `<button class="ghost" title="Save as template" onclick="saveTemplate('polls',${i})">💾</button>`+
         `<button class="ghost" title="Delete" onclick="delPoll(${i})">✕</button>`+
       `</div>`;
@@ -5477,7 +5849,7 @@ async function testDev(id){ try{ await api('/api/devices/test',{id}); }catch(e){
 async function setCal(id,v){ await devApi('/api/devices/calibration',{id, seconds_to_100: parseFloat(v)}); }
 async function removeDev(id){
   const d=(allDevices||[]).find(x=>x.id===id)||{};
-  if(!confirm(`Remove device "${d.label||id}"? Its calibration is lost with it.`)) return;
+  if(!confirm(`Remove device "${devName(d)||id}"? Its calibration is lost with it.`)) return;
   await devApi('/api/devices/remove',{id});
 }
 async function importPD(){
@@ -5498,6 +5870,7 @@ let lastState = {};
 function applyState(st, full){
   lastState = st || {};
   if(!st) return;
+  pumpUi();          // Pump/STOP follows whatever is actually firing
   // status (every poll)
   $('#capVal').textContent = st.capacity;
   $('#capBar').style.width = st.capacity + '%';
@@ -5517,8 +5890,19 @@ function applyState(st, full){
   // session pause: flip the STOP button to RESUME + show the paused pill
   sessionPaused = !!st.paused;
   const sb=$('#ctrlStopBtn');
-  if(sb){ sb.textContent = sessionPaused ? '▶ Resume' : '🛑 Stop';
-          sb.style.background = sessionPaused ? 'var(--on)' : 'var(--bad)'; }
+  if(sb){
+    // There is nothing to pause until the session is LIVE, so don't pretend:
+    // the button greys out and says why instead of firing a no-op.
+    const live = !!st.listener_enabled;
+    sb.textContent = sessionPaused ? '▶ Resume' : '⏸ Pause';
+    sb.style.background = sessionPaused ? 'var(--on)' : 'var(--bad)';
+    sb.disabled = !live;
+    sb.title = !live
+      ? 'nothing to pause — flip LIVE on first'
+      : sessionPaused
+        ? 'Resume the session: commands unlatch and events pick up again'
+        : 'Pause the whole session: pumps off, events + games cancelled, commands latched until Resume';
+  }
   const pp=$('#pausedPill');
   if(pp){ pp.style.display = sessionPaused ? 'inline-flex' : 'none';
           if(sessionPaused) pp.textContent = '⏸ SESSION PAUSED' + (st.paused_by ? (' by ' + st.paused_by) : ''); }
@@ -5596,6 +5980,7 @@ function applyState(st, full){
     if($('#richOutput')) $('#richOutput').checked = !!st.rich_output;
     $('#tokenState').textContent = st.has_token ? '✓ token saved' : 'no token yet';
     allDevices = st.devices||[];
+    pumpDevUi();       // the Pump picker follows renames + added/removed devices
     allCommandKeys = ['roll', ...(st.commands||[]).map(c=>(c.name||'').trim().toLowerCase()).filter(Boolean)];
     // Populate all editable row-arrays first (renderRanges references commands + events)
     rangeRows = JSON.parse(JSON.stringify(st.capacity_ranges||[]));
@@ -5623,11 +6008,15 @@ function applyState(st, full){
     prizeRows = JSON.parse(JSON.stringify(st.prizes||[]));
     chatButtons = JSON.parse(JSON.stringify(st.chat_buttons||[]));
     ownerCommands = JSON.parse(JSON.stringify(st.owner_commands||[]));
-    overlayButtons = JSON.parse(JSON.stringify(st.overlay_buttons||[]));
-    renderChatButtons(); renderOverlayButtons();
-    scenesData = JSON.parse(JSON.stringify(st.scenes||[]));
-    sceneGlobals = JSON.parse(JSON.stringify(st.scene_globals||[]));
-    chatSceneName = st.chat_scene||'';
+    renderChatButtons();
+    // NEVER swap the scene data out from under an in-progress drag: stgDrag
+    // holds a reference INTO scenesData, so replacing the array orphans it —
+    // the overlay stops following the pointer and snaps back on release.
+    if(!stgDrag){
+      scenesData = JSON.parse(JSON.stringify(st.scenes||[]));
+      sceneGlobals = JSON.parse(JSON.stringify(st.scene_globals||[]));
+      chatSceneName = st.chat_scene||'';
+    }
     // Decide which scene is current BEFORE anything reads its groups — the
     // Go Live picker below asks for them, and with no scene selected it
     // silently built an empty list.
@@ -5635,23 +6024,36 @@ function applyState(st, full){
     { const g=st.golive||{};
       const set=(id,v)=>{ const el=$(id); if(el && document.activeElement!==el){
         if(el.type==='checkbox') el.checked=!!v; else el.value=(v??''); } };
-      set('#glEnabled', g.intro_enabled); set('#glSecs', g.seconds??60);
-      set('#glHold', g.hold_commands!==false); set('#glAnnounce', g.announce||'');
+      set('#glEnabled', g.intro_enabled);
+      set('#glHold', g.hold_commands!==false); set('#glBlack', g.blackout!==false); set('#glAnnounce', g.announce||'');
       set('#glEvery', g.announce_every??0); set('#glImage', g.announce_image||'');
       set('#glCmds', (g.commands||[]).join(', '));
-      const gs=$('#glGroup'); if(gs && document.activeElement!==gs) gs.dataset.want=g.scene_group||'';
+      // stages, with the pre-stages shape folded in so old configs still work
+      if(!document.querySelector('#glStages select:focus, #glStages input:focus')){
+        const rows = Array.isArray(g.stages) && g.stages.length
+          ? g.stages.map(r=>({group:(r&&r.group)||'', seconds:Math.max(0,parseInt((r&&r.seconds)||0,10)||0)}))
+          : [{group:g.scene_group||'', seconds:Math.max(0,parseInt(g.seconds??60,10)||0)}];
+        glStages = rows;
+      }
+      const ga=$('#glAfter'); if(ga && document.activeElement!==ga) ga.dataset.want=g.after_group||'';
+      const on=$('#ovNotify'); if(on && document.activeElement!==on) on.dataset.want=st.notify_overlay||'';
+      const op=$('#ovPause');  if(op && document.activeElement!==op)  op.dataset.want=st.pause_overlay||'';
       goliveUi();
-      if(gs && gs.dataset.want!==undefined && document.activeElement!==gs) gs.value=gs.dataset.want;
+      if(ga && ga.dataset.want!==undefined && document.activeElement!==ga) ga.value=ga.dataset.want;
       const p=$('#golivePill');
       if(p) p.textContent = g.intro_enabled
         ? `intro · ${(+g.seconds||0)?(+g.seconds+'s'):'manual'}${g.scene_group?' · '+g.scene_group:''}`
         : 'begins immediately';
     }
     // the pre-show banner + Start-now button
-    { const intro=st.intro, b=$('#introNow');
+    { const intro=st.intro, b=$('#introNow'), nx=$('#introNext');
       if(b) b.style.display = intro ? '' : 'none';
       if(b && intro) b.textContent = intro.open_ended
         ? '🎬 Start now' : `🎬 Start now (${Math.round(intro.remaining)}s)`;
+      // only offered while a LATER stage exists — on the last one, Start now is it
+      if(nx) nx.style.display = (intro && intro.has_next) ? '' : 'none';
+      if(nx && intro && intro.has_next)
+        nx.textContent = `⏭ Next stage (${intro.stage}/${intro.stages})`;
       const pp=$('#pausedPill');
       if(pp && intro && !sessionPaused){ pp.style.display='inline-flex';
         pp.style.background='var(--accent)'; pp.style.color='#04202a';
@@ -5663,6 +6065,7 @@ function applyState(st, full){
     chatIsoChan = st.chat_isolate_channel||'';
     if($('#chatIso') && document.activeElement!==$('#chatIso')) $('#chatIso').checked = !!st.chat_isolate;
     gpPresetNames = (st.gameplay_presets||[]).map(p=>p.name).filter(Boolean);
+    presetLoadedName = st.preset_loaded||'';
     renderStages(); renderStgGlobals();
     goliveUi();          // groups are known now — refresh the intro picker
     renderCommands();
@@ -5760,12 +6163,16 @@ function gatherConfig(){
     chat_isolate: $('#chatIso')?$('#chatIso').checked:false, chat_isolate_channel: chatIsoChan,
     golive: {
       intro_enabled: $('#glEnabled')?$('#glEnabled').checked:false,
-      seconds: Math.max(0, parseInt(($('#glSecs')||{}).value,10)||0),
-      scene_group: ($('#glGroup')||{}).value||'',
+      stages: glStages.map(st=>({group:st.group||'', seconds:Math.max(0,+st.seconds||0)})),
+      // kept in step so a config written here still opens in an older build
+      seconds: Math.max(0, +(glStages[0]||{}).seconds||0),
+      scene_group: (glStages[0]||{}).group||'',
+      after_group: ($('#glAfter')||{}).value||'',
       announce: ($('#glAnnounce')||{}).value||'',
       announce_every: Math.max(0, parseInt(($('#glEvery')||{}).value,10)||0),
       announce_image: ($('#glImage')||{}).value||'',
       hold_commands: $('#glHold')?$('#glHold').checked:true,
+      blackout: $('#glBlack')?$('#glBlack').checked:true,
       commands: idList(($('#glCmds')||{}).value||''),
     },
     anon_user_label:$('#anonLabel').value,
@@ -5792,24 +6199,40 @@ function gatherConfig(){
     rich_output: $('#richOutput') ? $('#richOutput').checked : false,
     prizes:cleanPrizes(),
     chat_buttons: chatButtons.filter(b=>(b.label||'').trim()&&(b.name||'').trim())
-      .map(b=>({label:(b.label||'').trim(), kind:['poll','owner'].includes(b.kind)?b.kind:'command', name:(b.name||'').trim()})),
+      .map(b=>({label:(b.label||'').trim(), kind:['poll','owner','overlay','group'].includes(b.kind)?b.kind:'command', name:(b.name||'').trim()})),
     owner_commands: ownerCommands.filter(o=>(o.name||'').trim())
       .map(o=>({name:(o.name||'').trim().replace(/^#+/,'').toLowerCase(), message:o.message||''})),
-    overlay_buttons: overlayButtons.filter(b=>(b.label||'').trim())
-      .map(b=>({label:(b.label||'').trim(), image:(b.image||'').trim(),
-                seconds:+b.seconds||5, pos:b.pos||'center', scale:+b.scale||0.5})),
     capacity_ranges:rangeRows, commands:cleanCommands(), modes:cleanModes(), events:cleanEvents(),
     capacity_events:cleanCapEvents(), polls:cleanPolls(), competitions:cleanCompetitions(),
     bonus_rounds:cleanBonusRounds(),
     event_in_process_message: $('#eventInProcessMsg') ? $('#eventInProcessMsg').value : '',
     event_cooldown_message: $('#eventCooldownMsg') ? $('#eventCooldownMsg').value : '',
     broadcasts: cleanBroadcasts(),
+    notify_overlay: ($('#ovNotify')||{}).value||'',
+    pause_overlay:  ($('#ovPause')||{}).value||'',
     always_on_enabled: $('#alwaysOnEnabled') ? $('#alwaysOnEnabled').checked : false,
     always_on_commands: alwaysOnList,
   };
 }
 let saveT=null;
 function scheduleSave(){ if(!editingForms) return; clearTimeout(saveT); saveT=setTimeout(doSave, 400); }
+// Autosave is debounced, so changing a setting and immediately hitting LIVE
+// (or any action the server reads config for) could act on the OLD value.
+// Flush anything pending first.
+async function flushSave(){
+  // blur first: a number/text field only fires its onchange when it loses
+  // focus, so typing 60 and hitting LIVE would otherwise never register
+  if(document.activeElement && document.activeElement.blur){
+    try{ document.activeElement.blur(); }catch(e){}
+  }
+  // doSave defers itself while another save is in flight, so keep going until
+  // nothing is pending (bounded — never hang the click)
+  for(let i=0; i<12 && saveT; i++){
+    clearTimeout(saveT); saveT=null;
+    try{ await doSave(); }catch(e){ break; }
+    if(saveT) await new Promise(r=>setTimeout(r, 120));   // it deferred; retry
+  }
+}
 // Commit any pending autosave RIGHT NOW (tab switch, focus loss, before an
 // explicit save). The Save buttons are just reassurance — this is what makes
 // every field persist on its own.
@@ -5860,7 +6283,7 @@ async function doSave(){
 // config save for them is pointless and used to race their endpoint's rev bump.
 const NO_AUTOSAVE_IDS = new Set(['mock','listener','silenceOnOff','token','announceChan',
   'raEnabled','raNewIp','capSlider','capInput','ctrlDice','ctrlSides','ctrlPump',
-  'ctrlBroadcast','ctrlPoll','ctrlCleanup','camSelect','camMirror','camZoomSlider','snapCaption','importFile']);
+  'ctrlBroadcast','ctrlPoll','ctrlCleanup','importFile']);
 function maybeSave(e){ if(e.target && NO_AUTOSAVE_IDS.has(e.target.id)) return; scheduleSave(); }
 document.addEventListener('input', maybeSave);
 document.addEventListener('change', maybeSave);
@@ -5901,6 +6324,7 @@ function offlineBanner(on){
   }
   if(el) el.style.display = on ? '' : 'none';
 }
+trigRestore();          // Triggers sections: closed, minus whatever you left open
 refresh(); setInterval(refresh, 1000);
 autoCheckUpdates();
 </script>
