@@ -1,6 +1,6 @@
 {
-  "version": "3.75.1",
-  "versionCode": 163,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.75.1/discoflate-v3.75.1.apk",
-  "notes": "DiscoFlate v3.75.1 \u2014 the STARTING SOON standby card is one universal setting, not a per-scene one. It now sits with the other camera settings on the Chat tab, beside Camera, Size and Mirror."
+  "version": "3.76.0",
+  "versionCode": 164,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.76.0/discoflate-v3.76.0.apk",
+  "notes": "DiscoFlate v3.76.0 \u2014 the canvas and the stream agree again. Text without a background was being charged a background box's padding, so every line sat ~0.4x its own size lower than the canvas showed, and device-timer rows stacked nearly twice as far apart. The canvas also now draws the percentage inside the capacity gauge, the way the live one does."
 }

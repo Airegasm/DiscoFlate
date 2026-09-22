@@ -478,8 +478,13 @@ class VirtualCam:
         px = max(10, int(H * size))                 # target cap height in pixels
         scale = px / 22.0                           # Hershey units -> ~px
         thick = max(1, int(round(scale * 1.6)))
-        pad = max(4, int(px * 0.28))
-        gap = max(2, int(px * 0.22))                # leading between lines
+        # Padding exists to give a BACKGROUND box some breathing room. Unboxed
+        # text needs only enough not to clip its own outline — charging it the
+        # full box padding pushed every line ~0.4x its own size below where the
+        # canvas showed it, and stacked device rows twice as far apart.
+        boxed = bool(str(item.get("bg") or "").strip())
+        pad = max(4, int(px * 0.28)) if boxed else max(2, int(px * 0.08))
+        gap = max(2, int(px * 0.30))                # leading -> ~1.15x advance, as the canvas
         metrics = []
         for ln in lines:
             (tw, th), base = cv2.getTextSize(ln or " ", font, scale, thick)
@@ -577,7 +582,9 @@ class VirtualCam:
             return None
         if len(sprites) == 1:
             return sprites[0]
-        gap = max(2, int(H * 0.008))
+        # rows are already padded individually — keep the seam tight so the
+        # list reads as one block, the way the canvas draws it
+        gap = max(1, int(H * 0.002))
         w = max(s.shape[1] for s in sprites)
         h = sum(s.shape[0] for s in sprites) + gap * (len(sprites) - 1)
         out = np.zeros((h, w, 4), np.uint8)

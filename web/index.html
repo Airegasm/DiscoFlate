@@ -213,6 +213,10 @@
   .stgItem .gauge{border:2px solid #eee;border-radius:6px;overflow:hidden;position:relative;
                   background:rgba(20,20,20,.75)}
   .stgItem .gauge>i{display:block;background:#2ecc71}
+  /* the percentage the live gauge prints inside the bar */
+  .stgItem .gaugepct{position:absolute;inset:0;display:flex;align-items:center;
+    justify-content:center;color:#fff;font-weight:800;line-height:1;
+    text-shadow:0 1px 3px #000,0 0 2px #000}
   @keyframes dfflash{0%,49%{opacity:1}50%,100%{opacity:0}}
   .mediaTile{width:120px;cursor:pointer;border:1px solid var(--line);border-radius:8px;
              overflow:hidden;background:var(--panel2);position:relative}
@@ -2431,8 +2435,13 @@ function renderStgCanvas(){
       const thick = Math.max(6, (o.size||0.05)*CH);
       // same ramp the live gauge uses, previewed at the mock 55% fill
       const fill = o.color || `hsl(${Math.round(120-1.2*55)} 70% 45%)`;
+      // the live gauge prints the percentage inside the bar (show_pct, on by
+      // default) — the preview left it out, so the bar looked emptier here
+      // than on the stream
+      const pctLbl = (o.show_pct===false) ? ''
+        : `<span class="gaugepct" style="font-size:${Math.max(7, thick*0.7)}px">55%</span>`;
       inner = `<div class="gauge" style="${vert?`width:${thick}px;height:100%`:`width:100%;height:${thick}px`};${o.bg?`background:${esc(o.bg)}`:''}">`+
-              `<i style="${vert?'width:100%;height:55%;position:absolute;bottom:0':'width:55%;height:100%'};background:${esc(fill)}"></i></div>`;
+              `<i style="${vert?'width:100%;height:55%;position:absolute;bottom:0':'width:55%;height:100%'};background:${esc(fill)}"></i>${pctLbl}</div>`;
       // vertical gauges take their LENGTH from w along the y axis
       box = vert ? `width:${thick}px;height:${(o.w*100).toFixed(2)}%`
                  : `width:${(o.w*100).toFixed(2)}%`;
