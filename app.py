@@ -461,7 +461,7 @@ def _origin_ok(request: web.Request) -> bool:
 # Endpoints that reveal or replace secrets: beyond the origin check they need
 # the per-install browser cookie, so another local OS user can't just curl them.
 SENSITIVE_PATHS = {"/api/config/export", "/api/token", "/api/token/reveal",
-                   "/api/config/import", "/api/pull-updates"}
+                   "/api/config/import", "/api/pull-updates", "/api/repair-repo"}
 
 
 def _web_secret() -> str:
@@ -1651,10 +1651,109 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         engine.set_config(cfg)
         return web.json_response(_public_state(engine, botmgr))
 
+    REPO_URL = "https://github.com/Airegasm/DiscoFlate.git"
+
+    def _git(*args, timeout=60):
+        return subprocess.run(["git", "-C", HERE, *args],
+                              capture_output=True, text=True, timeout=timeout)
+
+    def _looks_like_discoflate() -> bool:
+        """Never run repo surgery on a directory that isn't this app."""
+        return all(os.path.exists(os.path.join(HERE, f))
+                   for f in ("app.py", "version.json", os.path.join("web", "index.html")))
+
+    def _repo_state() -> dict:
+        """Is this install a real clone we can update from?
+
+        Downloading the GitHub ZIP gives you the code but NO .git, so the
+        in-app updater has nothing to pull into — the usual way people end up
+        stranded on an old version without realising."""
+        if shutil.which("git") is None:
+            return {"ok": False, "kind": "no-git",
+                    "why": "git isn't installed on this machine"}
+        top = _git("rev-parse", "--show-toplevel", timeout=15)
+        if top.returncode != 0:
+            return {"ok": False, "kind": "not-a-repo",
+                    "why": "this folder isn't a git clone — it looks like the "
+                           "GitHub ZIP was downloaded and extracted instead of "
+                           "being cloned, so in-app updates can't work"}
+        root = os.path.realpath((top.stdout or "").strip())
+        if root and root != os.path.realpath(HERE):
+            return {"ok": False, "kind": "nested",
+                    "why": f"this folder sits inside another git repo ({root}) — "
+                           f"updating here would touch that repo, not DiscoFlate"}
+        rem = _git("remote", "get-url", "origin", timeout=15)
+        origin = (rem.stdout or "").strip()
+        if rem.returncode != 0 or not origin:
+            return {"ok": False, "kind": "no-origin", "origin": "",
+                    "why": "this clone has no 'origin' remote to update from"}
+        return {"ok": True, "kind": "clone", "origin": origin}
+
+    def _repair_repo() -> dict:
+        """Turn a ZIP install into a proper clone, in place.
+
+        Nothing you own is at risk: data/ (token, config, uploads), .venv/ and
+        dist/ are all gitignored, and .gitignore ships in the ZIP — so adopting
+        the upstream tree leaves every one of them untouched."""
+        if not _looks_like_discoflate():
+            return {"ok": False, "output": "this folder doesn't look like a "
+                                           "DiscoFlate install — refusing to touch it"}
+        if shutil.which("git") is None:
+            return {"ok": False, "output": "git isn't installed — install git, then retry"}
+        steps = []
+        try:
+            if _git("rev-parse", "--git-dir", timeout=15).returncode != 0:
+                r = _git("init", timeout=30)
+                steps.append(("git init", r))
+                if r.returncode != 0:
+                    return {"ok": False, "output": _fmt(steps)}
+            if _git("remote", "get-url", "origin", timeout=15).returncode == 0:
+                steps.append(("set origin", _git("remote", "set-url", "origin", REPO_URL)))
+            else:
+                steps.append(("add origin", _git("remote", "add", "origin", REPO_URL)))
+            f = _git("fetch", "origin", "main", timeout=180)
+            steps.append(("fetch", f))
+            if f.returncode != 0:
+                return {"ok": False, "output": _fmt(steps)}
+            r = _git("reset", "--hard", "FETCH_HEAD", timeout=60)
+            steps.append(("adopt latest", r))
+            if r.returncode != 0:
+                return {"ok": False, "output": _fmt(steps)}
+            b = _git("checkout", "-B", "main", "FETCH_HEAD", timeout=60)
+            steps.append(("on main", b))
+            _git("branch", "--set-upstream-to=origin/main", "main", timeout=30)
+            return {"ok": True, "restart_needed": True,
+                    "output": ("repaired — this is a real clone now, tracking "
+                               "origin/main. Your data/ folder was never touched.\n\n"
+                               + _fmt(steps))}
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "output": f"{e}\n\n{_fmt(steps)}"}
+
+    def _fmt(steps) -> str:
+        out = []
+        for label, r in steps:
+            tail = ((r.stdout or "") + (r.stderr or "")).strip()
+            out.append(f"$ {label}" + (f"\n{tail}" if tail else ""))
+        return "\n".join(out)[:2000]
+
+    async def repair_repo(request):
+        """Help -> Updates: 'Fix my install'."""
+        await guard(request)
+        if os.environ.get("DISCOFLATE_DEFAULT_CONFIG") is not None:
+            return web.json_response({"ok": False,
+                                      "output": "Android updates via the APK — nothing to repair here"})
+        res = await asyncio.get_event_loop().run_in_executor(None, _repair_repo)
+        return web.json_response(res)
+
     async def check_updates(request):
         await guard(request)
         result = {"current_version": VERSION, "current_code": VERSION_CODE,
                   "android": os.environ.get("DISCOFLATE_DEFAULT_CONFIG") is not None}
+        if not result["android"]:
+            try:
+                result["repo"] = _repo_state()
+            except Exception as e:  # noqa: BLE001
+                result["repo"] = {"ok": False, "kind": "unknown", "why": str(e)}
         try:
             async with aiohttp.ClientSession() as s:
                 # cache-buster: raw.githubusercontent's CDN caches for 5 min per
@@ -1673,6 +1772,14 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     async def pull_updates(request):
         # Desktop: git pull the latest code. (Android updates via APK install.)
         await guard(request)
+        # A ZIP install has no repo to pull into. Rather than failing with
+        # "not a git repository", make it one and carry on.
+        state = _repo_state()
+        if not state.get("ok") and state.get("kind") in ("not-a-repo", "no-origin"):
+            fixed = await asyncio.get_event_loop().run_in_executor(None, _repair_repo)
+            if not fixed.get("ok"):
+                return web.json_response(fixed)
+            return web.json_response({**fixed, "repaired": True})
         try:
             out = subprocess.run(["git", "-C", HERE, "pull", "--ff-only", "origin", "main"],
                                  capture_output=True, text=True, timeout=60)
@@ -2377,6 +2484,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/scene-design/import", scene_import),
         web.post("/api/check-updates", check_updates),
         web.post("/api/pull-updates", pull_updates),
+        web.post("/api/repair-repo", repair_repo),
     ])
     return app
 

@@ -29,9 +29,12 @@ unlock — they're all the same ordered list of **action rows**:
 a %) · `roll` · `chance` (a gamble with nested win/miss blocks) · `capacity` ·
 `wait` · `poll` · `competition` · `bonus_round` · `award` (grant a bonus command
 or bank volume) · `command_gate` (Block/Allow/Resume play) · `achievement` ·
-`stop_devices` · `end_session` — plus `broadcast` and `command`. The bot speaks
-only through **message** rows; results (`[secs]`, `[result]`, `[bonus_cmd]`, …)
-flow into the rows after them.
+`stop_devices` · `end_session` — plus `broadcast` and `command`, control flow
+(`var` · `if` · `repeat` · `random` · `group` · `label` · `goto` · `cancel`), and
+the stream rows (`overlay` · `scene_group` · `camera` · `snapshot` ·
+`update_overlay_text` · `start_timer` / `stop_timer`). The bot speaks only
+through **message** rows; results (`[secs]`, `[result]`, `[bonus_cmd]`, …) flow
+into the rows after them.
 
 - **Capacity engine** — capacity accumulates while the active pump runs, at a
   rate set by that device's `seconds-to-100%` calibration.
@@ -58,8 +61,17 @@ flow into the rows after them.
   its own entry milestone and final message/image.
 - **Modes, leaderboards (session / lifetime / per-range), per-user cooldowns,
   anti-spam buffer,** multi-server support with anonymized cross-server echoes.
-- **Snapshot** — capture a webcam frame and post it to the channel.
-- **Operator Controls** — dashboard buttons (Roll, Stop, Pump, Broadcasts,
+- **Virtual camera + scenes** — DiscoFlate composites overlays into your webcam
+  and exposes a **virtual camera** you select in Discord, so the whole show
+  plays inside a normal video call (no OBS scene work; OBS is only ever
+  installed once on Windows/macOS for its driver, and Linux uses
+  `v4l2loopback`). Design scenes OBS-style on the **Scenes** tab — media (with
+  chroma key), solid colour blocks, live text, timers, a capacity gauge, device
+  timers, a poll viewer, and audio cues — then fire them as named **scene
+  groups** from any action block. Go Live can open on a **chain of intro
+  stages** over a black feed; pausing covers the stream with a pause card.
+  **Snapshot** posts the current composited frame — overlays and all.
+- **Operator Controls** — dashboard buttons (Roll, Pump, Broadcasts,
   Leaderboards, Cleanup) that fire real in-channel actions *as the owner*.
 - **Gameplay Presets & Templates** — save/load whole game setups (the shipped
   **Defaults (built-in)** preset included) or single commands/events/ranges;
@@ -69,8 +81,9 @@ flow into the rows after them.
 
 Fully templated messages via `[placeholders]` — `[capacity]`, `[capacity_bar]`,
 `[dice]`, `[result]`, `[secs2capacity]`, `[timer]`, `[commands]`, `[winner]`,
-`[cmd_remain]`, `[operator]`, per-line `[if name]` conditionals, `[!command]`
-inline fires, and more (full table in Help → Placeholders).
+`[cmd_remain]`, `[operator]`/`[owner]`, `[command]`, `[syscom_*]` (every system
+command's current name), per-line `[if name]` conditionals, `[!command]` inline
+fires, and more (full table in Help → Placeholders).
 
 ---
 
@@ -110,6 +123,18 @@ cd DiscoFlate
 ```
 
 Windows: run **`start.bat`** (needs Python 3 with "Add to PATH" ticked).
+
+> ### ⚠ Clone it — don't download the ZIP
+>
+> Use `git clone` (above). GitHub's **Download ZIP** button gives you the code
+> but **not the repository**, so the in-app updater has nothing to pull into and
+> you quietly stay on whatever version you downloaded — forever.
+>
+> Already did it? Nothing is lost and you don't need to reinstall:
+> **Help → Updates** now detects it and offers **🛠 Fix my install**, which turns
+> the folder into a proper clone in place and brings it up to date. Your `data/`
+> folder — token, config, backups, uploaded media — is git-ignored and never
+> touched.
 
 The control panel is **loopback-only** (127.0.0.1). Everything is configured
 there — no `.env`.
@@ -173,7 +198,9 @@ away.
 
 The app checks for a newer release on launch and shows a banner on the Dashboard.
 **Help → Updates** applies it: on desktop it `git pull`s the latest code (then
-restart DiscoFlate); on the phone it opens the new APK's download link in your
+restart DiscoFlate). If the folder isn't a clone — the usual cause being a ZIP
+download — it says so and offers **🛠 Fix my install** instead of failing with a
+git error; on the phone it opens the new APK's download link in your
 browser — install it from there. Since v3.7.0 every APK is release-signed with
 the same key, so the phone updates **in place** and keeps your config and token.
 (Coming from v3.6.3 or older debug-signed builds: one-time uninstall/reinstall —

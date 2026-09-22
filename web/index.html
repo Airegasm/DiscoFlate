@@ -1119,9 +1119,18 @@
         <span id="updAction"></span>
       </div>
       <div class="hint" id="updHint" style="display:none;white-space:pre-wrap;margin-top:8px"></div>
+      <div id="repoWarn" style="display:none;margin-top:10px;background:var(--panel2);border:1px solid var(--warn);border-radius:8px;padding:12px 14px">
+        <b style="color:var(--warn)">⚠ This install can't update itself</b>
+        <div class="hint" style="margin:6px 0 0" id="repoWhy"></div>
+        <div class="hint" style="margin:6px 0 0">Downloading the GitHub <b>ZIP</b> gives you the code but not the repository, so there's nothing for the updater to pull into. <b>Fix my install</b> turns this folder into a proper clone in place and brings it up to date. Your <code>data/</code> folder — token, config, backups, uploaded media — is git-ignored and never touched.</div>
+        <div class="row" style="gap:10px;margin-top:10px;align-items:center">
+          <button onclick="repairRepo()">🛠 Fix my install</button>
+          <span class="muted" id="repoMsg"></span>
+        </div>
+      </div>
       <div class="hint">On the phone app this downloads &amp; installs the new APK; on desktop it pulls the latest code from GitHub (then restart DiscoFlate).
         Update APKs are <b>version-named</b> (<code>discoflate-vX.Y.Z.apk</code>) so downloads never collide — make sure you install the newest one. Old copies in Downloads are safe to delete. <b>Coming from v3.45 or older with a stuck update?</b> Delete any old <code>discoflate*.apk</code> files first — same-named downloads used to cache and re-install stale copies.</div>
-      <div class="hint" style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px"><b>Backups &amp; presets moved to the <a style="cursor:pointer" onclick="showTab('system')">System tab</a>:</b> full config backup (token included) at the top, and shareable <b>Gameplay Presets</b> below it.</div>
+      <div class="hint" style="border-top:1px solid var(--line);margin-top:12px;padding-top:12px"><b>Backups</b> live on the <a style="cursor:pointer" onclick="showTab('system')">System tab</a> (full config, token included); <b>Gameplay Presets</b> moved to the <a style="cursor:pointer" onclick="showTab('game')">Game tab</a>, with a read-only line showing which preset the live gameplay was last loaded from.</div>
     </div>
 
     <div class="card span" data-tab="help">
@@ -1178,7 +1187,7 @@
         <li><b>Row icons</b> — every command / event / range row has <b>📋 Duplicate</b> (a clash-safe copy, e.g. <code>fill</code> → <code>fill-copy</code>), <b>💾 Save as template</b> (stashes it in <b>System → Templates</b> for reuse), and <b>✕ Delete</b>. To open or close a row, <b>click its title strip</b> — anywhere that isn't one of those buttons, a checkbox, a field or the <b>⋮⋮</b> drag handle. Click it again to close. In <b>System → Templates</b>, <b>＋ Add to Config</b> ports a saved template back in (auto-renaming on a clash).</li>
       </ul>
       <div class="hint" style="max-width:820px"><b>⚠️ Two-step setup — this trips people up:</b> creating a command does <b>nothing</b> on its own. It only works after you either <b>add it to a range</b> (Game → <b>Capacity ranges</b> → open a range → “<b>+ Add command to this range</b>”) or put it in <b>⚡ Always-On</b> — never both: a range-bound command leaves Always-On automatically. Per range you set its <b>cooldown</b>, <b>max uses/person</b>, <b>scope</b>, and (for fire commands) a <b>Fire override</b> — <b>range values always beat the command's own</b>, so one <code>!pump</code> can drive different pumps for different lengths in different bands.</div>
-      <div class="hint" style="max-width:820px"><b>Example — a <code>!spin</code> command:</b> Commands tab → <b>+ Add command</b> → Name <code>spin</code>, then in its block add a <b>roll</b> row (Dice blank = the range's dice) and a <b>message</b> row <code>🌀 [user] spun [dice] = [result] → +[secs2capacity]%</code>. Then Game → Capacity ranges → open the <b>66–100%</b> range → <b>+ Add command to this range</b> → <code>!spin</code>, and set Max/person <code>3</code>, Cooldown <code>30</code>, Scope <b>per-user</b>. Now <code>!spin</code> is live only in the top band.</div>
+      <div class="hint" style="max-width:820px"><b>Example — a <code>!spin</code> command:</b> Triggers tab → <b>Custom commands</b> → <b>+ Add command</b> → Name <code>spin</code>, then in its block add a <b>roll</b> row (Dice blank = the range's dice) and a <b>message</b> row <code>🌀 [user] spun [dice] = [result] → +[secs2capacity]%</code>. Then Game → Capacity ranges → open the <b>66–100%</b> range → <b>+ Add command to this range</b> → <code>!spin</code>, and set Max/person <code>3</code>, Cooldown <code>30</code>, Scope <b>per-user</b>. Now <code>!spin</code> is live only in the top band.</div>
       </details>
     </div>
 
@@ -1223,7 +1232,47 @@
         <li><b>Clean up previous round</b> (loops only) — each round's messages <b>replace the previous round's</b> so a long loop doesn't spam the channel; the end block's first message replaces the last round and stays. Great for things like <code>PumpRoulette</code>.</li>
         <li>When an event is started by a <code>!command</code>, its pump fires <b>credit that person's leaderboard</b> (session + lifetime). Events turned on by the checkbox or a range aren't attributed to anyone.</li>
       </ul>
-      <div class="hint" style="max-width:820px"><b>Example — a slow drip only in the top band:</b> Events tab → <b>+ Add event</b> → Name <code>drip</code>, mode <b>loop</b>, every <code>45</code> s; in <b>Each round</b> add a <b>fire</b> row (<code>2</code> seconds) and a <b>message</b> row <code>💧 a slow drip…</code>. Leave it <b>OFF</b>. Then Game → Capacity ranges → the <b>66–100%</b> band → <b>+ Add event</b> (on entry) → <code>drip</code> / <b>Enable</b>. Now the drip only runs once the meter is two-thirds full, and stops when it drops back out.</div>
+      <div class="hint" style="max-width:820px"><b>Example — a slow drip only in the top band:</b> Triggers tab → <b>⏱ Timed events</b> → <b>+ Add event</b> → Name <code>drip</code>, mode <b>loop</b>, every <code>45</code> s; in <b>Each round</b> add a <b>fire</b> row (<code>2</code> seconds) and a <b>message</b> row <code>💧 a slow drip…</code>. Leave it <b>OFF</b>. Then Game → Capacity ranges → the <b>66–100%</b> band → <b>+ Add event</b> (on entry) → <code>drip</code> / <b>Enable</b>. Now the drip only runs once the meter is two-thirds full, and stops when it drops back out.</div>
+      </details>
+    </div>
+
+    <div class="card span" data-tab="help">
+      <details class="help"><summary><h2>🎥 Video streams — getting started</h2></summary>
+        <div class="hint" style="max-width:880px;margin-top:8px">DiscoFlate sends a <b>virtual camera</b>: your webcam with overlays composited into it. You pick that virtual camera in Discord instead of your real one, and everything you design on the <b>Scenes</b> tab plays inside your live call. <b>Desktop only</b> — Android can't register a camera device for Discord mobile, so the phone drives the PC instead (<b>🖥 VC Remote</b>).</div>
+
+        <h3 style="margin:14px 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--accent2)">First, the one-time driver</h3>
+        <div class="hint" style="max-width:880px;margin-top:0">A virtual camera needs a system driver, and it <b>cannot be bundled</b> — on Linux it's a kernel module built against your running kernel, on Windows it's an admin-registered system filter. You only do this once.
+          <ul style="margin:8px 0 0 18px">
+            <li><b>Just press 🩺 Driver</b> in the Chat tab's 🎥 section. It genuinely probes (it opens a device, it doesn't guess) and offers a one-click install when something's missing.</li>
+            <li><b>Windows</b> — it installs <b>OBS Studio</b> via <code>winget</code>, purely because its installer registers the virtual-camera driver. <b>You never have to run OBS</b>; DiscoFlate does its own compositing. If the driver doesn't register, open OBS once, click <b>Start Virtual Camera</b>, close it.</li>
+            <li><b>Linux</b> — it installs / loads <b>v4l2loopback</b> (<code>sudo apt install v4l2loopback-dkms</code>, then <code>sudo modprobe v4l2loopback exclusive_caps=1 card_label="DiscoFlate Cam"</code>). The button does both, with a password prompt. <b>No OBS needed at all.</b></li>
+            <li><b>macOS</b> — same as Windows: OBS installed once for its driver.</li>
+          </ul>
+        </div>
+
+        <h3 style="margin:14px 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--accent2)">Then, every session, in this order</h3>
+        <div class="hint" style="max-width:880px;margin-top:0">
+          <ol style="margin:4px 0 0 18px">
+            <li><b>Build a scene</b> (Scenes tab) — or use the shipped <b>Basic Overlays</b>. Whichever scene is selected here is the <b>live</b> one.</li>
+            <li><b>Join the Discord voice/video channel</b> and pick it in the Chat tab's <b>Channel</b> dropdown. The 🎥 section only appears for <b>video</b> channels.</li>
+            <li><b>▶ Start virtual cam.</b> The preview shows exactly what viewers get — trust it over your own Discord tile, which Discord always mirrors.</li>
+            <li><b>In Discord</b> → voice &amp; video settings → pick <b>DiscoFlate Cam</b> as your camera, then turn your camera on in the call. Nothing shows yet, and that's correct: <b>the feed is black until you go LIVE.</b> Get yourself set up in private.</li>
+            <li><b>Flip LIVE</b> (top-right). If Go Live is set to open with an intro, your intro stages play over black and hand over to the group you chose; otherwise the picture comes up straight away.</li>
+          </ol>
+        </div>
+
+        <h3 style="margin:14px 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--accent2)">Worth knowing</h3>
+        <div class="hint" style="max-width:880px;margin-top:0">
+          <ul style="margin:4px 0 0 18px">
+            <li><b>The camera holds your webcam</b> while it runs. Anything else wanting that same device will find it busy.</li>
+            <li><b>Black is deliberate.</b> Not LIVE = a genuinely black frame with no overlays at all, so you can start the camera, pick it in Discord and get ready without anyone seeing the room. During an intro it stays black with just the intro playing on it (untick <b>black during intro</b> in Go Live Options to show the camera behind it instead).</li>
+            <li><b>🪞 Mirror</b> exists only to cancel Discord's un-disableable self-view mirror. ON = your own tile reads correctly but <b>viewers see everything mirrored</b>. Leave it OFF unless you know you want that.</li>
+            <li><b>🔍 Detect</b> lists the sizes each attached camera really supports, portrait modes included.</li>
+            <li><b>⏸ Pause</b> covers the stream with your pause overlay and stops the pumps; ▶ Resume clears it.</li>
+            <li><b>Audio overlays play on this machine's speakers</b>, not down the video pipe. To get them to viewers, route your system audio into Discord (a loopback / monitor source).</li>
+            <li><b>On a phone</b>, the 🎥 section becomes <b>🖥 VC Remote</b>: video runs on the PC and the phone drives it. Needs <b>Remote access</b> on at the PC, with the phone's IP whitelisted.</li>
+          </ul>
+        </div>
       </details>
     </div>
 
@@ -1233,13 +1282,17 @@
       <ul style="line-height:1.7;padding-left:22px;margin:8px 0 0;max-width:820px">
         <li><b>Plain text posts AS YOU</b> — your Owner name + Discord avatar, via a webhook the bot manages. Without the <b>Manage Webhooks</b> permission it falls back to a <b>Owner:</b>-prefixed bot post (the status line under the send box tells you which mode you're in).</li>
         <li><b><code>!command</code></b> executes <b>as the Owner</b> — cooldown-exempt, owner-only commands allowed, reply lands in that channel. <b><code>#name</code></b> speaks a <b>Custom Owner Command</b> (same owner voice). Enter sends.</li>
-        <li><b>Custom Buttons</b> — one-click launchers (fire a !command, start a poll, post a #owner command) managed via 🔧; <b>Overlay actions</b> appear on video channels and play image layers over the virtual camera. Both live in Gameplay Presets, so profiles swap them on the fly.</li>
+        <li><b>Custom Buttons</b> — one-click launchers managed via 🔧. A button can fire a <code>!command</code>, start a poll, post a <code>#owner</code> command, <b>play an overlay</b>, or <b>play a whole scene group</b>. They live in Gameplay Presets, so profiles swap them on the fly.</li>
         <li><b>Video channels</b> — on desktop your feed shows <b>above the chat</b>: the live virtual-cam output (overlays included — exactly what viewers see), and <b>🔍 Detect</b> probes each attached camera for the sizes it really supports, portrait modes included. On the phone the video section becomes <b>🖥 VC Remote</b>: video calls run on your PC, and Connect links the app straight into the PC's panel (same Chat tab, buttons and camera controls, driving the PC) — enable <b>Remote access</b> + whitelist the phone's IP on the PC first; the phone's back button returns to the local app.</li>
         <li><b>The virtual camera is desktop-only.</b> Android has no way for an app to register a fake camera — that needs a system driver (root) — and Discord mobile only ever lists the real front/back cameras. On desktop, run DiscoFlate on the PC you join the call from and pick the virtual cam in Discord desktop's video settings.</li>
-        <li><b>Overlays live on the PC.</b> The virtual camera is the camera home base — design scenes on the <b>Stages</b> tab and they play into your Discord call from the PC. (A phone-hosted Stage view exists at <code>/stage</code> for screen-share setups, but it's parked for now and not linked from the UI.)</li>
+        <li><b>Overlays live on the PC.</b> The virtual camera is the camera home base — design scenes on the <b>Scenes</b> tab and they play into your Discord call from the PC. (A phone-hosted view exists at <code>/stage</code> for screen-share setups, but it's parked and not linked from the UI.)</li>
         <li><b>Active tickbox</b> (Discord tab, on each listen channel) — untick one to <b>mute that channel completely</b>: the bot stops listening there <i>and</i> stops posting there, while keeping it registered so you can flip it back on. Unlike Isolate this is <b>per channel and persistent</b>, and it composes with Isolate. Untick every channel and the bot goes fully silent. A muted channel stays muted even if it's also your announce channel.</li>
         <li><b>Isolate</b> (next to the channel picker) — while ticked, <b>every broadcast</b> (events, milestones, auto-reports, timers, cross-server echoes, owner-voice posts) goes <b>only to the channel selected here</b>, across every server. The <b>announce channel is suppressed too</b> while pinned, so it can't leak output into another server. The bot keeps <b>listening everywhere</b> — commands typed in other channels still run and reply there — and if the pinned channel isn't live it fails open rather than going silent. Switching channels while Isolate is on re-aims it.</li>
-        <li><b>🎭 Stages tab</b> — design overlay scenes OBS-style: create a Stage, link a Gameplay Preset, pick a resolution, then drag overlays onto the canvas (drag the ◢ corner to resize). Each overlay is either <b>always-on</b> (part of the scene whenever the stage is live) or <b>callable</b> (becomes a one-tap button on the Chat tab). Text overlays are <b>multi-line</b> with left/centre/right alignment, and <b>their placeholders keep updating while they're on screen</b> — so <code>Starting in [intro_timer]s</code> or <code>[var:score]</code> ticks live without re-firing the overlay. Overlay types: <b>Media</b> (image/video), <b>🅣 Text</b>, and two live system widgets — <b>📊 Capacity Gauge</b> and <b>⏱ Pump Timer</b>. Every overlay carries <b>its own options, saved per stage</b>: Text and the Pump Timer get colour, size, font and an optional background (blank = transparent); the Gauge gets fill colour, thickness, <b>horizontal or vertical</b> orientation and a show-% toggle; and everything supports <b>rotation</b> (⟳ handle, hold Shift to snap to 15°) and <b>flash</b> (N seconds visible, N hidden). Text and the timer accept <code>[capacity]</code> and <code>[secs]</code>, which stay live on the feed. With no stages yet, a <b>Default</b> stage is created so your overlays always have a home. The <b>🗂 Media browser</b> is the universal library — uploads land in <code>data/images</code>, so <b>⬇ Export Scene</b> bundles the design plus its media into one <code>.dfscene.zip</code> that <b>⬆ Import Scene</b> unpacks anywhere. <b>Global overlays</b> are callable from every stage.</li>
+        <li><b>🎭 Scenes tab</b> — design overlay scenes OBS-style. One picker: whichever scene is selected here <b>is the live scene</b>, the one the camera and every session overlay use. Pick a resolution, then drag overlays onto the canvas (◢ resizes, ⟳ rotates, Shift frees them from the 5% grid). The canvas previews at the <b>virtual cam's actual resolution</b>, so what you lay out is what viewers get.
+          <br><b>Overlay kinds:</b> 🖼 Media (image or video, with chroma key for green-screen clips) · ▬ Solid (a flat colour block, full-frame by default — a backdrop with no image file) · 🅣 Text (multi-line, left/centre/right) · ⏳ Timer · 📊 Capacity Gauge · ⏱ Device Timers · 🗳 Poll Viewer (draws itself only while a poll runs) · 🔊 Audio (plays a sound on this machine; nothing is drawn on the stream).
+          <br><b>Each overlay</b> is either <b>always-on</b> (part of the scene whenever it's live) or <b>callable</b> (played by an action, a button or a scene group — it ghosts on the canvas rather than vanishing, so you can still place it). Text placeholders <b>keep updating while they're on screen</b>, so <code>Starting in [intro_timer]s</code> or <code>[var:score]</code> ticks live without re-firing.
+          <br><b>Scene groups</b> are named sets you fire and clear as one. The <b>👁</b> beside the group dropdown puts the group on or off the <b>stream</b> — an off group isn't on screen and doesn't come up when the scene loads, but firing it still plays it, which is how an on-demand group (fireworks, an outro) works. <b>🎬</b> flags a group as an <b>intro</b> (it only ever plays during the pre-show). <b>➕ 📋 ✏️ 🗑</b> create, duplicate, rename and delete groups; the scene itself has the same icons beside its name. A <code>scene_group</code> action can tick <b>⬆ on top</b> to draw the whole group above everything already on screen.
+          <br>The <b>🗂 Media browser</b> is the universal library — images, video and audio all live in <code>data/images</code>, so Device Sync and Export bundle them automatically.</li>
         <li><b>Linking a chat to a stage:</b> on a video channel pick the <b>Stage</b> dropdown in the 🎥 section — its callable overlays appear as buttons, ▶ Start virtual cam puts the always-on items (and live gauges) on the feed, and 🎭 Stage opens the phone view with that design loaded.</li>
         <li><b>⏱ Device Timers overlay</b> — one row per configured device, <b>primary pump always on top</b>, each with its own countdown; rows appear as you add devices. Secondary pumps feed the <b>same capacity gauge</b> on their own calibration (rates add up — two pumps fill twice as fast). Row text uses <code>[name]</code> and <code>[secs]</code>, and you can hide idle devices.</li>
         <li><b>🟩 Green-screen clips.</b> Tick <b>chroma key</b> on any media overlay to knock its background colour out, so an ordinary <code>.mp4</code> shot against a green screen plays over your camera with a transparent background — no alpha codec or WebM conversion needed. Pick the <b>key colour</b> (green by default, blue screens work too), <b>tolerance</b> for how much of that hue goes, and <b>edge softness</b> so hair and motion blur don't get a hard jagged cut. Greys and skin tones are protected, so shadows don't punch holes.</li>
@@ -3450,6 +3503,7 @@ async function checkUpdates(){
   m.textContent='checking…'; act.innerHTML=''; hint.style.display='none';
   try{
     const r = await api('/api/check-updates', {});
+    repoWarnShow(r.repo);
     if(r.error){ m.textContent=r.error; return; }
     if(r.update_available){
       updApkUrl = r.apk_url||'';
@@ -3463,6 +3517,29 @@ async function checkUpdates(){
     showUpdateBanner(!!r.update_available);
   }catch(e){ m.textContent='check failed: '+(e.message||e); }
 }
+// A ZIP install (or a clone nested in another repo) can't be updated from
+// here — say so plainly instead of failing later with a git error.
+function repoWarnShow(repo){
+  const box=$('#repoWarn'); if(!box) return;
+  const bad = repo && repo.ok===false;
+  box.style.display = bad ? '' : 'none';
+  const why=$('#repoWhy');
+  if(why && bad) why.textContent = repo.why || '';
+  const btn = box.querySelector('button');
+  // "no git installed" and "nested repo" aren't ours to fix automatically
+  if(btn) btn.style.display = (bad && (repo.kind==='not-a-repo' || repo.kind==='no-origin')) ? '' : 'none';
+}
+async function repairRepo(){
+  const msg=$('#repoMsg'), hint=$('#updHint');
+  if(!confirm('Turn this folder into a proper git clone and bring it up to date?\n\nYour data/ folder (token, config, backups, media) is git-ignored and will not be touched. Any edits you made to the app\u2019s own source files will be replaced with the official version.')) return;
+  if(msg) msg.textContent='repairing…';
+  try{
+    const r = await api('/api/repair-repo', {});
+    if(msg) msg.textContent = r.ok ? '✅ fixed — restart DiscoFlate' : '⚠ failed';
+    if(hint && r.output){ hint.textContent=r.output; hint.style.display=''; }
+    if(r.ok) setTimeout(checkUpdates, 800);
+  }catch(e){ if(msg) msg.textContent='⚠ '+(e.message||e); }
+}
 // Dashboard banner shown above Capacity when a newer version exists.
 function showUpdateBanner(available){
   const b=$('#updBanner'); if(b) b.style.display = available ? '' : 'none';
@@ -3471,6 +3548,7 @@ function showUpdateBanner(available){
 async function autoCheckUpdates(){
   try{
     const r = await api('/api/check-updates', {});
+    if(r) repoWarnShow(r.repo);
     if(r && !r.error) showUpdateBanner(!!r.update_available);
   }catch(e){}
 }
