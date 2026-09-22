@@ -1,6 +1,6 @@
 {
-  "version": "3.73.1",
-  "versionCode": 160,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.73.1/discoflate-v3.73.1.apk",
-  "notes": "DiscoFlate v3.73.1 \u2014 the Chat tab fills itself when you land on it instead of needing you to click away and back, and the chat window gets a \ud83e\uddf9 Clear button that empties the view without touching anything in Discord."
+  "version": "3.74.0",
+  "versionCode": 161,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.74.0/discoflate-v3.74.0.apk",
+  "notes": "DiscoFlate v3.74.0 \u2014 typing in the chat box no longer fires the read-only-scene toast, the operator is never cooldown- or use-limited from the app's own chat box, a command that did nothing (its event was on cooldown) no longer announces itself, and every round of a looping event can announce what it did via the new 'notify' action row \u2014 e.g. 'AireGasm added 20s to Low-Speed Pump \u00b7 Roulette 2/3'."
 }

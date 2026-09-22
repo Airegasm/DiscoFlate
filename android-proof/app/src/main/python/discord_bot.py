@@ -895,7 +895,9 @@ class BotManager:
         ids = cfg.get("cooldown_exempt_user_ids") or []
         uid = str(ids[0]).strip() if ids and str(ids[0]).strip() else None
         who, _av = await self._owner_identity(cfg)
-        res = await self.engine.run_custom(cmd, who, uid=uid)
+        # Typed into the app's own chat box — this IS the operator, whatever
+        # their Discord display name happens to be. Never cooldown or budget it.
+        res = await self.engine.run_custom(cmd, who, uid=uid, as_owner=True)
         if res.get("game"):
             if uid is None:
                 return {"ok": False, "error": "set the Owner user ID (Game tab) to start games from here"}

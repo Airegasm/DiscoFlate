@@ -82,7 +82,7 @@
           },
           {
             "type": "message",
-            "message": "\ud83d\udca8 [mention] used [prefix]inflate - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+            "message": "\ud83d\udca8 [mention] used [prefix]inflate[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
           }
         ]
       },
@@ -125,13 +125,13 @@
               },
               {
                 "type": "message",
-                "message": "[mention] took a chance on a coin flip... - [user] can use this command [cmd_remain] more times.\n**SUCCESS!** [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+                "message": "[mention] took a chance on a coin flip...[cmd_remain_note]\n**SUCCESS!** [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
               }
             ],
             "miss_actions": [
               {
                 "type": "message",
-                "message": "[mention] took a chance on a coin flip - [user] can use this command [cmd_remain] more times.\n**FAILURE!** - Better luck next time..."
+                "message": "[mention] took a chance on a coin flip[cmd_remain_note]\n**FAILURE!** - Better luck next time..."
               }
             ]
           }
@@ -167,7 +167,7 @@
         "actions": [
           {
             "type": "message",
-            "message": "**[user]** spins the roulette wheel\u2026 [user] can use this command [cmd_remain] more times."
+            "message": "**[user]** spins the roulette wheel\u2026[cmd_remain_note]"
           }
         ]
       },
@@ -205,7 +205,7 @@
         "bl_points": 1,
         "rps_wins": 3,
         "sl_symbols": 6,
-        "game_intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it! [user] can use this command [cmd_remain] more times.",
+        "game_intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it![cmd_remain_note]",
         "game_tiers": [
           {
             "op": ">=",
@@ -291,7 +291,7 @@
         "bl_points": 1,
         "rps_wins": 3,
         "sl_symbols": 6,
-        "game_intro": "\ud83e\udde0 **[user]** takes on **Simon** \u2014 memorize the sequence, then repeat it![user] can use this command [cmd_remain] more times. ",
+        "game_intro": "\ud83e\udde0 **[user]** takes on **Simon** \u2014 memorize the sequence, then repeat it![cmd_remain_note] ",
         "game_tiers": [
           {
             "op": ">=",
@@ -409,7 +409,7 @@
         "bl_points": 1,
         "rps_wins": 3,
         "sl_symbols": 6,
-        "game_intro": "\ud83c\udf88 **[user]** plays **Don't Pop It** \u2014 reveal safe cells for points, or cash out before you hit a balloon! [user] can use this command [cmd_remain] more times.",
+        "game_intro": "\ud83c\udf88 **[user]** plays **Don't Pop It** \u2014 reveal safe cells for points, or cash out before you hit a balloon![cmd_remain_note]",
         "game_tiers": [
           {
             "op": ">=",
@@ -511,7 +511,7 @@
         "bl_points": 1,
         "rps_wins": 3,
         "sl_symbols": 6,
-        "game_intro": "\u270a\u270b\u270c\ufe0f **[user]** challenges the bot to **Rock-Paper-Scissors** \u2014 first to 3! [user] can use this command [cmd_remain] more times.",
+        "game_intro": "\u270a\u270b\u270c\ufe0f **[user]** challenges the bot to **Rock-Paper-Scissors** \u2014 first to 3![cmd_remain_note]",
         "game_tiers": [
           {
             "op": ">=",
@@ -597,7 +597,7 @@
         "bl_points": 1,
         "rps_wins": 3,
         "sl_symbols": 6,
-        "game_intro": "\ud83c\udfb0 **[user]** pulls the lever\u2026  [user] can use this command [cmd_remain] more times.",
+        "game_intro": "\ud83c\udfb0 **[user]** pulls the lever\u2026[cmd_remain_note]",
         "game_tiers": [
           {
             "op": ">=",
@@ -683,7 +683,7 @@
         "bl_points": 1,
         "rps_wins": 3,
         "sl_symbols": 6,
-        "game_intro": "\ud83c\udccf **[user]** sits down at the blackjack table\u2026  [user] can use this command [cmd_remain] more times.",
+        "game_intro": "\ud83c\udccf **[user]** sits down at the blackjack table\u2026[cmd_remain_note]",
         "game_tiers": [
           {
             "op": ">=",
@@ -1229,7 +1229,7 @@
         },
         {
           "type": "message",
-          "message": "\ud83d\udca8 [mention] used [prefix]fill - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+          "message": "\ud83d\udca8 [mention] used [prefix]fill[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
         }
       ],
       "notify_enabled": true,
@@ -1270,7 +1270,7 @@
         },
         {
           "type": "message",
-          "message": "\ud83d\udca8 [mention] used [prefix]inflate - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+          "message": "\ud83d\udca8 [mention] used [prefix]inflate[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
         }
       ],
       "notify_enabled": true,
@@ -1311,7 +1311,7 @@
         },
         {
           "type": "message",
-          "message": "\ud83d\udca8 [mention] used [prefix]pump - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+          "message": "\ud83d\udca8 [mention] used [prefix]pump[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
         }
       ],
       "notify_enabled": true,
@@ -1352,7 +1352,7 @@
         },
         {
           "type": "message",
-          "message": "\ud83d\udca8 [mention] used [prefix]squeeze - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+          "message": "\ud83d\udca8 [mention] used [prefix]squeeze[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
         }
       ],
       "notify_enabled": true,
@@ -1393,7 +1393,7 @@
         },
         {
           "type": "message",
-          "message": "\ud83d\udca8 [mention] used [prefix]tease - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+          "message": "\ud83d\udca8 [mention] used [prefix]tease[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
         }
       ],
       "notify_enabled": true,
@@ -1434,7 +1434,7 @@
         },
         {
           "type": "message",
-          "message": "\ud83d\udca8 [mention] used [prefix]topup - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+          "message": "\ud83d\udca8 [mention] used [prefix]topup[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
         }
       ],
       "notify_enabled": true,
@@ -1479,13 +1479,13 @@
             },
             {
               "type": "message",
-              "message": "[mention] took a chance on a coin flip... - [user] can use this command [cmd_remain] more times.\n**SUCCESS!** [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+              "message": "[mention] took a chance on a coin flip...[cmd_remain_note]\n**SUCCESS!** [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
             }
           ],
           "miss_actions": [
             {
               "type": "message",
-              "message": "[mention] took a chance on a coin flip - [user] can use this command [cmd_remain] more times.\n**FAILURE!** - Better luck next time..."
+              "message": "[mention] took a chance on a coin flip[cmd_remain_note]\n**FAILURE!** - Better luck next time..."
             }
           ]
         }
@@ -1524,10 +1524,10 @@
       "actions": [
         {
           "type": "message",
-          "message": "**[user]** spins the roulette wheel\u2026 [user] can use this command [cmd_remain] more times."
+          "message": "**[user]** spins the roulette wheel\u2026[cmd_remain_note]"
         }
       ],
-      "notify_enabled": true,
+      "notify_enabled": false,
       "notify": "[user] just triggered [command]"
     },
     {
@@ -1867,6 +1867,10 @@
               "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udfe2 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]"
             }
           ]
+        },
+        {
+          "type": "notify",
+          "message": "\ud83c\udfb0 [user] added [secs]s to [device] \u00b7 Roulette [current_loop]/[total_loops]"
         }
       ]
     },
@@ -2277,7 +2281,7 @@
         }
       ],
       "luck": null,
-      "intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it! [user] can use this command [cmd_remain] more times.",
+      "intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it![cmd_remain_note]",
       "intro_embed": false,
       "intro_title": "",
       "start_events": []
@@ -2374,7 +2378,7 @@
         }
       ],
       "luck": null,
-      "intro": "\ud83e\udde0 **[user]** takes on **Simon** \u2014 memorize the sequence, then repeat it![user] can use this command [cmd_remain] more times. ",
+      "intro": "\ud83e\udde0 **[user]** takes on **Simon** \u2014 memorize the sequence, then repeat it![cmd_remain_note] ",
       "intro_embed": false,
       "intro_title": "",
       "start_events": []
@@ -2455,7 +2459,7 @@
         }
       ],
       "luck": null,
-      "intro": "\ud83c\udf88 **[user]** plays **Don't Pop It** \u2014 reveal safe cells for points, or cash out before you hit a balloon! [user] can use this command [cmd_remain] more times.",
+      "intro": "\ud83c\udf88 **[user]** plays **Don't Pop It** \u2014 reveal safe cells for points, or cash out before you hit a balloon![cmd_remain_note]",
       "intro_embed": false,
       "intro_title": "",
       "start_events": []
@@ -2518,7 +2522,7 @@
         }
       ],
       "luck": null,
-      "intro": "\u270a\u270b\u270c\ufe0f **[user]** challenges the bot to **Rock-Paper-Scissors** \u2014 first to 3! [user] can use this command [cmd_remain] more times.",
+      "intro": "\u270a\u270b\u270c\ufe0f **[user]** challenges the bot to **Rock-Paper-Scissors** \u2014 first to 3![cmd_remain_note]",
       "intro_embed": false,
       "intro_title": "",
       "start_events": []
@@ -2581,7 +2585,7 @@
         }
       ],
       "luck": null,
-      "intro": "\ud83c\udfb0 **[user]** pulls the lever\u2026  [user] can use this command [cmd_remain] more times.",
+      "intro": "\ud83c\udfb0 **[user]** pulls the lever\u2026[cmd_remain_note]",
       "intro_embed": false,
       "intro_title": "",
       "start_events": []
@@ -2658,7 +2662,7 @@
         }
       ],
       "luck": null,
-      "intro": "\ud83c\udccf **[user]** sits down at the blackjack table\u2026  [user] can use this command [cmd_remain] more times.",
+      "intro": "\ud83c\udccf **[user]** sits down at the blackjack table\u2026[cmd_remain_note]",
       "intro_embed": false,
       "intro_title": "",
       "start_events": []
@@ -2961,7 +2965,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]fill - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "\ud83d\udca8 [mention] used [prefix]fill[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -3002,7 +3006,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]inflate - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "\ud83d\udca8 [mention] used [prefix]inflate[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -3043,7 +3047,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]pump - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "\ud83d\udca8 [mention] used [prefix]pump[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -3084,7 +3088,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]squeeze - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "\ud83d\udca8 [mention] used [prefix]squeeze[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -3125,7 +3129,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]tease - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "\ud83d\udca8 [mention] used [prefix]tease[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -3166,7 +3170,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]topup - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "\ud83d\udca8 [mention] used [prefix]topup[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -3211,13 +3215,13 @@
                   },
                   {
                     "type": "message",
-                    "message": "[mention] took a chance on a coin flip... - [user] can use this command [cmd_remain] more times.\n**SUCCESS!** [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+                    "message": "[mention] took a chance on a coin flip...[cmd_remain_note]\n**SUCCESS!** [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
                   }
                 ],
                 "miss_actions": [
                   {
                     "type": "message",
-                    "message": "[mention] took a chance on a coin flip - [user] can use this command [cmd_remain] more times.\n**FAILURE!** - Better luck next time..."
+                    "message": "[mention] took a chance on a coin flip[cmd_remain_note]\n**FAILURE!** - Better luck next time..."
                   }
                 ]
               }
@@ -3256,10 +3260,10 @@
             "actions": [
               {
                 "type": "message",
-                "message": "**[user]** spins the roulette wheel\u2026 [user] can use this command [cmd_remain] more times."
+                "message": "**[user]** spins the roulette wheel\u2026[cmd_remain_note]"
               }
             ],
-            "notify_enabled": true,
+            "notify_enabled": false,
             "notify": "[user] just triggered [command]"
           },
           {
@@ -3859,6 +3863,10 @@
                     "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udfe2 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]"
                   }
                 ]
+              },
+              {
+                "type": "notify",
+                "message": "\ud83c\udfb0 [user] added [secs]s to [device] \u00b7 Roulette [current_loop]/[total_loops]"
               }
             ]
           },
@@ -3929,7 +3937,7 @@
                 },
                 {
                   "type": "message",
-                  "message": "\ud83d\udca8 [mention] used [prefix]inflate - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                  "message": "\ud83d\udca8 [mention] used [prefix]inflate[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
                 }
               ]
             },
@@ -3972,13 +3980,13 @@
                     },
                     {
                       "type": "message",
-                      "message": "[mention] took a chance on a coin flip... - [user] can use this command [cmd_remain] more times.\n**SUCCESS!** [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+                      "message": "[mention] took a chance on a coin flip...[cmd_remain_note]\n**SUCCESS!** [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
                     }
                   ],
                   "miss_actions": [
                     {
                       "type": "message",
-                      "message": "[mention] took a chance on a coin flip - [user] can use this command [cmd_remain] more times.\n**FAILURE!** - Better luck next time..."
+                      "message": "[mention] took a chance on a coin flip[cmd_remain_note]\n**FAILURE!** - Better luck next time..."
                     }
                   ]
                 }
@@ -4014,7 +4022,7 @@
               "actions": [
                 {
                   "type": "message",
-                  "message": "**[user]** spins the roulette wheel\u2026 [user] can use this command [cmd_remain] more times."
+                  "message": "**[user]** spins the roulette wheel\u2026[cmd_remain_note]"
                 }
               ]
             },
@@ -4052,7 +4060,7 @@
               "bl_points": 1,
               "rps_wins": 3,
               "sl_symbols": 6,
-              "game_intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it! [user] can use this command [cmd_remain] more times.",
+              "game_intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it![cmd_remain_note]",
               "game_tiers": [
                 {
                   "op": ">=",
@@ -4138,7 +4146,7 @@
               "bl_points": 1,
               "rps_wins": 3,
               "sl_symbols": 6,
-              "game_intro": "\ud83e\udde0 **[user]** takes on **Simon** \u2014 memorize the sequence, then repeat it![user] can use this command [cmd_remain] more times. ",
+              "game_intro": "\ud83e\udde0 **[user]** takes on **Simon** \u2014 memorize the sequence, then repeat it![cmd_remain_note] ",
               "game_tiers": [
                 {
                   "op": ">=",
@@ -4256,7 +4264,7 @@
               "bl_points": 1,
               "rps_wins": 3,
               "sl_symbols": 6,
-              "game_intro": "\ud83c\udf88 **[user]** plays **Don't Pop It** \u2014 reveal safe cells for points, or cash out before you hit a balloon! [user] can use this command [cmd_remain] more times.",
+              "game_intro": "\ud83c\udf88 **[user]** plays **Don't Pop It** \u2014 reveal safe cells for points, or cash out before you hit a balloon![cmd_remain_note]",
               "game_tiers": [
                 {
                   "op": ">=",
@@ -4358,7 +4366,7 @@
               "bl_points": 1,
               "rps_wins": 3,
               "sl_symbols": 6,
-              "game_intro": "\u270a\u270b\u270c\ufe0f **[user]** challenges the bot to **Rock-Paper-Scissors** \u2014 first to 3! [user] can use this command [cmd_remain] more times.",
+              "game_intro": "\u270a\u270b\u270c\ufe0f **[user]** challenges the bot to **Rock-Paper-Scissors** \u2014 first to 3![cmd_remain_note]",
               "game_tiers": [
                 {
                   "op": ">=",
@@ -4444,7 +4452,7 @@
               "bl_points": 1,
               "rps_wins": 3,
               "sl_symbols": 6,
-              "game_intro": "\ud83c\udfb0 **[user]** pulls the lever\u2026  [user] can use this command [cmd_remain] more times.",
+              "game_intro": "\ud83c\udfb0 **[user]** pulls the lever\u2026[cmd_remain_note]",
               "game_tiers": [
                 {
                   "op": ">=",
@@ -4530,7 +4538,7 @@
               "bl_points": 1,
               "rps_wins": 3,
               "sl_symbols": 6,
-              "game_intro": "\ud83c\udccf **[user]** sits down at the blackjack table\u2026  [user] can use this command [cmd_remain] more times.",
+              "game_intro": "\ud83c\udccf **[user]** sits down at the blackjack table\u2026[cmd_remain_note]",
               "game_tiers": [
                 {
                   "op": ">=",
@@ -4869,7 +4877,7 @@
               }
             ],
             "luck": null,
-            "intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it! [user] can use this command [cmd_remain] more times.",
+            "intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it![cmd_remain_note]",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []
@@ -4966,7 +4974,7 @@
               }
             ],
             "luck": null,
-            "intro": "\ud83e\udde0 **[user]** takes on **Simon** \u2014 memorize the sequence, then repeat it![user] can use this command [cmd_remain] more times. ",
+            "intro": "\ud83e\udde0 **[user]** takes on **Simon** \u2014 memorize the sequence, then repeat it![cmd_remain_note] ",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []
@@ -5047,7 +5055,7 @@
               }
             ],
             "luck": null,
-            "intro": "\ud83c\udf88 **[user]** plays **Don't Pop It** \u2014 reveal safe cells for points, or cash out before you hit a balloon! [user] can use this command [cmd_remain] more times.",
+            "intro": "\ud83c\udf88 **[user]** plays **Don't Pop It** \u2014 reveal safe cells for points, or cash out before you hit a balloon![cmd_remain_note]",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []
@@ -5110,7 +5118,7 @@
               }
             ],
             "luck": null,
-            "intro": "\u270a\u270b\u270c\ufe0f **[user]** challenges the bot to **Rock-Paper-Scissors** \u2014 first to 3! [user] can use this command [cmd_remain] more times.",
+            "intro": "\u270a\u270b\u270c\ufe0f **[user]** challenges the bot to **Rock-Paper-Scissors** \u2014 first to 3![cmd_remain_note]",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []
@@ -5173,7 +5181,7 @@
               }
             ],
             "luck": null,
-            "intro": "\ud83c\udfb0 **[user]** pulls the lever\u2026  [user] can use this command [cmd_remain] more times.",
+            "intro": "\ud83c\udfb0 **[user]** pulls the lever\u2026[cmd_remain_note]",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []
@@ -5250,7 +5258,7 @@
               }
             ],
             "luck": null,
-            "intro": "\ud83c\udccf **[user]** sits down at the blackjack table\u2026  [user] can use this command [cmd_remain] more times.",
+            "intro": "\ud83c\udccf **[user]** sits down at the blackjack table\u2026[cmd_remain_note]",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []
@@ -5573,7 +5581,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]fill - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "\ud83d\udca8 [mention] used [prefix]fill[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -5614,7 +5622,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]inflate - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "\ud83d\udca8 [mention] used [prefix]inflate[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -5655,7 +5663,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]pump - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "\ud83d\udca8 [mention] used [prefix]pump[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -5696,7 +5704,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]squeeze - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "\ud83d\udca8 [mention] used [prefix]squeeze[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -5737,7 +5745,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]tease - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "\ud83d\udca8 [mention] used [prefix]tease[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -5778,7 +5786,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]topup - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "\ud83d\udca8 [mention] used [prefix]topup[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -5823,13 +5831,13 @@
                   },
                   {
                     "type": "message",
-                    "message": "[mention] took a chance on a coin flip... - [user] can use this command [cmd_remain] more times.\n**SUCCESS!** [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+                    "message": "[mention] took a chance on a coin flip...[cmd_remain_note]\n**SUCCESS!** [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
                   }
                 ],
                 "miss_actions": [
                   {
                     "type": "message",
-                    "message": "[mention] took a chance on a coin flip - [user] can use this command [cmd_remain] more times.\n**FAILURE!** - Better luck next time..."
+                    "message": "[mention] took a chance on a coin flip[cmd_remain_note]\n**FAILURE!** - Better luck next time..."
                   }
                 ]
               }
@@ -5868,10 +5876,10 @@
             "actions": [
               {
                 "type": "message",
-                "message": "**[user]** spins the roulette wheel\u2026 [user] can use this command [cmd_remain] more times."
+                "message": "**[user]** spins the roulette wheel\u2026[cmd_remain_note]"
               }
             ],
-            "notify_enabled": true,
+            "notify_enabled": false,
             "notify": "[user] just triggered [command]"
           },
           {
@@ -6471,6 +6479,10 @@
                     "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udfe2 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]"
                   }
                 ]
+              },
+              {
+                "type": "notify",
+                "message": "\ud83c\udfb0 [user] added [secs]s to [device] \u00b7 Roulette [current_loop]/[total_loops]"
               }
             ]
           },
@@ -6541,7 +6553,7 @@
                 },
                 {
                   "type": "message",
-                  "message": "\ud83d\udca8 [mention] used [prefix]inflate - [user] can use this command [cmd_remain] more times.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                  "message": "\ud83d\udca8 [mention] used [prefix]inflate[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
                 }
               ]
             },
@@ -6584,13 +6596,13 @@
                     },
                     {
                       "type": "message",
-                      "message": "[mention] took a chance on a coin flip... - [user] can use this command [cmd_remain] more times.\n**SUCCESS!** [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+                      "message": "[mention] took a chance on a coin flip...[cmd_remain_note]\n**SUCCESS!** [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
                     }
                   ],
                   "miss_actions": [
                     {
                       "type": "message",
-                      "message": "[mention] took a chance on a coin flip - [user] can use this command [cmd_remain] more times.\n**FAILURE!** - Better luck next time..."
+                      "message": "[mention] took a chance on a coin flip[cmd_remain_note]\n**FAILURE!** - Better luck next time..."
                     }
                   ]
                 }
@@ -6626,7 +6638,7 @@
               "actions": [
                 {
                   "type": "message",
-                  "message": "**[user]** spins the roulette wheel\u2026 [user] can use this command [cmd_remain] more times."
+                  "message": "**[user]** spins the roulette wheel\u2026[cmd_remain_note]"
                 }
               ]
             },
@@ -6664,7 +6676,7 @@
               "bl_points": 1,
               "rps_wins": 3,
               "sl_symbols": 6,
-              "game_intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it! [user] can use this command [cmd_remain] more times.",
+              "game_intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it![cmd_remain_note]",
               "game_tiers": [
                 {
                   "op": ">=",
@@ -6750,7 +6762,7 @@
               "bl_points": 1,
               "rps_wins": 3,
               "sl_symbols": 6,
-              "game_intro": "\ud83e\udde0 **[user]** takes on **Simon** \u2014 memorize the sequence, then repeat it![user] can use this command [cmd_remain] more times. ",
+              "game_intro": "\ud83e\udde0 **[user]** takes on **Simon** \u2014 memorize the sequence, then repeat it![cmd_remain_note] ",
               "game_tiers": [
                 {
                   "op": ">=",
@@ -6868,7 +6880,7 @@
               "bl_points": 1,
               "rps_wins": 3,
               "sl_symbols": 6,
-              "game_intro": "\ud83c\udf88 **[user]** plays **Don't Pop It** \u2014 reveal safe cells for points, or cash out before you hit a balloon! [user] can use this command [cmd_remain] more times.",
+              "game_intro": "\ud83c\udf88 **[user]** plays **Don't Pop It** \u2014 reveal safe cells for points, or cash out before you hit a balloon![cmd_remain_note]",
               "game_tiers": [
                 {
                   "op": ">=",
@@ -6970,7 +6982,7 @@
               "bl_points": 1,
               "rps_wins": 3,
               "sl_symbols": 6,
-              "game_intro": "\u270a\u270b\u270c\ufe0f **[user]** challenges the bot to **Rock-Paper-Scissors** \u2014 first to 3! [user] can use this command [cmd_remain] more times.",
+              "game_intro": "\u270a\u270b\u270c\ufe0f **[user]** challenges the bot to **Rock-Paper-Scissors** \u2014 first to 3![cmd_remain_note]",
               "game_tiers": [
                 {
                   "op": ">=",
@@ -7056,7 +7068,7 @@
               "bl_points": 1,
               "rps_wins": 3,
               "sl_symbols": 6,
-              "game_intro": "\ud83c\udfb0 **[user]** pulls the lever\u2026  [user] can use this command [cmd_remain] more times.",
+              "game_intro": "\ud83c\udfb0 **[user]** pulls the lever\u2026[cmd_remain_note]",
               "game_tiers": [
                 {
                   "op": ">=",
@@ -7142,7 +7154,7 @@
               "bl_points": 1,
               "rps_wins": 3,
               "sl_symbols": 6,
-              "game_intro": "\ud83c\udccf **[user]** sits down at the blackjack table\u2026  [user] can use this command [cmd_remain] more times.",
+              "game_intro": "\ud83c\udccf **[user]** sits down at the blackjack table\u2026[cmd_remain_note]",
               "game_tiers": [
                 {
                   "op": ">=",
@@ -7481,7 +7493,7 @@
               }
             ],
             "luck": null,
-            "intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it! [user] can use this command [cmd_remain] more times.",
+            "intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it![cmd_remain_note]",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []
@@ -7578,7 +7590,7 @@
               }
             ],
             "luck": null,
-            "intro": "\ud83e\udde0 **[user]** takes on **Simon** \u2014 memorize the sequence, then repeat it![user] can use this command [cmd_remain] more times. ",
+            "intro": "\ud83e\udde0 **[user]** takes on **Simon** \u2014 memorize the sequence, then repeat it![cmd_remain_note] ",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []
@@ -7659,7 +7671,7 @@
               }
             ],
             "luck": null,
-            "intro": "\ud83c\udf88 **[user]** plays **Don't Pop It** \u2014 reveal safe cells for points, or cash out before you hit a balloon! [user] can use this command [cmd_remain] more times.",
+            "intro": "\ud83c\udf88 **[user]** plays **Don't Pop It** \u2014 reveal safe cells for points, or cash out before you hit a balloon![cmd_remain_note]",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []
@@ -7722,7 +7734,7 @@
               }
             ],
             "luck": null,
-            "intro": "\u270a\u270b\u270c\ufe0f **[user]** challenges the bot to **Rock-Paper-Scissors** \u2014 first to 3! [user] can use this command [cmd_remain] more times.",
+            "intro": "\u270a\u270b\u270c\ufe0f **[user]** challenges the bot to **Rock-Paper-Scissors** \u2014 first to 3![cmd_remain_note]",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []
@@ -7785,7 +7797,7 @@
               }
             ],
             "luck": null,
-            "intro": "\ud83c\udfb0 **[user]** pulls the lever\u2026  [user] can use this command [cmd_remain] more times.",
+            "intro": "\ud83c\udfb0 **[user]** pulls the lever\u2026[cmd_remain_note]",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []
@@ -7862,7 +7874,7 @@
               }
             ],
             "luck": null,
-            "intro": "\ud83c\udccf **[user]** sits down at the blackjack table\u2026  [user] can use this command [cmd_remain] more times.",
+            "intro": "\ud83c\udccf **[user]** sits down at the blackjack table\u2026[cmd_remain_note]",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []

@@ -1964,6 +1964,25 @@ class Engine:
                     finally:
                         self._inline_depth -= 1
                     continue
+                if typ == "notify":
+                    # Put a line on the NOTIFY overlay from anywhere — a command,
+                    # an event ROUND, a minigame tier. Rounds fire the pump
+                    # without ever going through run_custom, so this is the only
+                    # way they can announce themselves on the stream.
+                    if self.notify_cb is not None:
+                        line = (a.get("message") or "").strip()
+                        if line:
+                            try:
+                                await self.notify_cb(line, {
+                                    **xc,
+                                    "user": xc.get("user") or who or "",
+                                    "mention": xc.get("mention")
+                                               or self._mention(uid, who or ""),
+                                    "command": xc.get("command") or hdr or name,
+                                })
+                            except Exception as ex:  # noqa: BLE001
+                                self._log("error", f"{name}: notify row failed: {ex}")
+                    continue
                 if typ == "capacity":
                     op = (a.get("capacity_op") or "add").lower()
                     val = float(a.get("capacity_value") or 0)
@@ -2313,7 +2332,8 @@ class Engine:
                             extra_ctx=dict(xc), cmdkey=cmdkey)
                         # a fire/roll inside the outcome publishes [secs] etc. onward
                         for k in ("secs", "seconds", "secs2capacity", "result", "total",
-                                  "dice", "sides", "timer", "total_secs", "total_seconds"):
+                                  "dice", "sides", "timer", "total_secs", "total_seconds",
+                                  "fired_desc", "command_overlay_desc", "device"):
                             if k in (sub or {}):
                                 xc[k] = sub[k]
                     continue
@@ -2390,6 +2410,7 @@ class Engine:
                     # smart plug ("P3"), `name` is what it drives ("Gut Buster").
                     # Same order as devName() in the panel.
                     _nm = ((_d.get("name") or "").strip() or (_d.get("label") or "").strip())
+                    xc["device"] = _nm or ""        # [device] on its own
                     _bit = f"+{dur:g}s" + (f" to {_nm}" if _nm else "")
                     xc["fired_desc"] = ((xc.get("fired_desc") + " · ") if xc.get("fired_desc") else "") + _bit
                     # the same phrase the notify overlay uses, so a MESSAGE row
@@ -3874,7 +3895,7 @@ class Engine:
             return {"ok": False, "silent": True}  # dice disabled in this range
         cd, scope = self._range_cd_scope(self.range_for(self.capacity), "roll")
         key_uid = str(uid) if scope == "user" else "*"
-        exempt = uid is not None and self._is_exempt(uid, who)
+        exempt = as_owner or (uid is not None and self._is_exempt(uid, who))
         if uid is not None and not exempt:
             remaining = self.cooldown_remaining(key_uid, "roll")
             if remaining > 0:
@@ -3913,12 +3934,13 @@ class Engine:
                 **p, "reply": reply, "reply_anon": reply_anon,
                 "announce": self.render(p["announce"]) if p.get("announce") else ""}
 
-    async def run_custom(self, cmd: dict, who: str, uid: str | None) -> dict:
+    async def run_custom(self, cmd: dict, who: str, uid: str | None,
+                         as_owner: bool = False) -> dict:
         """Run a command, then play its notification overlay line if it has
         one. Wrapping the dispatcher means every command TYPE gets this for
         free, and a run that was blocked (paused, cooldown, intro, gated)
         never announces itself."""
-        res = await self._run_custom(cmd, who, uid)
+        res = await self._run_custom(cmd, who, uid, as_owner=as_owner)
         try:
             # A minigame command PARKS here — nothing has happened yet. Hold the
             # notification until the game resolves, or it would announce the
@@ -3931,7 +3953,13 @@ class Engine:
                     "command": self._cmd_display(cmd.get("name", "")),
                     "who": who, "uid": uid, "at": time.monotonic()}
                 return res
-            if res.get("ok") and cmd.get("notify_enabled") and self.notify_cb:
+            # A command whose declared events ALL failed to start (on cooldown,
+            # already running) and which fired nothing has done nothing at all —
+            # announcing "X triggered !agroulette" then is just noise.
+            dead = (bool(cmd.get("start_events"))
+                    and not res.get("activated")
+                    and not (res.get("fired_desc") or "").strip())
+            if res.get("ok") and not dead and cmd.get("notify_enabled") and self.notify_cb:
                 line = (cmd.get("notify") or "").strip()
                 if line:
                     # [command_overlay_desc] is what the command DID — only
@@ -3948,7 +3976,8 @@ class Engine:
             self._log("error", f"{cmd.get('name')}: notify overlay failed: {e}")
         return res
 
-    async def _run_custom(self, cmd: dict, who: str, uid: str | None) -> dict:
+    async def _run_custom(self, cmd: dict, who: str, uid: str | None,
+                          as_owner: bool = False) -> dict:
         typ = (cmd.get("type") or "fire").lower()
         name = cmd.get("name", "command")
 
@@ -4021,7 +4050,8 @@ class Engine:
         # still subject to the in-progress event guard). A granted command runs
         # under the same exemption so a prize's charges are the ONLY limit — e.g.
         # 3 back-to-back rolls with the cooldown bypassed.
-        owner_exempt = (uid is not None and self._is_exempt(uid, who)) or winner_granted
+        owner_exempt = (as_owner or (uid is not None and self._is_exempt(uid, who))
+                        or winner_granted)
         # Per-person session use budget (carries across ranges, never replenishes).
         cmdkey_uses = name.lower()
         left = self.cmd_uses_left(uid, cmdkey_uses) if (uid is not None and not owner_exempt) else None
@@ -4040,6 +4070,17 @@ class Engine:
                 return "unlimited"
             r = self.cmd_uses_left(uid, cmdkey_uses)
             return "unlimited" if r is None else r
+
+        def _remain_note():
+            """The whole clause, or NOTHING when there is no limit to report.
+            "[cmd_remain] more times" reads as "unlimited more times" on an
+            uncapped command, which is most of them — this disappears instead."""
+            if owner_exempt:
+                return ""
+            r = self.cmd_uses_left(uid, cmdkey_uses)
+            if r is None:
+                return ""
+            return f" · {r} use{'' if r == 1 else 's'} left"
 
         if typ == "say":
             # Say commands respect cooldowns like every other type (the shipped
@@ -4076,7 +4117,7 @@ class Engine:
             cmdkey = name.lower()
             cd, scope = self._range_cd_scope(self.range_for(self.capacity), cmdkey)
             key_uid = str(uid) if scope == "user" else "*"
-            exempt = uid is not None and self._is_exempt(uid, who)
+            exempt = as_owner or (uid is not None and self._is_exempt(uid, who))
             if uid is not None and not exempt:
                 remaining = self.cooldown_remaining(key_uid, cmdkey)
                 if remaining > 0:
@@ -4093,11 +4134,17 @@ class Engine:
                         self._touch_cooldown(key_uid, cmdkey, cd)
             elif uid is not None:
                 self._track_user(uid, who)
+            # [cmd_remain] was only ever fed to the REPLY template, so a message
+            # ROW inside the block rendered it literally. The use is already
+            # spent above, so this is the same number the reply would show.
             bctx = await self._run_action_block(cmd.get("actions"), f"{name} by {who}",
-                                                hdr=name, uid=uid, who=who, cmdkey=cmdkey)
+                                                hdr=name, uid=uid, who=who, cmdkey=cmdkey,
+                                                extra_ctx={"cmd_remain": _remain(),
+                                                           "cmd_remain_note": _remain_note()})
             anon = self._anon_label()
             tmpl = cmd.get("reply") or ""   # legacy pre-v10 replies — [secs]/[result] flow in
-            base = {**(bctx or {}), "cmd_remain": _remain()}
+            base = {**(bctx or {}), "cmd_remain": _remain(),
+                    "cmd_remain_note": _remain_note()}
             game = (bctx or {}).get("__game")
             if game:
                 # The block hit a minigame row and parked itself. Hand the game
@@ -4113,6 +4160,7 @@ class Engine:
                                               "mention": self._mention(uid, who)})}
             return {"ok": True, "device": True, "started": True, "events_posted": ev_posts,
                     "fired_desc": (bctx or {}).get("fired_desc", ""),
+                    "activated": activated,
                     "reply": self.render(tmpl, {**base, "user": who, "mention": self._mention(uid, who)}),
                     "reply_anon": self.render(tmpl, {**base, "user": anon, "mention": anon})}
 
@@ -4167,7 +4215,7 @@ class Engine:
             cmdkey = name.lower()
             cd, scope = self._range_cd_scope(self.range_for(self.capacity), cmdkey)
             key_uid = str(uid) if scope == "user" else "*"
-            exempt = uid is not None and self._is_exempt(uid, who)
+            exempt = as_owner or (uid is not None and self._is_exempt(uid, who))
             if uid is not None and not exempt:
                 remaining = self.cooldown_remaining(key_uid, cmdkey)
                 if remaining > 0:
@@ -4229,7 +4277,7 @@ class Engine:
         cmdkey = name.lower()
         cd, scope = self._range_cd_scope(self.range_for(self.capacity), cmdkey)
         key_uid = str(uid) if scope == "user" else "*"
-        exempt = uid is not None and self._is_exempt(uid, who)
+        exempt = as_owner or (uid is not None and self._is_exempt(uid, who))
         if uid is not None and not exempt:
             remaining = self.cooldown_remaining(key_uid, cmdkey)
             if remaining > 0:
@@ -4873,8 +4921,11 @@ class Engine:
             self._events_done.discard(key)
             self._event_fires.pop(key, None)   # fresh loop count for this activation
             activated += 1
-            if uid is not None:
-                self._event_activator[key] = (uid, who)   # credit this person for the event's pumps
+            if uid is not None or (who or "").strip():
+                # credit this person for the event's pumps (uid), and let the
+                # rounds say who set it off (who) — the operator's own chat box
+                # has no uid, which used to leave [user] blank in every round
+                self._event_activator[key] = (uid, who)
             am = (ev.get("activation_message") or "").strip()   # legacy pre-v10 (now a block)
             if am:
                 posts.append(hdr + self.render(am, self._event_ctx(ev)))
@@ -4909,9 +4960,12 @@ class Engine:
         except (TypeError, ValueError):
             cap = 0
         name = (ev.get("name") or "").strip()
+        # whoever set this event running — so its rounds can say [user]
+        act = self._event_activator.get(name.lower()) or (None, "")
         return {"event": name, "loop_timer": f"{every:g}",
                 "total_loops": ("∞" if cap <= 0 else str(cap)),
-                "current_loop": self._event_fires.get(name.lower(), 0)}
+                "current_loop": self._event_fires.get(name.lower(), 0),
+                "user": act[1] or "", "mention": self._mention(act[0], act[1] or "")}
 
     def session_reset(self) -> None:
         """Full session reset: capacity→0, clear all cooldowns, revert any
