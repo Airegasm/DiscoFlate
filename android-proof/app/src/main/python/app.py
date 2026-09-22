@@ -33,6 +33,7 @@ from aiohttp import web
 
 import camera
 import config_store
+import media_len
 import stage
 import pumpdirect_import
 import kasa_legacy as kasa
@@ -228,6 +229,20 @@ def _mask_vendors(vendors: dict) -> dict:
     return out
 
 
+def _group_lengths(raw: dict) -> dict:
+    """{group name: {seconds, unknown, items}} for the LIVE scene's groups."""
+    scene = raw.get("chat_scene", "")
+    scn = next((s for s in (raw.get("scenes") or [])
+                if str(s.get("name") or "").strip().lower()
+                == str(scene or "").strip().lower()), None)
+    names = set(x for x in (scn or {}).get("groups") or [] if str(x).strip())
+    for o in list((scn or {}).get("overlays") or []) + list(raw.get("scene_globals") or []):
+        g = str(o.get("group") or "").strip()
+        if g:
+            names.add(g)
+    return {g: media_len.group_seconds(raw, scene, g, IMAGES_DIR) for g in sorted(names)}
+
+
 def _public_state(engine: Engine, botmgr: BotManager) -> dict:
     # RESOLVED: the panel must show the rules the live scene is actually
     # playing by, not the stale top-level copy they were migrated from.
@@ -320,6 +335,9 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "chat_scene": cfg.get("chat_scene", ""),
         "vcam_mirror": bool(cfg.get("vcam_mirror", True)),
         "standby_text": cfg.get("standby_text", "STARTING SOON"),
+        # How long each scene group needs on screen before it cuts its own
+        # content off, so a stage can't be set shorter than the clip it plays.
+        "group_seconds": _group_lengths(raw),
         "vcam_device": cfg.get("vcam_device", 0),
         "vcam_size": cfg.get("vcam_size", "1280x720"),
         "golive": engine.golive(),

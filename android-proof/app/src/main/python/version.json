@@ -1,6 +1,6 @@
 {
-  "version": "3.78.0",
-  "versionCode": 166,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.78.0/discoflate-v3.78.0.apk",
-  "notes": "DiscoFlate v3.78.0 \u2014 going LIVE with an intro no longer announces the session over the top of its own countdown. The activation message and its [!command] fires now wait for the pre-show to finish, and switching off mid-intro tears the pre-show down without bringing the main look up on a feed that is about to go dark."
+  "version": "3.79.0",
+  "versionCode": 167,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.79.0/discoflate-v3.79.0.apk",
+  "notes": "DiscoFlate v3.79.0 \u2014 an intro stage can no longer be set shorter than the clip its scene group plays. Each stage row shows what its group needs (read from the actual video/audio files) and snaps a too-short length up, telling you why. 0 still means 'hold until I press Next stage'. Files we can't measure are named rather than silently counted as zero."
 }

@@ -3375,6 +3375,7 @@ function glStageRows(){
       `<span class="muted" style="min-width:58px">Stage ${i+1}</span>`+
       `<label class="field"><select data-gls="${i}" style="width:170px" onchange="glStageSet(${i},'group',this.value)"></select></label>`+
       `<label class="field">Length <input type="number" min="0" step="5" value="${+st.seconds||0}" style="width:90px" onchange="glStageSet(${i},'seconds',this.value)"></label>`+
+      glStageNeed(st)+
       `<button class="ghost" title="move earlier" ${i===0?'disabled':''} onclick="glStageMove(${i},-1)">▲</button>`+
       `<button class="ghost" title="move later" ${i===glStages.length-1?'disabled':''} onclick="glStageMove(${i},1)">▼</button>`+
       `<button class="ghost" title="remove this stage" onclick="glStageDel(${i})">✕</button>`+
@@ -3386,10 +3387,41 @@ function glStageRows(){
     sel.value = st.group||'';
   });
 }
+// How long this stage's group needs before it cuts its own content off —
+// measured server-side from the media each overlay actually plays.
+function glStageMin(group){
+  const g=(lastState.group_seconds||{})[String(group||'').trim()];
+  return g ? {secs:+g.seconds||0, unknown:g.unknown||[], items:g.items||0}
+           : {secs:0, unknown:[], items:0};
+}
+function glStageNeed(st){
+  const m=glStageMin(st.group);
+  const cur=+st.seconds||0;
+  if(!m.secs && !m.unknown.length) return '';
+  const bits=[];
+  if(m.secs) bits.push(`needs ${m.secs}s`);
+  if(m.unknown.length) bits.push(`couldn't read ${m.unknown.join(', ')}`);
+  const short = m.secs && cur>0 && cur<m.secs;
+  return `<span class="muted" style="font-size:12px;${short?'color:var(--warn);font-weight:700':''}" `+
+    `title="The longest thing this group plays. A shorter stage cuts it off. 0 = hold until you press Next stage.">`+
+    `${short?'⚠ ':''}${bits.join(' · ')}</span>`;
+}
 function glStageSet(i,k,v){
   if(!glStages[i]) return;
-  glStages[i][k] = k==='seconds' ? Math.max(0, parseInt(v,10)||0) : v;
-  scheduleSave(); if(k!=='seconds') glStageRows();
+  if(k==='seconds'){
+    let n=Math.max(0, parseFloat(v)||0);
+    const m=glStageMin(glStages[i].group);
+    // 0 means "hold until I press Next", which is always allowed. Any other
+    // value can't be shorter than the group's own content.
+    if(n>0 && m.secs && n<m.secs){
+      n=m.secs;
+      toastMsg(`⏱ Stage ${i+1} holds ${m.secs}s — that's how long "${glStages[i].group}" plays for.`);
+    }
+    glStages[i].seconds=n;
+  } else {
+    glStages[i][k]=v;
+  }
+  scheduleSave(); glStageRows();
 }
 function glStageAdd(){ glStages.push({group:'',seconds:15}); glStageRows(); scheduleSave(); }
 function glStageDel(i){ glStages.splice(i,1); glStageRows(); scheduleSave(); }
