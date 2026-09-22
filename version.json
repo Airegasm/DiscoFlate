@@ -1,6 +1,6 @@
 {
-  "version": "3.77.0",
-  "versionCode": 165,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.77.0/discoflate-v3.77.0.apk",
-  "notes": "DiscoFlate v3.77.0 \u2014 the canvas now previews text with its placeholders RESOLVED, so what you size is the length that actually goes out ([syscom_help] previewed nearly twice as wide as the !aghelp it becomes). New 'dead centre' tick keeps an overlay centred however the text resolves, and the shipped intro card is now three big centred lines matching STARTING SOON."
+  "version": "3.78.0",
+  "versionCode": 166,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.78.0/discoflate-v3.78.0.apk",
+  "notes": "DiscoFlate v3.78.0 \u2014 going LIVE with an intro no longer announces the session over the top of its own countdown. The activation message and its [!command] fires now wait for the pre-show to finish, and switching off mid-intro tears the pre-show down without bringing the main look up on a feed that is about to go dark."
 }

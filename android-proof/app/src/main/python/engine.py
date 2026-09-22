@@ -1394,9 +1394,14 @@ class Engine:
         if self._intro_open:
             await self.end_intro(reason="timer")
 
-    async def end_intro(self, reason: str = "manual") -> bool:
+    async def end_intro(self, reason: str = "manual", go_live: bool = True) -> bool:
         """Close the pre-show and start the real session: clear the intro
-        scene group, release commands, and let the timed events go."""
+        scene group, release commands, and let the timed events go.
+
+        `go_live=False` tears the pre-show DOWN without handing over — the
+        session is being switched off mid-intro, so bringing the after-group up
+        would put the main look on a feed that is about to go dark.
+        """
         if not self._intro_open:
             return False
         self._intro_open = False
@@ -1418,15 +1423,16 @@ class Engine:
                 self._log("error", f"clearing the intro failed: {e}")
         # Hand over to the main look: whatever group you nominated comes up as
         # the intro clears, so the feed is never bare between the two.
-        after = (g.get("after_group") or "").strip()
+        after = (g.get("after_group") or "").strip() if go_live else ""
         if after and after != grp and self.overlay_cb is not None:
             try:
                 self.overlay_cb({"group": after, "mode": "",
                                  "fade_in": g.get("fade_in") or 0.4})
             except Exception as e:  # noqa: BLE001
                 self._log("error", f"after-intro group failed: {e}")
-        self._log("bot", f"INTRO ended ({reason}) — the session is live"
-                  + (f", showing '{after}'" if after else ""))
+        self._log("bot", (f"INTRO ended ({reason}) — the session is live"
+                          + (f", showing '{after}'" if after else ""))
+                  if go_live else f"INTRO stopped ({reason})")
         if self.intro_done_cb:
             try:
                 await self.intro_done_cb()

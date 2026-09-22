@@ -1207,30 +1207,23 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                else cfg.get("listener_message_off")) or "").strip()
         footer = f"-# DiscoFlate v{VERSION} by AireGasm"
         footer_plain = f"DiscoFlate v{VERSION} by AireGasm"
-        if enabled:
-            # STRICT activation order: 1) the ON message posts, 2) its
-            # [!command] tokens fire, 3) events release their first rounds.
-            # (Events are held by the engine's activation hold until step 3.)
-            if msg:
-                text = engine.render(engine.strip_inline(msg))
-                if text.strip():
-                    if cfg.get("listener_on_embed"):
-                        ttl = engine.render((cfg.get("listener_on_title") or "").strip()) or "🟢 Activation ON"
-                        await botmgr.post_embed(ttl, text, footer=footer_plain)
-                    else:
-                        await botmgr.announce(f"{text}\n{footer}", None)
-                await engine.fire_inline(msg)
-            # Go Live: an intro HOLDS the game (commands + events) until it
-            # ends; otherwise the session starts right now.
-            async def _go_live():
-                engine.finish_activation()
-            engine.intro_done_cb = _go_live
-            started = await engine.start_intro(
-                announce_cb=lambda t, img=None: botmgr.announce(t, img))
-            if not started:
-                engine.finish_activation()
-        elif msg:
+        async def _say_on():
+            """The ON message, then its [!command] tokens — in that order."""
+            if not msg:
+                return
+            text = engine.render(engine.strip_inline(msg))
+            if text.strip():
+                if cfg.get("listener_on_embed"):
+                    ttl = engine.render((cfg.get("listener_on_title") or "").strip()) or "🟢 Activation ON"
+                    await botmgr.post_embed(ttl, text, footer=footer_plain)
+                else:
+                    await botmgr.announce(f"{text}\n{footer}", None)
+            await engine.fire_inline(msg)
+
+        async def _say_off():
             # OFF message renders text only — no fires, the session is closing.
+            if not msg:
+                return
             text = engine.render(msg)
             if text.strip():
                 if cfg.get("listener_off_embed"):
@@ -1238,6 +1231,29 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                     await botmgr.post_embed(ttl, text, footer=footer_plain)
                 else:
                     await botmgr.announce(f"{text}\n{footer}", None)
+
+        if enabled:
+            # STRICT activation order: 1) the ON message posts, 2) its
+            # [!command] tokens fire, 3) events release their first rounds.
+            # With an INTRO the whole lot waits for the pre-show to finish —
+            # announcing the session and firing its commands over the top of a
+            # countdown is the one thing an intro exists to prevent.
+            async def _go_live():
+                await _say_on()
+                engine.finish_activation()
+            engine.intro_done_cb = _go_live
+            started = await engine.start_intro(
+                announce_cb=lambda t, img=None: botmgr.announce(t, img))
+            if not started:          # no intro — the session starts right now
+                await _say_on()
+                engine.finish_activation()
+        else:
+            # Flipping off mid-intro: tear the pre-show down FIRST, so the
+            # sign-off doesn't post underneath a countdown that is still up.
+            if engine.intro_active() or engine.intro_pending():
+                engine.intro_done_cb = None      # this is a stop, not a start
+                await engine.end_intro("listener off", go_live=False)
+            await _say_off()
         return web.json_response(_public_state(engine, botmgr))
 
     async def command_toggle(request):
