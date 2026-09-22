@@ -1,6 +1,6 @@
 {
-  "version": "3.72.0",
-  "versionCode": 157,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.72.0/discoflate-v3.72.0.apk",
-  "notes": "DiscoFlate v3.72.0 \u2014 the notification overlay stops showing its placeholder text on the stream the moment the intro ends: it now only ever appears when something actually notifies. Restyled to the bottom-left corner, white on blue, 3 seconds, rising and fading as it goes. A new per-command tickbox, 'say what it did', fills [command_overlay_desc] with the seconds really delivered and the pump they went to \u2014 e.g. '+5s to Belly'."
+  "version": "3.72.1",
+  "versionCode": 158,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.72.1/discoflate-v3.72.1.apk",
+  "notes": "DiscoFlate v3.72.1 \u2014 the notification overlay names the PUMP rather than the smart plug it is wired to, and every shipped fire command's notification line actually carries [command_overlay_desc] so the new 'say what it did' tickbox has somewhere to show."
 }
