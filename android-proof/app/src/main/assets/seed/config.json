@@ -1491,7 +1491,8 @@
         }
       ],
       "notify_enabled": true,
-      "notify": "[user] just triggered [command]"
+      "notify": "[user] triggered [command] [command_overlay_desc]",
+      "notify_desc": true
     },
     {
       "name": "agroulette",
@@ -1553,13 +1554,14 @@
       "success_reply": "",
       "failure_reply": "",
       "notify_enabled": true,
-      "notify": "[user] just triggered [command]",
+      "notify": "[user] triggered [command] [command_overlay_desc]",
       "actions": [
         {
           "type": "minigame",
           "minigame": "mg:38259041"
         }
-      ]
+      ],
+      "notify_desc": true
     },
     {
       "name": "agsimon",
@@ -1585,13 +1587,14 @@
       "success_reply": "",
       "failure_reply": "",
       "notify_enabled": true,
-      "notify": "[user] just triggered [command]",
+      "notify": "[user] triggered [command] [command_overlay_desc]",
       "actions": [
         {
           "type": "minigame",
           "minigame": "mg:0ceb8266"
         }
-      ]
+      ],
+      "notify_desc": true
     },
     {
       "name": "agpopit",
@@ -1617,13 +1620,14 @@
       "success_reply": "",
       "failure_reply": "",
       "notify_enabled": true,
-      "notify": "[user] just triggered [command]",
+      "notify": "[user] triggered [command] [command_overlay_desc]",
       "actions": [
         {
           "type": "minigame",
           "minigame": "mg:1c2ae90f"
         }
-      ]
+      ],
+      "notify_desc": true
     },
     {
       "name": "agrps",
@@ -1649,13 +1653,14 @@
       "success_reply": "",
       "failure_reply": "",
       "notify_enabled": true,
-      "notify": "[user] just triggered [command]",
+      "notify": "[user] triggered [command] [command_overlay_desc]",
       "actions": [
         {
           "type": "minigame",
           "minigame": "mg:b445be49"
         }
-      ]
+      ],
+      "notify_desc": true
     },
     {
       "name": "agpull",
@@ -1681,13 +1686,14 @@
       "success_reply": "",
       "failure_reply": "",
       "notify_enabled": true,
-      "notify": "[user] just triggered [command]",
+      "notify": "[user] triggered [command] [command_overlay_desc]",
       "actions": [
         {
           "type": "minigame",
           "minigame": "mg:babbe5d0"
         }
-      ]
+      ],
+      "notify_desc": true
     },
     {
       "name": "agblackjack",
@@ -1713,13 +1719,14 @@
       "success_reply": "",
       "failure_reply": "",
       "notify_enabled": true,
-      "notify": "[user] just triggered [command]",
+      "notify": "[user] triggered [command] [command_overlay_desc]",
       "actions": [
         {
           "type": "minigame",
           "minigame": "mg:f235ece3"
         }
-      ]
+      ],
+      "notify_desc": true
     },
     {
       "name": "agroll",
@@ -1736,7 +1743,8 @@
         }
       ],
       "notify_enabled": true,
-      "notify": "[user] just triggered [command]"
+      "notify": "[user] triggered [command] [command_overlay_desc]",
+      "notify_desc": true
     },
     {
       "name": "superpump",
@@ -1872,12 +1880,7 @@
       "clean_previous": false,
       "cooldown": null,
       "post_actions": [],
-      "actions": [
-        {
-          "type": "broadcast",
-          "broadcast": "NoCap"
-        }
-      ]
+      "actions": []
     },
     {
       "name": "Nozzle",
@@ -1889,12 +1892,7 @@
       "clean_previous": false,
       "cooldown": null,
       "post_actions": [],
-      "actions": [
-        {
-          "type": "broadcast",
-          "broadcast": "Plugged"
-        }
-      ]
+      "actions": []
     }
   ],
   "event_in_process_message": "\u23f3 [event] is already running.",
@@ -3225,7 +3223,8 @@
               }
             ],
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]"
+            "notify": "[user] triggered [command] [command_overlay_desc]",
+            "notify_desc": true
           },
           {
             "name": "agroulette",
@@ -3287,13 +3286,14 @@
             "success_reply": "",
             "failure_reply": "",
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]",
+            "notify": "[user] triggered [command] [command_overlay_desc]",
             "actions": [
               {
                 "type": "minigame",
                 "minigame": "mg:38259041"
               }
-            ]
+            ],
+            "notify_desc": true
           },
           {
             "name": "agsimon",
@@ -3319,13 +3319,14 @@
             "success_reply": "",
             "failure_reply": "",
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]",
+            "notify": "[user] triggered [command] [command_overlay_desc]",
             "actions": [
               {
                 "type": "minigame",
                 "minigame": "mg:0ceb8266"
               }
-            ]
+            ],
+            "notify_desc": true
           },
           {
             "name": "agpopit",
@@ -3351,13 +3352,14 @@
             "success_reply": "",
             "failure_reply": "",
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]",
+            "notify": "[user] triggered [command] [command_overlay_desc]",
             "actions": [
               {
                 "type": "minigame",
                 "minigame": "mg:1c2ae90f"
               }
-            ]
+            ],
+            "notify_desc": true
           },
           {
             "name": "agrps",
@@ -3383,13 +3385,14 @@
             "success_reply": "",
             "failure_reply": "",
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]",
+            "notify": "[user] triggered [command] [command_overlay_desc]",
             "actions": [
               {
                 "type": "minigame",
                 "minigame": "mg:b445be49"
               }
-            ]
+            ],
+            "notify_desc": true
           },
           {
             "name": "agpull",
@@ -3415,13 +3418,14 @@
             "success_reply": "",
             "failure_reply": "",
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]",
+            "notify": "[user] triggered [command] [command_overlay_desc]",
             "actions": [
               {
                 "type": "minigame",
                 "minigame": "mg:babbe5d0"
               }
-            ]
+            ],
+            "notify_desc": true
           },
           {
             "name": "agblackjack",
@@ -3447,13 +3451,14 @@
             "success_reply": "",
             "failure_reply": "",
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]",
+            "notify": "[user] triggered [command] [command_overlay_desc]",
             "actions": [
               {
                 "type": "minigame",
                 "minigame": "mg:f235ece3"
               }
-            ]
+            ],
+            "notify_desc": true
           },
           {
             "name": "agroll",
@@ -3470,7 +3475,8 @@
               }
             ],
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]"
+            "notify": "[user] triggered [command] [command_overlay_desc]",
+            "notify_desc": true
           },
           {
             "name": "superpump",
@@ -3866,12 +3872,7 @@
             "clean_previous": false,
             "cooldown": null,
             "post_actions": [],
-            "actions": [
-              {
-                "type": "broadcast",
-                "broadcast": "NoCap"
-              }
-            ]
+            "actions": []
           },
           {
             "name": "Nozzle",
@@ -3883,12 +3884,7 @@
             "clean_previous": false,
             "cooldown": null,
             "post_actions": [],
-            "actions": [
-              {
-                "type": "broadcast",
-                "broadcast": "Plugged"
-              }
-            ]
+            "actions": []
           }
         ],
         "capacity_events": [],
@@ -5839,7 +5835,8 @@
               }
             ],
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]"
+            "notify": "[user] triggered [command] [command_overlay_desc]",
+            "notify_desc": true
           },
           {
             "name": "agroulette",
@@ -5901,13 +5898,14 @@
             "success_reply": "",
             "failure_reply": "",
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]",
+            "notify": "[user] triggered [command] [command_overlay_desc]",
             "actions": [
               {
                 "type": "minigame",
                 "minigame": "mg:38259041"
               }
-            ]
+            ],
+            "notify_desc": true
           },
           {
             "name": "agsimon",
@@ -5933,13 +5931,14 @@
             "success_reply": "",
             "failure_reply": "",
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]",
+            "notify": "[user] triggered [command] [command_overlay_desc]",
             "actions": [
               {
                 "type": "minigame",
                 "minigame": "mg:0ceb8266"
               }
-            ]
+            ],
+            "notify_desc": true
           },
           {
             "name": "agpopit",
@@ -5965,13 +5964,14 @@
             "success_reply": "",
             "failure_reply": "",
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]",
+            "notify": "[user] triggered [command] [command_overlay_desc]",
             "actions": [
               {
                 "type": "minigame",
                 "minigame": "mg:1c2ae90f"
               }
-            ]
+            ],
+            "notify_desc": true
           },
           {
             "name": "agrps",
@@ -5997,13 +5997,14 @@
             "success_reply": "",
             "failure_reply": "",
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]",
+            "notify": "[user] triggered [command] [command_overlay_desc]",
             "actions": [
               {
                 "type": "minigame",
                 "minigame": "mg:b445be49"
               }
-            ]
+            ],
+            "notify_desc": true
           },
           {
             "name": "agpull",
@@ -6029,13 +6030,14 @@
             "success_reply": "",
             "failure_reply": "",
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]",
+            "notify": "[user] triggered [command] [command_overlay_desc]",
             "actions": [
               {
                 "type": "minigame",
                 "minigame": "mg:babbe5d0"
               }
-            ]
+            ],
+            "notify_desc": true
           },
           {
             "name": "agblackjack",
@@ -6061,13 +6063,14 @@
             "success_reply": "",
             "failure_reply": "",
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]",
+            "notify": "[user] triggered [command] [command_overlay_desc]",
             "actions": [
               {
                 "type": "minigame",
                 "minigame": "mg:f235ece3"
               }
-            ]
+            ],
+            "notify_desc": true
           },
           {
             "name": "agroll",
@@ -6084,7 +6087,8 @@
               }
             ],
             "notify_enabled": true,
-            "notify": "[user] just triggered [command]"
+            "notify": "[user] triggered [command] [command_overlay_desc]",
+            "notify_desc": true
           },
           {
             "name": "superpump",
@@ -6480,12 +6484,7 @@
             "clean_previous": false,
             "cooldown": null,
             "post_actions": [],
-            "actions": [
-              {
-                "type": "broadcast",
-                "broadcast": "NoCap"
-              }
-            ]
+            "actions": []
           },
           {
             "name": "Nozzle",
@@ -6497,12 +6496,7 @@
             "clean_previous": false,
             "cooldown": null,
             "post_actions": [],
-            "actions": [
-              {
-                "type": "broadcast",
-                "broadcast": "Plugged"
-              }
-            ]
+            "actions": []
           }
         ],
         "capacity_events": [],

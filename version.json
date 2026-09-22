@@ -1,6 +1,6 @@
 {
-  "version": "3.72.1",
-  "versionCode": 158,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.72.1/discoflate-v3.72.1.apk",
-  "notes": "DiscoFlate v3.72.1 \u2014 the notification overlay names the PUMP rather than the smart plug it is wired to, and every shipped fire command's notification line actually carries [command_overlay_desc] so the new 'say what it did' tickbox has somewhere to show."
+  "version": "3.73.0",
+  "versionCode": 159,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.73.0/discoflate-v3.73.0.apk",
+  "notes": "DiscoFlate v3.73.0 \u2014 anything that puts time on a pump now says so on the overlay, and a minigame announces its RESULT rather than the fact someone typed it. Roll and chance commands describe themselves like fire commands do; a minigame's notification is held back until the game finishes and its tier has fired, then reports the score and the seconds it won."
 }

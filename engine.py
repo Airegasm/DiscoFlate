@@ -75,6 +75,8 @@ class Engine:
         self.camera_cb = None           # app.py: start/stop/freeze/resume the vcam
         self.snapshot_cb = None         # app.py: post the current frame to chat
         self.notify_cb = None           # app.py: play a command's notify line
+        # token -> a notification waiting on a minigame to finish
+        self._notify_pending: dict[str, dict] = {}
         self.pause_overlay_cb = None    # app.py: cover/uncover the stream on pause
         self._runs: list = []            # live action-block cancel flags
         # Action blocks parked mid-run waiting on ONE player: token -> where to
@@ -1564,6 +1566,12 @@ class Engine:
             self._suspended.pop(tok, None)
         while len(self._suspended) >= self._MAX_PARKED:
             self._suspended.pop(next(iter(self._suspended)), None)
+        # a notification waiting on a game nobody finished ages out with it
+        for tok in [t for t, v in self._notify_pending.items()
+                    if now - v.get("at", now) > self._PARK_TTL]:
+            self._notify_pending.pop(tok, None)
+        while len(self._notify_pending) >= self._MAX_PARKED:
+            self._notify_pending.pop(next(iter(self._notify_pending)), None)
 
     def parked_row(self, token: str) -> dict | None:
         """The minigame row a parked block is waiting on (None if it's gone)."""
@@ -1585,6 +1593,7 @@ class Engine:
         """Forget every parked block — session reset / deactivation."""
         n = len(self._suspended)
         self._suspended.clear()
+        self._notify_pending.clear()     # and the notifications waiting on them
         return n
 
     async def _run_action_block(self, actions, name: str, hdr: str | None = None,
@@ -2383,6 +2392,9 @@ class Engine:
                     _nm = ((_d.get("name") or "").strip() or (_d.get("label") or "").strip())
                     _bit = f"+{dur:g}s" + (f" to {_nm}" if _nm else "")
                     xc["fired_desc"] = ((xc.get("fired_desc") + " · ") if xc.get("fired_desc") else "") + _bit
+                    # the same phrase the notify overlay uses, so a MESSAGE row
+                    # can say it in chat with the identical placeholder
+                    xc["command_overlay_desc"] = xc["fired_desc"]
                     if typ == "roll":
                         xc.update({"result": total, "total": total,
                                    "dice": f"{dice}d{sides}", "sides": sides})
@@ -3908,6 +3920,17 @@ class Engine:
         never announces itself."""
         res = await self._run_custom(cmd, who, uid)
         try:
+            # A minigame command PARKS here — nothing has happened yet. Hold the
+            # notification until the game resolves, or it would announce the
+            # command at the moment it was typed, with no result to report.
+            tok = res.get("resume_token") if res.get("game") else None
+            if tok and cmd.get("notify_enabled") and self.notify_cb:
+                self._notify_pending[str(tok)] = {
+                    "notify": (cmd.get("notify") or "").strip(),
+                    "desc_on": bool(cmd.get("notify_desc")),
+                    "command": self._cmd_display(cmd.get("name", "")),
+                    "who": who, "uid": uid, "at": time.monotonic()}
+                return res
             if res.get("ok") and cmd.get("notify_enabled") and self.notify_cb:
                 line = (cmd.get("notify") or "").strip()
                 if line:
@@ -4379,6 +4402,25 @@ class Engine:
                 best = (v, t)
         return best[1] if best else {}
 
+    async def notify_game_done(self, token: str, score=None, game: str | None = None,
+                               desc: str = "") -> None:
+        """Play the held notification for a minigame command, now that the game
+        has finished and its tier (and the rest of the block) have run. `desc`
+        is what all of that actually fired."""
+        p = self._notify_pending.pop(str(token or ""), None)
+        if not p or not self.notify_cb or not p.get("notify"):
+            return
+        try:
+            await self.notify_cb(p["notify"], {
+                "user": p["who"], "mention": self._mention(p["uid"], p["who"]),
+                "command": p["command"], "cmd": p["command"],
+                "score": score, "game": game or "",
+                "command_overlay_desc": (desc if p.get("desc_on") else ""),
+                "overlay_desc": (desc if p.get("desc_on") else ""),
+            })
+        except Exception as e:  # noqa: BLE001
+            self._log("error", f"minigame notify failed: {e}")
+
     async def resume_minigame(self, token: str, score, who: str, uid) -> dict:
         """A minigame ROW finished: run its winning tier, then carry on with the
         rest of the block that was waiting on it — for this player only."""
@@ -4434,11 +4476,12 @@ class Engine:
                 "secs2capacity": base["secs2capacity"]}
 
     async def run_actions(self, actions, name: str, uid=None, who: str | None = None,
-                          score=None, game: str | None = None) -> None:
+                          score=None, game: str | None = None) -> dict:
         """Public entry to run an action block from the bot layer (e.g. a minigame
-        tier's block, after its score line posts), crediting the player."""
+        tier's block, after its score line posts), crediting the player.
+        Returns the block's context, so the caller can see what it fired."""
         if not actions:
-            return
+            return {}
         xc = {}
         if uid is not None or who:
             xc["mention"] = self._mention(uid, who or "")
@@ -4447,9 +4490,10 @@ class Engine:
             xc["score"] = score
         if game:
             xc["game"] = game
-        await self._run_action_block(actions, name, hdr="🎮",
-                                     uid=(str(uid) if uid is not None else None),
-                                     who=who, extra_ctx=xc)
+        return await self._run_action_block(
+            actions, name, hdr="🎮",
+            uid=(str(uid) if uid is not None else None),
+            who=who, extra_ctx=xc) or {}
 
     async def _run_fires(self, fires, who: str, uid: str | None) -> list:
         """Fire each {device_id, seconds} row independently and concurrently.

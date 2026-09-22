@@ -1209,19 +1209,31 @@ class BotManager:
             if (res.get("real") or "").strip():   # tier message rows may replace the score line
                 await self._broadcast_named(res.get("real"), res.get("anon"), uid, label=label, who=who)
             # the winning tier's optional action block runs AFTER its result posts
+            bits = []
+            if res.get("secs") and float(res.get("secs") or 0) > 0:
+                bits.append(f"+{float(res['secs']):g}s")      # legacy tier fires
             if res.get("tier_actions"):
-                await self.engine.run_actions(res["tier_actions"], f"{label} tier",
-                                              uid=uid, who=who, score=res.get("score"),
-                                              game=label)
+                tier_ctx = await self.engine.run_actions(
+                    res["tier_actions"], f"{label} tier",
+                    uid=uid, who=who, score=res.get("score"), game=label)
+                if (tier_ctx or {}).get("fired_desc"):
+                    bits.append(tier_ctx["fired_desc"])
             # …and then the REST of the block that was waiting on this game,
             # for this player. Their score and the game's totals ride along so
             # later rows can use [score] / [secs] / [game].
             if token:
-                await self.engine.resume_block(token, {
+                rest = await self.engine.resume_block(token, {
                     "score": res.get("score"), "game": res.get("game") or label,
                     "secs": res.get("secs"), "seconds": res.get("seconds"),
                     "secs2capacity": res.get("secs2capacity"),
                     "luck": res.get("luck"), "user": who})
+                if (rest or {}).get("fired_desc"):
+                    bits.append(rest["fired_desc"])
+                # the command's notification was held back at typing time —
+                # play it now, with the score and everything the game fired
+                await self.engine.notify_game_done(
+                    token, score=res.get("score"), game=res.get("game") or label,
+                    desc=" · ".join(b for b in bits if b))
             # events the game's start_events activated (activation lines + any
             # fire_immediately first rounds) follow the result
             for post in (res.get("events_posted") or []):
