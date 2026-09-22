@@ -1,6 +1,6 @@
 {
-  "version": "3.69.1",
-  "versionCode": 154,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.69.1/discoflate-v3.69.1.apk",
-  "notes": "DiscoFlate v3.69.1 \u2014 Help and the README catch up with the scene model. The About section is gone, and every pointer to the removed Dashboard, Game tab and Gameplay Presets now names where things actually live."
+  "version": "3.70.0",
+  "versionCode": 155,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.70.0/discoflate-v3.70.0.apk",
+  "notes": "DiscoFlate v3.70.0 \u2014 audit fixes. Bonus Rounds now actually save (they were silently dropped on every write). Renaming a scene group follows every reference \u2014 the intro, the after-group, the pause overlay and every scene_group row \u2014 instead of quietly breaking your intro; renaming a command now also follows minigame tiers, prizes, range actions, chat buttons and the Go Live list. Adding a discovered device no longer errors. Any channel can be marked Announce only (receives broadcasts, ignores commands), replacing the single Announce channel. The typed !enter is gone \u2014 competitions are button-driven."
 }

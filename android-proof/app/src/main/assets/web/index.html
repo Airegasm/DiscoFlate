@@ -972,10 +972,9 @@
             <button class="ghost" onclick="loadGuilds()" title="Refresh server list from the bot">↻</button>
           </div>
           <div class="hint" style="margin-top:0">The bot must be connected for the lists to fill — click ↻ after inviting it somewhere new.
-            Events, milestones &amp; snapshots are announced in these same listen channels.</div>
+            Events, milestones &amp; snapshots go to these same channels. Tick <b>Announce only</b> on one to make it
+            receive broadcasts without accepting commands — a spectator or announcements channel.</div>
 
-          <label class="field" style="margin-top:6px">Announce channel <span class="muted">(optional — ALSO receives every broadcast: auto-reports, milestones, events, pause/resume)</span>
-            <select id="announceChan"><option value="">— none —</option></select></label>
           <label class="field" style="margin-top:6px">Cross-server label <span class="muted">(used only where the actor isn't a member)</span>
             <input id="anonLabel" placeholder="Someone on another server"></label>
           <div class="hint" style="margin-top:0">When a trigger is echoed to your other servers, DiscoFlate shows the person's <b>real name</b> in any server they're actually a member of (they'd be visible there anyway), and falls back to this label only in servers they're not in.</div>
@@ -1473,7 +1472,7 @@ esphome dashboard config/</code></pre>
             <tr><td><code>[session_leader]</code> / <code>[session_leader_score]</code></td><td>the top pumper this whole session and their capacity % — use <code>[session_leader]</code> as a target for an end-of-session special prize</td></tr>
             <tr><td><code>[on_message]</code> / <code>[off_message]</code></td><td>the configured Activation ON / OFF message text (rendered), for reuse in other messages</td></tr>
             <tr><td><code>[prefix]</code> <code>[capacity_cmd]</code> <code>[leaderboard_cmd]</code> <code>[pumptimer_cmd]</code></td><td>the system command names (e.g. <code>!capacity</code>)</td></tr>
-            <tr><td><code>[syscom_capacity]</code> <code>[syscom_help]</code> <code>[syscom_leaderboard]</code> <code>[syscom_leaderboard_life]</code> <code>[syscom_pumptimer]</code> <code>[syscom_vote]</code> <code>[syscom_enter]</code></td><td>every system command, <b>prefix included</b> and following any rename — e.g. <code>[syscom_help]</code> → <code>!aghelp</code>. Works in overlay text too, so a Text overlay can say “<code>[syscom_help]</code> for commands”.</td></tr>
+            <tr><td><code>[syscom_capacity]</code> <code>[syscom_help]</code> <code>[syscom_leaderboard]</code> <code>[syscom_leaderboard_life]</code> <code>[syscom_pumptimer]</code> <code>[syscom_vote]</code></td><td>every system command, <b>prefix included</b> and following any rename — e.g. <code>[syscom_help]</code> → <code>!aghelp</code>. Works in overlay text too, so a Text overlay can say “<code>[syscom_help]</code> for commands”.</td></tr>
             <tr><td><code>[count]</code> <code>[goal]</code> <code>[remaining]</code> <code>[counter]</code> <code>[prize]</code></td><td>Perfect Prize progress (in prize messages/blocks)</td></tr>
           </tbody></table>
         </div>
@@ -2380,7 +2379,7 @@ function renderStages(){
     if(rl) rl.title = stgGlobalMode ? 'globals preview at whatever scene is live' : ''; }
   if(s){
     $('#stgRes').value = `${s.width||1280}x${s.height||720}`;
-    renderStgPalette(); renderStgCanvas(); renderStgGroups(); renderStgContents(); renderStgProps();
+    renderStgPalette(); renderStgCanvas(); renderStgContents(); renderStgProps();
   }
   renderChatSceneSel(); sceneButtonsRefresh();
 }
@@ -2676,7 +2675,7 @@ function stgMoveTo(id){
     close();
     o.group=g||'';
     if(g){ const list=stgGroupList(); if(list && !list.includes(g)) list.push(g); }
-    renderStgCanvas(); renderStgGroups(); renderStgContents(); renderStgProps();
+    renderStgCanvas(); renderStgContents(); renderStgProps();
     sceneButtonsRefresh(); scheduleSave();
     toastMsg(g?`moved to “${g}”`:'moved out of its group');
   };
@@ -2800,7 +2799,7 @@ function stgGroupCopy(){
   const list=stgGroupList(); if(list && !list.includes(n)) list.push(n);
   if(stgGroupIsIntro(stgGroupFilter)) stgIntroGroups().push(n);   // a copy of an intro is an intro
   stgGroupFilter=n; stgRemember();
-  renderStgGroupPick(); renderStgContents(); renderStgCanvas(); renderStgGroups();
+  renderStgGroupPick(); renderStgContents(); renderStgCanvas();
   goliveUi(); scheduleSave();
   toastMsg(`📋 "${n}" — ${src.length} overlay${src.length===1?'':'s'} copied`);
 }
@@ -2827,7 +2826,7 @@ function stgGroupNew(){
   if(list && !list.some(g=>g.toLowerCase()===n.toLowerCase())) list.push(n);
   stgGroupFilter=n;                          // anything added now joins it
   stgRemember(); scheduleSave();             // an empty group is saved too
-  renderStgGroupPick(); renderStgContents(); renderStgGroups(); goliveUi();
+  renderStgGroupPick(); renderStgContents(); goliveUi();
   toastMsg(`🎬 "${n}" — overlays you add now join this group`);
 }
 function stgGroupRename(){
@@ -2843,8 +2842,37 @@ function stgGroupRename(){
   if(hi>=0) hid[hi]=n;
   const itr=stgIntroGroups(), ii=itr.findIndex(g=>String(g).toLowerCase()===stgGroupFilter.toLowerCase());
   if(ii>=0) itr[ii]=n;
+  renameGroupRefs(stgGroupFilter, n);
   stgGroupFilter=n; stgRemember();
-  renderStgGroupPick(); renderStgContents(); renderStgGroups(); goliveUi(); scheduleSave();
+  renderStgGroupPick(); renderStgContents(); goliveUi(); scheduleSave();
+}
+// A group name is referenced far outside the group itself: the intro stages
+// and after-group, the pause overlay, and every scene_group row in every
+// action block. Renaming without following those silently killed the intro.
+function renameGroupRefs(old, neu){
+  const o=String(old||'').trim().toLowerCase();
+  if(!o || !neu || o===String(neu).trim().toLowerCase()) return;
+  const same=v=>String(v||'').trim().toLowerCase()===o;
+
+  // the show: intro stages, the after-group, and the pause overlay
+  glStages.forEach(st=>{ if(same(st.group)) st.group=neu; });
+  const ga=$('#glAfter'); if(ga && same(ga.value)){ ga.dataset.want=neu; ga.value=neu; }
+  const op=$('#ovPause'); if(op && same(op.value)){ op.dataset.want=neu; op.value=neu; }
+
+  // every scene_group / scene_group_kill row, wherever it lives
+  const fix=a=>{ if((a.type==='scene_group'||a.type==='scene_group_kill') && same(a.group)) a.group=neu; };
+  (commandRows||[]).forEach(c=>{ _walkActs(c.actions,fix); (c.game_tiers||[]).forEach(t=>_walkActs(t.actions,fix)); });
+  (eventRows||[]).forEach(e=>{ _walkActs(e.activation_actions,fix); _walkActs(e.actions,fix); _walkActs(e.post_actions,fix); });
+  (capEvRows||[]).forEach(e=>{ _walkActs(e.actions,fix); _walkActs(e.post_actions,fix); });
+  (pollRows||[]).forEach(p=>(p.options||[]).forEach(x=>_walkActs(x.actions,fix)));
+  (compRows||[]).forEach(c=>{ _walkActs(c.win_actions,fix); _walkActs(c.no_winner_actions,fix); });
+  (bonusRoundRows||[]).forEach(b=>_walkActs(b.actions,fix));
+  (minigameRows||[]).forEach(g=>(g.tiers||[]).forEach(t=>_walkActs(t.actions,fix)));
+  (prizeRows||[]).forEach(p=>_walkActs(p.actions,fix));
+  (rangeRows||[]).forEach(r=>_walkActs(r.event_actions,fix));
+
+  renderCommands(); renderEvents(); renderCapEvents(); renderPolls();
+  renderCompetitions(); renderBonusRounds(); renderMinigames(); renderPrizes(); renderRanges();
 }
 function stgGroupDelete(){
   const s=stgStage(); if(!s||!stgGroupFilter||stgGroupFilter===STG_UNGROUPED){
@@ -2860,7 +2888,7 @@ function stgGroupDelete(){
   const itr=stgIntroGroups(), ii=itr.findIndex(g=>String(g).toLowerCase()===stgGroupFilter.toLowerCase());
   if(ii>=0) itr.splice(ii,1);
   stgGroupFilter=''; stgRemember();
-  renderStgGroupPick(); renderStgContents(); renderStgGroups(); goliveUi(); scheduleSave();
+  renderStgGroupPick(); renderStgContents(); goliveUi(); scheduleSave();
 }
 function renderStgContents(){
   const box=$('#stgContents'); if(!box) return;
@@ -2933,24 +2961,8 @@ function stgRemove(id){
   if(o && !confirm(`Remove "${o.label||o.text||o.media||o.kind}" from this scene?`)) return;
   s.overlays=(s.overlays||[]).filter(x=>x.id!==id);
   if(scnSelId===id) scnSelId=null;
-  renderStgCanvas(); renderStgGroups(); renderStgContents(); renderStgProps();
+  renderStgCanvas(); renderStgContents(); renderStgProps();
   sceneButtonsRefresh(); scheduleSave();
-}
-function renderStgGroups(){
-  const box=$('#stgGroups'); if(!box) return;
-  const s=stgStage();
-  if(!s){ box.innerHTML=''; return; }
-  const by={};
-  (s.overlays||[]).forEach(o=>{ const g=(o.group||'').trim(); if(g)(by[g]=by[g]||[]).push(o); });
-  const names=Object.keys(by).sort();
-  const gl=sceneGlobals.filter(o=>(o.group||'').trim()).length;
-  box.innerHTML = `<div class="row" style="gap:8px;flex-wrap:wrap;align-items:center">`+
-    `<span class="muted" style="font-size:12px;font-weight:700;text-transform:uppercase">Scene groups</span>`+
-    (names.length
-      ? names.map(n=>`<span class="pill" title="click to select the first overlay in this group" style="cursor:pointer" onclick="stgPickGroup('${esc(n)}')">🎬 ${esc(n)} <span class="muted">${by[n].length}</span></span>`).join('')
-      : `<span class="muted">none yet — tag an overlay with a <b>Scene group</b> name below and it appears here</span>`)+
-    (gl?`<span class="muted">· ${gl} global overlay${gl===1?'':'s'} also tagged</span>`:'')+
-    `</div>`;
 }
 function stgPickGroup(name){
   const s=stgStage(); if(!s) return;
@@ -3099,16 +3111,12 @@ function stgGridToggle(){
     if(v!==null){ const el=document.getElementById('stgGridOn'); if(el) el.checked = v==='1'; }
   }catch(e){}
 })();
-function stgLayer(dir){
-  const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===scnSelId); if(!o) return;
-  o.z=(+o.z||0)+dir; renderStgCanvas(); renderStgProps(); scheduleSave();
-}
 function stgItemSet(k,v){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===scnSelId); if(!o) return;
   if(k==='size'||k==='w') v = Math.max(0.01, (+v||0)/100);   // panel shows %
   if(k==='fade_in'||k==='fade_out') v = Math.max(0, +v||0);  // plain seconds
   if(k==='opacity') v = Math.max(0, Math.min(100, +v||0));   // percent, as stored
   if(k==='h') v = (v===null||v==='') ? null : Math.max(0.02, (+v||0)/100);
-  o[k]=v; renderStgCanvas(); renderStgGroups(); renderStgContents(); renderStgProps();
+  o[k]=v; renderStgCanvas(); renderStgContents(); renderStgProps();
   if(k==='group'){
     const list=stgGroupList(), nm=String(v||'').trim();
     if(list && nm && !list.some(g=>g.toLowerCase()===nm.toLowerCase())) list.push(nm);
@@ -3118,10 +3126,10 @@ function stgItemSet(k,v){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id
 function stgItemDup(){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===scnSelId); if(!o) return;
   const c=JSON.parse(JSON.stringify(o)); c.id=stgNewItem('x').id;
   c.x=Math.min(0.95,o.x+0.04); c.y=Math.min(0.95,o.y+0.04);
-  s.overlays.push(c); scnSelId=c.id; renderStgCanvas(); renderStgGroups(); renderStgContents(); renderStgProps(); sceneButtonsRefresh(); scheduleSave(); }
+  s.overlays.push(c); scnSelId=c.id; renderStgCanvas(); renderStgContents(); renderStgProps(); sceneButtonsRefresh(); scheduleSave(); }
 function stgItemDel(){ const s=stgStage(); if(!s) return;
   s.overlays=(s.overlays||[]).filter(x=>x.id!==scnSelId); scnSelId=null;
-  renderStgCanvas(); renderStgGroups(); renderStgContents(); renderStgProps(); sceneButtonsRefresh(); scheduleSave(); }
+  renderStgCanvas(); renderStgContents(); renderStgProps(); sceneButtonsRefresh(); scheduleSave(); }
 function stgPick(i){
   stgGlobalMode=false;                 // picking a scene leaves the global pool
   stgCur=i; scnSelId=null; stgGroupFilter=''; stgPending.clear();
@@ -3187,17 +3195,16 @@ function stgCopy(){
   stgRemember(); renderStages(); showReload(); sceneSwitchSave();
   toastMsg(`📋 copied to "${n}"`);
 }
-function stgProp(k,v){ const s=stgStage(); if(s){ s[k]=v; scheduleSave(); } }
 function stgResPick(){ if(stgGlobalMode) return;   // globals follow the live scene
   const s=stgStage(); if(!s) return;
   const [w,h]=$('#stgRes').value.split('x').map(Number); s.width=w; s.height=h;
   renderStgCanvas(); scheduleSave(); }
 function stgAddMedia(n){ const s=stgStage(); if(!s){ toastMsg('create a scene first'); return; }
   const o=stgNewItem('media',n); stgApplyGroup(o); (s.overlays=s.overlays||[]).push(o);
-  scnSelId=o.id; renderStgCanvas(); renderStgGroups(); renderStgContents(); renderStgProps(); sceneButtonsRefresh(); scheduleSave(); }
+  scnSelId=o.id; renderStgCanvas(); renderStgContents(); renderStgProps(); sceneButtonsRefresh(); scheduleSave(); }
 function stgAddWidget(kind){ const s=stgStage(); if(!s){ toastMsg('create a scene first'); return; }
   const o=stgNewItem(kind,''); stgApplyGroup(o); (s.overlays=s.overlays||[]).push(o);
-  scnSelId=o.id; renderStgCanvas(); renderStgGroups(); renderStgContents(); renderStgProps(); scheduleSave(); }
+  scnSelId=o.id; renderStgCanvas(); renderStgContents(); renderStgProps(); scheduleSave(); }
 // ---- universal media browser -------------------------------------------
 let mediaPickKind='';   // '', 'audio' or 'visual' — filters the browser
 function mediaBrowse(cb, kind){ mediaPickCb=cb||null; mediaPickKind=kind||'';
@@ -3691,85 +3698,8 @@ async function importConfigFile(input){
   input.value='';
 }
 // ---- gameplay presets (named snapshots, System tab) ----
-let presetNames = [];
-function setPresetMsg(t){ const m=$('#presetMsg'); if(m){ m.textContent=t; clearTimeout(m._t); m._t=setTimeout(()=>{ if(m) m.textContent=''; }, 4000); } }
-function renderPresets(){
-  // Read-only: a preset LOAD is one-way, so this says where the live gameplay
-  // came from rather than offering a link you can re-point.
-  const pn=$('#stgPresetNow');
-  if(pn){ pn.textContent = presetLoadedName || '(live settings — no preset loaded)';
-          pn.style.opacity = presetLoadedName ? '' : '.65'; }
-  const sel=$('#presetSel'); if(!sel) return;
-  const prev=sel.value;
-  sel.innerHTML = presetNames.length ? presetNames.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')
-                                     : `<option value="">(no presets yet)</option>`;
-  if(prev && presetNames.includes(prev)) sel.value=prev;
-}
 const BUILTIN_PRESET='Defaults (built-in)';
 function isBuiltinPreset(n){ return (n||'').trim().toLowerCase()===BUILTIN_PRESET.toLowerCase(); }
-async function presetCall(body){ return api('/api/gameplay/preset', body); }
-async function presetSaveCurrent(){
-  const name=(prompt('Name this preset (saves your current Game/Commands/Events/Templates):')||'').trim();
-  if(!name) return;
-  if(isBuiltinPreset(name)){ setPresetMsg('that name is reserved for the built-in preset'); return; }
-  flushSave();   // make sure pending edits are in the live config before snapshotting
-  try{ applyState(await presetCall({action: (presetNames.map(n=>n.toLowerCase()).includes(name.toLowerCase())?'update':'save'), name}), true);
-       setPresetMsg('saved preset “'+name+'” ✓'); $('#presetSel').value=name; }
-  catch(e){ setPresetMsg('save failed: '+(e.message||e)); }
-}
-async function presetLoad(){
-  const name=$('#presetSel').value; if(!name) return;
-  if(!confirm(`Load preset “${name}”?\n\nThis REPLACES your current Game, Commands, Events & Templates with the preset's. (Your token, devices, and server settings are untouched.)`)) return;
-  try{ applyState(await presetCall({action:'load', name}), true); setPresetMsg('loaded “'+name+'” ✓'); }
-  catch(e){ setPresetMsg('load failed: '+(e.message||e)); }
-}
-async function presetUpdate(){
-  const name=$('#presetSel').value; if(!name) return;
-  if(isBuiltinPreset(name)){ setPresetMsg('the built-in Defaults preset is read-only'); return; }
-  if(!confirm(`Overwrite preset “${name}” with your current settings?`)) return;
-  flushSave();
-  try{ applyState(await presetCall({action:'update', name}), true); setPresetMsg('updated “'+name+'” ✓'); }
-  catch(e){ setPresetMsg('update failed: '+(e.message||e)); }
-}
-async function presetRename(){
-  const name=$('#presetSel').value; if(!name) return;
-  if(isBuiltinPreset(name)){ setPresetMsg('the built-in Defaults preset is read-only'); return; }
-  const nn=(prompt(`Rename preset “${name}” to:`, name)||'').trim();
-  if(!nn || nn===name) return;
-  if(isBuiltinPreset(nn)){ setPresetMsg('that name is reserved for the built-in preset'); return; }
-  try{ applyState(await presetCall({action:'rename', name, new_name:nn}), true); setPresetMsg('renamed to “'+nn+'” ✓'); $('#presetSel').value=nn; }
-  catch(e){ setPresetMsg('rename failed: '+(e.message||e)); }
-}
-async function presetDelete(){
-  const name=$('#presetSel').value; if(!name) return;
-  if(isBuiltinPreset(name)){ setPresetMsg('the built-in Defaults preset is read-only'); return; }
-  if(!confirm(`Delete preset “${name}”? This can't be undone (your live setup is unaffected).`)) return;
-  try{ applyState(await presetCall({action:'delete', name}), true); setPresetMsg('deleted “'+name+'”'); }
-  catch(e){ setPresetMsg('delete failed: '+(e.message||e)); }
-}
-async function presetExport(){
-  const name=$('#presetSel').value; if(!name){ setPresetMsg('pick a preset first'); return; }
-  try{
-    const r=await presetCall({action:'export', name});
-    const text=JSON.stringify(r.data||{}, null, 2);
-    const fn='discoflate-preset-'+name.replace(/[^\w.-]+/g,'_')+'.json';
-    if(saveToDownloads(fn, text)){ setPresetMsg('saving to Downloads…'); return; }
-    const blob=new Blob([text],{type:'application/json'}); const a=document.createElement('a');
-    a.href=URL.createObjectURL(blob); a.download=fn; document.body.appendChild(a); a.click();
-    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-    setPresetMsg('exported '+fn+' ✓');
-  }catch(e){ setPresetMsg('export failed: '+(e.message||e)); }
-}
-async function importPresetFile(input){
-  const f=input.files&&input.files[0]; if(!f) return;
-  let obj; try{ obj=JSON.parse(await f.text()); }catch(e){ setPresetMsg("that file isn't valid JSON"); input.value=''; return; }
-  input.value='';
-  const suggested=(f.name||'').replace(/^discoflate-(preset-|gameplay)?/,'').replace(/\.json$/,'').replace(/_/g,' ').trim();
-  const name=(prompt('Name this imported preset:', suggested||'imported')||'').trim();
-  if(!name) return;
-  try{ applyState(await presetCall({action:'import', name, data:obj}), true); setPresetMsg('imported as “'+name+'” ✓'); $('#presetSel').value=name; }
-  catch(e){ setPresetMsg('import failed: '+(e.message||e)); }
-}
 
 // ---- share gameplay settings (safe subset: Game/Commands/Events/Templates) ----
 function setGameplayMsg(t){ const m=$('#gameplayMsg'); if(m){ m.textContent=t; clearTimeout(m._t); m._t=setTimeout(()=>{ if(m) m.textContent=''; }, 4000); } }
@@ -3918,10 +3848,8 @@ async function saveDiscord(){
       leaderboard_life: ($('#cmdLeaderboardLife').value||'toppumpers-life').trim().toLowerCase(),
       pumptimer: ($('#cmdPumptimer').value||'pumptimer').trim().toLowerCase(),
       vote: (($('#cmdVote')&&$('#cmdVote').value)||'agvote').trim().toLowerCase(),
-      enter: (($('#cmdEnter')&&$('#cmdEnter').value)||'enter').trim().toLowerCase(),
     },
     listen_targets: listenTargets,
-    announce_channel_id: announceChanId,
     anon_user_label: $('#anonLabel').value,
     allow_dms: $('#allowDms').checked,
     allow: { user_ids: idList($('#allowUsers').value) },
@@ -3947,7 +3875,6 @@ async function loadGuilds(){
   guildsLoaded = true;
   try{ guildsCache = await (await fetch('/api/guilds')).json(); }catch(e){ guildsCache=[]; }
   populateGuilds();
-  populateAnnounceChan();
   // restore last-picked server/channel across launches
   const g=lsGet('df_pick_guild'); if(g && guildsCache.find(x=>x.id===g)) $('#guildSel').value=g;
   populateChannels($('#guildSel').value);
@@ -3983,36 +3910,30 @@ function populateChannels(gid){
   const cs=$('#chanSel');
   cs.innerHTML = `<option value="">— select a channel —</option>`+chans.map(c=>`<option value="${esc(c.id)}">#${esc(c.name)}</option>`).join('');
 }
-let announceChanId = '';
-function populateAnnounceChan(){
-  const sel=$('#announceChan'); if(!sel) return;
-  let html = `<option value="">— none —</option>`;
-  guildsCache.forEach(g=>{
-    html += `<optgroup label="${esc(g.name)}">`+
-      g.channels.map(c=>`<option value="${esc(c.id)}" ${announceChanId===c.id?'selected':''}>#${esc(c.name)}</option>`).join('')+
-      `</optgroup>`;
-  });
-  // keep a saved id visible even before the bot connects / resolves names
-  if(announceChanId && ![...guildsCache.flatMap(g=>g.channels)].some(c=>c.id===announceChanId))
-    html += `<option value="${esc(announceChanId)}" selected>channel ${esc(announceChanId)}</option>`;
-  sel.innerHTML = html;
-  sel.onchange = ()=>{ announceChanId = sel.value; saveDiscord(); };
-}
 function onGuildChange(){ lsSet('df_pick_guild', $('#guildSel').value); populateChannels($('#guildSel').value); }
 function renderListenTargets(){
   const box=$('#listenTargets'); if(!box) return;
   if(!listenTargets.length){ box.innerHTML='<div class="muted">No channels yet — pick a server + channel below and Add.</div>'; return; }
   box.innerHTML = listenTargets.map((t,i)=>{
-    const n=targetName(t), on = t.active!==false;
+    const n=targetName(t), on = t.active!==false, ann = !!t.announce_only;
     return `<div class="dev" style="${on?'':'opacity:.55'}">`+
       `<label class="row" style="gap:6px;flex:0 0 auto" title="untick to mute this channel completely — no listening, no posting — without removing it">`+
         `<input type="checkbox" ${on?'checked':''} style="width:auto" onchange="setListenActive(${i}, this.checked)"> `+
         `<b style="font-size:12px;color:var(--dim)">Active</b></label>`+
+      `<label class="row" style="gap:6px;flex:0 0 auto" title="this channel RECEIVES every broadcast but ignores commands typed in it — a spectator / announcements channel">`+
+        `<input type="checkbox" ${ann?'checked':''} style="width:auto" onchange="setListenAnnounce(${i}, this.checked)"> `+
+        `<b style="font-size:12px;color:var(--dim)">Announce only</b></label>`+
       `<div class="grow"><div class="name">${esc(n.gname)}</div>`+
       `<div class="tag">#${esc(n.cname)}${n.known?'':' <span style="color:var(--warn)">(connect the bot to resolve names)</span>'}`+
-      `${on?'':' <span style="color:var(--warn)">· muted</span>'}</div></div>`+
+      `${on?'':' <span style="color:var(--warn)">· muted</span>'}`+
+      `${ann?' <span style="color:var(--accent)">· announce only</span>':''}</div></div>`+
       `<button class="ghost" onclick="removeListenTarget(${i})">Remove</button></div>`;
   }).join('');
+}
+function setListenAnnounce(i, on){
+  if(!listenTargets[i]) return;
+  listenTargets[i].announce_only = !!on;
+  renderListenTargets(); saveDiscord();
 }
 function setListenActive(i, on){
   if(!listenTargets[i]) return;
@@ -4472,6 +4393,12 @@ function renameCmdRefs(old, neu){
   pollRows.forEach(p=>(p.options||[]).forEach(o=>_walkActs(o.actions,fix)));
   compRows.forEach(c=>{ _walkActs(c.win_actions,fix); _walkActs(c.no_winner_actions,fix); });
   bonusRoundRows.forEach(b=>_walkActs(b.actions,fix));
+  // these four were missed, so a rename left them pointing at the old name:
+  (minigameRows||[]).forEach(g=>(g.tiers||[]).forEach(t=>_walkActs(t.actions,fix)));
+  (prizeRows||[]).forEach(p=>_walkActs(p.actions,fix));
+  (rangeRows||[]).forEach(r=>_walkActs(r.event_actions,fix));
+  // a chat button holds the command in `name`, not `command`
+  (chatButtons||[]).forEach(b=>{ if((b.name||'').trim().toLowerCase()===old) b.name=neu; });
 }
 // Renaming a command must follow it EVERYWHERE it's referenced by name:
 // range memberships & start-commands, Always-On, modes, and action rows.
@@ -4499,6 +4426,9 @@ function renameCommand(i, val){
       return a;
     });
     modeRows.forEach(m=>{ m.commands=(m.commands||[]).map(n=>n.toLowerCase()===old?neu:n); });
+    // Go Live's "allowed during the intro" list is a text field, not an array
+    const gc=$('#glCmds');
+    if(gc) gc.value = idList(gc.value).map(n=>n.toLowerCase()===old?neu:n).join(', ');
     renameCmdRefs(old, neu);
     renderAlwaysOn(); renderModes(); renderEvents(); renderCapEvents(); renderPolls(); renderCompetitions(); renderBonusRounds();
   }
@@ -4767,7 +4697,6 @@ async function toggleMode(i, on){
 
 // ---- timed events ----
 let eventRows = [];
-function evtSetFire(i, arr, j, key, val){ const f=(eventRows[i][arr]||[])[j]; if(!f) return; f[key]=(key==='seconds')?(val===''?null:+val):(val||null); scheduleSave(); }
 let evtOpen = new Set();
 function toggleEvtOpen(i){ if(evtOpen.has(i)) evtOpen.delete(i); else evtOpen.add(i); renderEvents(); }
 function renderEvents(){
@@ -4853,16 +4782,6 @@ async function saveEvents(){
 let capEvRows = [];
 let capEvOpen = new Set();
 function toggleCapEvOpen(i){ if(capEvOpen.has(i)) capEvOpen.delete(i); else capEvOpen.add(i); renderCapEvents(); }
-// a tickbox + its Until-Event-Completes / For-Session-Remainder radio pair
-function capScopeRadio(i, field){
-  const e=capEvRows[i];
-  if(!e[field]) return '';
-  const sf=field+'_scope', cur=e[sf]||'event', nm=`cesc-${i}-${field}`;
-  return `<span class="row" style="gap:10px;margin-left:26px">`+
-    `<label class="row" style="gap:5px"><input type="radio" name="${nm}" style="width:auto" ${cur!=='session'?'checked':''} onchange="capEvRows[${i}]['${sf}']='event';scheduleSave()"> Until Event Completes</label>`+
-    `<label class="row" style="gap:5px"><input type="radio" name="${nm}" style="width:auto" ${cur==='session'?'checked':''} onchange="capEvRows[${i}]['${sf}']='session';scheduleSave()"> For Session Remainder</label>`+
-  `</span>`;
-}
 // Poll-name dropdown for "poll" actions / poll-type commands.
 function pollNameOpts(sel){
   const names = pollRows.map(p=>(p.name||'').trim()).filter(Boolean);
@@ -6288,7 +6207,10 @@ async function importPD(){
 async function addDisc(btn){
   let d={}; try{ d=JSON.parse(btn.getAttribute('data-dev')); }catch(e){}
   await devApi('/api/devices/add', {...d, source:'discovered'});
-  $('#discovered').innerHTML='';
+  // results render into #disc-<vendor>; #discovered never existed, so this
+  // threw right after the device was added and the row never cleared
+  const box = btn.closest('.discovered');
+  if(box) box.innerHTML='';
 }
 
 // ---- state application ----
@@ -6359,9 +6281,7 @@ function applyState(st, full){
     $('#capacityMsg').value = st.capacity_message||'';
     $('#pumptimerMsg').value = st.pumptimer_message||'';
     if($('#pumpMsg')) $('#pumpMsg').value = st.pump_message||'';
-    announceChanId = st.announce_channel_id||'';
-    populateAnnounceChan();
-    const al = st.allow||{};
+      const al = st.allow||{};
     $('#allowUsers').value = (al.user_ids||[]).join(', ');
     $('#allowDms').checked = !!st.allow_dms;
     $('#anonLabel').value = st.anon_user_label||'';
@@ -6426,7 +6346,6 @@ function applyState(st, full){
     compRows = JSON.parse(JSON.stringify(st.competitions||[]));
     bonusRoundRows = JSON.parse(JSON.stringify(st.bonus_rounds||[]));
     if($('#cmdVote')) $('#cmdVote').value = (st.command_names||{}).vote||'agvote';
-    if($('#cmdEnter')) $('#cmdEnter').value = (st.command_names||{}).enter||'enter';
     if($('#eventInProcessMsg')) $('#eventInProcessMsg').value = st.event_in_process_message||'';
     if($('#eventCooldownMsg')) $('#eventCooldownMsg').value = st.event_cooldown_message||'';
     { const t = st.templates || {}; templatesData = {commands:t.commands||[], events:t.events||[], ranges:t.ranges||[], polls:t.polls||[], competitions:t.competitions||[], capevents:t.capevents||[]}; }
@@ -6520,7 +6439,6 @@ function applyState(st, full){
     remoteIps = (ra.allowed_ips||[]).slice();
     renderRemoteAccess(st);
     presetNames = (st.gameplay_presets||[]).map(p=>p.name).filter(Boolean);
-    renderPresets();
     configRev = st.config_rev ?? configRev;
     editingForms = true;
   }
@@ -6631,15 +6549,14 @@ function gatherConfig(){
       leaderboard:($('#cmdLeaderboard').value||'leaderboard').trim().toLowerCase(),
       leaderboard_life:($('#cmdLeaderboardLife').value||'toppumpers-life').trim().toLowerCase(),
       pumptimer:($('#cmdPumptimer').value||'pumptimer').trim().toLowerCase(),
-      vote:(($('#cmdVote')&&$('#cmdVote').value)||'agvote').trim().toLowerCase(),
-      enter:(($('#cmdEnter')&&$('#cmdEnter').value)||'enter').trim().toLowerCase() },
+      vote:(($('#cmdVote')&&$('#cmdVote').value)||'agvote').trim().toLowerCase() },
     capacity_message:$('#capacityMsg').value, pumptimer_message:$('#pumptimerMsg').value,
     capacity_embed:$('#capacityEmbed')?$('#capacityEmbed').checked:false, capacity_title:$('#capacityTitle')?$('#capacityTitle').value:'',
     pumptimer_embed:$('#pumptimerEmbed')?$('#pumptimerEmbed').checked:false, pumptimer_title:$('#pumptimerTitle')?$('#pumptimerTitle').value:'',
     cooldown_embed:$('#cooldownEmbed')?$('#cooldownEmbed').checked:false, cooldown_title:$('#cooldownTitle')?$('#cooldownTitle').value:'',
     pump_embed:$('#pumpEmbed')?$('#pumpEmbed').checked:false, pump_title:$('#pumpTitle')?$('#pumpTitle').value:'',
     pump_message: $('#pumpMsg') ? $('#pumpMsg').value : '',
-    listen_targets:listenTargets, announce_channel_id: announceChanId,
+    listen_targets:listenTargets,
     scenes: _scenesWithShow(), scene_globals: sceneGlobals, chat_scene: chatSceneName,
     scene_globals_meta: globalsMeta,
     chat_isolate: $('#chatIso')?$('#chatIso').checked:false, chat_isolate_channel: chatIsoChan,
@@ -6798,7 +6715,7 @@ async function doSave(){
 // any edit to a config field schedules a debounced save. Controls that save
 // through their OWN endpoint (or are pure runtime state) are excluded — a full
 // config save for them is pointless and used to race their endpoint's rev bump.
-const NO_AUTOSAVE_IDS = new Set(['mock','listener','silenceOnOff','token','announceChan',
+const NO_AUTOSAVE_IDS = new Set(['mock','listener','silenceOnOff','token',
   'raEnabled','raNewIp','capSlider','capInput','ctrlDice','ctrlSides','ctrlPump',
   'ctrlBroadcast','ctrlPoll','ctrlCleanup','importFile']);
 function maybeSave(e){ if(e.target && NO_AUTOSAVE_IDS.has(e.target.id)) return; scheduleSave(); }

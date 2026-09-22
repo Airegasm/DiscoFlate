@@ -14,8 +14,7 @@
     "leaderboard": "agtop",
     "leaderboard_life": "agtop-all",
     "pumptimer": "agtime",
-    "vote": "agvote",
-    "enter": "enter"
+    "vote": "agvote"
   },
   "pumptimer_message": "\u23f1\ufe0f [timer] seconds left on the pump timer.",
   "capacity_embed": false,
@@ -2897,8 +2896,7 @@
           "leaderboard": "agtop",
           "leaderboard_life": "agtop-all",
           "pumptimer": "agtime",
-          "vote": "agvote",
-          "enter": "enter"
+          "vote": "agvote"
         },
         "roll": {
           "mode": "value",
@@ -5502,8 +5500,7 @@
           "leaderboard": "agtop",
           "leaderboard_life": "agtop-all",
           "pumptimer": "agtime",
-          "vote": "agvote",
-          "enter": "enter"
+          "vote": "agvote"
         },
         "roll": {
           "mode": "value",

@@ -518,8 +518,13 @@ class BotManager:
         if not (cfg.get("chat_isolate") and iso):
             return None
         known = {str(t.get("channel_id")) for t in self._targets(cfg)}
-        known.add(str(cfg.get("announce_channel_id") or "").strip())
         return iso if iso in known else None
+
+    def _listen_targets(self, cfg: dict) -> list[dict]:
+        """Channels the bot accepts COMMANDS from. An announce-only channel is
+        watched and broadcast to, but typing in it does nothing — that is what
+        makes a spectator/announcements channel possible."""
+        return [t for t in self._targets(cfg) if not t.get("announce_only")]
 
     def _broadcast_targets(self, cfg: dict) -> list[dict]:
         """Where broadcasts (events, milestones, echoes, owner voice) go. This
@@ -547,7 +552,8 @@ class BotManager:
         # Guild: allow ONLY in an explicitly-selected channel. No channel picked
         # for a server means silent there (never "all channels").
         gid, cid = str(message.guild.id), str(message.channel.id)
-        if not any(str(t["guild_id"]) == gid and str(t["channel_id"]) == cid for t in self._targets(cfg)):
+        if not any(str(t["guild_id"]) == gid and str(t["channel_id"]) == cid
+                   for t in self._listen_targets(cfg)):
             return False
         if uids and message.author.id not in _ints(uids):
             return False
@@ -647,12 +653,6 @@ class BotManager:
         deleted before the new one is posted. `embed` posts a rich card instead."""
         cfg = self.get_config()
         chan_ids = {str(t["channel_id"]) for t in self._broadcast_targets(cfg)}
-        # The optional announce channel gets every broadcast too (auto-reports,
-        # milestones, events, pause/resume) — deduped if it's also a listen
-        # target, and suppressed while Isolate pins output to one channel.
-        ann = str(cfg.get("announce_channel_id") or "").strip()
-        if ann and self._isolated_to(cfg) is None and ann not in self._muted(cfg):
-            chan_ids.add(ann)
         if exclude_channel_id is not None:
             chan_ids.discard(str(exclude_channel_id))
         for cid in chan_ids:
@@ -667,15 +667,12 @@ class BotManager:
 
     # -- Chat tab (panel-side owner cockpit) ---------------------------------- #
     def _chat_watched(self, cfg) -> dict:
-        """{channel_id: label} for every watched channel (listen targets +
-        the announce channel)."""
+        """{channel_id: label} for every watched channel."""
         out = {}
         for t in self._targets(cfg):
             out[str(t["channel_id"])] = (f'{t.get("guild_name") or "?"} · '
-                                         f'#{t.get("channel_name") or t["channel_id"]}')
-        ann = str(cfg.get("announce_channel_id") or "").strip()
-        if ann and ann not in out and ann not in self._muted(cfg):
-            out[ann] = "announce channel"
+                                         f'#{t.get("channel_name") or t["channel_id"]}'
+                                         + (" · announce only" if t.get("announce_only") else ""))
         return out
 
     def _chan_kind(self, cid: str) -> str:
@@ -1046,9 +1043,6 @@ class BotManager:
             return {"ok": False, "error": "bot not connected"}
         cfg = self.get_config()
         chan_ids = {str(t["channel_id"]) for t in self._targets(cfg)}
-        ann = str(cfg.get("announce_channel_id") or "").strip()
-        if ann:
-            chan_ids.add(ann)
         if not chan_ids:
             return {"ok": False, "error": "no server/channel selected"}
         try:
@@ -1298,13 +1292,6 @@ class BotManager:
                 await _reply(message, res["reply"])
             if res.get("broadcast"):                   # quiet vote notice → everywhere
                 await self.broadcast(res["broadcast"], None)
-            return
-
-        if action == "enter":
-            # only live during a competition — enter_competition returns None otherwise
-            reply = self.engine.enter_competition(str(message.author.id), who)
-            if reply:
-                await self.broadcast(reply, None)
             return
 
         if action == "help":

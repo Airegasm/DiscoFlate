@@ -43,7 +43,7 @@ DEFAULT_PUMPDIRECT_PATH = os.path.normpath(
 
 # Schema version of the stored config. Bump it + add a _migrate step whenever a
 # key is renamed/moved, so old configs upgrade instead of silently stranding data.
-CONFIG_VERSION = 15
+CONFIG_VERSION = 16
 
 # The scene we ship read-only. It is the baseline every install can fall back
 # to and compare against, so nothing may write to it.
@@ -157,7 +157,7 @@ DEFAULTS = {
     "command_names": {"capacity": "capacity",
                       "help": "aghelp", "leaderboard": "toppumpers",
                       "leaderboard_life": "toppumpers-life", "pumptimer": "pumptimer",
-                      "vote": "agvote", "enter": "enter"},
+                      "vote": "agvote"},
     # The !pumptimer built-in reply (always available). Placeholders: [timer]/[total_secs].
     "pumptimer_message": "⏱️ [timer] seconds left on the pump timer.",
     # Per-message embed toggles + titlebars for the built-in replies/broadcasts.
@@ -263,7 +263,6 @@ DEFAULTS = {
                     "embed": False, "title": ""},
 
     # Channel the bot posts auto-reports and milestone messages into.
-    "announce_channel_id": "",
 
     # Roll total -> on-time (seconds). (Chat rolls are custom commands with a
     # `roll` action now; this block is the shared dice mechanics they all use.)
@@ -1487,6 +1486,34 @@ def _migrate(cfg: dict) -> dict:
             missing = [pool[i] for i in want if i and i not in have and i in pool]
             if missing:
                 gp["minigames"] = list(gp.get("minigames") or []) + copy.deepcopy(missing)
+    if v < 16:
+        # v16: the single "announce channel" becomes a per-channel flag. It was
+        # the only way to have a channel that receives events without accepting
+        # commands — now any listen target can be marked announce-only, which
+        # removes the special case and lets you have more than one.
+        # competitions are embeds with buttons — there is no typed entry
+        # command any more, so stop carrying its name around. command_names is
+        # scene-scoped, so every scene holds its own copy to clean as well.
+        for _blk in [cfg] + [sc.get("gameplay") for sc in (cfg.get("scenes") or [])
+                             if isinstance(sc, dict)]:
+            if isinstance(_blk, dict) and isinstance(_blk.get("command_names"), dict):
+                _blk["command_names"].pop("enter", None)
+        ann = str(cfg.pop("announce_channel_id", "") or "").strip()
+        if ann:
+            targets = cfg.get("listen_targets")
+            if not isinstance(targets, list):
+                targets = []
+            hit = next((t for t in targets if isinstance(t, dict)
+                        and str(t.get("channel_id") or "").strip() == ann), None)
+            if hit is None:
+                targets.append({"guild_id": str(cfg.get("listen_guild_id") or ""),
+                                "guild_name": "", "channel_id": ann,
+                                "channel_name": "announce", "announce_only": True})
+            else:
+                # it was BOTH a listen target and the announce channel, so it
+                # already accepted commands — leave it accepting them
+                hit.setdefault("announce_only", False)
+            cfg["listen_targets"] = targets
     cfg["config_version"] = CONFIG_VERSION
     return cfg
 

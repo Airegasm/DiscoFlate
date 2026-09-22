@@ -295,7 +295,6 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "resume_message": cfg.get("resume_message", ""),
         "paused_notice_message": cfg.get("paused_notice_message", ""),
         "auto_report": cfg.get("auto_report", {}),
-        "announce_channel_id": cfg.get("announce_channel_id", ""),
         "pumpdirect_path": cfg.get("pumpdirect_path"),
         "has_token": bool(cfg.get("discord_token")),
         "bot_error": botmgr.last_error,
@@ -310,6 +309,7 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         # its own wins, one that doesn't still falls back. The UI reads the
         # scene first and only uses these as the fallback, so they must agree.
         "pause_overlay": engine.session_overlay("pause_overlay"),
+        "bonus_rounds": cfg.get("bonus_rounds") or [],
         "scenes": raw.get("scenes") or [],
         # which keys the SCENE owns — the panel needs this to tell a scene-scoped
         # edit from a global one, and one definition beats two that drift
@@ -1079,9 +1079,10 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                     "vcam_device", "vcam_size",
                     "capacity_ranges", "commands", "modes", "events",
                     "capacity_events", "polls", "competitions", "minigames",
+                    "bonus_rounds",
                     "allow", "pumpdirect_path", "cooldown_seconds",
                     "cooldown_exempt_user_ids", "cooldown_exempt_names", "operator_name", "auto_report",
-                    "announce_channel_id", "listen_guild_id", "listen_channel_id",
+                    "listen_guild_id", "listen_channel_id",
                     "listen_targets", "anon_user_label", "output_headers", "rich_output", "templates",
                     "allow_dms", "server_channels", "silence_onoff_log",
                     "mock_calibration_seconds_to_100",

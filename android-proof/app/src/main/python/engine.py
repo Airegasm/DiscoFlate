@@ -2761,7 +2761,8 @@ class Engine:
         return out
 
     def enter_competition(self, uid, who: str) -> str | None:
-        """The !enter system command — register for the running competition.
+        """Register for the running competition. Kept for the embed's
+        🎲 Enter Challenge button; there is no typed command for it any more.
         None if nothing's running (stay silent). Returns a reply otherwise."""
         if self._comp is None:
             return None
@@ -2796,8 +2797,8 @@ class Engine:
         cd = c["def"]
         p = self._comp_player(uid, who)
         if cd.get("require_enter", True) and not p["entered"]:
-            prefix = self.cfg.get("command_prefix", "!")
-            return {"ok": False, "error": f"🙋 {who}, type `{prefix}{self.builtin_names()['enter']}` to join first!"}
+            return {"ok": False,
+                    "error": f"🙋 {who}, press **🎲 Enter Challenge** on the post to join first!"}
         cap = int(c.get("cap") or 0)
         if cap and p["entries"] >= cap:
             return {"ok": False, "error": f"🚫 {who}, you're out of entries ({cap} max)."}
@@ -3516,8 +3517,7 @@ class Engine:
                 "leaderboard": (n.get("leaderboard") or "leaderboard").strip().lower(),
                 "leaderboard_life": (n.get("leaderboard_life") or "toppumpers-life").strip().lower(),
                 "pumptimer": (n.get("pumptimer") or "pumptimer").strip().lower(),
-                "vote": (n.get("vote") or "agvote").strip().lower(),
-                "enter": (n.get("enter") or "enter").strip().lower()}
+                "vote": (n.get("vote") or "agvote").strip().lower()}
 
     # -- pump-time leaderboard (per session) --------------------------------- #
     def buffer_ok(self, cmdkey: str) -> bool:
