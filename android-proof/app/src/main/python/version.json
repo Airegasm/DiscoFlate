@@ -1,6 +1,6 @@
 {
-  "version": "3.68.0",
-  "versionCode": 151,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.68.0/discoflate-v3.68.0.apk",
-  "notes": "DiscoFlate v3.68.0 \u2014 the shipped game commands actually work again: !agpushluck, !agsimon, !agpopit, !agrps, !agpull and !agblackjack now play real minigame profiles instead of doing nothing. Minigame profiles belong to the scene along with the commands that call them, and a config that lost its profiles in the v3.65 upgrade repairs itself on load. Triggers is reordered and Perfect Prizes becomes its own Rewards section; Gameplay Presets is gone \u2014 copy a scene instead."
+  "version": "3.68.1",
+  "versionCode": 152,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.68.1/discoflate-v3.68.1.apk",
+  "notes": "DiscoFlate v3.68.1 \u2014 the top of the Chat tab is tidied up. Your Discord name moves up beside the channel picker instead of sitting in a box of its own, and the video controls line up properly."
 }
