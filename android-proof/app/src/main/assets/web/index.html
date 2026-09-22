@@ -298,12 +298,6 @@
      flex-stretched. */
   /* operator controls in the Chat side panel: one feature per line, the
      button at a fixed width so every row lines up in a narrow column */
-  .scenebar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;
-    margin:0 0 12px;padding:8px 12px;border:1px solid var(--line);
-    border-left:3px solid var(--accent);border-radius:8px;background:var(--card)}
-  .scenebar.ro{border-left-color:var(--warn)}
-  .scenebar select{min-height:32px;max-width:260px}
-  .scenebar button{padding:6px 10px;font-size:13px}
   .ctrlstack{display:flex;flex-direction:column;gap:7px}
   .ctrlline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .ctrlline>button{flex:0 0 132px;text-align:left;padding:8px 10px;font-size:14px}
@@ -355,15 +349,6 @@
     <button class="tab-btn" data-go="help">Help</button>
   </nav>
 
-  <!-- Whose rules am I editing? Gameplay belongs to the SCENE, so every tab
-       that edits it says which scene, and lets you change scene from here. -->
-  <div id="scenebar" class="scenebar" style="display:none">
-    <span class="muted">editing the rules for</span>
-    <select id="scenebarPick" onchange="scenebarPick(this.value)"></select>
-    <span class="muted" id="scenebarNote"></span>
-    <button class="ghost" id="scenebarCopy" onclick="sceneBarCopy()">⇪ Copy rules to…</button>
-  </div>
-
   <div class="grid">
     <!-- capacity -->
 
@@ -376,7 +361,7 @@
                  title="Who the Controls post as, and [operator] in messages. Blank → the bot's own Discord name."></label>
         <label class="field">Channel <select id="chatChan" style="width:280px" onchange="chatSwitch()"></select></label>
         <button id="introNext" style="display:none;background:var(--accent);color:#04202a;font-weight:700" onclick="introNextStage()" title="finish this intro stage and play the next one">⏭ Next stage</button><button id="introNow" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700" onclick="endIntroNow()" title="end the pre-show and start the session right now">🎬 Start now</button>
-        <label class="row" style="gap:6px" title="while checked, ALL broadcasts (events, announcements, timers) go ONLY to this channel — other live channels still get their direct command replies"><input type="checkbox" id="chatIso" style="width:auto" onchange="chatIsoChanged()"> <b>Isolate</b></label>
+        <label class="row" style="gap:6px" title="while checked, ALL broadcasts (events, announcements, timers) go ONLY to this channel — other live channels still get their direct command replies"><input type="checkbox" id="chatIso" style="width:auto" onchange="chatIsoChanged()"> <b>Isolate</b> <span class="muted">— Broadcast ONLY to this video channel</span></label>
       </div>
       <div id="overlaySec" style="display:none;border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
         <div id="vcamCtrls">
@@ -385,8 +370,8 @@
           <span class="muted" style="white-space:nowrap" title="the scene selected on the Scenes tab — that one picker drives everything">Scene: <b id="chatSceneName" style="color:var(--text)">—</b></span>
          </div>
          <div class="row vcamrow" style="gap:12px;align-items:flex-end">
-          <label class="field">Camera <select id="vcamDev" style="width:150px" onchange="vcamDevPick()"><option value="0">0</option></select></label>
-          <label class="field">Size <select id="vcamRes" style="width:130px">
+          <label class="field">Camera <select id="vcamDev" style="width:150px" onchange="vcamDevPick();scheduleSave()"><option value="0">0</option></select></label>
+          <label class="field">Size <select id="vcamRes" style="width:130px" onchange="scheduleSave()">
             <option>1280x720</option><option>1920x1080</option><option>640x480</option>
             <option>720x1280</option><option>1080x1920</option></select></label>
           <label class="row" style="gap:5px" title="Discord mirrors your own video tile and can't be told not to — so your overlays read backwards TO YOU there, while viewers see them correctly. Tick this to cancel that: your Discord tile reads right, but viewers then see everything mirrored. The preview above is always what viewers get."><input type="checkbox" id="vcamMirror" style="width:auto" onchange="vcamMirrorSet()"> 🪞 Mirror</label>
@@ -492,6 +477,7 @@
         <button class="ghost pmini" onclick="stgRename()" title="rename this scene">✏️</button>
         <button class="ghost pmini" onclick="stgDelete()" title="delete this scene (its media stays in the library)">🗑</button>
         <button class="ghost pmini" onclick="mediaBrowse(null)" title="media browser">🗂</button>
+        <button class="ghost pmini" onclick="pushGameplay()" title="copy this scene's rules — commands, triggers, wording — onto other scenes">⇪</button>
         <div style="flex:1"></div>
         <button class="ghost" onclick="stgExport()">⬇ Export Scene</button>
         <label class="ghost" style="padding:8px 12px;border:1px solid var(--line);border-radius:8px;cursor:pointer">⬆ Import Scene<input type="file" accept=".zip,.dfscene.zip" style="display:none" onchange="stgImport(this)"></label>
@@ -1597,48 +1583,21 @@ function showTab(name){
 }
 // Tabs whose contents ARE the scene's gameplay. On these the scene bar shows,
 // because what you type lands in one scene and not the others.
-const GAMEPLAY_TABS = ['stages','triggers','chat'];
-function renderSceneBar(tab){
-  // the header pill is always right, whatever tab you are on
+function renderSceneBar(){
+  // The header pill is the whole indicator now. A strip above the tabs said
+  // "editing the rules for X", which was a half-truth on Chat — your Discord
+  // name, the channel and Isolate are global, not scene-scoped — and its
+  // read-only warning is redundant now that a refused edit toasts.
   const pill=$('#scenePillName');
   if(pill) pill.textContent = chatSceneName || '(no scene)';
-  const ro = isBuiltinScene(stgStage());
   const ph=$('#scenePill');
-  if(ph) ph.title = ro
+  if(ph) ph.title = isBuiltinScene(stgStage())
     ? 'DiscoFlate Default is read-only — switch scenes or copy it to make changes'
     : 'The scene that is loaded: its overlays, its commands, its rules. Click to manage scenes.';
-
-  const bar=$('#scenebar'); if(!bar) return;
-  tab = tab || (document.querySelector('.tab-btn.active')||{getAttribute:()=>''}).getAttribute('data-go');
-  const on = GAMEPLAY_TABS.includes(tab) && (scenesData||[]).length>0;
-  bar.style.display = on ? '' : 'none';
-  if(!on) return;
-  const sel=$('#scenebarPick');
-  if(sel && document.activeElement!==sel){
-    // explicit value: the label carries "(read-only)" but the value must stay
-    // the bare name, or picking the baseline would match no scene at all
-    sel.innerHTML=(scenesData||[]).map(sc=>
-      `<option value="${esc(sc.name||'')}" ${sc.name===chatSceneName?'selected':''}>${esc(sc.name||'(unnamed)')}${sc.builtin?' 🔒':''}</option>`).join('');
-    if(chatSceneName) sel.value=chatSceneName;
-  }
-  const n=$('#scenebarNote');
-  if(n) n.textContent = ro
-    ? '🔒 read-only — the shipped baseline. Edits here are discarded.'
-    : ((scenesData||[]).length>1 ? `· ${scenesData.length} scenes, each with its own rules`
-                                 : '· your only scene');
-  bar.classList.toggle('ro', ro);
-  const cp=$('#scenebarCopy');
-  if(cp) cp.textContent = ro ? '📋 Make an editable copy' : '⇪ Copy rules to…';
 }
 // The shipped baseline. The server restores it on every save, so the panel
 // just says so up front rather than letting edits vanish silently.
 function isBuiltinScene(sc){ return !!(sc && sc.builtin); }
-// Divergence is the point, but a typo fix shouldn't mean editing N scenes.
-// Copy THIS scene's rules onto the ones you tick — all of them, or just the
-// commands. Anything not ticked is left completely alone.
-// On the read-only baseline this duplicates it into an editable scene; on any
-// other scene it pushes that scene's rules onto the ones you tick.
-function sceneBarCopy(){ return isBuiltinScene(stgStage()) ? stgCopy() : pushGameplay(); }
 function pushGameplay(){
   const me=stgStage(); if(!me) return toastMsg('no scene selected');
   const others=(scenesData||[]).filter(sc=>sc!==me);
@@ -1675,11 +1634,6 @@ function pushGameplay(){
     sceneSwitchSave();
     toastMsg(`⇪ copied to ${picked.length} scene${picked.length===1?'':'s'}`);
   };
-}
-// Switching from the bar is the same switch the Scenes tab does.
-function scenebarPick(name){
-  const i=(scenesData||[]).findIndex(sc=>sc.name===name);
-  if(i>=0) stgPick(i);
 }
 document.querySelectorAll('.tab-btn').forEach(b=>{
   b.addEventListener('click', ()=>showTab(b.getAttribute('data-go')));
@@ -2578,6 +2532,7 @@ function renderStgCanvas(){
       '</div>';
   }
 }
+let vcamWant={device:null, size:null};   // remembered camera + size
 let stgDrag=null;
 (function(){
   const cv=document.getElementById('stgCanvas'); if(!cv) return;
@@ -6507,6 +6462,7 @@ function applyState(st, full){
     if(!stgDrag){
       scenesData = JSON.parse(JSON.stringify(st.scenes||[]));
       sceneGlobals = JSON.parse(JSON.stringify(st.scene_globals||[]));
+      if(Array.isArray(st.gameplay_keys)) gameplayKeys = new Set(st.gameplay_keys);
       { const m = st.scene_globals_meta || {};
         globalsMeta = {groups: m.groups||[], hidden_groups: m.hidden_groups||[],
                        intro_groups: m.intro_groups||[]}; }
@@ -6537,6 +6493,16 @@ function applyState(st, full){
         pp.style.color='#3a2a00'; }
     }
     if($('#vcamMirror') && document.activeElement!==$('#vcamMirror')) $('#vcamMirror').checked = !!st.vcam_mirror;
+    // the camera list is built asynchronously, so remember the wanted values
+    // and let vcamDevPick apply them once the options exist
+    if(st.vcam_device!=null) vcamWant.device = String(st.vcam_device);
+    if(st.vcam_size) vcamWant.size = st.vcam_size;
+    { const d=$('#vcamDev');
+      if(d && document.activeElement!==d && vcamWant.device!=null
+         && [...d.options].some(o=>o.value===vcamWant.device)) d.value=vcamWant.device;
+      const r=$('#vcamRes');
+      if(r && document.activeElement!==r && vcamWant.size
+         && [...r.options].some(o=>o.value===vcamWant.size)) r.value=vcamWant.size; }
     chatIsoChan = st.chat_isolate_channel||'';
     if($('#chatIso') && document.activeElement!==$('#chatIso')) $('#chatIso').checked = !!st.chat_isolate;
     gpPresetNames = (st.gameplay_presets||[]).map(p=>p.name).filter(Boolean);
@@ -6697,6 +6663,9 @@ function gatherConfig(){
     scenes: _scenesWithShow(), scene_globals: sceneGlobals, chat_scene: chatSceneName,
     scene_globals_meta: globalsMeta,
     chat_isolate: $('#chatIso')?$('#chatIso').checked:false, chat_isolate_channel: chatIsoChan,
+    // camera + output size: global, so switching scenes never re-points them
+    vcam_device: $('#vcamDev') ? (+$('#vcamDev').value||0) : 0,
+    vcam_size: $('#vcamRes') ? ($('#vcamRes').value||'1280x720') : '1280x720',
     anon_user_label:$('#anonLabel').value,
     allow_dms:$('#allowDms').checked,
     allow:{user_ids:idList($('#allowUsers').value)},
@@ -6736,15 +6705,22 @@ function gatherConfig(){
   };
 }
 let saveT=null;
-// The shipped baseline refuses every scene-scoped edit. Catch it HERE, at the
-// one door every field edit goes through, rather than letting the change look
-// like it took and get silently reverted by the server a second later.
-// Only the tabs that edit the scene are gated — Devices, Discord and System
-// are global and keep saving normally.
-function sceneLocked(){
-  if(!isBuiltinScene(stgStage())) return false;
-  const tab=(document.querySelector('.tab-btn.active')||{getAttribute:()=>''}).getAttribute('data-go');
-  return GAMEPLAY_TABS.includes(tab);
+// The shipped baseline refuses every SCENE-SCOPED edit — but only those.
+// Gating by tab was too blunt: the Chat tab carries your Discord name, the
+// channel and Isolate, none of which belong to a scene, and all of which were
+// being refused along with the rest. The server tells us exactly which keys a
+// scene owns, so strip those from the save and let everything else through.
+let gameplayKeys = new Set();
+function sceneLocked(){ return isBuiltinScene(stgStage()); }
+// Drop everything the locked scene owns. Returns true if anything was dropped.
+function stripSceneKeys(payload){
+  let hit=false;
+  for(const k of Object.keys(payload)){
+    if(gameplayKeys.has(k)){ delete payload[k]; hit=true; }
+  }
+  // the scene's own content too — overlays, groups, its Go Live block
+  if(payload.scenes!==undefined){ delete payload.scenes; hit=true; }
+  return hit;
 }
 let _lockToastT=null;
 function sceneLockedToast(){
@@ -6755,7 +6731,6 @@ function sceneLockedToast(){
 }
 function scheduleSave(){
   if(!editingForms) return;
-  if(sceneLocked()){ sceneLockedToast(); return; }
   clearTimeout(saveT); saveT=setTimeout(doSave, 400);
 }
 // Autosave is debounced, so changing a setting and immediately hitting LIVE
@@ -6819,6 +6794,7 @@ async function doSave(){
     return;                           // fresh rev instead of 409ing against it
   }
   const payload = gatherConfig();
+  if(sceneLocked() && stripSceneKeys(payload)) sceneLockedToast();
   if(configRev != null) payload.config_rev = configRev;
   try{
     const r = await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});

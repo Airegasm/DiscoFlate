@@ -1,6 +1,6 @@
 {
-  "version": "3.68.1",
-  "versionCode": 152,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.68.1/discoflate-v3.68.1.apk",
-  "notes": "DiscoFlate v3.68.1 \u2014 the top of the Chat tab is tidied up. Your Discord name moves up beside the channel picker instead of sitting in a box of its own, and the video controls line up properly."
+  "version": "3.69.0",
+  "versionCode": 153,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.69.0/discoflate-v3.69.0.apk",
+  "notes": "DiscoFlate v3.69.0 \u2014 the read-only scene now refuses ONLY the things a scene actually owns. Your Discord name, the channel, Isolate, and every video setting save normally whichever scene is selected. Your camera and output size are remembered between sessions instead of resetting. The banner above the tabs is gone \u2014 the header pill names the scene, and a refused edit says so."
 }

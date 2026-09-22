@@ -501,6 +501,10 @@ DEFAULTS = {
     # your own self-view preview on its end; that's cosmetic and local.)
     # Applied to the raw frame BEFORE overlays composite either way.
     "vcam_mirror": False,
+    # Your webcam and the size you send: hardware, not show design. Global on
+    # purpose — switching scenes must never re-point your camera.
+    "vcam_device": 0,
+    "vcam_size": "1280x720",
 
     # Chat tab Isolate: broadcasts go ONLY to the chat tab's active channel
     # while enabled (other live channels still hear direct command replies).

@@ -311,11 +311,16 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         # scene first and only uses these as the fallback, so they must agree.
         "pause_overlay": engine.session_overlay("pause_overlay"),
         "scenes": raw.get("scenes") or [],
+        # which keys the SCENE owns — the panel needs this to tell a scene-scoped
+        # edit from a global one, and one definition beats two that drift
+        "gameplay_keys": list(config_store.GAMEPLAY_KEYS),
         "minigames": cfg.get("minigames") or [],
         "scene_globals": cfg.get("scene_globals") or [],
         "scene_globals_meta": cfg.get("scene_globals_meta") or {},
         "chat_scene": cfg.get("chat_scene", ""),
         "vcam_mirror": bool(cfg.get("vcam_mirror", True)),
+        "vcam_device": cfg.get("vcam_device", 0),
+        "vcam_size": cfg.get("vcam_size", "1280x720"),
         "golive": engine.golive(),
         "chat_isolate": bool(cfg.get("chat_isolate")),
         "chat_isolate_channel": cfg.get("chat_isolate_channel", ""),
@@ -1071,6 +1076,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                     # round-trips state back into config would otherwise flatten
                     # the live scene's show into the global fallback.
                     "chat_isolate", "chat_isolate_channel",
+                    "vcam_device", "vcam_size",
                     "capacity_ranges", "commands", "modes", "events",
                     "capacity_events", "polls", "competitions", "minigames",
                     "allow", "pumpdirect_path", "cooldown_seconds",
