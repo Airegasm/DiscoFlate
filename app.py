@@ -503,6 +503,11 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         """
         cfg0 = engine.cfg or {}
         if not cfg0.get("listener_enabled"):
+            # keep the standby line in step with the LIVE scene while we're here
+            g = engine.golive()
+            want = g.get("standby_text", "STARTING SOON")
+            if want != getattr(vcam, "_standby_text", None):
+                vcam.set_standby(want)
             return "off"
         # 'pending' matters: LIVE flips on BEFORE start_intro runs, and the ON
         # message + its [!command]s post to Discord in between. Without this

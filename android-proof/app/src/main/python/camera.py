@@ -63,6 +63,9 @@ class VirtualCam:
         # Blackout: the CAMERA picture is suppressed but overlays still draw on
         # top — so an intro can play over black without leaking your room.
         self._black = False
+        # What a viewer sees if they pick the virtual camera before you go
+        # live. app.py keeps it in step with the live scene's Go Live block.
+        self._standby_text = "STARTING SOON"
         # () -> 'live' | 'intro' | 'off'. app.py ties this to LIVE, and it's
         # asked every frame so it can never drift:
         #   'live'  — the camera picture, every overlay
@@ -111,6 +114,11 @@ class VirtualCam:
 
     def _gate_open(self) -> bool:
         return self._gate_mode() == "live" 
+
+    def set_standby(self, text: str) -> dict:
+        """The line shown on the pre-show black frame ("" = plain black)."""
+        self._standby_text = str(text or "")
+        return {"ok": True, "standby": self._standby_text}
 
     def set_blackout(self, on: bool) -> dict:
         """Black out the camera image while STILL compositing overlays over
@@ -864,6 +872,24 @@ class VirtualCam:
                 except Exception:  # noqa: BLE001
                     pass
 
+    def _standby(self, frame) -> None:
+        """Centre the standby line on an otherwise black pre-show frame.
+        Empty text = a genuinely black screen, as before."""
+        txt = str(self._standby_text or "").strip()
+        if not txt:
+            return
+        H, W = frame.shape[:2]
+        sp = self._text_sprite(txt, {"size": 0.14, "align": "center", "font": "bold",
+                                     "color": "#ffffff", "bg": ""}, H)
+        if sp is None:
+            return
+        h, w = sp.shape[:2]
+        if w > W or h > H:      # a very long line on a small frame
+            k = min(W / max(1, w), H / max(1, h))
+            sp = cv2.resize(sp, (max(1, int(w * k)), max(1, int(h * k))))
+            h, w = sp.shape[:2]
+        self._blend(frame, sp, (W - w) // 2, (H - h) // 2)
+
     def _composite(self, frame, intro: bool = False):
         now = time.monotonic()
         with self._lock:
@@ -1019,8 +1045,12 @@ class VirtualCam:
                     if self._black or mode != "live":
                         frame = np.zeros_like(frame)
                     if mode == "off":
-                        # a real black screen — nothing painted on it at all
+                        # a real black screen — nothing painted on it at all,
+                        # except a standby card so a viewer who picks the
+                        # virtual camera before you go live sees a deliberate
+                        # "STARTING SOON" instead of assuming it's broken
                         self._reap_only()
+                        self._standby(frame)
                     else:
                         frame = self._composite(frame, intro=(mode == "intro"))
                     if self._mirror:

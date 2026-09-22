@@ -480,6 +480,9 @@ DEFAULTS = {
     # Placeholders: [intro_timer] counts down in messages and overlay text.
     "golive": {
         "intro_enabled": False,
+        # what a viewer sees if they pick the virtual camera before you go
+        # live — blank for a genuinely black screen
+        "standby_text": "STARTING SOON",
         "seconds": 15,              # 0 = hold until you press Start now
         "scene_group": "",
         "announce": "",             # blank = say nothing

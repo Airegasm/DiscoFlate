@@ -5281,7 +5281,8 @@
         "announce_image": "",
         "hold_commands": true,
         "blackout": true,
-        "commands": []
+        "commands": [],
+        "standby_text": "STARTING SOON"
       },
       "notify_overlay": "dfdefnotify",
       "pause_overlay": "Pause"
@@ -7897,7 +7898,8 @@
         "announce_image": "",
         "hold_commands": true,
         "blackout": true,
-        "commands": []
+        "commands": [],
+        "standby_text": "STARTING SOON"
       },
       "notify_overlay": "dfdefnotify",
       "pause_overlay": "Pause",
@@ -7922,7 +7924,8 @@
     "hold_commands": true,
     "commands": [],
     "after_group": "Main",
-    "blackout": true
+    "blackout": true,
+    "standby_text": "STARTING SOON"
   },
   "vcam_last": {},
   "pause_overlay": "Pause",
