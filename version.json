@@ -1,6 +1,6 @@
 {
-  "version": "3.61.0",
-  "versionCode": 143,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.61.0/discoflate-v3.61.0.apk",
-  "notes": "DiscoFlate v3.61.0 \u2014 global overlays become global SCENE GROUPS. A Scoped / \ud83c\udf10 Global toggle sits above the group list, and global overlays are now designed through the same list, the same canvas and the same options as scoped ones. The cramped X%/Y%/W% section at the bottom of the Scenes tab is gone."
+  "version": "3.62.0",
+  "versionCode": 144,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.62.0/discoflate-v3.62.0.apk",
+  "notes": "DiscoFlate v3.62.0 \u2014 Custom Buttons are pure triggers: a button runs a !command, and that command's action block does the rest. \uff0b new builds an owner-only, hidden command for a button and takes you to it. #owner commands are retired from the Chat UI \u2014 a message row already has an 'As: the OWNER' option, which is the same thing with more behind it. Two wordy Chat blocks cut."
 }
