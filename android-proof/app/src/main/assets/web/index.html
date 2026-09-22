@@ -410,6 +410,7 @@
           <div class="row" style="gap:8px;margin-top:8px;flex-wrap:nowrap">
             <input id="chatText" placeholder="speak as yourself · !command runs as the Owner" style="flex:1;min-width:0" onkeydown="if(event.key==='Enter'){event.preventDefault();chatSend();}">
             <button id="chatSendBtn" onclick="chatSend()">Send</button>
+            <button class="ghost" onclick="chatClear()" title="Empty this window. Nothing is deleted in Discord — use 🧹 Cleanup in Controls for that.">🧹 Clear</button>
           </div>
           <div class="row" style="margin-top:4px;flex-wrap:nowrap"><span class="muted" id="chatPerm" style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span><div style="flex:1"></div><span class="muted" id="chatMsg"></span></div>
         </div>
@@ -1797,8 +1798,18 @@ function chatMd(t){
   t = t.replace(/@@DFCODE(\d+)@@/g, (m,i)=>code[+i]);
   return t;
 }
+// Empty the chat WINDOW. Local only — nothing is deleted in Discord (that's
+// 🧹 Cleanup in Controls). chatLast is left alone deliberately, so the next
+// poll appends only genuinely new messages instead of re-fetching the backlog
+// we just hid.
+function chatClear(){
+  const el=$('#chatLog'); if(!el) return;
+  el.innerHTML='<div class="muted" id="chatCleared">cleared — new messages appear here</div>';
+}
 function chatRender(entries, replaceAll){
   const el=$('#chatLog'); if(!el) return;
+  // an append after a clear replaces the placeholder rather than sitting under it
+  const ph=$('#chatCleared'); if(ph && entries.length) ph.remove();
   const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 40;
   const html = entries.map(m=>
     `<div><span class="t">${esc(m.t)}</span> <b style="color:${m.bot?'var(--accent2)':'var(--text)'}">${esc(m.author)}</b> ${chatMd(esc(m.text))}</div>`).join('');
@@ -3488,10 +3499,16 @@ document.addEventListener('click', e=>{
 document.addEventListener('click', e=>{
   const t = e.target.closest && e.target.closest('.tab-btn');
   if(!t) return;
-  if(t.dataset.go==='chat'){ chatChannels().then(()=>{ chatPoll(true); chatVideoUi(); }); }
-  else { vcamPreviewStop(); selfViewStop(); }   // leaving Chat: release the camera
-  if(t.dataset.go==='stages') setTimeout(()=>{ stgEnsureDefault(); renderStgCanvas(); }, 0);
+  tabEnter(t.dataset.go);
 });
+// Work a tab needs doing when it becomes visible. This used to live inside the
+// click handler, so landing on Chat at page load never ran it — the channel
+// list and video section stayed empty until you clicked away and back.
+function tabEnter(name){
+  if(name==='chat'){ chatChannels().then(()=>{ chatPoll(true); chatVideoUi(); }); }
+  else { vcamPreviewStop(); selfViewStop(); }   // leaving Chat: release the camera
+  if(name==='stages') setTimeout(()=>{ stgEnsureDefault(); renderStgCanvas(); }, 0);
+}
 async function controlCapacity(){ ctl('/api/control/capacity', {}); }
 async function controlLeaderboard(){ ctl('/api/control/leaderboard', {}); }
 async function controlLeaderboardLife(){ ctl('/api/control/leaderboard-life', {}); }
@@ -6465,6 +6482,13 @@ function applyState(st, full){
     presetNames = (st.gameplay_presets||[]).map(p=>p.name).filter(Boolean);
     configRev = st.config_rev ?? configRev;
     editingForms = true;
+  }
+  // The startup showTab() runs before any of this is initialised, so the
+  // tab we LANDED on never got its entry work. Do it on the first state.
+  if(!window._tabEntered){
+    window._tabEntered = true;
+    const b=document.querySelector('.tab-btn.active');
+    if(b) try{ tabEnter(b.getAttribute('data-go')); }catch(e){}
   }
   // one-time loud warning if the server booted from a corrupt config
   if(st.recovered_config && !window._recoveredWarned){

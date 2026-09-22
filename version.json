@@ -1,6 +1,6 @@
 {
-  "version": "3.73.0",
-  "versionCode": 159,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.73.0/discoflate-v3.73.0.apk",
-  "notes": "DiscoFlate v3.73.0 \u2014 anything that puts time on a pump now says so on the overlay, and a minigame announces its RESULT rather than the fact someone typed it. Roll and chance commands describe themselves like fire commands do; a minigame's notification is held back until the game finishes and its tier has fired, then reports the score and the seconds it won."
+  "version": "3.73.1",
+  "versionCode": 160,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.73.1/discoflate-v3.73.1.apk",
+  "notes": "DiscoFlate v3.73.1 \u2014 the Chat tab fills itself when you land on it instead of needing you to click away and back, and the chat window gets a \ud83e\uddf9 Clear button that empties the view without touching anything in Discord."
 }
