@@ -73,7 +73,7 @@ GAMEPLAY_KEYS = [
     "cooldown_seconds", "auto_report",
     "listener_message_on", "listener_message_off",
     "listener_on_embed", "listener_on_title", "listener_off_embed", "listener_off_title",
-    "pause_message", "resume_message", "paused_notice_message",
+    "pause_message", "resume_message", "paused_notice_message", "activation_off_notice",
     "pause_embed", "pause_title",
     "resume_embed", "resume_title",
     "output_headers", "rich_output",
@@ -197,6 +197,10 @@ DEFAULTS = {
     "resume_message": "▶️ **Session resumed** by [user] — pump away!",
     # Reply to someone who runs a command while paused (per-user, buffered).
     "paused_notice_message": "⏸️ [mention], the session is paused — hang tight until the operator resumes.",
+    # Tell people when a command arrives while Activation is off. Once per
+    # person per off period either way — this switches it off entirely, for
+    # a second install that is only ever meant to sit quiet.
+    "activation_off_notice": True,
     # ONE embed toggle + titlebar shared by all three pause/resume messages.
     "pause_embed": True,
     "pause_title": "⏸ Paused",

@@ -20,6 +20,44 @@ import discord
 SIMON_SYMBOLS = ["🔴", "🟢", "🔵", "🟡", "🟣", "🟠"]
 
 
+def _card(bot, text, title=None):
+    """A game panel as an embed card when rich output is on, else None so the
+    caller falls back to plain content. Every game's panel goes through this —
+    they were the last thing in the bot still posting as bare text with the
+    toggle on."""
+    try:
+        if not bot.get_config().get("rich_output"):
+            return None
+        e = discord.Embed(description=str(text or "")[:4096], color=0x9B59B6)
+        if title:
+            e.title = str(title)[:256]
+        return e
+    except Exception:  # noqa: BLE001 — never lose a game panel to a bad embed
+        return None
+
+
+async def _say(interaction, bot, text, view=None, ephemeral=True, title=None):
+    """Send a game panel (embed or plain)."""
+    emb = _card(bot, text, title)
+    kw = {"embed": emb} if emb is not None else {"content": text}
+    if view is not None:
+        kw["view"] = view
+    await interaction.response.send_message(ephemeral=ephemeral, **kw)
+
+
+async def _edit(interaction, bot, text, view=None, title=None):
+    """Edit a game panel in place. The unused field is explicitly cleared —
+    switching a live message between content and embed leaves the old one
+    showing otherwise."""
+    emb = _card(bot, text, title)
+    kw = ({"embed": emb, "content": None} if emb is not None
+          else {"content": text, "embed": None})
+    if view is not None:
+        kw["view"] = view
+    await interaction.response.edit_message(**kw)
+
+
+
 def make_play_view(bot, cmd, who, uid):
     # Slots plays out publicly (pull → reels shown in-channel); the rest open an
     # ephemeral game behind the ▶ Play button.
@@ -58,7 +96,7 @@ class SlotsView(discord.ui.View):
             c.disabled = True
         self.stop()
         try:
-            await interaction.response.edit_message(content="🎰 " + " ".join(reels), view=self)
+            await _edit(interaction, self.bot, "🎰 " + " ".join(reels), view=self)
         except Exception:
             pass
         await self.bot.game_payoff(self.cmd, score, self.who, self.uid)
@@ -139,7 +177,7 @@ class PushLuckView(discord.ui.View):
                 f"Next pump busts at **{self._bust_pct():.0f}%** — Pump for more, or Bank it?")
 
     async def begin(self, interaction: discord.Interaction):
-        await interaction.response.send_message(self._state(), view=self, ephemeral=True)
+        await _say(interaction, self.bot, self._state(), view=self)
 
     @discord.ui.button(label="💨 Pump", style=discord.ButtonStyle.danger)
     async def pump(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -155,7 +193,7 @@ class PushLuckView(discord.ui.View):
         if self.pumps >= self.max_pumps:
             await self._finish(interaction, busted=False, note="Max pumps — auto-banked!")
         else:
-            await interaction.response.edit_message(content=self._state(), view=self)
+            await _edit(interaction, self.bot, self._state(), view=self)
 
     @discord.ui.button(label="🏦 Bank", style=discord.ButtonStyle.success)
     async def bank(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -170,7 +208,7 @@ class PushLuckView(discord.ui.View):
         head = ("💥 **BUST!** You lost it all." if busted
                 else f"🏦 Banked **{self.score:g}**! {note}".strip())
         try:
-            await interaction.response.edit_message(content=head, view=self)
+            await _edit(interaction, self.bot, head, view=self)
         except Exception:
             pass
         await self.bot.game_payoff(self.cmd, self.score, self.who, self.uid)
@@ -205,7 +243,7 @@ class SimonView(discord.ui.View):
     async def begin(self, interaction: discord.Interaction):
         self._interaction = interaction
         self._add()
-        await interaction.response.send_message(self._reveal_text(), ephemeral=True)
+        await _say(interaction, self.bot, self._reveal_text())
         self._reveal_task = asyncio.create_task(self._reveal_then_input())
 
     async def _reveal_then_input(self):
@@ -235,14 +273,14 @@ class SimonView(discord.ui.View):
             for c in self.children:
                 c.disabled = True
             self.stop()
-            await interaction.response.edit_message(
-                content=f"❌ Wrong! You reached round **{self.score}**.", view=self)
+            await _edit(
+                interaction, self.bot, f"❌ Wrong! You reached round **{self.score}**.", view=self)
             await self.bot.game_payoff(self.cmd, self.score, self.who, self.uid)
             return
         self.entered.append(sym)
         if len(self.entered) < len(self.sequence):
-            await interaction.response.edit_message(
-                content=f"🧠 **{self.bot.engine.game_display_name(self.cmd)}** — keep going… "
+            await _edit(
+                interaction, self.bot, f"🧠 **{self.bot.engine.game_display_name(self.cmd)}** — keep going… "
                         f"({len(self.entered)}/{len(self.sequence)})", view=self)
             return
         # round cleared
@@ -251,16 +289,16 @@ class SimonView(discord.ui.View):
             for c in self.children:
                 c.disabled = True
             self.stop()
-            await interaction.response.edit_message(
-                content=f"🏆 Perfect! You cleared all **{self.score}** rounds!", view=self)
+            await _edit(
+                interaction, self.bot, f"🏆 Perfect! You cleared all **{self.score}** rounds!", view=self)
             await self.bot.game_payoff(self.cmd, self.score, self.who, self.uid)
             return
         # next round: reveal the longer sequence, then re-arm input
         self._add()
         self.clear_items()
         self._interaction = interaction
-        await interaction.response.edit_message(
-            content=self._reveal_text(prefix=f"✅ Round {self.score} done!\n"), view=self)
+        await _edit(
+            interaction, self.bot, self._reveal_text(prefix=f"✅ Round {self.score} done!\n"), view=self)
         self._reveal_task = asyncio.create_task(self._reveal_then_input())
 
 
@@ -309,7 +347,7 @@ class BalloonView(discord.ui.View):
                 f"Reveal a safe cell (+{self.points:g}) or 🏦 Cash Out.  Score: **{self.score:g}**")
 
     async def begin(self, interaction: discord.Interaction):
-        await interaction.response.send_message(self._state(), view=self, ephemeral=True)
+        await _say(interaction, self.bot, self._state(), view=self)
 
     async def reveal(self, interaction, k, btn):
         if self.is_finished():
@@ -318,7 +356,7 @@ class BalloonView(discord.ui.View):
             for c in self.children:
                 c.disabled = True
             self.stop()
-            await interaction.response.edit_message(content="💥 **POP!** You hit a balloon — lost it all.", view=self)
+            await _edit(interaction, self.bot, "💥 **POP!** You hit a balloon — lost it all.", view=self)
             await self.bot.game_payoff(self.cmd, 0, self.who, self.uid)
             return
         self.revealed += 1
@@ -330,10 +368,10 @@ class BalloonView(discord.ui.View):
             for c in self.children:
                 c.disabled = True
             self.stop()
-            await interaction.response.edit_message(content=f"🏆 Cleared the whole board — score **{self.score:g}**!", view=self)
+            await _edit(interaction, self.bot, f"🏆 Cleared the whole board — score **{self.score:g}**!", view=self)
             await self.bot.game_payoff(self.cmd, self.score, self.who, self.uid)
             return
-        await interaction.response.edit_message(content=self._state(), view=self)
+        await _edit(interaction, self.bot, self._state(), view=self)
 
     async def cash_out(self, interaction):
         if self.is_finished():
@@ -341,7 +379,7 @@ class BalloonView(discord.ui.View):
         for c in self.children:
             c.disabled = True
         self.stop()
-        await interaction.response.edit_message(content=f"🏦 Cashed out with **{self.score:g}**!", view=self)
+        await _edit(interaction, self.bot, f"🏦 Cashed out with **{self.score:g}**!", view=self)
         await self.bot.game_payoff(self.cmd, self.score, self.who, self.uid)
 
 
@@ -383,7 +421,7 @@ class RpsView(discord.ui.View):
                 f"You **{self.pw}** – **{self.bw}** Bot{tail}\nPick your throw:")
 
     async def begin(self, interaction: discord.Interaction):
-        await interaction.response.send_message(self._state(), view=self, ephemeral=True)
+        await _say(interaction, self.bot, self._state(), view=self)
 
     async def throw(self, interaction, choice):
         if self.is_finished():
@@ -404,10 +442,10 @@ class RpsView(discord.ui.View):
             won = self.pw >= self.target
             head = (f"🏆 You won the match **{self.pw}–{self.bw}**!" if won
                     else f"💀 The bot took it **{self.bw}–{self.pw}**.")
-            await interaction.response.edit_message(content=head, view=self)
+            await _edit(interaction, self.bot, head, view=self)
             await self.bot.game_payoff(self.cmd, self.pw, self.who, self.uid)  # score = player round wins
             return
-        await interaction.response.edit_message(content=self._state(last), view=self)
+        await _edit(interaction, self.bot, self._state(last), view=self)
 
     @discord.ui.button(label="✊", style=discord.ButtonStyle.secondary)
     async def rock(self, interaction, button):
@@ -462,7 +500,7 @@ class BlackjackView(discord.ui.View):
         if self._total(self.player) == 21:            # natural blackjack on the deal
             await self._resolve(interaction, natural=True, first=True)
             return
-        await interaction.response.send_message(self._state(), view=self, ephemeral=True)
+        await _say(interaction, self.bot, self._state(), view=self)
 
     @discord.ui.button(label="🃏 Hit", style=discord.ButtonStyle.primary)
     async def hit(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -472,7 +510,7 @@ class BlackjackView(discord.ui.View):
         if self._total(self.player) > 21:
             await self._resolve(interaction, busted=True)
         else:
-            await interaction.response.edit_message(content=self._state(), view=self)
+            await _edit(interaction, self.bot, self._state(), view=self)
 
     @discord.ui.button(label="✋ Stand", style=discord.ButtonStyle.success)
     async def stand(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -504,9 +542,9 @@ class BlackjackView(discord.ui.View):
                 score, head = 0, f"❌ Dealer wins **{dt}** vs your **{pt}**."
         try:
             if first:
-                await interaction.response.send_message(head, view=self, ephemeral=True)
+                await _say(interaction, self.bot, head, view=self)
             else:
-                await interaction.response.edit_message(content=head, view=self)
+                await _edit(interaction, self.bot, head, view=self)
         except Exception:
             pass
         await self.bot.game_payoff(self.cmd, score, self.who, self.uid)

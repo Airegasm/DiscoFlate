@@ -1,6 +1,6 @@
 {
-  "version": "3.84.1",
-  "versionCode": 174,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.84.1/discoflate-v3.84.1.apk",
-  "notes": "DiscoFlate v3.84.1 — 🩹 The Competition and Bonus Round cards drew nothing. The views were built correctly and published correctly, then dropped on the way to the compositor: the virtual camera's state hand-picked which keys it forwarded and only ever named `poll`. All four card keys now come from one list, so the next card added can't repeat it. Also: rich output finally means something. It only ever reached the status/report blocks, so a config whose action rows are all plain message rows — which every shipped one is — produced a wall of bare text however rich you'd asked for. Event, milestone and minigame-result posts are now embed cards when it's on. And 🔇 Activation is currently off is one notice per person per buffer window instead of an answer to every single command."
+  "version": "3.84.2",
+  "versionCode": 175,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.84.2/discoflate-v3.84.2.apk",
+  "notes": "DiscoFlate v3.84.2 — 🎮 Every minigame panel is an embed now. Push Your Luck, Simon, Don't Pop It, Rock Paper Scissors, Slots and Blackjack all drew their boards with plain content and never looked at rich output — all 21 panels go through one helper that honours it. 💬 The Chat tab draws embeds as cards, the way Discord does: coloured spine, title, body, inline fields, footer, with markdown rendered inside them. They used to be squashed into a single \"▧ title · body\" line, which lost the shape entirely, and user IDs leaked through as raw <@…> instead of names. 🔇 \"Activation is currently off\" is now told ONCE per person per off period rather than answering every command — nothing changes between one command and the next while we're off — and there's a switch in Game → Messages to silence it completely, which is what you want on a second install that only sits quiet."
 }

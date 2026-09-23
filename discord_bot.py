@@ -257,6 +257,9 @@ class BotManager:
         # already got a one-time history backfill.
         self._chat_logs: dict[str, deque] = {}
         self._chat_hist: set = set()
+        # who has already been told Activation is off during THIS off period —
+        # cleared the moment a command runs again
+        self._off_told: set = set()
         # Owner voice: per-channel webhook (posts AS the owner — their name +
         # avatar) and the cached owner (avatar url, display name).
         self._webhooks: dict = {}
@@ -727,19 +730,44 @@ class BotManager:
                 for cid, lbl in self._chat_watched(self.get_config()).items()]
 
     def _chat_entry(self, message) -> dict:
-        text = (message.content or "").strip()
-        for e in (message.embeds or []):
-            part = " · ".join(x for x in ((e.title or "").strip() if e.title else "",
-                                          (e.description or "").strip() if e.description else "") if x)
-            if part:
-                text = (text + "\n" if text else "") + f"▧ {part}"
+        """One Chat-tab row. Embeds travel STRUCTURED so the panel can draw the
+        card Discord draws — they used to be squashed to a "▧ title · body"
+        line, which lost the shape entirely and went blank-ish for an embed
+        with no description."""
+        # clean_content resolves <@id> / <#id> / <@&id> to readable names; the
+        # raw form leaked user IDs into the panel
+        try:
+            text = (message.clean_content or "").strip()
+        except Exception:  # noqa: BLE001
+            text = (message.content or "").strip()
+        embeds = []
+        for e in (message.embeds or [])[:4]:
+            try:
+                col = e.color.value if getattr(e, "color", None) is not None else None
+            except Exception:  # noqa: BLE001
+                col = None
+            fields = []
+            for f in (getattr(e, "fields", None) or [])[:12]:
+                fields.append({"name": (f.name or "")[:256],
+                               "value": (f.value or "")[:1024],
+                               "inline": bool(getattr(f, "inline", False))})
+            foot = getattr(e, "footer", None)
+            auth = getattr(e, "author", None)
+            embeds.append({
+                "title": ((e.title or "").strip() if e.title else "")[:256],
+                "description": ((e.description or "").strip() if e.description else "")[:2000],
+                "color": col, "fields": fields,
+                "footer": (getattr(foot, "text", "") or "")[:256] if foot else "",
+                "author": (getattr(auth, "name", "") or "")[:256] if auth else "",
+                "image": bool(getattr(getattr(e, "image", None), "url", None)),
+            })
         if message.attachments:
             text = (text + "\n" if text else "") + f"[{len(message.attachments)} attachment(s)]"
         return {"id": str(message.id),
                 "t": message.created_at.strftime("%H:%M:%S"),
                 "author": getattr(message.author, "display_name", None) or message.author.name,
                 "bot": bool(message.author.bot),
-                "text": text[:1500]}
+                "text": text[:1500], "embeds": embeds}
 
     def _chat_capture(self, message) -> None:
         try:
@@ -1337,13 +1365,17 @@ class BotManager:
         if not self._allowed(cfg, message):
             return
         if not cfg.get("listener_enabled"):
-            # ONE notice per person per buffer window, repeats silent — the same
-            # rule the paused notice uses. Answering every command with this was
-            # the loudest thing in the channel whenever a second install was up
-            # with Activation off, or after an End Sequence deactivated us.
-            if self.engine.buffer_ok(f"offnote:{message.author.id}"):
+            # ONE notice per person per OFF PERIOD, not per command and not per
+            # buffer window: while we're off, nothing changes between one
+            # command and the next, so there is nothing new to say. Answering
+            # every command was the loudest thing in the channel — especially
+            # with a second install up whose Activation is off, which answers
+            # commands the first one is busy running.
+            if cfg.get("activation_off_notice", True) and message.author.id not in self._off_told:
+                self._off_told.add(message.author.id)
                 await _reply(message, "🔇 Activation is currently **off**.")
             return
+        self._off_told.clear()   # back on: everyone gets told again next time
 
         who = message.author.display_name
 

@@ -151,6 +151,19 @@
            display:inline-block}
   .spoil{background:var(--dim);color:transparent;border-radius:3px;cursor:pointer}
   .spoil:hover{background:transparent;color:inherit}
+  /* an embed, drawn the way Discord draws it: coloured spine, title, body,
+     then fields (inline ones share a row) */
+  .embedmd{margin:4px 0 4px 2px;padding:7px 11px;background:#20222a;
+           border-left:4px solid var(--line);border-radius:4px;max-width:560px}
+  .embedmd .ema{font-size:.84em;color:var(--dim);margin-bottom:2px}
+  .embedmd .emt{font-weight:700;margin-bottom:3px}
+  .embedmd .emd{white-space:pre-wrap}
+  .embedmd .emfs{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:6px}
+  .embedmd .emf{flex:1 1 100%;min-width:0}
+  .embedmd .emf.inline{flex:1 1 30%}
+  .embedmd .emfn{font-weight:700;font-size:.88em}
+  .embedmd .emfv{font-size:.94em}
+  .embedmd .emft{margin-top:6px;font-size:.8em;color:var(--dim)}
   .chatsplit{display:grid;grid-template-columns:2fr 1fr;gap:12px;align-items:start;margin-top:10px}
   .chatmain{min-width:0}
   .chatside{min-width:0;border:1px solid var(--line);border-radius:10px;
@@ -708,6 +721,7 @@
           <div class="row" style="gap:10px;align-items:flex-end;margin-top:4px"><label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" id="resumeEmbed" style="width:auto" onchange="scheduleSave()"> embed</label><label class="field" style="flex:1">Titlebar <input id="resumeTitle" placeholder="▶ Resumed" onchange="scheduleSave()"></label></div>
           <label class="field">Paused notice <span class="muted">(reply to a command while paused)</span>
             <input id="pausedNoticeMsg" placeholder="⏸️ [mention], the session is paused…"></label>
+          <label class="row" style="gap:6px;margin-top:6px" title="Reply '🔇 Activation is currently off' when a command arrives while Activation is off. Told once per person per off period either way — untick to say nothing at all, which is what you want on a second install that only ever sits quiet."><input type="checkbox" id="activationOffNotice" style="width:auto" onchange="scheduleSave()"> say “Activation is off” when a command arrives</label>
         </div>
       </div>
       <div class="row" style="margin-top:12px">
@@ -1830,6 +1844,27 @@ function chatSwitch(){ chatLast=''; const el=$('#chatLog'); if(el) el.innerHTML=
 // log reads the way the channel does instead of showing **raw asterisks**.
 // The input is ALREADY html-escaped by esc() — this only ever ADDS tags, and
 // code spans are pulled out first so nothing inside them gets formatted.
+// Discord draws an embed as a card with a coloured spine; so do we. They used
+// to arrive squashed into a "▧ title · body" line, which lost the shape and
+// showed almost nothing for an embed that is all fields.
+function chatEmbeds(list){
+  if(!Array.isArray(list) || !list.length) return '';
+  return list.map(e=>{
+    const col = (e.color!=null) ? '#'+Number(e.color).toString(16).padStart(6,'0') : 'var(--line)';
+    const fields = (e.fields||[]).map(f=>
+      `<div class="emf${f.inline?' inline':''}">`+
+      (f.name?`<div class="emfn">${chatMd(esc(f.name))}</div>`:'')+
+      (f.value?`<div class="emfv">${chatMd(esc(f.value))}</div>`:'')+`</div>`).join('');
+    return `<div class="embedmd" style="border-left-color:${esc(col)}">`+
+      (e.author?`<div class="ema">${chatMd(esc(e.author))}</div>`:'')+
+      (e.title?`<div class="emt">${chatMd(esc(e.title))}</div>`:'')+
+      (e.description?`<div class="emd">${chatMd(esc(e.description))}</div>`:'')+
+      (fields?`<div class="emfs">${fields}</div>`:'')+
+      (e.image?`<div class="muted" style="font-size:11px">🖼 image</div>`:'')+
+      (e.footer?`<div class="emft">${chatMd(esc(e.footer))}</div>`:'')+
+    `</div>`;
+  }).join('');
+}
 function chatMd(t){
   const code=[];
   const keep = c => { code.push(c); return '@@DFCODE' + (code.length-1) + '@@'; };
@@ -1865,7 +1900,8 @@ function chatRender(entries, replaceAll){
   const ph=$('#chatCleared'); if(ph && entries.length) ph.remove();
   const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 40;
   const html = entries.map(m=>
-    `<div><span class="t">${esc(m.t)}</span> <b style="color:${m.bot?'var(--accent2)':'var(--text)'}">${esc(m.author)}</b> ${chatMd(esc(m.text))}</div>`).join('');
+    `<div><span class="t">${esc(m.t)}</span> <b style="color:${m.bot?'var(--accent2)':'var(--text)'}">${esc(m.author)}</b> `+
+    `${chatMd(esc(m.text))}${chatEmbeds(m.embeds)}</div>`).join('');
   if(replaceAll) el.innerHTML = html || '<div class="muted">nothing here yet</div>';
   else el.insertAdjacentHTML('beforeend', html);
   if(atBottom || replaceAll) el.scrollTop = el.scrollHeight;
@@ -4356,6 +4392,7 @@ async function saveAutomation(){
     resume_title: $('#resumeTitle')?$('#resumeTitle').value:'',
     resume_message: $('#resumeMsg').value,
     paused_notice_message: $('#pausedNoticeMsg').value,
+    activation_off_notice: $('#activationOffNotice')?$('#activationOffNotice').checked:true,
     output_headers: $('#outputHeaders').checked,
     rich_output: $('#richOutput').checked,
   });
@@ -6770,6 +6807,7 @@ function applyState(st, full){
     if($('#pauseMsg')) $('#pauseMsg').value = st.pause_message||'';
     if($('#resumeMsg')) $('#resumeMsg').value = st.resume_message||'';
     if($('#pausedNoticeMsg')) $('#pausedNoticeMsg').value = st.paused_notice_message||'';
+    if($('#activationOffNotice')) $('#activationOffNotice').checked = st.activation_off_notice!==false;
     if($('#outputHeaders')) $('#outputHeaders').checked = !!st.output_headers;
     if($('#richOutput')) $('#richOutput').checked = !!st.rich_output;
     $('#tokenState').textContent = st.has_token ? '✓ token saved' : 'no token yet';
@@ -7054,6 +7092,7 @@ function gatherConfig(){
     resume_title: $('#resumeTitle')?$('#resumeTitle').value:'',
     resume_message: $('#resumeMsg') ? $('#resumeMsg').value : '',
     paused_notice_message: $('#pausedNoticeMsg') ? $('#pausedNoticeMsg').value : '',
+    activation_off_notice: $('#activationOffNotice') ? $('#activationOffNotice').checked : true,
     output_headers: $('#outputHeaders') ? $('#outputHeaders').checked : false,
     rich_output: $('#richOutput') ? $('#richOutput').checked : false,
     prizes:cleanPrizes(),

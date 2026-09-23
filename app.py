@@ -292,6 +292,7 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "anon_user_label": cfg.get("anon_user_label", ""),
         "output_headers": cfg.get("output_headers", False),
         "rich_output": cfg.get("rich_output", False),
+        "activation_off_notice": cfg.get("activation_off_notice", True),
         "templates": cfg.get("templates", {"commands": [], "events": [], "ranges": []}),
         "templates_removed": cfg.get("templates_removed", []),
         "allow_dms": cfg.get("allow_dms", False),
@@ -1141,7 +1142,8 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                     "event_in_process_message", "event_cooldown_message", "broadcasts",
                     "listener_message_on", "listener_message_off",
                     "listener_on_embed", "listener_on_title", "listener_off_embed", "listener_off_title",
-                    "pause_message", "resume_message", "paused_notice_message"):
+                    "pause_message", "resume_message", "paused_notice_message",
+                    "activation_off_notice"):
             if key in body:
                 want = _TYPE_FLOOR.get(key)
                 if want and not isinstance(body[key], want):
