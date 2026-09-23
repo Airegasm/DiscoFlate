@@ -1,6 +1,6 @@
 {
-  "version": "3.87.0",
-  "versionCode": 185,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.87.0/discoflate-v3.87.0.apk",
-  "notes": "DiscoFlate v3.87.0 \u2014 \ud83d\udc41 Hide cam. A one-click toggle on the Chat tab that blanks the CAMERA IMAGE while the overlays keep playing, so you can lay out and rehearse a scene live without the room in shot \u2014 no tape over the webcam. The frame is blacked out BEFORE anything is composited, so what you see is the real on-air picture minus the camera, not an approximation. The compositor already worked this way (Go Live's intro uses it); it simply had no button. The toggle reflects the server, so it survives a panel reload, and it is kept distinct from the automatic blackout that applies whenever you are off air."
+  "version": "3.87.1",
+  "versionCode": 186,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.87.1/discoflate-v3.87.1.apk",
+  "notes": "DiscoFlate v3.87.1 \u2014 \ud83c\udfa8 The shipped scene now matches a real working layout instead of a guess. The Main group's positions, sizes and opacities are ported from a scene that actually runs a show: the four cards are spread rather than stacked, the gauge and device timers sit tighter to the corner, and the cards and notification run at 67\u201377% opacity so the picture reads through them. The activation and auto-report announcements come across too, so a fresh install sounds like a show rather than a status page."
 }
