@@ -203,11 +203,17 @@
   /* stretch, so the side column is exactly as tall as the canvas and the two
      lists can divide that height between them */
   .stgstage{display:flex;gap:14px;align-items:stretch;margin-top:8px}
-  .stgstage>#stgCanvas{flex:1 1 auto;min-width:0}
+  /* the canvas column: canvas, its controls, then the properties panel */
+  .stgmain{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}
+  .stgmain>#stgCanvas{width:100%;min-width:0}
+  /* the lists run the FULL height of the section beside that column, and their
+     right edge lands on the card's content edge — the same gutter the canvas
+     has on the left */
   .stgstage .stgside{flex:0 0 clamp(300px, 32%, 460px);min-width:0;display:flex;
-                     flex-direction:column;gap:12px;padding-top:2px}
+                     flex-direction:column;gap:12px}
   @media(max-width:860px){
     .stgstage{flex-direction:column}
+    .stgmain{flex:none}
     .stgstage .stgside{flex:none;width:100%;flex-direction:column;align-items:stretch;gap:10px}
   }
   /* layout grid: a line every 5%, brighter every 25%, brightest on the centre.
@@ -537,13 +543,28 @@
         <button class="ghost pmini" onclick="stgDelete()" title="delete this scene (its media stays in the library)">🗑</button>
         <button class="ghost pmini" onclick="mediaBrowse(null)" title="media browser">🗂</button>
         <button class="ghost pmini" onclick="pushGameplay()" title="copy this scene's rules — commands, triggers, wording — onto other scenes">⇪</button>
-        <div style="flex:1"></div>
-        <button class="ghost" onclick="stgExport()">⬇ Export Scene</button>
-        <label class="ghost" style="padding:8px 12px;border:1px solid var(--line);border-radius:8px;cursor:pointer">⬆ Import Scene<input type="file" accept=".zip,.dfscene.zip" style="display:none" onchange="stgImport(this)"></label>
       </div>
       <div id="stgEditor" style="display:none;margin-top:10px">
         <div class="stgstage">
+          <!-- the canvas and everything that belongs to it in one column,
+               so the lists beside them span the WHOLE section -->
+          <div class="stgmain">
           <div id="stgCanvas"></div>
+            <div class="stgunder">
+          <label class="field">Resolution <select id="stgRes" onchange="stgResPick()">
+            <option>1280x720</option><option>1920x1080</option><option>640x480</option>
+            <option>720x1280</option><option>1080x1920</option></select></label>
+          <label class="row" style="gap:6px" title="show a 5% grid and snap to it — hold Shift while dragging to place freely"><input type="checkbox" id="stgGridOn" checked style="width:auto" onchange="stgGridToggle()"> grid &amp; snap</label>
+          <div id="stgScope"></div>
+          <div style="flex:1"></div>
+          <button class="ghost pmini" onclick="stgExport()" title="export this scene, media and all">⬇ Export</button>
+          <label class="ghost pmini" style="cursor:pointer" title="import a scene bundle">⬆ Import<input type="file" accept=".zip,.dfscene.zip" style="display:none" onchange="stgImport(this)"></label>
+          <button class="ghost pmini" id="stgHushAll" style="display:none"
+                  title="show every overlay on the canvas again"
+                  onclick="stgHushClear()">🙈 show hidden</button>
+        </div>
+        <div id="stgProps" style="margin-top:8px"></div>
+          </div>
           <div class="stgside">
         <div class="stglists">
           <div class="stgpane">
@@ -572,19 +593,6 @@
         </div>
           </div>
         </div>
-        <!-- canvas controls sit UNDER the canvas in one row; the side column
-             beside it is for the two lists now -->
-        <div class="stgunder">
-          <label class="field">Resolution <select id="stgRes" onchange="stgResPick()">
-            <option>1280x720</option><option>1920x1080</option><option>640x480</option>
-            <option>720x1280</option><option>1080x1920</option></select></label>
-          <label class="row" style="gap:6px" title="show a 5% grid and snap to it — hold Shift while dragging to place freely"><input type="checkbox" id="stgGridOn" checked style="width:auto" onchange="stgGridToggle()"> grid &amp; snap</label>
-          <div id="stgScope"></div>
-          <button class="ghost pmini" id="stgHushAll" style="display:none"
-                  title="show every overlay on the canvas again"
-                  onclick="stgHushClear()">🙈 show hidden</button>
-        </div>
-        <div id="stgProps" style="margin-top:8px"></div>
       </div>
       </details>
     </div>
@@ -2908,6 +2916,7 @@ let stgDrag=null;
     // offsetWidth/Height are the UNROTATED layout box — the right basis for resize
     const fw = el ? el.offsetWidth / R.width  : 0.1;
     const fh = el ? el.offsetHeight / R.height : 0.1;
+    stgSnap();          // one drag / resize / rotate = one undo step
     stgDrag={o, el, shellEl, R,
              handle: hEl ? hEl.dataset.h : null,
              rot:  !!e.target.closest('.stgRot'),
@@ -3029,6 +3038,7 @@ function stgApplyGroup(o){
 // opening its settings. Also offers a brand-new group, so you can pull items
 // out into one as you build.
 function stgMoveTo(id){
+  stgSnap();
   const s=stgStage(); if(!s) return;
   const o=(s.overlays||[]).find(x=>x.id===id); if(!o) return;
   const cur=(o.group||'').trim();
@@ -3341,6 +3351,7 @@ function renderStgContents(){
 // the front. z values are renormalised to whole steps so repeated nudges can't
 // drift into ties or huge numbers.
 function stgReorder(id, dir){
+  stgSnap();
   const s=stgStage(); if(!s) return;
   const list=(s.overlays||[]).map((o,i)=>({o,i}))
     .sort((a,b)=>((+a.o.z||0)-(+b.o.z||0))||(a.i-b.i));   // back -> front
@@ -3353,14 +3364,52 @@ function stgReorder(id, dir){
   renderStgCanvas(); renderStgContents(); renderStgProps(); scheduleSave();
 }
 function stgItemVis(id){
+  stgSnap();
   const s=stgStage(); if(!s) return;
   const o=(s.overlays||[]).find(x=>x.id===id); if(!o) return;
   o.visible=!o.visible;
   renderStgCanvas(); renderStgContents(); renderStgProps(); sceneButtonsRefresh(); scheduleSave();
 }
-function stgSelect(id){ scnSelId=id; renderStgCanvas(); renderStgContents(); renderStgProps();
-  const p=$('#stgProps'); if(p) p.scrollIntoView({block:'nearest'}); }
+// No scrollIntoView. The properties panel sits directly under the canvas now,
+// so it is already in view — and yanking the page down every time you clicked
+// a row made the list unusable for browsing.
+// ---- Ctrl+Z on the canvas -------------------------------------------------
+// A snapshot of this scene's overlays before each change. Scene-tagged, so an
+// undo can never pull another scene's layout in; bounded so a long session
+// can't grow it without limit.
+let stgUndo = [];
+const STG_UNDO_MAX = 60;
+function stgSnap(){
+  const s = stgStage(); if(!s) return;
+  try{ stgUndo.push(JSON.stringify({name: s.name, overlays: s.overlays || []})); }catch(e){ return; }
+  if(stgUndo.length > STG_UNDO_MAX) stgUndo.shift();
+}
+function stgUndoPop(){
+  const s = stgStage(); if(!s) return;
+  let snap = null;
+  while(stgUndo.length){                      // discard anything from another scene
+    const c = JSON.parse(stgUndo.pop());
+    if(c.name === s.name){ snap = c; break; }
+  }
+  if(!snap){ toastMsg('nothing to undo'); return; }
+  s.overlays = snap.overlays;
+  if(!(s.overlays||[]).some(o=>o.id===scnSelId)) scnSelId = null;
+  renderStgCanvas(); renderStgContents(); renderStgProps(); scheduleSave();
+  toastMsg('↩ undid a canvas change');
+}
+document.addEventListener('keydown', e=>{
+  if(!(e.ctrlKey || e.metaKey) || e.shiftKey || String(e.key).toLowerCase() !== 'z') return;
+  const card = document.querySelector('.card[data-tab="stages"]');
+  if(!card || !card.classList.contains('show')) return;
+  // a field undoes its own typing — don't steal that
+  const t = e.target;
+  if(t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+  e.preventDefault();
+  stgUndoPop();
+});
+function stgSelect(id){ scnSelId=id; renderStgCanvas(); renderStgContents(); renderStgProps(); }
 function stgRemove(id){
+  stgSnap();
   const s=stgStage(); if(!s) return;
   const o=(s.overlays||[]).find(x=>x.id===id);
   if(o && !confirm(`Remove "${o.label||o.text||o.media||o.kind}" from this scene?`)) return;
@@ -3391,7 +3440,7 @@ function stgRestoreFocus(box, k){
   if(!box || !k) return;
   const el = [...box.querySelectorAll('input,select,textarea,button')][k.i];
   if(!el) return;
-  el.focus();
+  try{ el.focus({preventScroll:true}); }catch(e){ el.focus(); }
   try{ if(k.s != null) el.setSelectionRange(k.s, k.e); }catch(e){}
 }
 function renderStgProps(){
@@ -3575,6 +3624,7 @@ function stgGridToggle(){
   }catch(e){}
 })();
 function stgItemSet(k,v){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===scnSelId); if(!o) return;
+  stgSnap();
   if(k==='size'||k==='w') v = Math.max(0.01, (+v||0)/100);   // panel shows %
   if(k==='fade_in'||k==='fade_out') v = Math.max(0, +v||0);  // plain seconds
   if(k==='slide_in_secs'||k==='slide_out_secs') v = Math.max(0.05, +v||0.4);
@@ -3590,10 +3640,13 @@ function stgItemSet(k,v){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id
   }
   sceneButtonsRefresh(); scheduleSave(); }
 function stgItemDup(){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===scnSelId); if(!o) return;
+  stgSnap();
   const c=JSON.parse(JSON.stringify(o)); c.id=stgNewItem('x').id;
   c.x=Math.min(0.95,o.x+0.04); c.y=Math.min(0.95,o.y+0.04);
+  stgSnap();
   s.overlays.push(c); scnSelId=c.id; renderStgCanvas(); renderStgContents(); renderStgProps(); sceneButtonsRefresh(); scheduleSave(); }
 function stgItemDel(){ const s=stgStage(); if(!s) return;
+  stgSnap();
   s.overlays=(s.overlays||[]).filter(x=>x.id!==scnSelId); scnSelId=null;
   renderStgCanvas(); renderStgContents(); renderStgProps(); sceneButtonsRefresh(); scheduleSave(); }
 function stgPick(i){

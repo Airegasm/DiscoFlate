@@ -1,6 +1,6 @@
 {
-  "version": "3.85.1",
-  "versionCode": 183,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.85.1/discoflate-v3.85.1.apk",
-  "notes": "DiscoFlate v3.85.1 \u2014 \ud83e\ude79 Fixes the Scenes tab layout that v3.85.0 broke. The two lists moved beside the canvas into a column too narrow for them: the group-controls row was pinned with flex-wrap:nowrap, each overlay row carries nine controls, and height:100% collapsed the panes \u2014 so everything overlapped and spilled sideways. The column is fluid now (300\u2013460px), panes stretch to the canvas height, and both the controls and the overlay rows wrap. Also: the Scenes tab's two walls of text (nearly 2,000 characters) move into Help \u2192 \ud83c\udfac Scenes, broken into sections and brought up to date. And the intro's free-text \"commands allowed during the intro\" allowlist is gone \u2014 a typo in it silently HELD the command rather than allowing it, and intro stages carry action blocks now, so a command_gate row does the same job with real dropdowns."
+  "version": "3.86.0",
+  "versionCode": 184,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.86.0/discoflate-v3.86.0.apk",
+  "notes": "DiscoFlate v3.86.0 \u2014 \ud83c\udfad Scenes tab, properly laid out. The canvas, its controls and the properties panel are one column now, so the two lists beside them run the FULL height of the section, equal to each other, with their right edge on the same gutter the canvas has on the left. \u21a9 Ctrl+Z undoes canvas changes \u2014 move, resize, rotate, add, delete, reorder, any property \u2014 60 deep, and a snapshot taken in one scene can never be applied to another. Clicking an overlay in the list no longer yanks the page down to the properties panel; it sits under the canvas now, already in view. Export/Import Scene move out of the top row into the controls strip under the canvas."
 }
