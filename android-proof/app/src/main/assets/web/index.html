@@ -1699,6 +1699,13 @@ try{ IS_ANDROID = new URLSearchParams(location.search).has('android') || !!(wind
   // blank page — fall back rather than stranding anyone mid-upgrade
   if(!document.querySelector(`.tab-btn[data-go="${t}"]`)) t='chat';
   showTab(t);
+  // showTab only toggles the CSS classes. The work a tab needs on BECOMING
+  // visible — Chat's channel list, its first poll, the video section — lives
+  // in tabEnter(), which was only ever wired to the tab-button click. So
+  // landing here at page load left the log and the webcam blank until you
+  // clicked away and back. Deferred a tick: the rest of this script (and the
+  // `let`s it touches) hasn't been evaluated yet.
+  setTimeout(()=>{ try{ tabEnter(t); }catch(e){} }, 0);
 })();
 let allDevices = [];        // device list (for command targeting dropdowns)
 let allCommandKeys = ['roll'];  // 'roll' + custom command names (for range cooldowns)
@@ -2139,18 +2146,29 @@ async function vcamStop(){
   catch(e){ $('#vcamMsg').textContent='⚠ '+(e.message||e); }
 }
 // live preview of the composited virtual-cam output (desktop, ~1.5fps poll)
-let vcamPrevTimer=null;
-function vcamPreviewStart(){ if(!vcamPrevTimer){ vcamPrevTimer=setInterval(vcamPreviewTick, 700); vcamPreviewTick(); } }
+let vcamPrevTimer=null, vcamPrevMiss=0;
+function vcamPreviewStart(){ if(!vcamPrevTimer){ vcamPrevMiss=0; vcamPrevTimer=setInterval(vcamPreviewTick, 700); vcamPreviewTick(); } }
 function vcamPreviewStop(){
+  vcamPrevMiss=0;
   if(vcamPrevTimer){ clearInterval(vcamPrevTimer); vcamPrevTimer=null; }
   const im=$('#vcamPrev'); if(im){ im.style.display='none'; if(im.src) URL.revokeObjectURL(im.src); im.removeAttribute('src'); }
 }
 async function vcamPreviewTick(){
   const im=$('#vcamPrev'); if(!im) return;
+  // While the pipeline is down, SLOW DOWN — don't die. This used to
+  // clearInterval on the first non-ok response, so opening the tab before the
+  // camera was up (or one blip while it ran) killed the preview for good and
+  // the only way back was to leave the tab and return.
+  if(vcamPrevMiss){ vcamPrevMiss++; if(vcamPrevMiss % 5) return; }
   try{
     const dfAuth=(document.querySelector('meta[name="df-auth"]')||{}).content||'';
     const resp = await fetch('/api/camera/preview', {headers:{'X-DiscoFlate-Auth':dfAuth}});
-    if(!resp.ok){ vcamPreviewStop(); return; }   // pipeline stopped
+    if(!resp.ok){                                // pipeline not running (yet)
+      if(!vcamPrevMiss) vcamPrevMiss=1;
+      im.style.display='none';
+      return;
+    }
+    vcamPrevMiss=0;
     const url = URL.createObjectURL(await resp.blob());
     if(im.src) URL.revokeObjectURL(im.src);
     im.src=url; im.style.display='';
