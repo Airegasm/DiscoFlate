@@ -1,6 +1,6 @@
 {
-  "version": "3.79.0",
-  "versionCode": 167,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.79.0/discoflate-v3.79.0.apk",
-  "notes": "DiscoFlate v3.79.0 \u2014 an intro stage can no longer be set shorter than the clip its scene group plays. Each stage row shows what its group needs (read from the actual video/audio files) and snaps a too-short length up, telling you why. 0 still means 'hold until I press Next stage'. Files we can't measure are named rather than silently counted as zero."
+  "version": "3.80.0",
+  "versionCode": 168,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.80.0/discoflate-v3.80.0.apk",
+  "notes": "DiscoFlate v3.80.0 \u2014 intro stages get their own action blocks; the shipped scenes are GENERATED rather than stored (rename Your Scene to claim it); Templates move to Triggers with five new categories; Device Sync is now PC \u2194 Android Config Sync; and the shipped scenes come furnished \u2014 two polls with chat buttons, capacity events at 20/50/70/90, a competition, a bonus round, broadcasts, a mode, and one template of every kind."
 }

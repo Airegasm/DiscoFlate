@@ -1017,6 +1017,20 @@ class BotManager:
             return {"ok": False, "error": err}
         return self.engine.start_poll_bg(name, source="dashboard")
 
+    async def operator_start_competition(self, name: str) -> dict:
+        cfg = self.get_config()
+        err = self._operator_ready(cfg)
+        if err:
+            return {"ok": False, "error": err}
+        return self.engine.start_competition_bg(name, source="operator")
+
+    async def operator_start_bonus_round(self, name: str) -> dict:
+        cfg = self.get_config()
+        err = self._operator_ready(cfg)
+        if err:
+            return {"ok": False, "error": err}
+        return self.engine.start_bonus_round_bg(name, source="operator")
+
     async def operator_broadcast_capacity(self) -> dict:
         cfg = self.get_config()
         err = self._operator_ready(cfg)

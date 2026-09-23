@@ -1287,8 +1287,9 @@ class Engine:
                     secs = max(0.0, float(r.get("seconds") or 0))
                 except (TypeError, ValueError):
                     secs = 0.0
-                if grp or secs:
-                    out.append({"group": grp, "seconds": secs})
+                acts = r.get("actions") if isinstance(r.get("actions"), list) else []
+                if grp or secs or acts:
+                    out.append({"group": grp, "seconds": secs, "actions": acts})
         if not out:
             try:
                 secs = max(0.0, float(g.get("seconds") or 0))
@@ -1339,8 +1340,36 @@ class Engine:
                   + (f" · {len(self._intro_stages)} stages: {chain}"
                      if len(self._intro_stages) > 1 else ""))
         self._intro_play_stage(0)
+        await self._intro_stage_actions(0)
         self._intro_task = asyncio.create_task(self._intro_loop(announce_cb))
         return True
+
+    async def _intro_stage_actions(self, idx: int) -> None:
+        """A stage is a span of time with an ACTION BLOCK, the way a capacity
+        range is a band with one. It runs as the stage opens, beside its scene
+        group — a message, a sound, a gate, whatever the pre-show needs."""
+        if not (0 <= idx < len(self._intro_stages)):
+            return
+        stage = self._intro_stages[idx]
+        rows = stage.get("actions") or []
+        if not rows:
+            return
+        try:
+            await self._run_action_block(
+                rows, f"intro stage {idx + 1}", hdr="",
+                extra_ctx={**self._intro_ctx(),
+                           "stage": idx + 1, "stages": len(self._intro_stages),
+                           "group": stage.get("group") or ""})
+        except Exception as e:  # noqa: BLE001 — a bad row never strands the intro
+            self._log("error", f"intro stage {idx + 1} actions failed: {e}")
+
+    def _intro_ctx(self) -> dict:
+        """Stage-specific placeholders. [operator]/[owner] and the rest are
+        added by render() for every context, so they aren't repeated here."""
+        left = 0
+        if self._intro_until:
+            left = max(0, int(round(self._intro_until - time.monotonic())))
+        return {"intro_timer": str(left)}
 
     async def intro_next(self) -> bool:
         """Advance to the next stage, or end the pre-show when that was the
@@ -1357,6 +1386,7 @@ class Engine:
         self._log("bot", f"INTRO stage {nxt + 1}/{len(self._intro_stages)}"
                          f" — {stage['group'] or '(nothing)'}"
                          + (f" · {secs:g}s" if secs else " · until you press Start now"))
+        await self._intro_stage_actions(nxt)
         return True
 
     async def _intro_loop(self, announce_cb) -> None:

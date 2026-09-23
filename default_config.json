@@ -49,13 +49,13 @@
   "templates": {
     "commands": [
       {
-        "name": "inflate",
+        "name": "fill",
         "type": "actions",
         "enabled": true,
         "owner_only": false,
         "start_events": [],
-        "range_gate": "20-40",
-        "description": "inflate a little further",
+        "range_gate": "0-20",
+        "description": "fill those guts a bit more",
         "hide_in_list": false,
         "react_only": false,
         "react_emoji": "",
@@ -77,40 +77,35 @@
           {
             "type": "fire",
             "fire_mode": "seconds",
-            "seconds": 30,
+            "seconds": 35,
             "device_id": null
           },
           {
             "type": "message",
-            "message": "\ud83d\udca8 [mention] used [prefix]inflate[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+            "message": "\ud83d\udca8 [mention] used [prefix]fill[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
           }
-        ]
-      },
+        ],
+        "notify_enabled": true,
+        "notify": "[user] triggered [command] [command_overlay_desc]",
+        "notify_desc": true
+      }
+    ],
+    "events": [
       {
-        "name": "agtoss",
-        "type": "actions",
-        "enabled": true,
-        "owner_only": false,
-        "start_events": [],
-        "range_gate": "all",
-        "description": "flip a coin",
-        "hide_in_list": false,
-        "react_only": false,
-        "react_emoji": "",
-        "pl_bust_start": 15,
-        "pl_bust_step": 12,
-        "pl_max_pumps": 8,
-        "pl_points": 1,
-        "sm_symbols": 4,
-        "sm_max_rounds": 8,
-        "sm_reveal": 3,
-        "bl_cells": 9,
-        "bl_pops": 3,
-        "bl_points": 1,
-        "rps_wins": 3,
-        "sl_symbols": 6,
-        "game_intro": "",
-        "game_tiers": [],
+        "name": "PumpRoulette",
+        "enabled": false,
+        "mode": "loop",
+        "every": 30,
+        "max_repeats": 3,
+        "fire_immediately": true,
+        "clean_previous": false,
+        "cooldown": 30,
+        "post_actions": [
+          {
+            "type": "message",
+            "message": "\ud83c\udfb0 **PumpRoulette** complete!"
+          }
+        ],
         "actions": [
           {
             "type": "chance",
@@ -120,93 +115,218 @@
               {
                 "type": "fire",
                 "fire_mode": "seconds",
-                "seconds": 10,
+                "seconds": 20,
                 "device_id": null
               },
               {
                 "type": "message",
-                "message": "[mention] took a chance on a coin flip...[cmd_remain_note]\n**SUCCESS!** [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+                "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udd34 **BIG HIT!** +20s pump! (Capacity now [capacity]%)\n[next_round]"
               }
             ],
             "miss_actions": [
               {
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 5,
+                "device_id": null
+              },
+              {
                 "type": "message",
-                "message": "[mention] took a chance on a coin flip[cmd_remain_note]\n**FAILURE!** - Better luck next time..."
+                "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udfe2 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]"
+              }
+            ]
+          },
+          {
+            "type": "notify",
+            "message": "\ud83c\udfb0 [user] added [secs]s to [device] \u00b7 Roulette [current_loop]/[total_loops]"
+          }
+        ]
+      }
+    ],
+    "ranges": [
+      {
+        "min": 0,
+        "max": 20,
+        "dice": 6,
+        "sides": 6,
+        "announce": "\ud83c\udf88 [operator] is barely inflated \u2014 you can do better than that!",
+        "milestone": "",
+        "image": "",
+        "cooldowns": {
+          "fill": {
+            "enabled": true,
+            "max_uses": 3,
+            "seconds": 120,
+            "scope": "user"
+          },
+          "roll": {
+            "seconds": 120,
+            "scope": "user"
+          },
+          "agroll": {
+            "seconds": 120,
+            "scope": "user"
+          }
+        },
+        "start_command": "",
+        "start_command_enabled": false,
+        "event_actions": []
+      }
+    ],
+    "polls": [
+      {
+        "name": "Mercy",
+        "title": "Mercy or More?",
+        "body": "[owner] is at [capacity]% \u2014 the room decides.",
+        "duration": 60,
+        "repeat_every": 0,
+        "options": [
+          {
+            "label": "Mercy \u2014 let them breathe",
+            "fallback": true,
+            "actions": [
+              {
+                "type": "message",
+                "message": "\ud83d\udd4a The room shows mercy. No pump this round."
+              },
+              {
+                "type": "notify",
+                "message": "\ud83d\udd4a Mercy \u2014 [capacity]%"
+              }
+            ]
+          },
+          {
+            "label": "More \u2014 keep going",
+            "fallback": false,
+            "actions": [
+              {
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 15,
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83d\ude08 The room votes MORE \u2014 [secs]s! (now [capacity]%)"
+              },
+              {
+                "type": "notify",
+                "message": "\ud83d\ude08 The room voted MORE \u00b7 [command_overlay_desc]"
               }
             ]
           }
         ]
-      },
+      }
+    ],
+    "competitions": [
       {
-        "name": "agroulette",
-        "type": "actions",
-        "enabled": true,
-        "owner_only": false,
-        "start_events": [
-          "PumpRoulette"
+        "name": "RollOff",
+        "type": "rolloff",
+        "duration": 90,
+        "repeat_every": 15,
+        "metric": "total",
+        "max_entries": 3,
+        "required_entries": 1,
+        "title": "\ud83c\udfc1 Roll-off!",
+        "body": "Press **Enter Challenge**, roll, and the highest total takes it.",
+        "allow_reroll": false,
+        "reroll_count": 1,
+        "roll_specs": [
+          {
+            "dice": 2,
+            "sides": 10
+          }
         ],
-        "range_gate": "all",
-        "description": "spin the pump roulette \u2014 3 rounds of 50/50 +5s or +20s",
-        "hide_in_list": false,
-        "react_only": false,
-        "react_emoji": "",
-        "pl_bust_start": 15,
-        "pl_bust_step": 12,
-        "pl_max_pumps": 8,
-        "pl_points": 1,
-        "sm_symbols": 4,
-        "sm_max_rounds": 8,
-        "sm_reveal": 3,
-        "bl_cells": 9,
-        "bl_pops": 3,
-        "bl_points": 1,
-        "rps_wins": 3,
-        "sl_symbols": 6,
-        "game_intro": "",
-        "game_tiers": [],
+        "require_enter": true,
+        "win_actions": [
+          {
+            "type": "message",
+            "message": "\ud83c\udfc1 **[winner]** takes it with **[winner_score]**!"
+          },
+          {
+            "type": "fire",
+            "fire_mode": "seconds",
+            "seconds": "[winner_score]",
+            "device_id": null
+          },
+          {
+            "type": "notify",
+            "message": "\ud83c\udfc1 [winner] won the roll-off"
+          }
+        ],
+        "no_winner_actions": [
+          {
+            "type": "message",
+            "message": "\ud83c\udfc1 Nobody entered \u2014 the wheel spins on."
+          }
+        ]
+      }
+    ],
+    "capevents": [
+      {
+        "name": "Quarter",
+        "enabled": true,
+        "at": 20,
         "actions": [
           {
             "type": "message",
-            "message": "**[user]** spins the roulette wheel\u2026[cmd_remain_note]"
+            "message": "\ud83d\udcc8 **20%** \u2014 [owner] is starting to fill out."
+          },
+          {
+            "type": "notify",
+            "message": "\ud83d\udcc8 20% reached"
+          }
+        ],
+        "post_actions": []
+      }
+    ],
+    "bonus_rounds": [
+      {
+        "name": "TeamPush",
+        "type": "teamwork",
+        "title": "\ud83e\udd1d Team Push",
+        "body": "Everyone holding banked volume can cash it in together.",
+        "duration": 60,
+        "confirm": "all",
+        "no_holders_message": "Nobody has anything banked.",
+        "expire_message": "The team push fizzled out.",
+        "actions": [
+          {
+            "type": "fire",
+            "fire_mode": "seconds",
+            "seconds": "[total_bonus_secs]",
+            "device_id": null
+          },
+          {
+            "type": "message",
+            "message": "\ud83e\udd1d The team cashed in **[total_bonus_secs]s**!"
+          },
+          {
+            "type": "notify",
+            "message": "\ud83e\udd1d Team push \u00b7 [command_overlay_desc]"
           }
         ]
-      },
+      }
+    ],
+    "broadcasts": [
       {
-        "name": "agpushluck",
-        "type": "game-pushluck",
-        "seconds": null,
-        "dice": null,
-        "sides": null,
-        "enabled": true,
-        "owner_only": false,
-        "device_id": null,
-        "start_events": [],
-        "range_gate": "all",
-        "description": "push-your-luck minigame \u2014 pump for points, bank before you bust",
-        "hide_in_list": false,
-        "mention": false,
-        "react_only": false,
-        "react_emoji": "",
-        "fires": [],
-        "fail_fires": [],
-        "chance": null,
-        "luck": null,
-        "success_reply": "",
-        "failure_reply": "",
-        "pl_bust_start": 12,
-        "pl_bust_step": 13,
-        "pl_max_pumps": 8,
-        "pl_points": 1,
-        "sm_symbols": 4,
-        "sm_max_rounds": 8,
-        "sm_reveal": 3,
-        "bl_cells": 9,
-        "bl_pops": 3,
-        "bl_points": 1,
-        "rps_wins": 3,
-        "sl_symbols": 6,
-        "game_intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it![cmd_remain_note]",
-        "game_tiers": [
+        "name": "Welcome",
+        "message": "\ud83d\udc4b Welcome in. [owner] is at [capacity]%. [syscom_help] for commands.",
+        "enabled": true
+      }
+    ],
+    "minigames": [
+      {
+        "id": "mg:38259041",
+        "name": "Push Your Luck",
+        "kind": "pushluck",
+        "config": {
+          "pl_bust_start": 12,
+          "pl_bust_step": 13,
+          "pl_max_pumps": 8,
+          "pl_points": 1
+        },
+        "tiers": [
           {
             "op": ">=",
             "min": 0,
@@ -255,710 +375,51 @@
               }
             ]
           }
-        ]
-      },
-      {
-        "name": "agsimon",
-        "type": "game-simon",
-        "seconds": null,
-        "dice": null,
-        "sides": null,
-        "enabled": true,
-        "owner_only": false,
-        "device_id": null,
-        "start_events": [],
-        "range_gate": "all",
-        "description": "memory minigame \u2014 repeat the growing emoji sequence",
-        "hide_in_list": false,
-        "mention": false,
-        "react_only": false,
-        "react_emoji": "",
-        "fires": [],
-        "fail_fires": [],
-        "chance": null,
+        ],
         "luck": null,
-        "success_reply": "",
-        "failure_reply": "",
-        "pl_bust_start": 15,
-        "pl_bust_step": 12,
-        "pl_max_pumps": 8,
-        "pl_points": 1,
-        "sm_symbols": 4,
-        "sm_max_rounds": 8,
-        "sm_reveal": 3,
-        "bl_cells": 9,
-        "bl_pops": 3,
-        "bl_points": 1,
-        "rps_wins": 3,
-        "sl_symbols": 6,
-        "game_intro": "\ud83e\udde0 **[user]** takes on **Simon** \u2014 memorize the sequence, then repeat it![cmd_remain_note] ",
-        "game_tiers": [
-          {
-            "op": ">=",
-            "min": 0,
-            "actions": [
-              {
-                "type": "fire",
-                "fire_mode": "seconds",
-                "seconds": 5,
-                "device_id": null
-              },
-              {
-                "type": "message",
-                "message": "\u274c **[user]** fumbled at round **[score]**.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-              }
-            ]
-          },
-          {
-            "op": ">=",
-            "min": 1,
-            "actions": [
-              {
-                "type": "fire",
-                "fire_mode": "seconds",
-                "seconds": 15,
-                "device_id": null
-              },
-              {
-                "type": "message",
-                "message": "\ud83d\udc4f **[user]** reached round **[score]** \u2014 nice!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-              }
-            ]
-          },
-          {
-            "op": ">=",
-            "min": 3,
-            "actions": [
-              {
-                "type": "fire",
-                "fire_mode": "seconds",
-                "seconds": 20,
-                "device_id": null
-              },
-              {
-                "type": "message",
-                "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-              }
-            ]
-          },
-          {
-            "op": ">=",
-            "min": 6,
-            "actions": [
-              {
-                "type": "fire",
-                "fire_mode": "seconds",
-                "seconds": 35,
-                "device_id": null
-              },
-              {
-                "type": "message",
-                "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-              }
-            ]
-          },
-          {
-            "op": ">=",
-            "min": 8,
-            "actions": [
-              {
-                "type": "fire",
-                "fire_mode": "seconds",
-                "seconds": 50,
-                "device_id": null
-              },
-              {
-                "type": "message",
-                "message": "\ud83c\udfc6 **[user]** got a PERFECT SCORE **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-              }
-            ]
-          }
-        ]
-      },
-      {
-        "name": "agpopit",
-        "type": "game-balloon",
-        "seconds": null,
-        "dice": null,
-        "sides": null,
-        "enabled": true,
-        "owner_only": false,
-        "device_id": null,
-        "start_events": [],
-        "range_gate": "all",
-        "description": "don't-pop-it minigame \u2014 reveal safe cells, avoid the balloons",
-        "hide_in_list": false,
-        "mention": false,
-        "react_only": false,
-        "react_emoji": "",
-        "fires": [],
-        "fail_fires": [],
-        "chance": null,
-        "luck": null,
-        "success_reply": "",
-        "failure_reply": "",
-        "pl_bust_start": 15,
-        "pl_bust_step": 12,
-        "pl_max_pumps": 8,
-        "pl_points": 1,
-        "sm_symbols": 4,
-        "sm_max_rounds": 8,
-        "sm_reveal": 3,
-        "bl_cells": 9,
-        "bl_pops": 3,
-        "bl_points": 1,
-        "rps_wins": 3,
-        "sl_symbols": 6,
-        "game_intro": "\ud83c\udf88 **[user]** plays **Don't Pop It** \u2014 reveal safe cells for points, or cash out before you hit a balloon![cmd_remain_note]",
-        "game_tiers": [
-          {
-            "op": ">=",
-            "min": 0,
-            "actions": [
-              {
-                "type": "fire",
-                "fire_mode": "seconds",
-                "seconds": 5,
-                "device_id": null
-              },
-              {
-                "type": "message",
-                "message": "\ud83d\udca5 **[user]** popped a balloon and walked away with the bare minimum.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-              }
-            ]
-          },
-          {
-            "op": ">=",
-            "min": 1,
-            "actions": [
-              {
-                "type": "fire",
-                "fire_mode": "seconds",
-                "seconds": 10,
-                "device_id": null
-              },
-              {
-                "type": "message",
-                "message": "\ud83c\udf88 **[user]** cashed out **[score]** \u2014 nice haul!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-              }
-            ]
-          },
-          {
-            "op": ">=",
-            "min": 3,
-            "actions": [
-              {
-                "type": "fire",
-                "fire_mode": "seconds",
-                "seconds": 20,
-                "device_id": null
-              },
-              {
-                "type": "message",
-                "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-              }
-            ]
-          },
-          {
-            "op": ">=",
-            "min": 5,
-            "actions": [
-              {
-                "type": "fire",
-                "fire_mode": "seconds",
-                "seconds": 35,
-                "device_id": null
-              },
-              {
-                "type": "message",
-                "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-              }
-            ]
-          }
-        ]
-      },
-      {
-        "name": "agrps",
-        "type": "game-rps",
-        "seconds": null,
-        "dice": null,
-        "sides": null,
-        "enabled": true,
-        "owner_only": false,
-        "device_id": null,
-        "start_events": [],
-        "range_gate": "all",
-        "description": "rock-paper-scissors vs the bot, best of 5",
-        "hide_in_list": false,
-        "mention": false,
-        "react_only": false,
-        "react_emoji": "",
-        "fires": [],
-        "fail_fires": [],
-        "chance": null,
-        "luck": null,
-        "success_reply": "",
-        "failure_reply": "",
-        "pl_bust_start": 15,
-        "pl_bust_step": 12,
-        "pl_max_pumps": 8,
-        "pl_points": 1,
-        "sm_symbols": 4,
-        "sm_max_rounds": 8,
-        "sm_reveal": 3,
-        "bl_cells": 9,
-        "bl_pops": 3,
-        "bl_points": 1,
-        "rps_wins": 3,
-        "sl_symbols": 6,
-        "game_intro": "\u270a\u270b\u270c\ufe0f **[user]** challenges the bot to **Rock-Paper-Scissors** \u2014 first to 3![cmd_remain_note]",
-        "game_tiers": [
-          {
-            "op": ">=",
-            "min": 0,
-            "actions": [
-              {
-                "type": "fire",
-                "fire_mode": "seconds",
-                "seconds": 5,
-                "device_id": null
-              },
-              {
-                "type": "message",
-                "message": "\ud83d\udc80 **[user]** got swept by the bot in rock, paper, scissors.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-              }
-            ]
-          },
-          {
-            "op": ">=",
-            "min": 1,
-            "actions": [
-              {
-                "type": "fire",
-                "fire_mode": "seconds",
-                "seconds": 10,
-                "device_id": null
-              },
-              {
-                "type": "message",
-                "message": "\ud83d\ude05 **[user]** fought to **[score]** round(s) but lost the match.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-              }
-            ]
-          },
-          {
-            "op": ">=",
-            "min": 3,
-            "actions": [
-              {
-                "type": "fire",
-                "fire_mode": "seconds",
-                "seconds": 25,
-                "device_id": null
-              },
-              {
-                "type": "message",
-                "message": "\ud83c\udfc6 **[user]** BEAT the bot! **+[secs]s** added to the pump timer!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-              }
-            ]
-          }
-        ]
-      },
-      {
-        "name": "agpull",
-        "type": "game-slots",
-        "seconds": null,
-        "dice": null,
-        "sides": null,
-        "enabled": true,
-        "owner_only": false,
-        "device_id": null,
-        "start_events": [],
-        "range_gate": "all",
-        "description": "public slot machine \u2014 one pull, tiered payout",
-        "hide_in_list": false,
-        "mention": false,
-        "react_only": false,
-        "react_emoji": "",
-        "fires": [],
-        "fail_fires": [],
-        "chance": null,
-        "luck": null,
-        "success_reply": "",
-        "failure_reply": "",
-        "pl_bust_start": 15,
-        "pl_bust_step": 12,
-        "pl_max_pumps": 8,
-        "pl_points": 1,
-        "sm_symbols": 4,
-        "sm_max_rounds": 8,
-        "sm_reveal": 3,
-        "bl_cells": 9,
-        "bl_pops": 3,
-        "bl_points": 1,
-        "rps_wins": 3,
-        "sl_symbols": 6,
-        "game_intro": "\ud83c\udfb0 **[user]** pulls the lever\u2026[cmd_remain_note]",
-        "game_tiers": [
-          {
-            "op": ">=",
-            "min": 0,
-            "actions": [
-              {
-                "type": "fire",
-                "fire_mode": "seconds",
-                "seconds": 5,
-                "device_id": null
-              },
-              {
-                "type": "message",
-                "message": "\ud83c\udfb0 no match \u2014 better luck next pull, **[user]** - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
-              }
-            ]
-          },
-          {
-            "op": ">=",
-            "min": 1,
-            "actions": [
-              {
-                "type": "fire",
-                "fire_mode": "seconds",
-                "seconds": 15,
-                "device_id": null
-              },
-              {
-                "type": "message",
-                "message": "\ud83c\udfb0 **[user]** hit a pair \u2014 small win! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
-              }
-            ]
-          },
-          {
-            "op": ">=",
-            "min": 3,
-            "actions": [
-              {
-                "type": "fire",
-                "fire_mode": "seconds",
-                "seconds": 35,
-                "device_id": null
-              },
-              {
-                "type": "message",
-                "message": "\ud83c\udfb0\ud83c\udf89 **JACKPOT!** **[user]** hit three of a kind! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
-              }
-            ]
-          }
-        ]
-      },
-      {
-        "name": "agblackjack",
-        "type": "game-blackjack",
-        "seconds": null,
-        "dice": null,
-        "sides": null,
-        "enabled": true,
-        "owner_only": false,
-        "device_id": null,
-        "start_events": [],
-        "range_gate": "all",
-        "description": "blackjack (21) vs the bot \u2014 hit or stand",
-        "hide_in_list": false,
-        "mention": false,
-        "react_only": false,
-        "react_emoji": "",
-        "fires": [],
-        "fail_fires": [],
-        "chance": null,
-        "luck": null,
-        "success_reply": "",
-        "failure_reply": "",
-        "pl_bust_start": 15,
-        "pl_bust_step": 12,
-        "pl_max_pumps": 8,
-        "pl_points": 1,
-        "sm_symbols": 4,
-        "sm_max_rounds": 8,
-        "sm_reveal": 3,
-        "bl_cells": 9,
-        "bl_pops": 3,
-        "bl_points": 1,
-        "rps_wins": 3,
-        "sl_symbols": 6,
-        "game_intro": "\ud83c\udccf **[user]** sits down at the blackjack table\u2026[cmd_remain_note]",
-        "game_tiers": [
-          {
-            "op": ">=",
-            "min": 0,
-            "actions": [
-              {
-                "type": "fire",
-                "fire_mode": "seconds",
-                "seconds": 5,
-                "device_id": null
-              },
-              {
-                "type": "message",
-                "message": "\ud83c\udccf **[user]** lost the hand. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
-              }
-            ]
-          },
-          {
-            "op": ">=",
-            "min": 1,
-            "actions": [
-              {
-                "type": "fire",
-                "fire_mode": "seconds",
-                "seconds": 10,
-                "device_id": null
-              },
-              {
-                "type": "message",
-                "message": "\ud83c\udccf **[user]** pushed \u2014 a wash. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
-              }
-            ]
-          },
-          {
-            "op": ">=",
-            "min": 2,
-            "actions": [
-              {
-                "type": "fire",
-                "fire_mode": "seconds",
-                "seconds": 20,
-                "device_id": null
-              },
-              {
-                "type": "message",
-                "message": "\ud83c\udccf **[user]** beat the dealer! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
-              }
-            ]
-          },
-          {
-            "op": ">=",
-            "min": 3,
-            "actions": [
-              {
-                "type": "fire",
-                "fire_mode": "seconds",
-                "seconds": 40,
-                "device_id": null
-              },
-              {
-                "type": "message",
-                "message": "\ud83c\udccf\ud83c\udca1 **BLACKJACK!** **[user] dominated the dealer!** \u2014 [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
-              }
-            ]
-          }
-        ]
+        "intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it![cmd_remain_note]",
+        "intro_embed": false,
+        "intro_title": "",
+        "start_events": []
       }
     ],
-    "events": [
+    "prizes": [
       {
-        "name": "PumpRoulette",
-        "enabled": false,
-        "mode": "loop",
-        "every": 30,
-        "max_repeats": 3,
-        "fire_immediately": true,
-        "clean_previous": false,
-        "cooldown": 30,
+        "name": "SUPERPUMP - !superpump triggers a 40s burst of air",
+        "enabled": true,
+        "counter": "roll",
+        "goal": 3,
+        "range_gate": "all",
+        "progress_message": "[mention] rolled a perfect score [[count]/[goal]] \u2014 [remaining] more will unlock a bonus command!",
         "actions": [
           {
-            "type": "chance",
-            "chance": 50,
-            "luck": null,
-            "win_actions": [
-              {
-                "type": "fire",
-                "fire_mode": "seconds",
-                "seconds": 20,
-                "device_id": null
-              },
-              {
-                "type": "message",
-                "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udd34 **BIG HIT!** +20s pump! (Capacity now [capacity]%)\n[next_round]"
-              }
-            ],
-            "miss_actions": [
-              {
-                "type": "fire",
-                "fire_mode": "seconds",
-                "seconds": 5,
-                "device_id": null
-              },
-              {
-                "type": "message",
-                "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udfe2 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]"
-              }
-            ]
-          }
-        ],
-        "post_actions": [
+            "type": "award",
+            "award_type": "command",
+            "target": "[user]",
+            "command": "superpump",
+            "charges": 1,
+            "stash": true
+          },
           {
             "type": "message",
-            "message": "\ud83c\udfb0 **PumpRoulette** complete!"
+            "message": "[mention] has unlocked: [bonus_cmd] \u2014 SUPERPUMP - !superpump triggers a 40s burst of air\\nYou can use this command a total of [charges] times."
           }
         ]
       }
     ],
-    "ranges": [
+    "modes": [
       {
-        "min": 0,
-        "max": 20,
-        "dice": 6,
-        "sides": 6,
-        "announce": "\ud83e\udec1 [operator] is barely inflated \u2014 you can do better than that!",
-        "milestone": "",
-        "image": "",
-        "cooldowns": {
-          "fill": {
-            "enabled": true,
-            "max_uses": 3,
-            "seconds": 120,
-            "scope": "user"
-          },
-          "roll": {
-            "seconds": 120,
-            "scope": "user"
-          }
-        },
-        "start_command": "",
-        "start_command_enabled": false,
-        "event_actions": []
-      },
-      {
-        "min": 20,
-        "max": 40,
-        "dice": 4,
-        "sides": 6,
-        "announce": "\ud83d\udca8 [operator] is filling out nicely, the first signs of bloating begin to appear.",
-        "milestone": "**MILESTONE:** \ud83d\udca8 [operator]'s belly starts to round out and press outward slightly. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
-        "image": "",
-        "cooldowns": {
-          "inflate": {
-            "enabled": true,
-            "max_uses": 6,
-            "seconds": 195,
-            "scope": "user"
-          },
-          "roll": {
-            "seconds": 195,
-            "scope": "user",
-            "dice": 5
-          }
-        },
-        "start_command": "",
-        "start_command_enabled": false,
-        "event_actions": []
-      },
-      {
-        "min": 40,
-        "max": 60,
-        "dice": 4,
-        "sides": 6,
-        "announce": "\ud83c\udf88 [operator]'s belly is taut and pressurised, curves stretching tighter.",
-        "milestone": "**MILESTONE:** \ud83c\udf88 Halfway there \u2014 [operator]'s middle is firm and noticeably swollen. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
-        "image": "",
-        "cooldowns": {
-          "pump": {
-            "enabled": true,
-            "max_uses": 6,
-            "seconds": 220,
-            "scope": "user"
-          },
-          "roll": {
-            "seconds": 220,
-            "scope": "user",
-            "luck": 15
-          }
-        },
-        "start_command": "",
-        "start_command_enabled": false,
-        "event_actions": []
-      },
-      {
-        "min": 60,
-        "max": 80,
-        "dice": 2,
-        "sides": 4,
-        "announce": "\ud83c\udf88 [operator]'s belly is round, tight, and visibly swollen.",
-        "milestone": "**MILESTONE:** \ud83c\udf88 [operator] is seriously swollen now \u2014 the pressure is constant and building. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
-        "image": "",
-        "cooldowns": {
-          "squeeze": {
-            "enabled": true,
-            "max_uses": 3,
-            "seconds": 350,
-            "scope": "user"
-          },
-          "roll": {
-            "seconds": 350,
-            "scope": "user",
-            "dice": 3,
-            "sides": 7,
-            "luck": 10
-          }
-        },
-        "start_command": "",
-        "start_command_enabled": false,
-        "event_actions": []
-      },
-      {
-        "min": 80,
-        "max": 90,
-        "dice": 2,
-        "sides": 4,
-        "announce": "\u26a0\ufe0f [operator] 's belly is stretched dangerously tight, groaning under the strain.",
-        "milestone": "**MILESTONE:** \u26a0\ufe0f [operator]'s gut is straining hard \u2014 one bold roll could tip them over! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
-        "image": "",
-        "cooldowns": {
-          "tease": {
-            "enabled": true,
-            "max_uses": 5,
-            "seconds": 275,
-            "scope": "user"
-          },
-          "roll": {
-            "seconds": 275,
-            "scope": "user",
-            "luck": 20,
-            "sides": 8
-          }
-        },
-        "start_command": "",
-        "start_command_enabled": false,
-        "event_actions": []
-      },
-      {
-        "min": 90,
-        "max": 100,
-        "dice": 2,
-        "sides": 4,
-        "announce": "\ud83d\udea8 [operator]'s belly is at the absolute brink, creaking and ready to pop''.",
-        "milestone": "**MILESTONE:** \ud83d\udea8 The edge! [operator] has reached maximum capacity and can't take much more! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]\n",
-        "image": "",
-        "cooldowns": {
-          "topup": {
-            "enabled": true,
-            "max_uses": null,
-            "seconds": 300,
-            "scope": "user"
-          },
-          "roll": {
-            "seconds": 300,
-            "scope": "user",
-            "luck": 20,
-            "dice": 3
-          }
-        },
-        "start_command": "",
-        "start_command_enabled": false,
-        "event_actions": []
+        "name": "Gentle",
+        "commands": [
+          "fill",
+          "tease"
+        ],
+        "events": [],
+        "enabled": false,
+        "message_on": "\ud83d\udd4a **Gentle mode** \u2014 only the softer commands are live.",
+        "message_off": "Gentle mode off \u2014 everything is back."
       }
-    ],
-    "polls": [],
-    "competitions": [],
-    "capevents": []
+    ]
   },
   "allow_dms": false,
   "server_channels": {},
@@ -1768,6 +1229,40 @@
       "notify_enabled": true,
       "notify": "[user] triggered [command] [command_overlay_desc]",
       "notify_desc": true
+    },
+    {
+      "name": "mercypoll",
+      "type": "actions",
+      "enabled": true,
+      "owner_only": true,
+      "hide_in_help": true,
+      "range_gate": "all",
+      "description": "start the Mercy or More? poll",
+      "actions": [
+        {
+          "type": "poll",
+          "poll": "Mercy"
+        }
+      ],
+      "start_events": [],
+      "notify_enabled": false
+    },
+    {
+      "name": "pickpump",
+      "type": "actions",
+      "enabled": true,
+      "owner_only": true,
+      "hide_in_help": true,
+      "range_gate": "all",
+      "description": "start the Which pump? poll",
+      "actions": [
+        {
+          "type": "poll",
+          "poll": "PickThePump"
+        }
+      ],
+      "start_events": [],
+      "notify_enabled": false
     }
   ],
   "always_on_enabled": true,
@@ -1821,7 +1316,19 @@
       "luck": null
     }
   ],
-  "modes": [],
+  "modes": [
+    {
+      "name": "Gentle",
+      "commands": [
+        "fill",
+        "tease"
+      ],
+      "events": [],
+      "enabled": false,
+      "message_on": "\ud83d\udd4a **Gentle mode** \u2014 only the softer commands are live.",
+      "message_off": "Gentle mode off \u2014 everything is back."
+    }
+  ],
   "events": [
     {
       "name": "PumpRoulette",
@@ -1903,238 +1410,236 @@
   "event_cooldown_message": "\u23f3 [event] is on cooldown \u2014 [cooldown]s left.",
   "capacity_events": [
     {
-      "name": "Popornot",
+      "name": "Quarter",
       "enabled": true,
-      "at": 99,
+      "at": 20,
       "actions": [
         {
-          "type": "stop_devices"
-        },
-        {
-          "type": "command_gate",
-          "modifiers": [
-            {
-              "op": "disable_range_cmds"
-            },
-            {
-              "op": "disable_always_on"
-            },
-            {
-              "op": "pause_events"
-            }
-          ]
-        },
-        {
           "type": "message",
-          "message": "** \ud83d\udea8 WARNING\u203c\ufe0f: [operator]'s belly has officially reached critical capacity! It's now time to decide the next step of this inflation procedure...**",
-          "seconds": null,
-          "device_id": null,
-          "dice": null,
-          "sides": null,
-          "capacity_op": "add",
-          "capacity_value": 0,
-          "poll": null,
-          "broadcast": null,
-          "if_option": null
+          "message": "\ud83d\udcc8 **20%** \u2014 [owner] is starting to fill out."
         },
         {
-          "type": "poll",
-          "message": "",
-          "seconds": null,
-          "device_id": null,
-          "dice": null,
-          "sides": null,
-          "capacity_op": "add",
-          "capacity_value": 0,
-          "poll": "Popordonot",
-          "broadcast": null,
-          "if_option": null
-        },
-        {
-          "type": "command_gate",
-          "modifiers": [
-            {
-              "op": "resume_range_cmds"
-            },
-            {
-              "op": "resume_always_on"
-            },
-            {
-              "op": "resume_events"
-            }
-          ]
+          "type": "notify",
+          "message": "\ud83d\udcc8 20% reached"
         }
       ],
       "post_actions": []
     },
     {
-      "name": "Gutrep1",
+      "name": "Halfway",
       "enabled": true,
-      "at": 33,
+      "at": 50,
       "actions": [
         {
           "type": "message",
-          "message": "** \ud83e\udd75 GUT REPORT \ud83d\udcc8: ** [operator] is experiencing significant noticeable pressure bordering on mildly uncomfortable.\n[capacity_bar]",
-          "seconds": null,
-          "device_id": null,
-          "dice": null,
-          "sides": null,
-          "capacity_op": "add",
-          "capacity_value": 0,
-          "poll": null,
-          "broadcast": null,
-          "if_option": null
+          "message": "\ud83d\udcc8 **Halfway.** [owner] is at [capacity]% \u2014 no going back now."
+        },
+        {
+          "type": "notify",
+          "message": "\ud83d\udcc8 Halfway \u2014 [capacity]%"
+        },
+        {
+          "type": "fire",
+          "fire_mode": "seconds",
+          "seconds": 10,
+          "device_id": null
         }
       ],
       "post_actions": []
     },
     {
-      "name": "Gutrep2",
+      "name": "Tight",
       "enabled": true,
-      "at": 66,
+      "at": 70,
       "actions": [
         {
           "type": "message",
-          "message": "** \ud83e\udd75 GUT REPORT \ud83d\udcc8: ** [operator] is experiencing fairly regular mild to moderate intestinal cramping.\n[capacity_bar]",
-          "seconds": null,
-          "device_id": null,
-          "dice": null,
-          "sides": null,
-          "capacity_op": "add",
-          "capacity_value": 0,
-          "poll": null,
-          "broadcast": null,
-          "if_option": null
+          "message": "\ud83d\ude33 **70%** \u2014 things are getting tight."
+        },
+        {
+          "type": "notify",
+          "message": "\ud83d\ude33 70% \u2014 getting tight"
         }
       ],
       "post_actions": []
     },
     {
-      "name": "Gutrep3",
+      "name": "NearlyThere",
       "enabled": true,
-      "at": 81,
+      "at": 90,
       "actions": [
         {
           "type": "message",
-          "message": "** \ud83e\udd75 GUT REPORT \ud83d\udcc8: ** [operator] is experiencing intense cramping and the sensation that their belly might pop from the pressure.\n[capacity_bar]",
-          "seconds": null,
-          "device_id": null,
-          "dice": null,
-          "sides": null,
-          "capacity_op": "add",
-          "capacity_value": 0,
-          "poll": null,
-          "broadcast": null,
-          "if_option": null
+          "message": "\ud83d\udea8 **90%!** [owner] is nearly at capacity."
+        },
+        {
+          "type": "notify",
+          "message": "\ud83d\udea8 90% \u2014 nearly there"
         }
       ],
       "post_actions": []
     }
   ],
-  "competitions": [],
-  "bonus_rounds": [],
+  "competitions": [
+    {
+      "name": "RollOff",
+      "type": "rolloff",
+      "duration": 90,
+      "repeat_every": 15,
+      "metric": "total",
+      "max_entries": 3,
+      "required_entries": 1,
+      "title": "\ud83c\udfc1 Roll-off!",
+      "body": "Press **Enter Challenge**, roll, and the highest total takes it.",
+      "allow_reroll": false,
+      "reroll_count": 1,
+      "roll_specs": [
+        {
+          "dice": 2,
+          "sides": 10
+        }
+      ],
+      "require_enter": true,
+      "win_actions": [
+        {
+          "type": "message",
+          "message": "\ud83c\udfc1 **[winner]** takes it with **[winner_score]**!"
+        },
+        {
+          "type": "fire",
+          "fire_mode": "seconds",
+          "seconds": "[winner_score]",
+          "device_id": null
+        },
+        {
+          "type": "notify",
+          "message": "\ud83c\udfc1 [winner] won the roll-off"
+        }
+      ],
+      "no_winner_actions": [
+        {
+          "type": "message",
+          "message": "\ud83c\udfc1 Nobody entered \u2014 the wheel spins on."
+        }
+      ]
+    }
+  ],
+  "bonus_rounds": [
+    {
+      "name": "TeamPush",
+      "type": "teamwork",
+      "title": "\ud83e\udd1d Team Push",
+      "body": "Everyone holding banked volume can cash it in together.",
+      "duration": 60,
+      "confirm": "all",
+      "no_holders_message": "Nobody has anything banked.",
+      "expire_message": "The team push fizzled out.",
+      "actions": [
+        {
+          "type": "fire",
+          "fire_mode": "seconds",
+          "seconds": "[total_bonus_secs]",
+          "device_id": null
+        },
+        {
+          "type": "message",
+          "message": "\ud83e\udd1d The team cashed in **[total_bonus_secs]s**!"
+        },
+        {
+          "type": "notify",
+          "message": "\ud83e\udd1d Team push \u00b7 [command_overlay_desc]"
+        }
+      ]
+    }
+  ],
   "polls": [
     {
-      "name": "Belly-shock",
-      "title": "Create an electrifying experience?",
-      "body": "**[operator] currently has TENS unit electrodes attached to the sides of their belly!** It is up to you whether or not the e-stim machine gets activated to shock their belly and and cause involuntary abdominal muscle contractions. A successful vote to activate the device will keep it running for 5 minutes. Choose wisely!",
+      "name": "Mercy",
+      "title": "Mercy or More?",
+      "body": "[owner] is at [capacity]% \u2014 the room decides.",
       "duration": 60,
-      "repeat_every": 15,
+      "repeat_every": 0,
       "options": [
         {
-          "label": "ACTIVATE!",
+          "label": "Mercy \u2014 let them breathe",
           "fallback": true,
           "actions": [
             {
               "type": "message",
-              "message": "**The decision has been made to activate the electro stimulation machine and begins sending shocking pulses into [operator]'s belly, forcing contractions during the inflation process. This will continue for 5 minutes.**",
-              "seconds": null,
-              "device_id": null,
-              "dice": null,
-              "sides": null,
-              "capacity_op": "add",
-              "capacity_value": 0,
-              "poll": null,
-              "broadcast": null,
-              "if_option": null
+              "message": "\ud83d\udd4a The room shows mercy. No pump this round."
+            },
+            {
+              "type": "notify",
+              "message": "\ud83d\udd4a Mercy \u2014 [capacity]%"
             }
           ]
         },
         {
-          "label": "Mercy!",
+          "label": "More \u2014 keep going",
           "fallback": false,
           "actions": [
             {
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 15,
+              "device_id": null
+            },
+            {
               "type": "message",
-              "message": "**The inflators have chosen to show [operator] mercy, sparing them from the shocking jolts that would have been applied to their swelling gut.**",
-              "seconds": null,
-              "device_id": null,
-              "dice": null,
-              "sides": null,
-              "capacity_op": "add",
-              "capacity_value": 0,
-              "poll": null,
-              "broadcast": null,
-              "if_option": null
+              "message": "\ud83d\ude08 The room votes MORE \u2014 [secs]s! (now [capacity]%)"
+            },
+            {
+              "type": "notify",
+              "message": "\ud83d\ude08 The room voted MORE \u00b7 [command_overlay_desc]"
             }
           ]
         }
       ]
     },
     {
-      "name": "Popordonot",
-      "title": "[operator]'s belly has reached critical capacity!",
-      "body": "It is now up to the pump operators to decide how this inflation procedure session ends! You can choose to end the session now, allowing [operator] to deflate and release the air safely, or you could decide that you want to see just how much pressure their belly can actually take before it pops!",
-      "duration": 60,
-      "repeat_every": 15,
+      "name": "PickThePump",
+      "title": "Which pump?",
+      "body": "Choose what runs next.",
+      "duration": 45,
+      "repeat_every": 0,
       "options": [
         {
-          "label": "Deflate",
-          "fallback": false,
+          "label": "Slow and steady",
+          "fallback": true,
           "actions": [
             {
-              "type": "message",
-              "message": "** The operators have decided to allow [operator] to deflate safely! **",
-              "seconds": null,
-              "device_id": null,
-              "dice": null,
-              "sides": null,
-              "capacity_op": "add",
-              "capacity_value": 0,
-              "poll": null,
-              "broadcast": null,
-              "if_option": null
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 20,
+              "device_id": null
             },
             {
-              "type": "end_session",
-              "seconds": null,
-              "device_id": null,
-              "dice": null,
-              "sides": null,
-              "capacity_op": "add",
-              "capacity_value": 0,
-              "poll": null,
-              "broadcast": null,
-              "if_option": null
+              "type": "message",
+              "message": "\ud83d\udc22 Slow and steady \u2014 [secs]s."
+            },
+            {
+              "type": "notify",
+              "message": "\ud83d\udc22 Slow and steady \u00b7 [command_overlay_desc]"
             }
           ]
         },
         {
-          "label": "Burst",
-          "fallback": true,
+          "label": "Short and sharp",
+          "fallback": false,
           "actions": [
             {
+              "type": "fire",
+              "fire_mode": "seconds",
+              "seconds": 8,
+              "device_id": null
+            },
+            {
               "type": "message",
-              "message": "** The operators have decided to over inflate [operator]'s belly until it bursts! **",
-              "seconds": null,
-              "device_id": null,
-              "dice": null,
-              "sides": null,
-              "capacity_op": "add",
-              "capacity_value": 0,
-              "poll": null,
-              "broadcast": null,
-              "if_option": null
+              "message": "\u26a1 Short and sharp \u2014 [secs]s."
+            },
+            {
+              "type": "notify",
+              "message": "\u26a1 Short and sharp \u00b7 [command_overlay_desc]"
             }
           ]
         }
@@ -2143,8 +1648,13 @@
   ],
   "broadcasts": [
     {
-      "name": "Announcement",
-      "message": "\ud83d\udce2 **Announcement from [operator]**\n\nYour message goes here \u2014 placeholders work: capacity is **[capacity]%** [capacity_bar], and commands are listed with [syscom_help].",
+      "name": "Welcome",
+      "message": "\ud83d\udc4b Welcome in. [owner] is at [capacity]%. [syscom_help] for commands.",
+      "enabled": true
+    },
+    {
+      "name": "LastCall",
+      "message": "\u23f3 Last call \u2014 [owner] is at [capacity]%.",
       "enabled": true
     }
   ],
@@ -2213,7 +1723,16 @@
   },
   "pumpdirect_path": "/home/saintorphan/Projects/PumpDirect/data/devices.json",
   "owner_commands": [],
-  "chat_buttons": [],
+  "chat_buttons": [
+    {
+      "label": "\ud83d\udd4a Mercy or More?",
+      "name": "mercypoll"
+    },
+    {
+      "label": "\ud83c\udf9b Which pump?",
+      "name": "pickpump"
+    }
+  ],
   "chat_isolate": false,
   "chat_isolate_channel": "",
   "vcam_mirror": false,
@@ -3506,10 +3025,67 @@
             "notify_enabled": true,
             "notify": "[user] triggered [command] [command_overlay_desc]",
             "notify_desc": true
+          },
+          {
+            "name": "mercypoll",
+            "type": "actions",
+            "enabled": true,
+            "owner_only": true,
+            "hide_in_help": true,
+            "range_gate": "all",
+            "description": "start the Mercy or More? poll",
+            "actions": [
+              {
+                "type": "poll",
+                "poll": "Mercy"
+              }
+            ],
+            "start_events": [],
+            "notify_enabled": false
+          },
+          {
+            "name": "pickpump",
+            "type": "actions",
+            "enabled": true,
+            "owner_only": true,
+            "hide_in_help": true,
+            "range_gate": "all",
+            "description": "start the Which pump? poll",
+            "actions": [
+              {
+                "type": "poll",
+                "poll": "PickThePump"
+              }
+            ],
+            "start_events": [],
+            "notify_enabled": false
           }
         ],
-        "broadcasts": [],
-        "modes": [],
+        "broadcasts": [
+          {
+            "name": "Welcome",
+            "message": "\ud83d\udc4b Welcome in. [owner] is at [capacity]%. [syscom_help] for commands.",
+            "enabled": true
+          },
+          {
+            "name": "LastCall",
+            "message": "\u23f3 Last call \u2014 [owner] is at [capacity]%.",
+            "enabled": true
+          }
+        ],
+        "modes": [
+          {
+            "name": "Gentle",
+            "commands": [
+              "fill",
+              "tease"
+            ],
+            "events": [],
+            "enabled": false,
+            "message_on": "\ud83d\udd4a **Gentle mode** \u2014 only the softer commands are live.",
+            "message_off": "Gentle mode off \u2014 everything is back."
+          }
+        ],
         "prizes": [
           {
             "name": "SUPERPUMP - !superpump triggers a 40s burst of air",
@@ -3535,7 +3111,16 @@
           }
         ],
         "owner_commands": [],
-        "chat_buttons": [],
+        "chat_buttons": [
+          {
+            "label": "\ud83d\udd4a Mercy or More?",
+            "name": "mercypoll"
+          },
+          {
+            "label": "\ud83c\udf9b Which pump?",
+            "name": "pickpump"
+          }
+        ],
         "cooldown_seconds": 120,
         "auto_report": {
           "enabled": true,
@@ -3897,22 +3482,256 @@
             "actions": []
           }
         ],
-        "capacity_events": [],
-        "polls": [],
-        "competitions": [],
-        "bonus_rounds": [],
+        "capacity_events": [
+          {
+            "name": "Quarter",
+            "enabled": true,
+            "at": 20,
+            "actions": [
+              {
+                "type": "message",
+                "message": "\ud83d\udcc8 **20%** \u2014 [owner] is starting to fill out."
+              },
+              {
+                "type": "notify",
+                "message": "\ud83d\udcc8 20% reached"
+              }
+            ],
+            "post_actions": []
+          },
+          {
+            "name": "Halfway",
+            "enabled": true,
+            "at": 50,
+            "actions": [
+              {
+                "type": "message",
+                "message": "\ud83d\udcc8 **Halfway.** [owner] is at [capacity]% \u2014 no going back now."
+              },
+              {
+                "type": "notify",
+                "message": "\ud83d\udcc8 Halfway \u2014 [capacity]%"
+              },
+              {
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 10,
+                "device_id": null
+              }
+            ],
+            "post_actions": []
+          },
+          {
+            "name": "Tight",
+            "enabled": true,
+            "at": 70,
+            "actions": [
+              {
+                "type": "message",
+                "message": "\ud83d\ude33 **70%** \u2014 things are getting tight."
+              },
+              {
+                "type": "notify",
+                "message": "\ud83d\ude33 70% \u2014 getting tight"
+              }
+            ],
+            "post_actions": []
+          },
+          {
+            "name": "NearlyThere",
+            "enabled": true,
+            "at": 90,
+            "actions": [
+              {
+                "type": "message",
+                "message": "\ud83d\udea8 **90%!** [owner] is nearly at capacity."
+              },
+              {
+                "type": "notify",
+                "message": "\ud83d\udea8 90% \u2014 nearly there"
+              }
+            ],
+            "post_actions": []
+          }
+        ],
+        "polls": [
+          {
+            "name": "Mercy",
+            "title": "Mercy or More?",
+            "body": "[owner] is at [capacity]% \u2014 the room decides.",
+            "duration": 60,
+            "repeat_every": 0,
+            "options": [
+              {
+                "label": "Mercy \u2014 let them breathe",
+                "fallback": true,
+                "actions": [
+                  {
+                    "type": "message",
+                    "message": "\ud83d\udd4a The room shows mercy. No pump this round."
+                  },
+                  {
+                    "type": "notify",
+                    "message": "\ud83d\udd4a Mercy \u2014 [capacity]%"
+                  }
+                ]
+              },
+              {
+                "label": "More \u2014 keep going",
+                "fallback": false,
+                "actions": [
+                  {
+                    "type": "fire",
+                    "fire_mode": "seconds",
+                    "seconds": 15,
+                    "device_id": null
+                  },
+                  {
+                    "type": "message",
+                    "message": "\ud83d\ude08 The room votes MORE \u2014 [secs]s! (now [capacity]%)"
+                  },
+                  {
+                    "type": "notify",
+                    "message": "\ud83d\ude08 The room voted MORE \u00b7 [command_overlay_desc]"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "PickThePump",
+            "title": "Which pump?",
+            "body": "Choose what runs next.",
+            "duration": 45,
+            "repeat_every": 0,
+            "options": [
+              {
+                "label": "Slow and steady",
+                "fallback": true,
+                "actions": [
+                  {
+                    "type": "fire",
+                    "fire_mode": "seconds",
+                    "seconds": 20,
+                    "device_id": null
+                  },
+                  {
+                    "type": "message",
+                    "message": "\ud83d\udc22 Slow and steady \u2014 [secs]s."
+                  },
+                  {
+                    "type": "notify",
+                    "message": "\ud83d\udc22 Slow and steady \u00b7 [command_overlay_desc]"
+                  }
+                ]
+              },
+              {
+                "label": "Short and sharp",
+                "fallback": false,
+                "actions": [
+                  {
+                    "type": "fire",
+                    "fire_mode": "seconds",
+                    "seconds": 8,
+                    "device_id": null
+                  },
+                  {
+                    "type": "message",
+                    "message": "\u26a1 Short and sharp \u2014 [secs]s."
+                  },
+                  {
+                    "type": "notify",
+                    "message": "\u26a1 Short and sharp \u00b7 [command_overlay_desc]"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "competitions": [
+          {
+            "name": "RollOff",
+            "type": "rolloff",
+            "duration": 90,
+            "repeat_every": 15,
+            "metric": "total",
+            "max_entries": 3,
+            "required_entries": 1,
+            "title": "\ud83c\udfc1 Roll-off!",
+            "body": "Press **Enter Challenge**, roll, and the highest total takes it.",
+            "allow_reroll": false,
+            "reroll_count": 1,
+            "roll_specs": [
+              {
+                "dice": 2,
+                "sides": 10
+              }
+            ],
+            "require_enter": true,
+            "win_actions": [
+              {
+                "type": "message",
+                "message": "\ud83c\udfc1 **[winner]** takes it with **[winner_score]**!"
+              },
+              {
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": "[winner_score]",
+                "device_id": null
+              },
+              {
+                "type": "notify",
+                "message": "\ud83c\udfc1 [winner] won the roll-off"
+              }
+            ],
+            "no_winner_actions": [
+              {
+                "type": "message",
+                "message": "\ud83c\udfc1 Nobody entered \u2014 the wheel spins on."
+              }
+            ]
+          }
+        ],
+        "bonus_rounds": [
+          {
+            "name": "TeamPush",
+            "type": "teamwork",
+            "title": "\ud83e\udd1d Team Push",
+            "body": "Everyone holding banked volume can cash it in together.",
+            "duration": 60,
+            "confirm": "all",
+            "no_holders_message": "Nobody has anything banked.",
+            "expire_message": "The team push fizzled out.",
+            "actions": [
+              {
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": "[total_bonus_secs]",
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83e\udd1d The team cashed in **[total_bonus_secs]s**!"
+              },
+              {
+                "type": "notify",
+                "message": "\ud83e\udd1d Team push \u00b7 [command_overlay_desc]"
+              }
+            ]
+          }
+        ],
         "event_in_process_message": "\u23f3 [event] is already running.",
         "event_cooldown_message": "\u23f3 [event] is on cooldown \u2014 [cooldown]s left.",
         "templates": {
           "commands": [
             {
-              "name": "inflate",
+              "name": "fill",
               "type": "actions",
               "enabled": true,
               "owner_only": false,
               "start_events": [],
-              "range_gate": "20-40",
-              "description": "inflate a little further",
+              "range_gate": "0-20",
+              "description": "fill those guts a bit more",
               "hide_in_list": false,
               "react_only": false,
               "react_emoji": "",
@@ -3934,40 +3753,35 @@
                 {
                   "type": "fire",
                   "fire_mode": "seconds",
-                  "seconds": 30,
+                  "seconds": 35,
                   "device_id": null
                 },
                 {
                   "type": "message",
-                  "message": "\ud83d\udca8 [mention] used [prefix]inflate[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                  "message": "\ud83d\udca8 [mention] used [prefix]fill[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
                 }
-              ]
-            },
+              ],
+              "notify_enabled": true,
+              "notify": "[user] triggered [command] [command_overlay_desc]",
+              "notify_desc": true
+            }
+          ],
+          "events": [
             {
-              "name": "agtoss",
-              "type": "actions",
-              "enabled": true,
-              "owner_only": false,
-              "start_events": [],
-              "range_gate": "all",
-              "description": "flip a coin",
-              "hide_in_list": false,
-              "react_only": false,
-              "react_emoji": "",
-              "pl_bust_start": 15,
-              "pl_bust_step": 12,
-              "pl_max_pumps": 8,
-              "pl_points": 1,
-              "sm_symbols": 4,
-              "sm_max_rounds": 8,
-              "sm_reveal": 3,
-              "bl_cells": 9,
-              "bl_pops": 3,
-              "bl_points": 1,
-              "rps_wins": 3,
-              "sl_symbols": 6,
-              "game_intro": "",
-              "game_tiers": [],
+              "name": "PumpRoulette",
+              "enabled": false,
+              "mode": "loop",
+              "every": 30,
+              "max_repeats": 3,
+              "fire_immediately": true,
+              "clean_previous": false,
+              "cooldown": 30,
+              "post_actions": [
+                {
+                  "type": "message",
+                  "message": "\ud83c\udfb0 **PumpRoulette** complete!"
+                }
+              ],
               "actions": [
                 {
                   "type": "chance",
@@ -3977,93 +3791,218 @@
                     {
                       "type": "fire",
                       "fire_mode": "seconds",
-                      "seconds": 10,
+                      "seconds": 20,
                       "device_id": null
                     },
                     {
                       "type": "message",
-                      "message": "[mention] took a chance on a coin flip...[cmd_remain_note]\n**SUCCESS!** [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+                      "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udd34 **BIG HIT!** +20s pump! (Capacity now [capacity]%)\n[next_round]"
                     }
                   ],
                   "miss_actions": [
                     {
+                      "type": "fire",
+                      "fire_mode": "seconds",
+                      "seconds": 5,
+                      "device_id": null
+                    },
+                    {
                       "type": "message",
-                      "message": "[mention] took a chance on a coin flip[cmd_remain_note]\n**FAILURE!** - Better luck next time..."
+                      "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udfe2 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]"
+                    }
+                  ]
+                },
+                {
+                  "type": "notify",
+                  "message": "\ud83c\udfb0 [user] added [secs]s to [device] \u00b7 Roulette [current_loop]/[total_loops]"
+                }
+              ]
+            }
+          ],
+          "ranges": [
+            {
+              "min": 0,
+              "max": 20,
+              "dice": 6,
+              "sides": 6,
+              "announce": "\ud83c\udf88 [operator] is barely inflated \u2014 you can do better than that!",
+              "milestone": "",
+              "image": "",
+              "cooldowns": {
+                "fill": {
+                  "enabled": true,
+                  "max_uses": 3,
+                  "seconds": 120,
+                  "scope": "user"
+                },
+                "roll": {
+                  "seconds": 120,
+                  "scope": "user"
+                },
+                "agroll": {
+                  "seconds": 120,
+                  "scope": "user"
+                }
+              },
+              "start_command": "",
+              "start_command_enabled": false,
+              "event_actions": []
+            }
+          ],
+          "polls": [
+            {
+              "name": "Mercy",
+              "title": "Mercy or More?",
+              "body": "[owner] is at [capacity]% \u2014 the room decides.",
+              "duration": 60,
+              "repeat_every": 0,
+              "options": [
+                {
+                  "label": "Mercy \u2014 let them breathe",
+                  "fallback": true,
+                  "actions": [
+                    {
+                      "type": "message",
+                      "message": "\ud83d\udd4a The room shows mercy. No pump this round."
+                    },
+                    {
+                      "type": "notify",
+                      "message": "\ud83d\udd4a Mercy \u2014 [capacity]%"
+                    }
+                  ]
+                },
+                {
+                  "label": "More \u2014 keep going",
+                  "fallback": false,
+                  "actions": [
+                    {
+                      "type": "fire",
+                      "fire_mode": "seconds",
+                      "seconds": 15,
+                      "device_id": null
+                    },
+                    {
+                      "type": "message",
+                      "message": "\ud83d\ude08 The room votes MORE \u2014 [secs]s! (now [capacity]%)"
+                    },
+                    {
+                      "type": "notify",
+                      "message": "\ud83d\ude08 The room voted MORE \u00b7 [command_overlay_desc]"
                     }
                   ]
                 }
               ]
-            },
+            }
+          ],
+          "competitions": [
             {
-              "name": "agroulette",
-              "type": "actions",
-              "enabled": true,
-              "owner_only": false,
-              "start_events": [
-                "PumpRoulette"
+              "name": "RollOff",
+              "type": "rolloff",
+              "duration": 90,
+              "repeat_every": 15,
+              "metric": "total",
+              "max_entries": 3,
+              "required_entries": 1,
+              "title": "\ud83c\udfc1 Roll-off!",
+              "body": "Press **Enter Challenge**, roll, and the highest total takes it.",
+              "allow_reroll": false,
+              "reroll_count": 1,
+              "roll_specs": [
+                {
+                  "dice": 2,
+                  "sides": 10
+                }
               ],
-              "range_gate": "all",
-              "description": "spin the pump roulette \u2014 3 rounds of 50/50 +5s or +20s",
-              "hide_in_list": false,
-              "react_only": false,
-              "react_emoji": "",
-              "pl_bust_start": 15,
-              "pl_bust_step": 12,
-              "pl_max_pumps": 8,
-              "pl_points": 1,
-              "sm_symbols": 4,
-              "sm_max_rounds": 8,
-              "sm_reveal": 3,
-              "bl_cells": 9,
-              "bl_pops": 3,
-              "bl_points": 1,
-              "rps_wins": 3,
-              "sl_symbols": 6,
-              "game_intro": "",
-              "game_tiers": [],
+              "require_enter": true,
+              "win_actions": [
+                {
+                  "type": "message",
+                  "message": "\ud83c\udfc1 **[winner]** takes it with **[winner_score]**!"
+                },
+                {
+                  "type": "fire",
+                  "fire_mode": "seconds",
+                  "seconds": "[winner_score]",
+                  "device_id": null
+                },
+                {
+                  "type": "notify",
+                  "message": "\ud83c\udfc1 [winner] won the roll-off"
+                }
+              ],
+              "no_winner_actions": [
+                {
+                  "type": "message",
+                  "message": "\ud83c\udfc1 Nobody entered \u2014 the wheel spins on."
+                }
+              ]
+            }
+          ],
+          "capevents": [
+            {
+              "name": "Quarter",
+              "enabled": true,
+              "at": 20,
               "actions": [
                 {
                   "type": "message",
-                  "message": "**[user]** spins the roulette wheel\u2026[cmd_remain_note]"
+                  "message": "\ud83d\udcc8 **20%** \u2014 [owner] is starting to fill out."
+                },
+                {
+                  "type": "notify",
+                  "message": "\ud83d\udcc8 20% reached"
+                }
+              ],
+              "post_actions": []
+            }
+          ],
+          "bonus_rounds": [
+            {
+              "name": "TeamPush",
+              "type": "teamwork",
+              "title": "\ud83e\udd1d Team Push",
+              "body": "Everyone holding banked volume can cash it in together.",
+              "duration": 60,
+              "confirm": "all",
+              "no_holders_message": "Nobody has anything banked.",
+              "expire_message": "The team push fizzled out.",
+              "actions": [
+                {
+                  "type": "fire",
+                  "fire_mode": "seconds",
+                  "seconds": "[total_bonus_secs]",
+                  "device_id": null
+                },
+                {
+                  "type": "message",
+                  "message": "\ud83e\udd1d The team cashed in **[total_bonus_secs]s**!"
+                },
+                {
+                  "type": "notify",
+                  "message": "\ud83e\udd1d Team push \u00b7 [command_overlay_desc]"
                 }
               ]
-            },
+            }
+          ],
+          "broadcasts": [
             {
-              "name": "agpushluck",
-              "type": "game-pushluck",
-              "seconds": null,
-              "dice": null,
-              "sides": null,
-              "enabled": true,
-              "owner_only": false,
-              "device_id": null,
-              "start_events": [],
-              "range_gate": "all",
-              "description": "push-your-luck minigame \u2014 pump for points, bank before you bust",
-              "hide_in_list": false,
-              "mention": false,
-              "react_only": false,
-              "react_emoji": "",
-              "fires": [],
-              "fail_fires": [],
-              "chance": null,
-              "luck": null,
-              "success_reply": "",
-              "failure_reply": "",
-              "pl_bust_start": 12,
-              "pl_bust_step": 13,
-              "pl_max_pumps": 8,
-              "pl_points": 1,
-              "sm_symbols": 4,
-              "sm_max_rounds": 8,
-              "sm_reveal": 3,
-              "bl_cells": 9,
-              "bl_pops": 3,
-              "bl_points": 1,
-              "rps_wins": 3,
-              "sl_symbols": 6,
-              "game_intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it![cmd_remain_note]",
-              "game_tiers": [
+              "name": "Welcome",
+              "message": "\ud83d\udc4b Welcome in. [owner] is at [capacity]%. [syscom_help] for commands.",
+              "enabled": true
+            }
+          ],
+          "minigames": [
+            {
+              "id": "mg:38259041",
+              "name": "Push Your Luck",
+              "kind": "pushluck",
+              "config": {
+                "pl_bust_start": 12,
+                "pl_bust_step": 13,
+                "pl_max_pumps": 8,
+                "pl_points": 1
+              },
+              "tiers": [
                 {
                   "op": ">=",
                   "min": 0,
@@ -4112,710 +4051,51 @@
                     }
                   ]
                 }
-              ]
-            },
-            {
-              "name": "agsimon",
-              "type": "game-simon",
-              "seconds": null,
-              "dice": null,
-              "sides": null,
-              "enabled": true,
-              "owner_only": false,
-              "device_id": null,
-              "start_events": [],
-              "range_gate": "all",
-              "description": "memory minigame \u2014 repeat the growing emoji sequence",
-              "hide_in_list": false,
-              "mention": false,
-              "react_only": false,
-              "react_emoji": "",
-              "fires": [],
-              "fail_fires": [],
-              "chance": null,
+              ],
               "luck": null,
-              "success_reply": "",
-              "failure_reply": "",
-              "pl_bust_start": 15,
-              "pl_bust_step": 12,
-              "pl_max_pumps": 8,
-              "pl_points": 1,
-              "sm_symbols": 4,
-              "sm_max_rounds": 8,
-              "sm_reveal": 3,
-              "bl_cells": 9,
-              "bl_pops": 3,
-              "bl_points": 1,
-              "rps_wins": 3,
-              "sl_symbols": 6,
-              "game_intro": "\ud83e\udde0 **[user]** takes on **Simon** \u2014 memorize the sequence, then repeat it![cmd_remain_note] ",
-              "game_tiers": [
-                {
-                  "op": ">=",
-                  "min": 0,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 5,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\u274c **[user]** fumbled at round **[score]**.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 1,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 15,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83d\udc4f **[user]** reached round **[score]** \u2014 nice!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 3,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 20,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 6,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 35,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 8,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 50,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udfc6 **[user]** got a PERFECT SCORE **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "name": "agpopit",
-              "type": "game-balloon",
-              "seconds": null,
-              "dice": null,
-              "sides": null,
-              "enabled": true,
-              "owner_only": false,
-              "device_id": null,
-              "start_events": [],
-              "range_gate": "all",
-              "description": "don't-pop-it minigame \u2014 reveal safe cells, avoid the balloons",
-              "hide_in_list": false,
-              "mention": false,
-              "react_only": false,
-              "react_emoji": "",
-              "fires": [],
-              "fail_fires": [],
-              "chance": null,
-              "luck": null,
-              "success_reply": "",
-              "failure_reply": "",
-              "pl_bust_start": 15,
-              "pl_bust_step": 12,
-              "pl_max_pumps": 8,
-              "pl_points": 1,
-              "sm_symbols": 4,
-              "sm_max_rounds": 8,
-              "sm_reveal": 3,
-              "bl_cells": 9,
-              "bl_pops": 3,
-              "bl_points": 1,
-              "rps_wins": 3,
-              "sl_symbols": 6,
-              "game_intro": "\ud83c\udf88 **[user]** plays **Don't Pop It** \u2014 reveal safe cells for points, or cash out before you hit a balloon![cmd_remain_note]",
-              "game_tiers": [
-                {
-                  "op": ">=",
-                  "min": 0,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 5,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83d\udca5 **[user]** popped a balloon and walked away with the bare minimum.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 1,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 10,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udf88 **[user]** cashed out **[score]** \u2014 nice haul!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 3,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 20,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 5,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 35,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "name": "agrps",
-              "type": "game-rps",
-              "seconds": null,
-              "dice": null,
-              "sides": null,
-              "enabled": true,
-              "owner_only": false,
-              "device_id": null,
-              "start_events": [],
-              "range_gate": "all",
-              "description": "rock-paper-scissors vs the bot, best of 5",
-              "hide_in_list": false,
-              "mention": false,
-              "react_only": false,
-              "react_emoji": "",
-              "fires": [],
-              "fail_fires": [],
-              "chance": null,
-              "luck": null,
-              "success_reply": "",
-              "failure_reply": "",
-              "pl_bust_start": 15,
-              "pl_bust_step": 12,
-              "pl_max_pumps": 8,
-              "pl_points": 1,
-              "sm_symbols": 4,
-              "sm_max_rounds": 8,
-              "sm_reveal": 3,
-              "bl_cells": 9,
-              "bl_pops": 3,
-              "bl_points": 1,
-              "rps_wins": 3,
-              "sl_symbols": 6,
-              "game_intro": "\u270a\u270b\u270c\ufe0f **[user]** challenges the bot to **Rock-Paper-Scissors** \u2014 first to 3![cmd_remain_note]",
-              "game_tiers": [
-                {
-                  "op": ">=",
-                  "min": 0,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 5,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83d\udc80 **[user]** got swept by the bot in rock, paper, scissors.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 1,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 10,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83d\ude05 **[user]** fought to **[score]** round(s) but lost the match.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 3,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 25,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udfc6 **[user]** BEAT the bot! **+[secs]s** added to the pump timer!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "name": "agpull",
-              "type": "game-slots",
-              "seconds": null,
-              "dice": null,
-              "sides": null,
-              "enabled": true,
-              "owner_only": false,
-              "device_id": null,
-              "start_events": [],
-              "range_gate": "all",
-              "description": "public slot machine \u2014 one pull, tiered payout",
-              "hide_in_list": false,
-              "mention": false,
-              "react_only": false,
-              "react_emoji": "",
-              "fires": [],
-              "fail_fires": [],
-              "chance": null,
-              "luck": null,
-              "success_reply": "",
-              "failure_reply": "",
-              "pl_bust_start": 15,
-              "pl_bust_step": 12,
-              "pl_max_pumps": 8,
-              "pl_points": 1,
-              "sm_symbols": 4,
-              "sm_max_rounds": 8,
-              "sm_reveal": 3,
-              "bl_cells": 9,
-              "bl_pops": 3,
-              "bl_points": 1,
-              "rps_wins": 3,
-              "sl_symbols": 6,
-              "game_intro": "\ud83c\udfb0 **[user]** pulls the lever\u2026[cmd_remain_note]",
-              "game_tiers": [
-                {
-                  "op": ">=",
-                  "min": 0,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 5,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udfb0 no match \u2014 better luck next pull, **[user]** - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 1,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 15,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udfb0 **[user]** hit a pair \u2014 small win! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 3,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 35,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udfb0\ud83c\udf89 **JACKPOT!** **[user]** hit three of a kind! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "name": "agblackjack",
-              "type": "game-blackjack",
-              "seconds": null,
-              "dice": null,
-              "sides": null,
-              "enabled": true,
-              "owner_only": false,
-              "device_id": null,
-              "start_events": [],
-              "range_gate": "all",
-              "description": "blackjack (21) vs the bot \u2014 hit or stand",
-              "hide_in_list": false,
-              "mention": false,
-              "react_only": false,
-              "react_emoji": "",
-              "fires": [],
-              "fail_fires": [],
-              "chance": null,
-              "luck": null,
-              "success_reply": "",
-              "failure_reply": "",
-              "pl_bust_start": 15,
-              "pl_bust_step": 12,
-              "pl_max_pumps": 8,
-              "pl_points": 1,
-              "sm_symbols": 4,
-              "sm_max_rounds": 8,
-              "sm_reveal": 3,
-              "bl_cells": 9,
-              "bl_pops": 3,
-              "bl_points": 1,
-              "rps_wins": 3,
-              "sl_symbols": 6,
-              "game_intro": "\ud83c\udccf **[user]** sits down at the blackjack table\u2026[cmd_remain_note]",
-              "game_tiers": [
-                {
-                  "op": ">=",
-                  "min": 0,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 5,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udccf **[user]** lost the hand. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 1,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 10,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udccf **[user]** pushed \u2014 a wash. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 2,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 20,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udccf **[user]** beat the dealer! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 3,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 40,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udccf\ud83c\udca1 **BLACKJACK!** **[user] dominated the dealer!** \u2014 [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
-                    }
-                  ]
-                }
-              ]
+              "intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it![cmd_remain_note]",
+              "intro_embed": false,
+              "intro_title": "",
+              "start_events": []
             }
           ],
-          "events": [
+          "prizes": [
             {
-              "name": "PumpRoulette",
-              "enabled": false,
-              "mode": "loop",
-              "every": 30,
-              "max_repeats": 3,
-              "fire_immediately": true,
-              "clean_previous": false,
-              "cooldown": 30,
+              "name": "SUPERPUMP - !superpump triggers a 40s burst of air",
+              "enabled": true,
+              "counter": "roll",
+              "goal": 3,
+              "range_gate": "all",
+              "progress_message": "[mention] rolled a perfect score [[count]/[goal]] \u2014 [remaining] more will unlock a bonus command!",
               "actions": [
                 {
-                  "type": "chance",
-                  "chance": 50,
-                  "luck": null,
-                  "win_actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 20,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udd34 **BIG HIT!** +20s pump! (Capacity now [capacity]%)\n[next_round]"
-                    }
-                  ],
-                  "miss_actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 5,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udfe2 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]"
-                    }
-                  ]
-                }
-              ],
-              "post_actions": [
+                  "type": "award",
+                  "award_type": "command",
+                  "target": "[user]",
+                  "command": "superpump",
+                  "charges": 1,
+                  "stash": true
+                },
                 {
                   "type": "message",
-                  "message": "\ud83c\udfb0 **PumpRoulette** complete!"
+                  "message": "[mention] has unlocked: [bonus_cmd] \u2014 SUPERPUMP - !superpump triggers a 40s burst of air\\nYou can use this command a total of [charges] times."
                 }
               ]
             }
           ],
-          "ranges": [
+          "modes": [
             {
-              "min": 0,
-              "max": 20,
-              "dice": 6,
-              "sides": 6,
-              "announce": "\ud83e\udec1 [operator] is barely inflated \u2014 you can do better than that!",
-              "milestone": "",
-              "image": "",
-              "cooldowns": {
-                "fill": {
-                  "enabled": true,
-                  "max_uses": 3,
-                  "seconds": 120,
-                  "scope": "user"
-                },
-                "roll": {
-                  "seconds": 120,
-                  "scope": "user"
-                }
-              },
-              "start_command": "",
-              "start_command_enabled": false,
-              "event_actions": []
-            },
-            {
-              "min": 20,
-              "max": 40,
-              "dice": 4,
-              "sides": 6,
-              "announce": "\ud83d\udca8 [operator] is filling out nicely, the first signs of bloating begin to appear.",
-              "milestone": "**MILESTONE:** \ud83d\udca8 [operator]'s belly starts to round out and press outward slightly. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
-              "image": "",
-              "cooldowns": {
-                "inflate": {
-                  "enabled": true,
-                  "max_uses": 6,
-                  "seconds": 195,
-                  "scope": "user"
-                },
-                "roll": {
-                  "seconds": 195,
-                  "scope": "user",
-                  "dice": 5
-                }
-              },
-              "start_command": "",
-              "start_command_enabled": false,
-              "event_actions": []
-            },
-            {
-              "min": 40,
-              "max": 60,
-              "dice": 4,
-              "sides": 6,
-              "announce": "\ud83c\udf88 [operator]'s belly is taut and pressurised, curves stretching tighter.",
-              "milestone": "**MILESTONE:** \ud83c\udf88 Halfway there \u2014 [operator]'s middle is firm and noticeably swollen. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
-              "image": "",
-              "cooldowns": {
-                "pump": {
-                  "enabled": true,
-                  "max_uses": 6,
-                  "seconds": 220,
-                  "scope": "user"
-                },
-                "roll": {
-                  "seconds": 220,
-                  "scope": "user",
-                  "luck": 15
-                }
-              },
-              "start_command": "",
-              "start_command_enabled": false,
-              "event_actions": []
-            },
-            {
-              "min": 60,
-              "max": 80,
-              "dice": 2,
-              "sides": 4,
-              "announce": "\ud83c\udf88 [operator]'s belly is round, tight, and visibly swollen.",
-              "milestone": "**MILESTONE:** \ud83c\udf88 [operator] is seriously swollen now \u2014 the pressure is constant and building. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
-              "image": "",
-              "cooldowns": {
-                "squeeze": {
-                  "enabled": true,
-                  "max_uses": 3,
-                  "seconds": 350,
-                  "scope": "user"
-                },
-                "roll": {
-                  "seconds": 350,
-                  "scope": "user",
-                  "dice": 3,
-                  "sides": 7,
-                  "luck": 10
-                }
-              },
-              "start_command": "",
-              "start_command_enabled": false,
-              "event_actions": []
-            },
-            {
-              "min": 80,
-              "max": 90,
-              "dice": 2,
-              "sides": 4,
-              "announce": "\u26a0\ufe0f [operator] 's belly is stretched dangerously tight, groaning under the strain.",
-              "milestone": "**MILESTONE:** \u26a0\ufe0f [operator]'s gut is straining hard \u2014 one bold roll could tip them over! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
-              "image": "",
-              "cooldowns": {
-                "tease": {
-                  "enabled": true,
-                  "max_uses": 5,
-                  "seconds": 275,
-                  "scope": "user"
-                },
-                "roll": {
-                  "seconds": 275,
-                  "scope": "user",
-                  "luck": 20,
-                  "sides": 8
-                }
-              },
-              "start_command": "",
-              "start_command_enabled": false,
-              "event_actions": []
-            },
-            {
-              "min": 90,
-              "max": 100,
-              "dice": 2,
-              "sides": 4,
-              "announce": "\ud83d\udea8 [operator]'s belly is at the absolute brink, creaking and ready to pop''.",
-              "milestone": "**MILESTONE:** \ud83d\udea8 The edge! [operator] has reached maximum capacity and can't take much more! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]\n",
-              "image": "",
-              "cooldowns": {
-                "topup": {
-                  "enabled": true,
-                  "max_uses": null,
-                  "seconds": 300,
-                  "scope": "user"
-                },
-                "roll": {
-                  "seconds": 300,
-                  "scope": "user",
-                  "luck": 20,
-                  "dice": 3
-                }
-              },
-              "start_command": "",
-              "start_command_enabled": false,
-              "event_actions": []
+              "name": "Gentle",
+              "commands": [
+                "fill",
+                "tease"
+              ],
+              "events": [],
+              "enabled": false,
+              "message_on": "\ud83d\udd4a **Gentle mode** \u2014 only the softer commands are live.",
+              "message_off": "Gentle mode off \u2014 everything is back."
             }
-          ],
-          "polls": [],
-          "competitions": [],
-          "capevents": []
+          ]
         },
         "minigames": [
           {
@@ -6123,10 +5403,67 @@
             "notify_enabled": true,
             "notify": "[user] triggered [command] [command_overlay_desc]",
             "notify_desc": true
+          },
+          {
+            "name": "mercypoll",
+            "type": "actions",
+            "enabled": true,
+            "owner_only": true,
+            "hide_in_help": true,
+            "range_gate": "all",
+            "description": "start the Mercy or More? poll",
+            "actions": [
+              {
+                "type": "poll",
+                "poll": "Mercy"
+              }
+            ],
+            "start_events": [],
+            "notify_enabled": false
+          },
+          {
+            "name": "pickpump",
+            "type": "actions",
+            "enabled": true,
+            "owner_only": true,
+            "hide_in_help": true,
+            "range_gate": "all",
+            "description": "start the Which pump? poll",
+            "actions": [
+              {
+                "type": "poll",
+                "poll": "PickThePump"
+              }
+            ],
+            "start_events": [],
+            "notify_enabled": false
           }
         ],
-        "broadcasts": [],
-        "modes": [],
+        "broadcasts": [
+          {
+            "name": "Welcome",
+            "message": "\ud83d\udc4b Welcome in. [owner] is at [capacity]%. [syscom_help] for commands.",
+            "enabled": true
+          },
+          {
+            "name": "LastCall",
+            "message": "\u23f3 Last call \u2014 [owner] is at [capacity]%.",
+            "enabled": true
+          }
+        ],
+        "modes": [
+          {
+            "name": "Gentle",
+            "commands": [
+              "fill",
+              "tease"
+            ],
+            "events": [],
+            "enabled": false,
+            "message_on": "\ud83d\udd4a **Gentle mode** \u2014 only the softer commands are live.",
+            "message_off": "Gentle mode off \u2014 everything is back."
+          }
+        ],
         "prizes": [
           {
             "name": "SUPERPUMP - !superpump triggers a 40s burst of air",
@@ -6152,7 +5489,16 @@
           }
         ],
         "owner_commands": [],
-        "chat_buttons": [],
+        "chat_buttons": [
+          {
+            "label": "\ud83d\udd4a Mercy or More?",
+            "name": "mercypoll"
+          },
+          {
+            "label": "\ud83c\udf9b Which pump?",
+            "name": "pickpump"
+          }
+        ],
         "cooldown_seconds": 120,
         "auto_report": {
           "enabled": true,
@@ -6514,22 +5860,256 @@
             "actions": []
           }
         ],
-        "capacity_events": [],
-        "polls": [],
-        "competitions": [],
-        "bonus_rounds": [],
+        "capacity_events": [
+          {
+            "name": "Quarter",
+            "enabled": true,
+            "at": 20,
+            "actions": [
+              {
+                "type": "message",
+                "message": "\ud83d\udcc8 **20%** \u2014 [owner] is starting to fill out."
+              },
+              {
+                "type": "notify",
+                "message": "\ud83d\udcc8 20% reached"
+              }
+            ],
+            "post_actions": []
+          },
+          {
+            "name": "Halfway",
+            "enabled": true,
+            "at": 50,
+            "actions": [
+              {
+                "type": "message",
+                "message": "\ud83d\udcc8 **Halfway.** [owner] is at [capacity]% \u2014 no going back now."
+              },
+              {
+                "type": "notify",
+                "message": "\ud83d\udcc8 Halfway \u2014 [capacity]%"
+              },
+              {
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": 10,
+                "device_id": null
+              }
+            ],
+            "post_actions": []
+          },
+          {
+            "name": "Tight",
+            "enabled": true,
+            "at": 70,
+            "actions": [
+              {
+                "type": "message",
+                "message": "\ud83d\ude33 **70%** \u2014 things are getting tight."
+              },
+              {
+                "type": "notify",
+                "message": "\ud83d\ude33 70% \u2014 getting tight"
+              }
+            ],
+            "post_actions": []
+          },
+          {
+            "name": "NearlyThere",
+            "enabled": true,
+            "at": 90,
+            "actions": [
+              {
+                "type": "message",
+                "message": "\ud83d\udea8 **90%!** [owner] is nearly at capacity."
+              },
+              {
+                "type": "notify",
+                "message": "\ud83d\udea8 90% \u2014 nearly there"
+              }
+            ],
+            "post_actions": []
+          }
+        ],
+        "polls": [
+          {
+            "name": "Mercy",
+            "title": "Mercy or More?",
+            "body": "[owner] is at [capacity]% \u2014 the room decides.",
+            "duration": 60,
+            "repeat_every": 0,
+            "options": [
+              {
+                "label": "Mercy \u2014 let them breathe",
+                "fallback": true,
+                "actions": [
+                  {
+                    "type": "message",
+                    "message": "\ud83d\udd4a The room shows mercy. No pump this round."
+                  },
+                  {
+                    "type": "notify",
+                    "message": "\ud83d\udd4a Mercy \u2014 [capacity]%"
+                  }
+                ]
+              },
+              {
+                "label": "More \u2014 keep going",
+                "fallback": false,
+                "actions": [
+                  {
+                    "type": "fire",
+                    "fire_mode": "seconds",
+                    "seconds": 15,
+                    "device_id": null
+                  },
+                  {
+                    "type": "message",
+                    "message": "\ud83d\ude08 The room votes MORE \u2014 [secs]s! (now [capacity]%)"
+                  },
+                  {
+                    "type": "notify",
+                    "message": "\ud83d\ude08 The room voted MORE \u00b7 [command_overlay_desc]"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "PickThePump",
+            "title": "Which pump?",
+            "body": "Choose what runs next.",
+            "duration": 45,
+            "repeat_every": 0,
+            "options": [
+              {
+                "label": "Slow and steady",
+                "fallback": true,
+                "actions": [
+                  {
+                    "type": "fire",
+                    "fire_mode": "seconds",
+                    "seconds": 20,
+                    "device_id": null
+                  },
+                  {
+                    "type": "message",
+                    "message": "\ud83d\udc22 Slow and steady \u2014 [secs]s."
+                  },
+                  {
+                    "type": "notify",
+                    "message": "\ud83d\udc22 Slow and steady \u00b7 [command_overlay_desc]"
+                  }
+                ]
+              },
+              {
+                "label": "Short and sharp",
+                "fallback": false,
+                "actions": [
+                  {
+                    "type": "fire",
+                    "fire_mode": "seconds",
+                    "seconds": 8,
+                    "device_id": null
+                  },
+                  {
+                    "type": "message",
+                    "message": "\u26a1 Short and sharp \u2014 [secs]s."
+                  },
+                  {
+                    "type": "notify",
+                    "message": "\u26a1 Short and sharp \u00b7 [command_overlay_desc]"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "competitions": [
+          {
+            "name": "RollOff",
+            "type": "rolloff",
+            "duration": 90,
+            "repeat_every": 15,
+            "metric": "total",
+            "max_entries": 3,
+            "required_entries": 1,
+            "title": "\ud83c\udfc1 Roll-off!",
+            "body": "Press **Enter Challenge**, roll, and the highest total takes it.",
+            "allow_reroll": false,
+            "reroll_count": 1,
+            "roll_specs": [
+              {
+                "dice": 2,
+                "sides": 10
+              }
+            ],
+            "require_enter": true,
+            "win_actions": [
+              {
+                "type": "message",
+                "message": "\ud83c\udfc1 **[winner]** takes it with **[winner_score]**!"
+              },
+              {
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": "[winner_score]",
+                "device_id": null
+              },
+              {
+                "type": "notify",
+                "message": "\ud83c\udfc1 [winner] won the roll-off"
+              }
+            ],
+            "no_winner_actions": [
+              {
+                "type": "message",
+                "message": "\ud83c\udfc1 Nobody entered \u2014 the wheel spins on."
+              }
+            ]
+          }
+        ],
+        "bonus_rounds": [
+          {
+            "name": "TeamPush",
+            "type": "teamwork",
+            "title": "\ud83e\udd1d Team Push",
+            "body": "Everyone holding banked volume can cash it in together.",
+            "duration": 60,
+            "confirm": "all",
+            "no_holders_message": "Nobody has anything banked.",
+            "expire_message": "The team push fizzled out.",
+            "actions": [
+              {
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": "[total_bonus_secs]",
+                "device_id": null
+              },
+              {
+                "type": "message",
+                "message": "\ud83e\udd1d The team cashed in **[total_bonus_secs]s**!"
+              },
+              {
+                "type": "notify",
+                "message": "\ud83e\udd1d Team push \u00b7 [command_overlay_desc]"
+              }
+            ]
+          }
+        ],
         "event_in_process_message": "\u23f3 [event] is already running.",
         "event_cooldown_message": "\u23f3 [event] is on cooldown \u2014 [cooldown]s left.",
         "templates": {
           "commands": [
             {
-              "name": "inflate",
+              "name": "fill",
               "type": "actions",
               "enabled": true,
               "owner_only": false,
               "start_events": [],
-              "range_gate": "20-40",
-              "description": "inflate a little further",
+              "range_gate": "0-20",
+              "description": "fill those guts a bit more",
               "hide_in_list": false,
               "react_only": false,
               "react_emoji": "",
@@ -6551,40 +6131,35 @@
                 {
                   "type": "fire",
                   "fire_mode": "seconds",
-                  "seconds": 30,
+                  "seconds": 35,
                   "device_id": null
                 },
                 {
                   "type": "message",
-                  "message": "\ud83d\udca8 [mention] used [prefix]inflate[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                  "message": "\ud83d\udca8 [mention] used [prefix]fill[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
                 }
-              ]
-            },
+              ],
+              "notify_enabled": true,
+              "notify": "[user] triggered [command] [command_overlay_desc]",
+              "notify_desc": true
+            }
+          ],
+          "events": [
             {
-              "name": "agtoss",
-              "type": "actions",
-              "enabled": true,
-              "owner_only": false,
-              "start_events": [],
-              "range_gate": "all",
-              "description": "flip a coin",
-              "hide_in_list": false,
-              "react_only": false,
-              "react_emoji": "",
-              "pl_bust_start": 15,
-              "pl_bust_step": 12,
-              "pl_max_pumps": 8,
-              "pl_points": 1,
-              "sm_symbols": 4,
-              "sm_max_rounds": 8,
-              "sm_reveal": 3,
-              "bl_cells": 9,
-              "bl_pops": 3,
-              "bl_points": 1,
-              "rps_wins": 3,
-              "sl_symbols": 6,
-              "game_intro": "",
-              "game_tiers": [],
+              "name": "PumpRoulette",
+              "enabled": false,
+              "mode": "loop",
+              "every": 30,
+              "max_repeats": 3,
+              "fire_immediately": true,
+              "clean_previous": false,
+              "cooldown": 30,
+              "post_actions": [
+                {
+                  "type": "message",
+                  "message": "\ud83c\udfb0 **PumpRoulette** complete!"
+                }
+              ],
               "actions": [
                 {
                   "type": "chance",
@@ -6594,93 +6169,218 @@
                     {
                       "type": "fire",
                       "fire_mode": "seconds",
-                      "seconds": 10,
+                      "seconds": 20,
                       "device_id": null
                     },
                     {
                       "type": "message",
-                      "message": "[mention] took a chance on a coin flip...[cmd_remain_note]\n**SUCCESS!** [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+                      "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udd34 **BIG HIT!** +20s pump! (Capacity now [capacity]%)\n[next_round]"
                     }
                   ],
                   "miss_actions": [
                     {
+                      "type": "fire",
+                      "fire_mode": "seconds",
+                      "seconds": 5,
+                      "device_id": null
+                    },
+                    {
                       "type": "message",
-                      "message": "[mention] took a chance on a coin flip[cmd_remain_note]\n**FAILURE!** - Better luck next time..."
+                      "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udfe2 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]"
+                    }
+                  ]
+                },
+                {
+                  "type": "notify",
+                  "message": "\ud83c\udfb0 [user] added [secs]s to [device] \u00b7 Roulette [current_loop]/[total_loops]"
+                }
+              ]
+            }
+          ],
+          "ranges": [
+            {
+              "min": 0,
+              "max": 20,
+              "dice": 6,
+              "sides": 6,
+              "announce": "\ud83c\udf88 [operator] is barely inflated \u2014 you can do better than that!",
+              "milestone": "",
+              "image": "",
+              "cooldowns": {
+                "fill": {
+                  "enabled": true,
+                  "max_uses": 3,
+                  "seconds": 120,
+                  "scope": "user"
+                },
+                "roll": {
+                  "seconds": 120,
+                  "scope": "user"
+                },
+                "agroll": {
+                  "seconds": 120,
+                  "scope": "user"
+                }
+              },
+              "start_command": "",
+              "start_command_enabled": false,
+              "event_actions": []
+            }
+          ],
+          "polls": [
+            {
+              "name": "Mercy",
+              "title": "Mercy or More?",
+              "body": "[owner] is at [capacity]% \u2014 the room decides.",
+              "duration": 60,
+              "repeat_every": 0,
+              "options": [
+                {
+                  "label": "Mercy \u2014 let them breathe",
+                  "fallback": true,
+                  "actions": [
+                    {
+                      "type": "message",
+                      "message": "\ud83d\udd4a The room shows mercy. No pump this round."
+                    },
+                    {
+                      "type": "notify",
+                      "message": "\ud83d\udd4a Mercy \u2014 [capacity]%"
+                    }
+                  ]
+                },
+                {
+                  "label": "More \u2014 keep going",
+                  "fallback": false,
+                  "actions": [
+                    {
+                      "type": "fire",
+                      "fire_mode": "seconds",
+                      "seconds": 15,
+                      "device_id": null
+                    },
+                    {
+                      "type": "message",
+                      "message": "\ud83d\ude08 The room votes MORE \u2014 [secs]s! (now [capacity]%)"
+                    },
+                    {
+                      "type": "notify",
+                      "message": "\ud83d\ude08 The room voted MORE \u00b7 [command_overlay_desc]"
                     }
                   ]
                 }
               ]
-            },
+            }
+          ],
+          "competitions": [
             {
-              "name": "agroulette",
-              "type": "actions",
-              "enabled": true,
-              "owner_only": false,
-              "start_events": [
-                "PumpRoulette"
+              "name": "RollOff",
+              "type": "rolloff",
+              "duration": 90,
+              "repeat_every": 15,
+              "metric": "total",
+              "max_entries": 3,
+              "required_entries": 1,
+              "title": "\ud83c\udfc1 Roll-off!",
+              "body": "Press **Enter Challenge**, roll, and the highest total takes it.",
+              "allow_reroll": false,
+              "reroll_count": 1,
+              "roll_specs": [
+                {
+                  "dice": 2,
+                  "sides": 10
+                }
               ],
-              "range_gate": "all",
-              "description": "spin the pump roulette \u2014 3 rounds of 50/50 +5s or +20s",
-              "hide_in_list": false,
-              "react_only": false,
-              "react_emoji": "",
-              "pl_bust_start": 15,
-              "pl_bust_step": 12,
-              "pl_max_pumps": 8,
-              "pl_points": 1,
-              "sm_symbols": 4,
-              "sm_max_rounds": 8,
-              "sm_reveal": 3,
-              "bl_cells": 9,
-              "bl_pops": 3,
-              "bl_points": 1,
-              "rps_wins": 3,
-              "sl_symbols": 6,
-              "game_intro": "",
-              "game_tiers": [],
+              "require_enter": true,
+              "win_actions": [
+                {
+                  "type": "message",
+                  "message": "\ud83c\udfc1 **[winner]** takes it with **[winner_score]**!"
+                },
+                {
+                  "type": "fire",
+                  "fire_mode": "seconds",
+                  "seconds": "[winner_score]",
+                  "device_id": null
+                },
+                {
+                  "type": "notify",
+                  "message": "\ud83c\udfc1 [winner] won the roll-off"
+                }
+              ],
+              "no_winner_actions": [
+                {
+                  "type": "message",
+                  "message": "\ud83c\udfc1 Nobody entered \u2014 the wheel spins on."
+                }
+              ]
+            }
+          ],
+          "capevents": [
+            {
+              "name": "Quarter",
+              "enabled": true,
+              "at": 20,
               "actions": [
                 {
                   "type": "message",
-                  "message": "**[user]** spins the roulette wheel\u2026[cmd_remain_note]"
+                  "message": "\ud83d\udcc8 **20%** \u2014 [owner] is starting to fill out."
+                },
+                {
+                  "type": "notify",
+                  "message": "\ud83d\udcc8 20% reached"
+                }
+              ],
+              "post_actions": []
+            }
+          ],
+          "bonus_rounds": [
+            {
+              "name": "TeamPush",
+              "type": "teamwork",
+              "title": "\ud83e\udd1d Team Push",
+              "body": "Everyone holding banked volume can cash it in together.",
+              "duration": 60,
+              "confirm": "all",
+              "no_holders_message": "Nobody has anything banked.",
+              "expire_message": "The team push fizzled out.",
+              "actions": [
+                {
+                  "type": "fire",
+                  "fire_mode": "seconds",
+                  "seconds": "[total_bonus_secs]",
+                  "device_id": null
+                },
+                {
+                  "type": "message",
+                  "message": "\ud83e\udd1d The team cashed in **[total_bonus_secs]s**!"
+                },
+                {
+                  "type": "notify",
+                  "message": "\ud83e\udd1d Team push \u00b7 [command_overlay_desc]"
                 }
               ]
-            },
+            }
+          ],
+          "broadcasts": [
             {
-              "name": "agpushluck",
-              "type": "game-pushluck",
-              "seconds": null,
-              "dice": null,
-              "sides": null,
-              "enabled": true,
-              "owner_only": false,
-              "device_id": null,
-              "start_events": [],
-              "range_gate": "all",
-              "description": "push-your-luck minigame \u2014 pump for points, bank before you bust",
-              "hide_in_list": false,
-              "mention": false,
-              "react_only": false,
-              "react_emoji": "",
-              "fires": [],
-              "fail_fires": [],
-              "chance": null,
-              "luck": null,
-              "success_reply": "",
-              "failure_reply": "",
-              "pl_bust_start": 12,
-              "pl_bust_step": 13,
-              "pl_max_pumps": 8,
-              "pl_points": 1,
-              "sm_symbols": 4,
-              "sm_max_rounds": 8,
-              "sm_reveal": 3,
-              "bl_cells": 9,
-              "bl_pops": 3,
-              "bl_points": 1,
-              "rps_wins": 3,
-              "sl_symbols": 6,
-              "game_intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it![cmd_remain_note]",
-              "game_tiers": [
+              "name": "Welcome",
+              "message": "\ud83d\udc4b Welcome in. [owner] is at [capacity]%. [syscom_help] for commands.",
+              "enabled": true
+            }
+          ],
+          "minigames": [
+            {
+              "id": "mg:38259041",
+              "name": "Push Your Luck",
+              "kind": "pushluck",
+              "config": {
+                "pl_bust_start": 12,
+                "pl_bust_step": 13,
+                "pl_max_pumps": 8,
+                "pl_points": 1
+              },
+              "tiers": [
                 {
                   "op": ">=",
                   "min": 0,
@@ -6729,710 +6429,51 @@
                     }
                   ]
                 }
-              ]
-            },
-            {
-              "name": "agsimon",
-              "type": "game-simon",
-              "seconds": null,
-              "dice": null,
-              "sides": null,
-              "enabled": true,
-              "owner_only": false,
-              "device_id": null,
-              "start_events": [],
-              "range_gate": "all",
-              "description": "memory minigame \u2014 repeat the growing emoji sequence",
-              "hide_in_list": false,
-              "mention": false,
-              "react_only": false,
-              "react_emoji": "",
-              "fires": [],
-              "fail_fires": [],
-              "chance": null,
+              ],
               "luck": null,
-              "success_reply": "",
-              "failure_reply": "",
-              "pl_bust_start": 15,
-              "pl_bust_step": 12,
-              "pl_max_pumps": 8,
-              "pl_points": 1,
-              "sm_symbols": 4,
-              "sm_max_rounds": 8,
-              "sm_reveal": 3,
-              "bl_cells": 9,
-              "bl_pops": 3,
-              "bl_points": 1,
-              "rps_wins": 3,
-              "sl_symbols": 6,
-              "game_intro": "\ud83e\udde0 **[user]** takes on **Simon** \u2014 memorize the sequence, then repeat it![cmd_remain_note] ",
-              "game_tiers": [
-                {
-                  "op": ">=",
-                  "min": 0,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 5,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\u274c **[user]** fumbled at round **[score]**.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 1,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 15,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83d\udc4f **[user]** reached round **[score]** \u2014 nice!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 3,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 20,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 6,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 35,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 8,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 50,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udfc6 **[user]** got a PERFECT SCORE **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "name": "agpopit",
-              "type": "game-balloon",
-              "seconds": null,
-              "dice": null,
-              "sides": null,
-              "enabled": true,
-              "owner_only": false,
-              "device_id": null,
-              "start_events": [],
-              "range_gate": "all",
-              "description": "don't-pop-it minigame \u2014 reveal safe cells, avoid the balloons",
-              "hide_in_list": false,
-              "mention": false,
-              "react_only": false,
-              "react_emoji": "",
-              "fires": [],
-              "fail_fires": [],
-              "chance": null,
-              "luck": null,
-              "success_reply": "",
-              "failure_reply": "",
-              "pl_bust_start": 15,
-              "pl_bust_step": 12,
-              "pl_max_pumps": 8,
-              "pl_points": 1,
-              "sm_symbols": 4,
-              "sm_max_rounds": 8,
-              "sm_reveal": 3,
-              "bl_cells": 9,
-              "bl_pops": 3,
-              "bl_points": 1,
-              "rps_wins": 3,
-              "sl_symbols": 6,
-              "game_intro": "\ud83c\udf88 **[user]** plays **Don't Pop It** \u2014 reveal safe cells for points, or cash out before you hit a balloon![cmd_remain_note]",
-              "game_tiers": [
-                {
-                  "op": ">=",
-                  "min": 0,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 5,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83d\udca5 **[user]** popped a balloon and walked away with the bare minimum.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 1,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 10,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udf88 **[user]** cashed out **[score]** \u2014 nice haul!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 3,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 20,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 5,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 35,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "name": "agrps",
-              "type": "game-rps",
-              "seconds": null,
-              "dice": null,
-              "sides": null,
-              "enabled": true,
-              "owner_only": false,
-              "device_id": null,
-              "start_events": [],
-              "range_gate": "all",
-              "description": "rock-paper-scissors vs the bot, best of 5",
-              "hide_in_list": false,
-              "mention": false,
-              "react_only": false,
-              "react_emoji": "",
-              "fires": [],
-              "fail_fires": [],
-              "chance": null,
-              "luck": null,
-              "success_reply": "",
-              "failure_reply": "",
-              "pl_bust_start": 15,
-              "pl_bust_step": 12,
-              "pl_max_pumps": 8,
-              "pl_points": 1,
-              "sm_symbols": 4,
-              "sm_max_rounds": 8,
-              "sm_reveal": 3,
-              "bl_cells": 9,
-              "bl_pops": 3,
-              "bl_points": 1,
-              "rps_wins": 3,
-              "sl_symbols": 6,
-              "game_intro": "\u270a\u270b\u270c\ufe0f **[user]** challenges the bot to **Rock-Paper-Scissors** \u2014 first to 3![cmd_remain_note]",
-              "game_tiers": [
-                {
-                  "op": ">=",
-                  "min": 0,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 5,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83d\udc80 **[user]** got swept by the bot in rock, paper, scissors.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 1,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 10,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83d\ude05 **[user]** fought to **[score]** round(s) but lost the match.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 3,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 25,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udfc6 **[user]** BEAT the bot! **+[secs]s** added to the pump timer!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "name": "agpull",
-              "type": "game-slots",
-              "seconds": null,
-              "dice": null,
-              "sides": null,
-              "enabled": true,
-              "owner_only": false,
-              "device_id": null,
-              "start_events": [],
-              "range_gate": "all",
-              "description": "public slot machine \u2014 one pull, tiered payout",
-              "hide_in_list": false,
-              "mention": false,
-              "react_only": false,
-              "react_emoji": "",
-              "fires": [],
-              "fail_fires": [],
-              "chance": null,
-              "luck": null,
-              "success_reply": "",
-              "failure_reply": "",
-              "pl_bust_start": 15,
-              "pl_bust_step": 12,
-              "pl_max_pumps": 8,
-              "pl_points": 1,
-              "sm_symbols": 4,
-              "sm_max_rounds": 8,
-              "sm_reveal": 3,
-              "bl_cells": 9,
-              "bl_pops": 3,
-              "bl_points": 1,
-              "rps_wins": 3,
-              "sl_symbols": 6,
-              "game_intro": "\ud83c\udfb0 **[user]** pulls the lever\u2026[cmd_remain_note]",
-              "game_tiers": [
-                {
-                  "op": ">=",
-                  "min": 0,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 5,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udfb0 no match \u2014 better luck next pull, **[user]** - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 1,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 15,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udfb0 **[user]** hit a pair \u2014 small win! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 3,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 35,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udfb0\ud83c\udf89 **JACKPOT!** **[user]** hit three of a kind! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "name": "agblackjack",
-              "type": "game-blackjack",
-              "seconds": null,
-              "dice": null,
-              "sides": null,
-              "enabled": true,
-              "owner_only": false,
-              "device_id": null,
-              "start_events": [],
-              "range_gate": "all",
-              "description": "blackjack (21) vs the bot \u2014 hit or stand",
-              "hide_in_list": false,
-              "mention": false,
-              "react_only": false,
-              "react_emoji": "",
-              "fires": [],
-              "fail_fires": [],
-              "chance": null,
-              "luck": null,
-              "success_reply": "",
-              "failure_reply": "",
-              "pl_bust_start": 15,
-              "pl_bust_step": 12,
-              "pl_max_pumps": 8,
-              "pl_points": 1,
-              "sm_symbols": 4,
-              "sm_max_rounds": 8,
-              "sm_reveal": 3,
-              "bl_cells": 9,
-              "bl_pops": 3,
-              "bl_points": 1,
-              "rps_wins": 3,
-              "sl_symbols": 6,
-              "game_intro": "\ud83c\udccf **[user]** sits down at the blackjack table\u2026[cmd_remain_note]",
-              "game_tiers": [
-                {
-                  "op": ">=",
-                  "min": 0,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 5,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udccf **[user]** lost the hand. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 1,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 10,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udccf **[user]** pushed \u2014 a wash. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 2,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 20,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udccf **[user]** beat the dealer! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
-                    }
-                  ]
-                },
-                {
-                  "op": ">=",
-                  "min": 3,
-                  "actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 40,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udccf\ud83c\udca1 **BLACKJACK!** **[user] dominated the dealer!** \u2014 [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
-                    }
-                  ]
-                }
-              ]
+              "intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it![cmd_remain_note]",
+              "intro_embed": false,
+              "intro_title": "",
+              "start_events": []
             }
           ],
-          "events": [
+          "prizes": [
             {
-              "name": "PumpRoulette",
-              "enabled": false,
-              "mode": "loop",
-              "every": 30,
-              "max_repeats": 3,
-              "fire_immediately": true,
-              "clean_previous": false,
-              "cooldown": 30,
+              "name": "SUPERPUMP - !superpump triggers a 40s burst of air",
+              "enabled": true,
+              "counter": "roll",
+              "goal": 3,
+              "range_gate": "all",
+              "progress_message": "[mention] rolled a perfect score [[count]/[goal]] \u2014 [remaining] more will unlock a bonus command!",
               "actions": [
                 {
-                  "type": "chance",
-                  "chance": 50,
-                  "luck": null,
-                  "win_actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 20,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udd34 **BIG HIT!** +20s pump! (Capacity now [capacity]%)\n[next_round]"
-                    }
-                  ],
-                  "miss_actions": [
-                    {
-                      "type": "fire",
-                      "fire_mode": "seconds",
-                      "seconds": 5,
-                      "device_id": null
-                    },
-                    {
-                      "type": "message",
-                      "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udfe2 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]"
-                    }
-                  ]
-                }
-              ],
-              "post_actions": [
+                  "type": "award",
+                  "award_type": "command",
+                  "target": "[user]",
+                  "command": "superpump",
+                  "charges": 1,
+                  "stash": true
+                },
                 {
                   "type": "message",
-                  "message": "\ud83c\udfb0 **PumpRoulette** complete!"
+                  "message": "[mention] has unlocked: [bonus_cmd] \u2014 SUPERPUMP - !superpump triggers a 40s burst of air\\nYou can use this command a total of [charges] times."
                 }
               ]
             }
           ],
-          "ranges": [
+          "modes": [
             {
-              "min": 0,
-              "max": 20,
-              "dice": 6,
-              "sides": 6,
-              "announce": "\ud83e\udec1 [operator] is barely inflated \u2014 you can do better than that!",
-              "milestone": "",
-              "image": "",
-              "cooldowns": {
-                "fill": {
-                  "enabled": true,
-                  "max_uses": 3,
-                  "seconds": 120,
-                  "scope": "user"
-                },
-                "roll": {
-                  "seconds": 120,
-                  "scope": "user"
-                }
-              },
-              "start_command": "",
-              "start_command_enabled": false,
-              "event_actions": []
-            },
-            {
-              "min": 20,
-              "max": 40,
-              "dice": 4,
-              "sides": 6,
-              "announce": "\ud83d\udca8 [operator] is filling out nicely, the first signs of bloating begin to appear.",
-              "milestone": "**MILESTONE:** \ud83d\udca8 [operator]'s belly starts to round out and press outward slightly. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
-              "image": "",
-              "cooldowns": {
-                "inflate": {
-                  "enabled": true,
-                  "max_uses": 6,
-                  "seconds": 195,
-                  "scope": "user"
-                },
-                "roll": {
-                  "seconds": 195,
-                  "scope": "user",
-                  "dice": 5
-                }
-              },
-              "start_command": "",
-              "start_command_enabled": false,
-              "event_actions": []
-            },
-            {
-              "min": 40,
-              "max": 60,
-              "dice": 4,
-              "sides": 6,
-              "announce": "\ud83c\udf88 [operator]'s belly is taut and pressurised, curves stretching tighter.",
-              "milestone": "**MILESTONE:** \ud83c\udf88 Halfway there \u2014 [operator]'s middle is firm and noticeably swollen. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
-              "image": "",
-              "cooldowns": {
-                "pump": {
-                  "enabled": true,
-                  "max_uses": 6,
-                  "seconds": 220,
-                  "scope": "user"
-                },
-                "roll": {
-                  "seconds": 220,
-                  "scope": "user",
-                  "luck": 15
-                }
-              },
-              "start_command": "",
-              "start_command_enabled": false,
-              "event_actions": []
-            },
-            {
-              "min": 60,
-              "max": 80,
-              "dice": 2,
-              "sides": 4,
-              "announce": "\ud83c\udf88 [operator]'s belly is round, tight, and visibly swollen.",
-              "milestone": "**MILESTONE:** \ud83c\udf88 [operator] is seriously swollen now \u2014 the pressure is constant and building. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
-              "image": "",
-              "cooldowns": {
-                "squeeze": {
-                  "enabled": true,
-                  "max_uses": 3,
-                  "seconds": 350,
-                  "scope": "user"
-                },
-                "roll": {
-                  "seconds": 350,
-                  "scope": "user",
-                  "dice": 3,
-                  "sides": 7,
-                  "luck": 10
-                }
-              },
-              "start_command": "",
-              "start_command_enabled": false,
-              "event_actions": []
-            },
-            {
-              "min": 80,
-              "max": 90,
-              "dice": 2,
-              "sides": 4,
-              "announce": "\u26a0\ufe0f [operator] 's belly is stretched dangerously tight, groaning under the strain.",
-              "milestone": "**MILESTONE:** \u26a0\ufe0f [operator]'s gut is straining hard \u2014 one bold roll could tip them over! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
-              "image": "",
-              "cooldowns": {
-                "tease": {
-                  "enabled": true,
-                  "max_uses": 5,
-                  "seconds": 275,
-                  "scope": "user"
-                },
-                "roll": {
-                  "seconds": 275,
-                  "scope": "user",
-                  "luck": 20,
-                  "sides": 8
-                }
-              },
-              "start_command": "",
-              "start_command_enabled": false,
-              "event_actions": []
-            },
-            {
-              "min": 90,
-              "max": 100,
-              "dice": 2,
-              "sides": 4,
-              "announce": "\ud83d\udea8 [operator]'s belly is at the absolute brink, creaking and ready to pop''.",
-              "milestone": "**MILESTONE:** \ud83d\udea8 The edge! [operator] has reached maximum capacity and can't take much more! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]\n",
-              "image": "",
-              "cooldowns": {
-                "topup": {
-                  "enabled": true,
-                  "max_uses": null,
-                  "seconds": 300,
-                  "scope": "user"
-                },
-                "roll": {
-                  "seconds": 300,
-                  "scope": "user",
-                  "luck": 20,
-                  "dice": 3
-                }
-              },
-              "start_command": "",
-              "start_command_enabled": false,
-              "event_actions": []
+              "name": "Gentle",
+              "commands": [
+                "fill",
+                "tease"
+              ],
+              "events": [],
+              "enabled": false,
+              "message_on": "\ud83d\udd4a **Gentle mode** \u2014 only the softer commands are live.",
+              "message_off": "Gentle mode off \u2014 everything is back."
             }
-          ],
-          "polls": [],
-          "competitions": [],
-          "capevents": []
+          ]
         },
         "minigames": [
           {

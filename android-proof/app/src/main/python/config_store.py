@@ -49,11 +49,10 @@ CONFIG_VERSION = 18
 # to and compare against, so nothing may write to it.
 DEFAULT_SCENE_NAME = "DiscoFlate Default"
 
-# The starter scene. It ships as a carbon copy of the read-only baseline and
-# keeps tracking it — change what we ship and an untouched copy follows — right
-# up until the operator makes it theirs by editing or renaming it. From that
-# moment it is their scene and we never touch it again. `pristine` is the mark
-# of "still ours"; the first edit clears it for good.
+# The starter scene: a copy of the read-only baseline for you to build on.
+# Like the baseline it is GENERATED, never stored — so while it still carries
+# this name it is regenerated from what we ship. RENAME it to claim it; that
+# makes it an ordinary scene of your own and we stop touching it.
 STARTER_SCENE_NAME = "Your Scene"
 
 # The gameplay half of the config: everything that defines HOW THE SHOW PLAYS,
@@ -234,7 +233,9 @@ DEFAULTS = {
     # config backup/restore). "Add to Config" ports one back into the live config
     # with clash-safe naming. Each list holds whole item objects.
     "templates": {"commands": [], "events": [], "ranges": [],
-                  "polls": [], "competitions": [], "capevents": []},
+                  "polls": [], "competitions": [], "capevents": [],
+                  "bonus_rounds": [], "broadcasts": [], "minigames": [],
+                  "prizes": [], "modes": []},
 
     # Also accept commands via DM to the bot (opt-in). Anyone who shares a
     # server with the bot can DM it, so pair this with the user allowlist.
@@ -719,9 +720,7 @@ def load() -> dict:
     # Migrate the RAW stored config (merging first would inherit DEFAULTS'
     # current config_version and skip every step).
     cfg = _coerce_numbers(_deep_merge(DEFAULTS, _migrate(stored)))
-    # an untouched starter picks up whatever we ship now, without waiting for
-    # a save or a config-version bump
-    _sync_starter(cfg, None, compare=False)
+    _inject_shipped(cfg)
     cfg["discord_token"] = _dec_token(cfg.get("discord_token") or "")
     return cfg
 
@@ -1444,20 +1443,13 @@ def _migrate(cfg: dict) -> dict:
             old["name"] = nm
             old.pop("builtin", None)
 
-        # The shipped default is read-only and ships clean — no sample
-        # broadcasts or capacity events to delete on every fresh install.
-        dflt = _by(DEFAULT_SCENE_NAME.lower())
-        if dflt is not None:
-            dflt["builtin"] = True
-            gp = dflt.setdefault("gameplay", {})
-            gp["broadcasts"] = []
-            gp["capacity_events"] = []
-            gp["polls"] = []
-        # The starter we just handed over is untouched by construction, so mark
-        # it as ours — it keeps tracking the shipped scene until they edit it.
-        start = _by(STARTER_SCENE_NAME.lower())
-        if start is not None:
-            start["pristine"] = True
+        # Both shipped scenes are generated on load now, so the migration has
+        # nothing to do to them — it only needs to stop a stale stored copy
+        # shadowing the generated one.
+        for _nm in (DEFAULT_SCENE_NAME, STARTER_SCENE_NAME):
+            _old = _by(_nm.lower())
+            if _old is not None:
+                scenes.remove(_old)
         # never leave the panel pointed at a scene nobody can edit
         if (str(cfg.get("chat_scene") or "").strip().lower()
                 == DEFAULT_SCENE_NAME.lower()):
@@ -1599,116 +1591,56 @@ def _fsync_dir(path: str) -> None:
         pass
 
 
-def _shipped(name: str) -> dict | None:
-    want = name.strip().lower()
-    return next((sc for sc in (_factory_seed().get("scenes") or [])
-                 if str(sc.get("name") or "").strip().lower() == want), None)
+SHIPPED_SCENE_NAMES = (DEFAULT_SCENE_NAME, STARTER_SCENE_NAME)
 
 
-def _named(sc: dict, like: dict) -> dict:
-    """`sc` under the other scene's name, for a name-blind comparison."""
-    out = dict(sc)
-    out["name"] = like.get("name")
-    return out
+def _shipped_scenes() -> list:
+    """The scenes we generate. Read from the factory file so they stay
+    editable by us, but they are never written into anyone's config."""
+    want = {n.strip().lower() for n in SHIPPED_SCENE_NAMES}
+    return [copy.deepcopy(sc) for sc in (_factory_seed().get("scenes") or [])
+            if str(sc.get("name") or "").strip().lower() in want]
 
 
-def _scene_body(sc: dict) -> str:
-    """A scene's content, ignoring the pristine mark, for change detection."""
-    return json.dumps({k: v for k, v in sc.items() if k != "pristine"},
-                      sort_keys=True, default=str)
+def _is_shipped(sc: dict) -> bool:
+    return (str((sc or {}).get("name") or "").strip().lower()
+            in {n.strip().lower() for n in SHIPPED_SCENE_NAMES})
 
 
-def _sync_starter(cfg: dict, previous: list | None, compare: bool) -> None:
-    """Keep an untouched starter matching what we ship; release an edited one.
+def _inject_shipped(cfg: dict) -> None:
+    """Generate the shipped scenes on the way IN.
 
-    Only a SAVE can tell an edit from an untouched copy, because only a save
-    has both the incoming scenes and the stored ones. `compare=True` makes that
-    judgement. A LOAD passes compare=False: the config it just read IS the
-    stored copy, so comparing would always say "unchanged" — the stored
-    `pristine` mark is already the record of whether they had touched it, and
-    the refresh is what carries a newly shipped version across.
+    Neither is stored, so neither can be edited, renamed away, half-migrated or
+    left stale — there is nothing on disk to diverge. A scene still called
+    "Your Scene" is by definition not yours yet, so it is regenerated; RENAMING
+    it is how you claim it, at which point it becomes an ordinary stored scene
+    and we never touch it again.
     """
-    scenes = cfg.get("scenes")
-    if not isinstance(scenes, list):
-        return
-    want = STARTER_SCENE_NAME.strip().lower()
-    for sc in scenes:
-        # renamed it → it's theirs now, whatever else they did
-        if isinstance(sc, dict) and sc.get("pristine") \
-                and str(sc.get("name") or "").strip().lower() != want:
-            sc.pop("pristine", None)
-    at = next((i for i, sc in enumerate(scenes)
-               if isinstance(sc, dict) and sc.get("pristine")
-               and str(sc.get("name") or "").strip().lower() == want), None)
-    if at is None:
-        return
-    fresh = _shipped(STARTER_SCENE_NAME)
-    if compare:
-      # Untouched means matching EITHER what we ship (load() may have just
-    # refreshed it) OR what was last written (we shipped a change they have not
-    # picked up yet). Only when it matches neither did they edit it.
-    # With no stored copy to compare against — the very first write — matching
-    # what we ship is the only evidence of "untouched", and we must not refresh
-    # on a guess or we would wipe content the caller deliberately put there.
-      body = _scene_body(scenes[at])
-      was = next((sc for sc in (previous or [])
-                  if isinstance(sc, dict)
-                  and str(sc.get("name") or "").strip().lower() == want), None)
-      same_as_shipped = fresh is not None and _scene_body(_named(fresh, scenes[at])) == body
-      same_as_disk = was is not None and _scene_body(was) == body
-      if not (same_as_shipped or same_as_disk):
-          scenes[at].pop("pristine", None)        # edited → hands off from now on
-          return
-    if fresh is not None:
-        scenes[at] = copy.deepcopy(fresh)
-        scenes[at]["pristine"] = True
+    stored = [sc for sc in (cfg.get("scenes") or [])
+              if isinstance(sc, dict) and not _is_shipped(sc)]
+    cfg["scenes"] = _shipped_scenes() + stored
 
 
-def _disk_scenes() -> list | None:
-    """The scene list exactly as stored, for before/after comparison."""
-    try:
-        with open(CONFIG_PATH, "r", encoding="utf-8") as fh:
-            d = json.load(fh)
-        return d.get("scenes") if isinstance(d, dict) else None
-    except (FileNotFoundError, ValueError, OSError):
-        return None
-
-
-def _enforce_builtin(cfg: dict) -> None:
-    """Restore the read-only shipped scene, whatever the caller sent.
-
-    Enforced here rather than in the API handler so EVERY write path — panel,
-    device sync, import, preset load — gets the same answer: the DiscoFlate
-    Default is the one thing you can always compare against, so nothing may
-    edit it, rename it or delete it.
-    """
-    want = DEFAULT_SCENE_NAME.strip().lower()
-    shipped = next((sc for sc in (_factory_seed().get("scenes") or [])
-                    if str(sc.get("name") or "").strip().lower() == want), None)
-    if shipped is None:
-        return
-    scenes = cfg.get("scenes")
-    if not isinstance(scenes, list):
-        return
-    at = next((i for i, sc in enumerate(scenes)
-               if isinstance(sc, dict)
-               and str(sc.get("name") or "").strip().lower() == want), None)
-    if at is None:
-        scenes.insert(0, copy.deepcopy(shipped))   # deleted → put it back
-    else:
-        scenes[at] = copy.deepcopy(shipped)        # edited → undo it
+def _strip_shipped(cfg: dict) -> None:
+    """...and drop them again on the way OUT, so the file only ever holds the
+    scenes the operator actually owns."""
+    if isinstance(cfg.get("scenes"), list):
+        cfg["scenes"] = [sc for sc in cfg["scenes"]
+                         if isinstance(sc, dict) and not _is_shipped(sc)]
 
 
 def save(cfg: dict) -> dict:
     os.makedirs(DATA_DIR, exist_ok=True)
-    _sync_starter(cfg, _disk_scenes(), compare=True)
-    _enforce_builtin(cfg)
     cfg["config_rev"] = int(cfg.get("config_rev") or 0) + 1
     _rotate_backups()
     # Only the ON-DISK copy carries the encrypted token; callers keep using
     # the returned dict with the plaintext one (the bot needs the real thing).
     disk = dict(cfg)
     disk["discord_token"] = _enc_token(disk.get("discord_token") or "")
+    # The shipped scenes are GENERATED on load, so they never go to disk. This
+    # rebinds disk["scenes"] rather than mutating it, so the caller keeps the
+    # full list it was working with.
+    _strip_shipped(disk)
     fd, tmp = tempfile.mkstemp(dir=DATA_DIR, prefix=".config-", suffix=".tmp")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:

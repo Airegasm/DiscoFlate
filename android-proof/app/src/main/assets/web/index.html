@@ -444,6 +444,14 @@
               <span class="ctrlbits"><select id="ctrlPoll"></select></span>
             </div>
             <div class="ctrlline">
+              <button class="ghost" onclick="controlCompetition()">🏁 Competition</button>
+              <span class="ctrlbits"><select id="ctrlComp"></select></span>
+            </div>
+            <div class="ctrlline">
+              <button class="ghost" onclick="controlBonusRound()">🤝 Bonus round</button>
+              <span class="ctrlbits"><select id="ctrlBonus"></select></span>
+            </div>
+            <div class="ctrlline">
               <button class="ghost" onclick="controlCapacity()">📊 Capacity</button>
               <span class="ctrlbits"></span>
             </div>
@@ -540,7 +548,7 @@
           <div style="flex:1"></div>
           <button class="ghost" onclick="closeOverlay('mediaOverlay')">✕</button>
         </div>
-        <div class="hint" style="margin-top:6px">The universal overlay library — every file lives in <code>data/images</code>, so 🔁 Device Sync and ⬇ Export Scene bundle them automatically. Images up to 8MB, videos up to 96MB. Click a tile to pick it (when you got here from a picker).</div>
+        <div class="hint" style="margin-top:6px">The universal overlay library — every file lives in <code>data/images</code>, so 🔁 PC ↔ Android Config Sync and ⬇ Export Scene bundle them automatically. Images up to 8MB, videos up to 96MB. Click a tile to pick it (when you got here from a picker).</div>
         <div id="mediaGrid" style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px"></div>
       </div>
     </div>
@@ -893,6 +901,37 @@
       </details>
     </div>
 
+    <!-- templates: reusable snapshots of any trigger -->
+    <div class="card span" data-tab="triggers">
+      <details class="help"><summary><b style="font-size:1.02rem">🧩 Templates</b></summary>
+        <div class="hint" style="margin-top:8px">Reusable snapshots saved from the <b>Commands</b>, <b>Events</b>, <b>Ranges</b> (incl. <b>End</b> / <b>End Sequence</b>), <b>Polls</b>, <b>Competitions</b>, and <b>Capacity Events</b> editors — hit the <b>💾</b> on any row to save it here. <b>＋ Add to Config</b> ports one back into your live setup, renaming to dodge clashes. Templates are stored with your config and included in backup/restore.</div>
+        <details class="help" style="margin-top:12px"><summary><b>Commands</b> (<span id="tplCmdCount">0</span>)</summary>
+          <div id="tplCommands" style="margin-top:8px"></div></details>
+        <details class="help"><summary><b>Events</b> (<span id="tplEvtCount">0</span>)</summary>
+          <div id="tplEvents" style="margin-top:8px"></div></details>
+        <details class="help"><summary><b>Ranges</b> (<span id="tplRangeCount">0</span>)</summary>
+          <div id="tplRanges" style="margin-top:8px"></div>
+          <div class="hint" style="margin-top:6px">A range template is a full snapshot — dice, announce, milestone, its <b>From/To band</b>, in-range commands and event actions. <b>End</b> / <b>End Sequence</b> snapshots work too (only one End can exist, so delete the current one before adding). After adding, check its <b>From %</b> / <b>To %</b> in <b>Game → Capacity ranges</b> and adjust if it overlaps an existing band (bands are matched top-down). Custom commands it references must also exist in this config to work.</div></details>
+        <details class="help"><summary><b>Polls</b> (<span id="tplPollCount">0</span>)</summary>
+          <div id="tplPolls" style="margin-top:8px"></div></details>
+        <details class="help"><summary><b>Competitions</b> (<span id="tplCompCount">0</span>)</summary>
+          <div id="tplComps" style="margin-top:8px"></div></details>
+        <details class="help"><summary><b>Capacity Events</b> (<span id="tplCapEvtCount">0</span>)</summary>
+          <div id="tplCapEvts" style="margin-top:8px"></div>
+          <div class="hint" style="margin-top:6px">A capacity-event template keeps its <b>actions</b>, not the threshold it happened to be saved at — adding one asks where to fire it, so the same block can sit at 50% in one show and 70% in another.</div></details>
+        <details class="help"><summary><b>Bonus Rounds</b> (<span id="tplBonusCount">0</span>)</summary>
+          <div id="tplBonus" style="margin-top:8px"></div></details>
+        <details class="help"><summary><b>Broadcasts</b> (<span id="tplBcastCount">0</span>)</summary>
+          <div id="tplBcasts" style="margin-top:8px"></div></details>
+        <details class="help"><summary><b>Minigames</b> (<span id="tplMgCount">0</span>)</summary>
+          <div id="tplMgs" style="margin-top:8px"></div></details>
+        <details class="help"><summary><b>Rewards</b> (<span id="tplPrizeCount">0</span>)</summary>
+          <div id="tplPrizes" style="margin-top:8px"></div></details>
+        <details class="help"><summary><b>Modes</b> (<span id="tplModeCount">0</span>)</summary>
+          <div id="tplModes" style="margin-top:8px"></div></details>
+      </details>
+    </div>
+
     <!-- overlay editors (Chat tab) -->
     <div class="overlay" id="btnOverlay">
       <div class="page">
@@ -1091,7 +1130,7 @@
         <div class="hint" style="margin-top:8px"><b>Heads-up:</b> if both installs run the <b>same bot token</b> with Activation on, every command gets answered twice. Takeover offers to switch <b>this</b> device's Activation off so only the PC drives the game.</div>
       </details>
 
-      <details class="help" style="margin-top:16px"><summary><b style="font-size:1.02rem">🔁 Device Sync</b></summary>
+      <details class="help" style="margin-top:16px"><summary><b style="font-size:1.02rem">🔁 PC ↔ Android Config Sync</b></summary>
         <div class="hint" style="margin-top:8px;max-width:820px">Pull the <b>gameplay setup + overlay media</b> from your other DiscoFlate install (phone ⇄ PC) so both have the same scenes — commands, events, buttons and wording — plus the <code>data/images</code> files they use. On the <b>other</b> device: enable <b>Remote access</b> and whitelist <b>this</b> device's IP. <b>⬇ Pull</b> brings their setup here; <b>⬆ Push</b> sends this device's setup to them — handy when you build a scene on the phone and want it on the PC without walking over. Push works by asking the other device to fetch from this one, so <b>Remote access must be on at BOTH ends</b>, each whitelisting the other's IP. Either direction <b>replaces</b> the receiving device's scenes (token, devices and network settings are never touched — copy a scene first if you want a way back). Files already present with the same name+size are skipped.</div>
         <div class="row" style="gap:8px;margin-top:10px;align-items:flex-end">
           <label class="field" style="flex:1;min-width:180px;max-width:320px">Other device's address <input id="syncAddr" placeholder="192.168.1.50:8765"></label>
@@ -1102,22 +1141,6 @@
         <div class="row" style="margin-top:6px"><span class="muted" id="syncMsg"></span></div>
       </details>
 
-      <details class="help" style="margin-top:16px"><summary><b style="font-size:1.02rem">🧩 Templates</b></summary>
-        <div class="hint" style="margin-top:8px">Reusable snapshots saved from the <b>Commands</b>, <b>Events</b>, <b>Ranges</b> (incl. <b>End</b> / <b>End Sequence</b>), <b>Polls</b>, <b>Competitions</b>, and <b>Capacity Events</b> editors — hit the <b>💾</b> on any row to save it here. <b>＋ Add to Config</b> ports one back into your live setup, renaming to dodge clashes. Templates are stored with your config and included in backup/restore.</div>
-        <details class="help" style="margin-top:12px"><summary><b>Commands</b> (<span id="tplCmdCount">0</span>)</summary>
-          <div id="tplCommands" style="margin-top:8px"></div></details>
-        <details class="help"><summary><b>Events</b> (<span id="tplEvtCount">0</span>)</summary>
-          <div id="tplEvents" style="margin-top:8px"></div></details>
-        <details class="help"><summary><b>Ranges</b> (<span id="tplRangeCount">0</span>)</summary>
-          <div id="tplRanges" style="margin-top:8px"></div>
-          <div class="hint" style="margin-top:6px">A range template is a full snapshot — dice, announce, milestone, its <b>From/To band</b>, in-range commands and event actions. <b>End</b> / <b>End Sequence</b> snapshots work too (only one End can exist, so delete the current one before adding). After adding, check its <b>From %</b> / <b>To %</b> in <b>Game → Capacity ranges</b> and adjust if it overlaps an existing band (bands are matched top-down). Custom commands it references must also exist in this config to work.</div></details>
-        <details class="help"><summary><b>Polls</b> (<span id="tplPollCount">0</span>)</summary>
-          <div id="tplPolls" style="margin-top:8px"></div></details>
-        <details class="help"><summary><b>Competitions</b> (<span id="tplCompCount">0</span>)</summary>
-          <div id="tplComps" style="margin-top:8px"></div></details>
-        <details class="help"><summary><b>Capacity Events</b> (<span id="tplCapEvtCount">0</span>)</summary>
-          <div id="tplCapEvts" style="margin-top:8px"></div></details>
-      </details>
       </details>
     </div>
 
@@ -1299,7 +1322,7 @@
           <br><b>Overlay kinds:</b> 🖼 Media (image or video, with chroma key for green-screen clips) · ▬ Solid (a flat colour block, full-frame by default — a backdrop with no image file) · 🅣 Text (multi-line, left/centre/right) · ⏳ Timer · 📊 Capacity Gauge · ⏱ Device Timers · 🗳 Poll Viewer (draws itself only while a poll runs) · 🔊 Audio (plays a sound on this machine; nothing is drawn on the stream).
           <br><b>Each overlay</b> is either <b>always-on</b> (part of the scene whenever it's live) or <b>callable</b> (played by an action, a button or a scene group — it ghosts on the canvas rather than vanishing, so you can still place it). Text placeholders <b>keep updating while they're on screen</b>, so <code>Starting in [intro_timer]s</code> or <code>[var:score]</code> ticks live without re-firing.
           <br><b>Scene groups</b> are named sets you fire and clear as one. The <b>👁</b> beside the group dropdown puts the group on or off the <b>stream</b> — an off group isn't on screen and doesn't come up when the scene loads, but firing it still plays it, which is how an on-demand group (fireworks, an outro) works. <b>🎬</b> flags a group as an <b>intro</b> (it only ever plays during the pre-show). <b>➕ 📋 ✏️ 🗑</b> create, duplicate, rename and delete groups; the scene itself has the same icons beside its name. A <code>scene_group</code> action can tick <b>⬆ on top</b> to draw the whole group above everything already on screen.
-          <br>The <b>🗂 Media browser</b> is the universal library — images, video and audio all live in <code>data/images</code>, so Device Sync and Export bundle them automatically.</li>
+          <br>The <b>🗂 Media browser</b> is the universal library — images, video and audio all live in <code>data/images</code>, so PC ↔ Android Config Sync and Export bundle them automatically.</li>
         <li><b>The scene drives the feed:</b> whichever scene is selected on the <b>Scenes</b> tab is the live one — its callable overlays appear as buttons in the 🎥 section, and ▶ Start virtual cam puts the always-on items (and live gauges) on the feed.</li>
         <li><b>⏱ Device Timers overlay</b> — one row per configured device, <b>primary pump always on top</b>, each with its own countdown; rows appear as you add devices. Secondary pumps feed the <b>same capacity gauge</b> on their own calibration (rates add up — two pumps fill twice as fast). Row text uses <code>[name]</code> and <code>[secs]</code>, and you can hide idle devices.</li>
         <li><b>🟩 Green-screen clips.</b> Tick <b>chroma key</b> on any media overlay to knock its background colour out, so an ordinary <code>.mp4</code> shot against a green screen plays over your camera with a transparent background — no alpha codec or WebM conversion needed. Pick the <b>key colour</b> (green by default, blue screens work too), <b>tolerance</b> for how much of that hue goes, and <b>edge softness</b> so hair and motion blur don't get a hard jagged cut. Greys and skin tones are protected, so shadows don't punch holes.</li>
@@ -1322,7 +1345,7 @@
         <li><b>Command pacing.</b> Plug commands are paced per device — cloud vendors (Govee, Tuya, Wyze) at most one ON every 2s, LAN vendors every 0.5s — so a burst of events can't get you throttled or banned by a vendor's API. <b>Turning a device OFF is never delayed</b>, at any time: it's a safety operation and always goes straight through.</li>
         <li><b>Renaming devices</b> — the ✏️ next to any device on the Devices tab. Purely cosmetic: everything references devices by id, so renaming can't break commands, ranges or overlays. Leave it blank to restore the original vendor label.</li>
         <li><b>🖥 Take over the PC session (System tab, phone app).</b> Hands the whole app over to your PC's DiscoFlate — every tab, not just Chat — so you drive the PC instance as if you were sitting at it, while the PC stays the bot and the camera home base. A <b>🖥 CONTROLLING PC · ↩ Release</b> chip sits in the header the whole time; tap it (or the back button) to return to this phone's own instance. Needs Remote access enabled + this phone whitelisted on the PC. If both installs share a bot token, takeover offers to switch <b>this</b> device's Activation off first, so commands don't get answered twice.</li>
-        <li><b>🔁 Device Sync (System tab)</b> keeps both installs matching over Wi-Fi — <b>all your scenes</b> with the commands, events, buttons and wording each one owns, and <b>the overlay images/videos</b> they use. <b>⬇ Pull</b> brings the other device's setup here; <b>⬆ Push</b> sends this one's over — so a Stage built on the phone lands on the PC without export/import or walking over. <b>📡 Send scenes</b> (beside them) pushes just your scenes and their media. Push asks the other device to fetch from this one, so <b>Remote access must be on at both ends</b>, each whitelisting the other's IP. Same-name-same-size files are skipped; tokens, devices and network settings never sync.</li>
+        <li><b>🔁 PC ↔ Android Config Sync (System tab)</b> keeps both installs matching over Wi-Fi — <b>all your scenes</b> with the commands, events, buttons and wording each one owns, and <b>the overlay images/videos</b> they use. <b>⬇ Pull</b> brings the other device's setup here; <b>⬆ Push</b> sends this one's over — so a Stage built on the phone lands on the PC without export/import or walking over. <b>📡 Send scenes</b> (beside them) pushes just your scenes and their media. Push asks the other device to fetch from this one, so <b>Remote access must be on at both ends</b>, each whitelisting the other's IP. Same-name-same-size files are skipped; tokens, devices and network settings never sync.</li>
         <li><b>The permission line</b> (under the send box) shows the bot's rights in the scoped channel live: 🚫 = it can't post there (Send disables, the missing permissions are listed) · ⚠ no Manage Webhooks = owner posts fall back to the bot-prefixed style · ⚠ no Read Message History = the mirror starts from now (no backfill).</li>
       </ul>
       <h3 style="margin:14px 0 6px">Granting Manage Webhooks on a server the bot already joined</h3>
@@ -2091,7 +2114,7 @@ function selfViewStop(){
   if(selfStream){ selfStream.getTracks().forEach(t=>t.stop()); selfStream=null; }
   if(v){ v.style.display='none'; v.srcObject=null; }
 }
-// Device Sync: this server pulls gameplay + media from the other install
+// PC ↔ Android Config Sync: this server pulls gameplay + media from the other install
 async function syncPull(){
   const a=($('#syncAddr').value||'').trim(), m=$('#syncMsg');
   if(!a){ m.textContent='enter the other device\'s address first'; return; }
@@ -2118,7 +2141,7 @@ async function syncPush(){
 }
 // Stages tab shortcut: same push, reported inline
 async function stgSend(){
-  // It lives in System -> Device Sync now, right next to that address field,
+  // It lives in System -> PC ↔ Android Config Sync now, right next to that address field,
   // so use it rather than prompting for an address that's already on screen.
   const f=$('#syncAddr');
   let a=(f && f.value || '').trim();
@@ -3371,7 +3394,8 @@ let glStages = [];
 function glStageRows(){
   const box=$('#glStages'); if(!box) return;
   box.innerHTML = glStages.map((st,i)=>
-    `<div class="row" style="gap:8px;align-items:flex-end;margin-bottom:6px">`+
+    `<div class="dev" style="flex-direction:column;align-items:stretch;gap:6px;margin-bottom:8px">`+
+    `<div class="row" style="gap:8px;align-items:flex-end">`+
       `<span class="muted" style="min-width:58px">Stage ${i+1}</span>`+
       `<label class="field"><select data-gls="${i}" style="width:170px" onchange="glStageSet(${i},'group',this.value)"></select></label>`+
       `<label class="field">Length <input type="number" min="0" step="5" value="${+st.seconds||0}" style="width:90px" onchange="glStageSet(${i},'seconds',this.value)"></label>`+
@@ -3379,6 +3403,12 @@ function glStageRows(){
       `<button class="ghost" title="move earlier" ${i===0?'disabled':''} onclick="glStageMove(${i},-1)">▲</button>`+
       `<button class="ghost" title="move later" ${i===glStages.length-1?'disabled':''} onclick="glStageMove(${i},1)">▼</button>`+
       `<button class="ghost" title="remove this stage" onclick="glStageDel(${i})">✕</button>`+
+    `</div>`+
+    // a stage is a span of time with an ACTION BLOCK, like a capacity range
+    actionsSection(`⚙️ Stage ${i+1} actions`, `glStages[${i}].actions`, 'glStageRows',
+        st.actions, "{type:'message',message:''}",
+        'Runs as this stage opens, beside its scene group — a message, a sound, a gate. '+
+        '<code>[stage]</code> <code>[stages]</code> <code>[group]</code> <code>[intro_timer]</code> work here.')+
     `</div>`).join('') || '<span class="muted">no stages yet — add one</span>';
   // fill each row's picker with the INTRO-flagged groups, like the old one did
   glStages.forEach((st,i)=>{
@@ -3596,6 +3626,33 @@ function tabEnter(name){
   else { vcamPreviewStop(); selfViewStop(); }   // leaving Chat: release the camera
   if(name==='stages') setTimeout(()=>{ stgEnsureDefault(); renderStgCanvas(); }, 0);
 }
+function setCtrlMsg(t){
+  const m=$('#ctrlMsg'); if(!m) return;
+  m.textContent=t; clearTimeout(m._t);
+  m._t=setTimeout(()=>{ if(m) m.textContent=''; }, 2500);
+}
+async function controlCompetition(){
+  const sel=$('#ctrlComp'); const name = sel ? sel.value : '';
+  if(!name) return setCtrlMsg('pick a competition first');
+  ctl('/api/control/competition', {name});
+}
+async function controlBonusRound(){
+  const sel=$('#ctrlBonus'); const name = sel ? sel.value : '';
+  if(!name) return setCtrlMsg('pick a bonus round first');
+  ctl('/api/control/bonus-round', {name});
+}
+// both dropdowns list what the LIVE scene actually has
+function renderCompDropdown(){ _fillCtrlPick('#ctrlComp', compRows, 'no competitions yet'); }
+function renderBonusDropdown(){ _fillCtrlPick('#ctrlBonus', bonusRoundRows, 'no bonus rounds yet'); }
+function _fillCtrlPick(id, rows, empty){
+  const sel=$(id); if(!sel) return;
+  const keep=sel.value;
+  const names=(rows||[]).map(r=>(r.name||'').trim()).filter(Boolean);
+  sel.innerHTML = names.length
+    ? names.map(n=>`<option>${esc(n)}</option>`).join('')
+    : `<option value="">— ${empty} —</option>`;
+  if(keep && names.includes(keep)) sel.value=keep;
+}
 async function controlCapacity(){ ctl('/api/control/capacity', {}); }
 async function controlLeaderboard(){ ctl('/api/control/leaderboard', {}); }
 async function controlLeaderboardLife(){ ctl('/api/control/leaderboard-life', {}); }
@@ -3637,6 +3694,7 @@ function renderBroadcasts(){
         `<label class="row" style="gap:5px" title="Active — an inactive broadcast is hidden from the Controls dropdown and a broadcast action skips it"><input type="checkbox" ${b.enabled!==false?'checked':''} style="width:auto" onchange="broadcastRows[${i}].enabled=this.checked;renderBroadcastDropdown();scheduleSave()"> active</label>`+
         `<input value="${esc(b.name||'')}" placeholder="name (shown in the dropdown)" style="width:240px" onchange="broadcastRows[${i}].name=this.value;renderBroadcastDropdown()">`+
         `<div style="flex:1"></div>`+
+`<button class="ghost" title="Save as template" onclick="saveTemplate('broadcasts',${i})">💾</button>`+
         `<button class="ghost" onclick="delBroadcast(${i})">✕</button>`+
       `</div>`+
       `<textarea rows="3" placeholder="message · [capacity] [operator] [commands] …" onchange="broadcastRows[${i}].message=this.value">${esc(b.message||'')}</textarea>`;
@@ -4611,7 +4669,7 @@ function renderMinigames(){
       `<span class="muted" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">`+
         `${esc((MG_KINDS.find(k=>k[0]===kind)||[,kind])[1])} · ${(g.tiers||[]).length} tier${(g.tiers||[]).length===1?'':'s'}`+
         `${used?` · played by ${used} command${used===1?'':'s'}`:' · not used yet'}</span>`+
-      `<button class="ghost" title="Delete" onclick="event.stopPropagation();delMinigame(${i})">✕</button>`+
+`<button class="ghost" title="Save as template" onclick="event.stopPropagation();saveTemplate('minigames',${i})">💾</button>`+`<button class="ghost" title="Delete" onclick="event.stopPropagation();delMinigame(${i})">✕</button>`+
     `</div>`;
     if(!open) return `<div class="dev" style="flex-direction:column;align-items:stretch;gap:6px">${head}</div>`;
     const cf=g.config||{};
@@ -4800,7 +4858,7 @@ function renderModes(){
           `<textarea style="flex:1" rows="4" placeholder="message when OFF" onchange="modeRows[${i}].message_off=this.value">${esc(m.message_off||'')}</textarea>`+
         `</div>`+
       `</div>`+
-      `<button class="ghost" onclick="delMode(${i})">✕</button>`;
+      `<button class="ghost" title="Save as template" onclick="saveTemplate('modes',${i})">💾</button><button class="ghost" onclick="delMode(${i})">✕</button>`;
     box.appendChild(el);
   });
 }
@@ -5638,7 +5696,7 @@ function renderBonusRounds(){
       `<b style="min-width:120px">${esc(b.name||'(unnamed)')}</b>`+
       `<span class="pill" style="padding:2px 10px;font-size:11px">teamwork</span>`+
       `<span class="muted" style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">confirm: ${esc(b.confirm||'all')} · ${b.duration??60}s</span>`+
-      `<button class="ghost" onclick="event.stopPropagation();delBonusRound(${i})">✕</button></div>`;
+      `<button class="ghost" title="Save as template" onclick="event.stopPropagation();saveTemplate('bonus_rounds',${i})">💾</button><button class="ghost" onclick="event.stopPropagation();delBonusRound(${i})">✕</button></div>`;
     if(open){
       html+=`<div class="row" style="gap:12px;align-items:flex-end">`+
         `<label class="field">Name <input value="${esc(b.name||'')}" style="width:200px" onchange="bonusRoundRows[${i}].name=this.value"></label>`+
@@ -5854,7 +5912,9 @@ function delRange(i){ const r=rangeRows[i]||{}; const lbl = r.is_end ? (r.end_on
 // kind → the live editor array it snapshots to/from
 function _tplRows(kind){
   return {commands:commandRows, events:eventRows, ranges:rangeRows,
-          polls:pollRows, competitions:compRows, capevents:capEvRows}[kind];
+          polls:pollRows, competitions:compRows, capevents:capEvRows,
+          bonus_rounds:bonusRoundRows, broadcasts:broadcastRows,
+          minigames:minigameRows, prizes:prizeRows, modes:modeRows}[kind];
 }
 function _tplLabel(kind, o){
   if(kind==='ranges') return o.is_end ? (o.end_only?'End point':'End Sequence') : `range ${o.min}–${o.max}%`;
@@ -5875,14 +5935,27 @@ function addTemplateToConfig(kind, idx){
     toastMsg(copy.is_end?'End added':'Range added — set its From/To % in Capacity ranges');
     return;
   }
+  if(kind==='capevents'){
+    // A capacity event template remembers its ACTIONS, not the threshold it
+    // happened to be saved at — the same "halfway there" block is useful at
+    // 50% in one show and 70% in another. Ask where it goes.
+    const at=prompt(`Fire "${copy.name||'this event'}" at what capacity %?`,
+                    String(copy.at ?? 50));
+    if(at===null) return;
+    copy.at=Math.max(1, Math.min(999, parseFloat(at)||0));
+  }
   const rows=_tplRows(kind);
   copy.name=uniqueName(copy.name, new Set(rows.map(r=>(r.name||'').toLowerCase())));
   rows.push(copy);
   ({commands:renderCommands, events:renderEvents, polls:renderPolls,
-    competitions:renderCompetitions, capevents:renderCapEvents}[kind])();
+    competitions:renderCompetitions, capevents:renderCapEvents,
+    bonus_rounds:renderBonusRounds, broadcasts:renderBroadcasts,
+    minigames:renderMinigames, prizes:renderPrizes, modes:renderModes}[kind])();
+  if(kind==='broadcasts') renderBroadcastDropdown();
+  if(kind==='polls') renderPollDropdown();
   if(kind==='commands') renderRanges();
   scheduleSave();
-  showTab(kind==='commands'?'commands':'events');
+  showTab('triggers');
 }
 function removeTemplate(kind, idx){
   const t=(templatesData[kind]||[])[idx]||{};
@@ -5891,7 +5964,10 @@ function removeTemplate(kind, idx){
 }
 function renderTemplates(){
   [['commands','tplCommands','tplCmdCount'],['events','tplEvents','tplEvtCount'],['ranges','tplRanges','tplRangeCount'],
-   ['polls','tplPolls','tplPollCount'],['competitions','tplComps','tplCompCount'],['capevents','tplCapEvts','tplCapEvtCount']]
+   ['polls','tplPolls','tplPollCount'],['competitions','tplComps','tplCompCount'],['capevents','tplCapEvts','tplCapEvtCount'],
+   ['bonus_rounds','tplBonus','tplBonusCount'],['broadcasts','tplBcasts','tplBcastCount'],
+   ['minigames','tplMgs','tplMgCount'],['prizes','tplPrizes','tplPrizeCount'],
+   ['modes','tplModes','tplModeCount']]
   .forEach(([kind,boxId,cntId])=>{
     const box=$('#'+boxId); if(!box) return;
     const list=templatesData[kind]||[];
@@ -6296,7 +6372,7 @@ function renderPrizes(){
     el.innerHTML =
       `<div class="row" style="gap:10px">`+
         `<label class="row" style="gap:6px"><input type="checkbox" ${p.enabled!==false?'checked':''} onchange="prizeRows[${i}].enabled=this.checked;scheduleSave()"> on</label>`+
-        `<div style="flex:1"></div><button class="ghost" onclick="delPrize(${i})">✕</button>`+
+        `<div style="flex:1"></div><button class="ghost" title="Save as template" onclick="saveTemplate('prizes',${i})">💾</button><button class="ghost" onclick="delPrize(${i})">✕</button>`+
       `</div>`+
       `<div class="row" style="gap:12px;align-items:flex-end">`+
         `<label class="field">Name <input value="${esc(p.name||'')}" placeholder="a special reward" style="width:200px" onchange="prizeRows[${i}].name=this.value;scheduleSave()"></label>`+
@@ -6554,6 +6630,8 @@ function applyState(st, full){
     renderCompetitions();
     renderBonusRounds();
     renderPollDropdown();
+    renderCompDropdown();
+    renderBonusDropdown();
     renderTemplates();
     renderBroadcasts();
     renderBroadcastDropdown();
@@ -6669,7 +6747,8 @@ function _scenesWithShow(){
   if(sc){
     sc.golive = {
       intro_enabled: $('#glEnabled')?$('#glEnabled').checked:false,
-      stages: glStages.map(st=>({group:st.group||'', seconds:Math.max(0,+st.seconds||0)})),
+      stages: glStages.map(st=>({group:st.group||'', seconds:Math.max(0,+st.seconds||0),
+                                 actions: cleanActionRows(st.actions)})),
       // kept in step so a scene written here still opens in an older build
       seconds: Math.max(0, +(glStages[0]||{}).seconds||0),
       scene_group: (glStages[0]||{}).group||'',
