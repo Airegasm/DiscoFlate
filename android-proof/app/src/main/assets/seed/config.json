@@ -737,8 +737,7 @@
     "video": {
       "required": true
     },
-    "role_pref": "host",
-    "auto_accept": false
+    "role_pref": "host"
   },
   "cooldown_seconds": 120,
   "cooldown_exempt_user_ids": [],

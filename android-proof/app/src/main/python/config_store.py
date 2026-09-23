@@ -428,9 +428,6 @@ DEFAULTS = {
         # after. Never "either": a negotiated seat is a seat you can end up in
         # by accident.
         "role_pref": "host",
-        # Skip the accept prompt. Off by default: the invite carries a cost
-        # estimate precisely so somebody reads it before agreeing.
-        "auto_accept": False,
     },
 
     # Default cooldown (seconds) — used by the roll command and by custom

@@ -79,6 +79,19 @@ for ctl in ("#seatTgl", "#mpInviteBtn", "#mpStartBtn", "#mpAbortBtn"):
 ok("data-mode" in vis,
    "…and every multi-scoped card, which is what carries the setup now")
 
+# ---- no switch that skips the accept prompt --------------------------------- #
+# `auto_accept` used to sit in the config, read by nothing. A dead switch is
+# worse than no switch: it implies a behaviour that does not exist, and the
+# first person to tick it learns that only when an invite they never saw has
+# already started firing their pump.
+ok("auto_accept" not in cs.DEFAULTS["multiplayer"],
+   "there is no auto-accept: an invite carries a cost estimate precisely so "
+   "somebody reads it before agreeing")
+import json as _j
+_raw = _j.load(open("default_config.json", encoding="utf-8"))
+ok("auto_accept" not in (_raw.get("multiplayer") or {}),
+   "…and the shipped config does not carry one either")
+
 # ---- the API refuses the switch --------------------------------------------- #
 src = open("app.py", encoding="utf-8").read()
 i = src.index('if "mode" in body:')

@@ -262,7 +262,7 @@ def cfg_for(peer_name, net="900", cast="901", mode="multi", **kw):
             "blocked": [],
             "video": {"guest_cam_group": "", "no_guest_cam_group": ""},
             "peer": {"bot_id": "", "owner_id": "", "name": ""},
-            "role_pref": "either", "auto_accept": False,
+            "role_pref": kw.get("role_pref", "host"),
         },
         "listen_targets": [], "cooldown_exempt_user_ids": ["55"],
         "devices": [], "listener_enabled": True,
@@ -284,7 +284,7 @@ NET, CAST_A, CAST_B = Chan("900"), Chan("901"), Chan("902")
 CHANS = {900: NET, 901: CAST_A, 902: CAST_B}
 
 A, EA, CFGA = make(100, "Curtis-bot", "Dave-bot", CHANS)
-B, EB, CFGB = make(200, "Dave-bot", "Curtis-bot", CHANS)
+B, EB, CFGB = make(200, "Dave-bot", "Curtis-bot", CHANS, role_pref="guest")
 NET.listeners = [A, B]
 
 # ---- the envelope path ------------------------------------------------------ #
@@ -454,8 +454,11 @@ HN, HC = Chan("920"), Chan("921")
 HCHANS = {920: HN, 921: HC}
 P1, EP1, CP1 = make(500, "Curtis-bot", "Dave-bot", HCHANS, net="920", cast="921",
                     peer_player="Dave")
+# Seats are picked before going live, and they are BINDING: a second host
+# cannot accept an invite. So the fixture has to seat them the way two real
+# people would.
 P2, EP2, CP2 = make(600, "Dave-bot", "Curtis-bot", HCHANS, net="920", cast="921",
-                    peer_player="Curtis")
+                    peer_player="Curtis", role_pref="guest")
 HN.listeners = [P1, P2]
 CP1["cooldown_exempt_names"] = ["Curtis"]; CP1["cooldown_exempt_user_ids"] = ["7001"]
 CP2["cooldown_exempt_names"] = ["Dave"];   CP2["cooldown_exempt_user_ids"] = ["7002"]
@@ -599,7 +602,8 @@ HOST_UID, GUEST_UID, FAN = "5001", "5002", "9999"
 RNET, RCAST = Chan("910"), Chan("911")
 RCHANS = {910: RNET, 911: RCAST}
 H, EH, CFGH = make(300, "Curtis-bot", "Dave-bot", RCHANS, net="910", cast="911")
-G, EG, CFGG = make(400, "Dave-bot", "Curtis-bot", RCHANS, net="910", cast="911")
+G, EG, CFGG = make(400, "Dave-bot", "Curtis-bot", RCHANS, net="910", cast="911",
+                   role_pref="guest")     # seats are binding: a host can't accept
 RNET.listeners = [H, G]
 for c, uid, nm, opp in ((CFGH, HOST_UID, "Curtis", "Dave"),
                         (CFGG, GUEST_UID, "Dave", "Curtis")):
