@@ -1,6 +1,6 @@
 {
-  "version": "3.84.6",
-  "versionCode": 179,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.84.6/discoflate-v3.84.6.apk",
-  "notes": "DiscoFlate v3.84.6 \u2014 \ud83d\udda5 The Chat tab loads itself now. Landing on it at page load left the log and the webcam blank until you clicked to another tab and back: showTab() only toggles the CSS, and the work a tab needs on becoming visible \u2014 the channel list, the first poll, the video section \u2014 was only ever wired to the tab-button click. And the camera preview killed its own timer on the first failed frame, so opening the tab before the camera was up, or one blip while it ran, ended the preview permanently. It now slows down instead of dying and picks itself back up within a few seconds."
+  "version": "3.84.7",
+  "versionCode": 180,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.84.7/discoflate-v3.84.7.apk",
+  "notes": "DiscoFlate v3.84.7 \u2014 \ud83d\udcf1 THE ANDROID APP BOOTS AGAIN. It has been unbootable since v3.79.0: app.py started importing media_len.py, nobody added that file to the APK's hand-listed module set, and the import threw before the server could bind \u2014 so the app sat on \"booting local server\" until it timed out. Invisible on desktop, where the file is simply there. Fixed, and check.sh now parses the imports of every shipped module and fails the build if one isn't in the list, so the list cannot silently drift again."
 }

@@ -35,6 +35,39 @@ if command -v node >/dev/null; then
   rm -f /tmp/discoflate-ui-check.js
 fi
 
+# The APK ships a hand-listed set of modules. A module the app imports but
+# nobody added to that list is invisible here (the file is in the repo) and
+# fatal on Android: the import throws, the server thread dies before it binds,
+# and the app hangs on "booting local server" until it times out. media_len.py
+# went missing this way in v3.79.0 and shipped broken for five releases.
+echo "→ every imported local module is in the APK …"
+python3 - <<'PYEOF'
+import ast, os, re, sys
+src = open("scripts/sync-android.sh", encoding="utf-8").read()
+listed = set(re.search(r"PY_FILES=\(([^)]*)\)", src, re.S).group(1).split())
+shipped = {f[:-3] for f in listed if f.endswith(".py")}
+local = {f[:-3] for f in os.listdir(".") if f.endswith(".py")}
+missing = {}
+for mod in sorted(shipped):
+    if not os.path.exists(f"{mod}.py"):
+        continue
+    for n in ast.walk(ast.parse(open(f"{mod}.py", encoding="utf-8").read())):
+        names = []
+        if isinstance(n, ast.Import):
+            names = [a.name.split(".")[0] for a in n.names]
+        elif isinstance(n, ast.ImportFrom) and n.level == 0 and n.module:
+            names = [n.module.split(".")[0]]
+        for nm in names:
+            if nm in local and nm not in shipped:
+                missing.setdefault(nm, set()).add(mod)
+if missing:
+    for nm, who in sorted(missing.items()):
+        print(f"   \u2717 {nm}.py is imported by {', '.join(sorted(who))} "
+              f"but is NOT in sync-android.sh PY_FILES")
+    sys.exit(1)
+print("   ok")
+PYEOF
+
 if [ -x scripts/sync-android.sh ]; then
   echo "→ android-proof copies in sync …"
   scripts/sync-android.sh --check

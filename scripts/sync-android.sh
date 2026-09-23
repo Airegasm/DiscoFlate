@@ -7,9 +7,14 @@ cd "$(dirname "$0")/.."
 PY_DST=android-proof/app/src/main/python
 ASSETS=android-proof/app/src/main/assets
 
+# Every module the app imports must be here. A missing one is invisible on the
+# desktop (the file is right there) and fatal in the APK, where the import
+# throws and the server thread dies before it binds — the WebView then just
+# spins on "booting local server". scripts/check.sh now audits this list
+# against the actual imports so it can't drift again.
 PY_FILES=(app.py camera.py config_store.py device_control.py discord_bot.py engine.py
-          kasa_legacy.py minigames.py pumpdirect_import.py stage.py version.json
-          default_preset.json)
+          kasa_legacy.py media_len.py minigames.py pumpdirect_import.py stage.py
+          version.json default_preset.json)
 
 check_only=false
 [ "${1:-}" = "--check" ] && check_only=true
