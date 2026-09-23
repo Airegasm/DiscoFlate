@@ -1,6 +1,6 @@
 {
-  "version": "3.85.0",
-  "versionCode": 182,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.85.0/discoflate-v3.85.0.apk",
-  "notes": "DiscoFlate v3.85.0 \u2014 \ud83c\udccf Cards size themselves to their content. The poll/competition/bonus-round card divided its fixed height by the row count, so every entrant made the text smaller: at six rows a 16px glyph was being drawn inside a 13px bar, i.e. unreadable exactly when it had something to say. Height is now a MINIMUM \u2014 text size is fixed, rows keep a legible height, and the card grows. Near the bottom of the frame it grows UPWARD from its configured bottom edge instead of running off. Long names WRAP instead of being cut at 26 characters, and past Max rows (default 8, now a setting) it says \u201c+N more\u201d rather than silently dropping entrants. \ud83c\udf9a Panel sliders also survive a nudge: the properties panel rebuilds itself on every change, which threw away the control mid-interaction so an arrow key worked exactly once."
+  "version": "3.85.1",
+  "versionCode": 183,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.85.1/discoflate-v3.85.1.apk",
+  "notes": "DiscoFlate v3.85.1 \u2014 \ud83e\ude79 Fixes the Scenes tab layout that v3.85.0 broke. The two lists moved beside the canvas into a column too narrow for them: the group-controls row was pinned with flex-wrap:nowrap, each overlay row carries nine controls, and height:100% collapsed the panes \u2014 so everything overlapped and spilled sideways. The column is fluid now (300\u2013460px), panes stretch to the canvas height, and both the controls and the overlay rows wrap. Also: the Scenes tab's two walls of text (nearly 2,000 characters) move into Help \u2192 \ud83c\udfac Scenes, broken into sections and brought up to date. And the intro's free-text \"commands allowed during the intro\" allowlist is gone \u2014 a typo in it silently HELD the command rather than allowing it, and intro stages carry action blocks now, so a command_gate row does the same job with real dropdowns."
 }

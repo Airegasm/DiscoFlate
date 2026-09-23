@@ -4693,8 +4693,7 @@
         "announce_every": 0,
         "announce_image": "",
         "hold_commands": true,
-        "blackout": true,
-        "commands": []
+        "blackout": true
       },
       "notify_overlay": "dfdefnotify",
       "pause_overlay": "Pause"
@@ -7190,8 +7189,7 @@
         "announce_every": 0,
         "announce_image": "",
         "hold_commands": true,
-        "blackout": true,
-        "commands": []
+        "blackout": true
       },
       "notify_overlay": "dfdefnotify",
       "pause_overlay": "Pause",
@@ -7214,7 +7212,6 @@
     "announce_image": "",
     "announce_every": 0,
     "hold_commands": true,
-    "commands": [],
     "after_group": "Main",
     "blackout": true
   },

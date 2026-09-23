@@ -1536,12 +1536,17 @@ class Engine:
         return max(0.0, self._intro_until - time.monotonic())
 
     def intro_allows(self, cmd_name: str) -> bool:
-        """During the intro only the explicitly-allowed commands run."""
-        g = self.golive()
-        if not g.get("hold_commands", True):
-            return True
-        ok = {str(c).strip().lower() for c in (g.get("commands") or []) if str(c).strip()}
-        return str(cmd_name or "").strip().lower() in ok
+        """Whether a player command runs during the intro. The pre-show holds
+        everything (`hold_commands`); untick that and nothing is held.
+
+        There is no per-command allowlist any more. It was a comma-separated
+        text field, so a typo silently HELD the command instead of allowing it
+        — the failure was invisible and looked like the command being broken.
+        It also did the same job as a `command_gate` row with no defined
+        precedence between them. An intro STAGE carries an action block now, so
+        an exception is a command_gate there: real dropdowns, and it reads
+        beside everything else the stage does."""
+        return not self.golive().get("hold_commands", True)
 
     def _intro_result(self, who: str, uid) -> dict:
         tmpl = self.golive().get("holding_message") or \

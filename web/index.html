@@ -125,10 +125,18 @@
   /* Scenes tab: the two lists live BESIDE the canvas, stacked and equal, so
      the canvas keeps the full width of the page and the lists keep their
      height instead of being a squat strip above it. */
-  .stglists{display:flex;flex-direction:column;gap:10px;min-height:0;height:100%}
+  .stglists{display:flex;flex-direction:column;gap:10px;flex:1;min-height:0}
   .stgpane{border:1px solid var(--line);border-radius:10px;background:var(--panel2);
-           padding:8px;flex:1 1 0;min-height:0;display:flex;flex-direction:column}
-  .stglist{flex:1;min-height:120px;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+           padding:8px;flex:1 1 0;min-height:150px;display:flex;flex-direction:column;
+           overflow:hidden}
+  .stglist{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;
+           display:flex;flex-direction:column;gap:4px}
+  /* a 300-460px column cannot hold nine controls on one line — let the row
+     wrap, name first, buttons under it */
+  .stgpane .row{flex-wrap:wrap}
+  .stgrow{flex-wrap:wrap;row-gap:3px}
+  .stgrow .nm{flex:1 1 55%}
+  .stgrow button{padding:1px 6px;font-size:12px}
   /* canvas controls, in one row under the canvas */
   .stgunder{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-top:8px}
   .stgunder .field{flex:0 0 auto}
@@ -192,11 +200,12 @@
   #stgCanvas{position:relative;background:#05070b;border:1px solid var(--line);
              border-radius:8px;overflow:hidden;touch-action:none;width:100%;max-width:900px}
   /* the canvas keeps its own settings beside it, not stranded above the lists */
-  .stgstage{display:flex;gap:14px;align-items:flex-start;margin-top:8px}
+  /* stretch, so the side column is exactly as tall as the canvas and the two
+     lists can divide that height between them */
+  .stgstage{display:flex;gap:14px;align-items:stretch;margin-top:8px}
   .stgstage>#stgCanvas{flex:1 1 auto;min-width:0}
-  /* wide enough for the two lists and their group controls */
-  .stgstage .stgside{flex:0 0 380px;min-width:0;display:flex;flex-direction:column;
-                     gap:12px;padding-top:2px}
+  .stgstage .stgside{flex:0 0 clamp(300px, 32%, 460px);min-width:0;display:flex;
+                     flex-direction:column;gap:12px;padding-top:2px}
   @media(max-width:860px){
     .stgstage{flex-direction:column}
     .stgstage .stgside{flex:none;width:100%;flex-direction:column;align-items:stretch;gap:10px}
@@ -519,7 +528,7 @@
     <div class="card span" data-tab="stages">
       <details class="help" open><summary><b style="font-size:1.02rem">🎭 Scenes</b></summary>
 
-      <div class="hint">A <b>scene is the whole show</b>: its overlays and groups, and also its commands, triggers, buttons, wording and limits. Pick a resolution, drag overlays onto the canvas, mark each one <b>always-on</b> or <b>callable</b> — then set up the rules that go with them. Switching scenes switches all of it at once, so nothing can point at a group that belongs to somewhere else. <b>DiscoFlate Default</b> is read-only: copy it, or edit <b>Your Scene</b>, and rename it to make it yours. ▶ Start virtual cam puts the always-on items on your feed. On a phone there is no virtual camera — video runs on your PC and the phone drives it through <b>🖥 VC Remote</b> (Chat tab). Everything autosaves.</div>
+      <div class="hint">A <b>scene is the whole show</b> — overlays, groups, commands, triggers, wording and limits, all switching together. See <b>Help → 🎬 Scenes</b>.</div>
       <div class="row" style="gap:8px;align-items:flex-end;margin-top:8px">
         <label class="field">Scene <select id="scnSel" style="width:200px" onchange="stgPick(+this.value)"></select></label>
         <button class="ghost pmini" onclick="stgAdd()" title="new scene">➕</button>
@@ -533,7 +542,6 @@
         <label class="ghost" style="padding:8px 12px;border:1px solid var(--line);border-radius:8px;cursor:pointer">⬆ Import Scene<input type="file" accept=".zip,.dfscene.zip" style="display:none" onchange="stgImport(this)"></label>
       </div>
       <div id="stgEditor" style="display:none;margin-top:10px">
-        <div class="hint" style="margin:8px 0 0">Drag on the canvas snaps to the <b>5% grid</b> — hold <b>Shift</b> to place freely, or untick <b>grid &amp; snap</b>. Add from the left. The right-hand list shows one <b>scene group</b> at a time — pick it in the dropdown, or <b>All overlays</b>; <b>➕✏️🗑</b> create, rename and delete groups (deleting a group keeps its overlays, just untagged). Anything you add while a group is selected <b>joins that group</b>, and a group fires as a batch from a <code>scene_group</code> action. The list on the right has a <b>Scoped / 🌐 Global</b> toggle: <b>Scoped</b> groups belong to this scene, <b>Global</b> groups are callable from every scene — same list, same canvas, same options, so a global overlay is designed exactly like any other. Globals are always <b>callable</b> (the camera only mounts the live scene's always-on overlays), and a global group fires alongside a scene group of the <b>same name</b>. Overlay kinds include <b>▬ Solid</b> — a flat colour block, full-frame by default, for a backdrop behind a scene group (no image file needed). Rows are the draw stack, front first: <b>👁</b> always-on vs callable (a callable one <b>ghosts</b> on the canvas rather than vanishing, so you can still place it), <b>▲▼</b> front/back, <b>⚙</b> options, <b>−</b> remove. On the canvas: drag to place, <b>◢</b> resize, <b>⟳</b> rotate.</div>
         <div class="stgstage">
           <div id="stgCanvas"></div>
           <div class="stgside">
@@ -550,7 +558,7 @@
               <span class="muted" id="stgScopeNote" style="font-size:11px"></span>
             </div>
             <div class="hint" id="stgScopeHint" style="margin:0 0 7px;font-size:11px"></div>
-            <div class="row" style="gap:6px;align-items:center;margin-bottom:7px;flex-wrap:nowrap">
+            <div class="row" style="gap:6px;align-items:center;margin-bottom:7px;flex-wrap:wrap">
               <select id="stgGroupPick" style="flex:1;min-width:0" onchange="stgSetGroupFilter(this.value)"></select>
               <button class="ghost pmini" id="stgGroupEye" title="hide/show this whole group" onclick="stgGroupHide()">👁</button>
               <button class="ghost pmini" id="stgGroupIntro" title="mark this group as an INTRO" onclick="stgGroupIntroToggle()">🎬</button>
@@ -628,8 +636,6 @@
                   <button class="ghost" title="clear" onclick="$('#glImage').value='';scheduleSave()">✕</button>
                 </div></label>
             </div>
-            <label class="field" style="margin-top:8px">Commands allowed during the intro <span class="muted">(comma-separated · everything else is held)</span>
-              <input id="glCmds" placeholder="signup, rules" style="width:100%;max-width:520px" onchange="scheduleSave()"></label>
           </div>
         </details>
     </div>
@@ -1315,6 +1321,33 @@
       </details>
     </div>
 
+    <div class="card span" data-tab="help">
+      <details class="help"><summary><h2>🎬 Scenes — the whole show in one place</h2></summary>
+        <div class="hint" style="max-width:880px;margin-top:8px">A <b>scene</b> is the entire show: its overlays and groups, and also its commands, triggers, buttons, wording and limits. Switching scenes switches all of it at once, so nothing can point at a group that belongs somewhere else. Everything autosaves.</div>
+
+        <h3 style="margin:14px 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--accent2)">Getting started</h3>
+        <div class="hint" style="max-width:880px">Pick a resolution under the canvas, drag overlays onto it, and mark each one <b>always-on</b> or <b>callable</b> — then set up the rules that go with them. <b>DiscoFlate Default</b> is read-only: copy it, or edit <b>Your Scene</b> and rename it to make it yours. <b>▶ Start virtual cam</b> puts the always-on items on your feed. On a phone there is no virtual camera — video runs on your PC and the phone drives it through <b>🖥 VC Remote</b> on the Chat tab.</div>
+
+        <h3 style="margin:14px 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--accent2)">The canvas</h3>
+        <div class="hint" style="max-width:880px">Drag snaps to the <b>5% grid</b> — hold <b>Shift</b> to place freely, or untick <b>grid &amp; snap</b> below the canvas. On the canvas itself: drag to place, <b>◢</b> resize, <b>⟳</b> rotate. Coordinates are stored as fractions of the frame, so a design works at any resolution of the same aspect ratio.</div>
+
+        <h3 style="margin:14px 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--accent2)">The two lists</h3>
+        <div class="hint" style="max-width:880px">They sit to the <b>right of the canvas</b>: <b>Add an overlay</b> on top, the scene's <b>contents</b> below. Rows are the draw stack, front first:
+          <b>👁</b> always-on vs callable — a callable one <b>ghosts</b> on the canvas rather than vanishing, so you can still place it ·
+          <b>🤫</b> hides it from the <b>canvas only</b> so you can reach whatever sits underneath; it is an editing aid and never touches the stream ·
+          <b>▲▼</b> front/back · <b>➦</b> move to another group · <b>⚙</b> options · <b>−</b> remove.</div>
+
+        <h3 style="margin:14px 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--accent2)">Scene groups</h3>
+        <div class="hint" style="max-width:880px">The contents list shows one <b>group</b> at a time — pick it in the dropdown, or <b>All overlays</b>. <b>➕✏️🗑</b> create, rename and delete them (deleting a group keeps its overlays, just untagged). Anything you add while a group is selected <b>joins that group</b>, and a group fires as a batch from a <code>scene_group</code> action.<br><br>
+          The <b>Scoped / 🌐 Global</b> toggle: <b>Scoped</b> groups belong to this scene; <b>Global</b> groups are callable from every scene — same list, same canvas, same options, so a global overlay is designed exactly like any other. Globals are always <b>callable</b> (the camera only mounts the live scene's always-on overlays), and a global group fires alongside a scene group of the <b>same name</b>.</div>
+
+        <h3 style="margin:14px 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--accent2)">Overlay kinds</h3>
+        <div class="hint" style="max-width:880px"><b>🖼 Media</b> (image or video) · <b>🅣 Text</b> with live placeholders · <b>⏳ Timer</b> · <b>📊 Capacity Gauge</b> · <b>⏱ Device Timers</b> · <b>▬ Solid</b>, a flat colour block, full-frame by default, for a backdrop behind a group with no image file needed · and the four self-gated cards — <b>🗳 Poll</b>, <b>🏁 Competition</b>, <b>🤝 Bonus Round</b>, <b>📣 Broadcast</b> — each of which draws only while its own round is running. A poll, a competition and a bonus round can never run at once, so all four cards can share one corner.</div>
+
+        <h3 style="margin:14px 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--accent2)">The media library</h3>
+        <div class="hint" style="max-width:880px">Every file lives in <code>data/images</code>, so <b>🔁 PC ↔ Android Config Sync</b> and <b>⬇ Export Scene</b> bundle them automatically. Limits: images <b>8MB</b>, audio <b>24MB</b>, video <b>96MB</b>.</div>
+      </details>
+    </div>
     <div class="card span" data-tab="help">
       <details class="help"><summary><h2>🎥 Video streams — getting started</h2></summary>
         <div class="hint" style="max-width:880px;margin-top:8px">DiscoFlate sends a <b>virtual camera</b>: your webcam with overlays composited into it. You pick that virtual camera in Discord instead of your real one, and everything you design on the <b>Scenes</b> tab plays inside your live call. <b>Desktop only</b> — Android can't register a camera device for Discord mobile, so the phone drives the PC instead (<b>🖥 VC Remote</b>).</div>
@@ -4946,9 +4979,6 @@ function renameCommand(i, val){
       return a;
     });
     modeRows.forEach(m=>{ m.commands=(m.commands||[]).map(n=>n.toLowerCase()===old?neu:n); });
-    // Go Live's "allowed during the intro" list is a text field, not an array
-    const gc=$('#glCmds');
-    if(gc) gc.value = idList(gc.value).map(n=>n.toLowerCase()===old?neu:n).join(', ');
     renameCmdRefs(old, neu);
     renderAlwaysOn(); renderModes(); renderEvents(); renderCapEvents(); renderPolls(); renderCompetitions(); renderBonusRounds();
   }
@@ -7102,7 +7132,6 @@ function showToDom(sc, st, force){
   set('#glHold', g.hold_commands!==false); set('#glBlack', g.blackout!==false);
   set('#glAnnounce', g.announce||'');
   set('#glEvery', g.announce_every??0); set('#glImage', g.announce_image||'');
-  set('#glCmds', (g.commands||[]).join(', '));
   // stages, with the pre-stages shape folded in so old configs still work
   if(force || !document.querySelector('#glStages select:focus, #glStages input:focus')){
     glStages = Array.isArray(g.stages) && g.stages.length
@@ -7140,7 +7169,6 @@ function _scenesWithShow(){
       announce_image: ($('#glImage')||{}).value||'',
       hold_commands: $('#glHold')?$('#glHold').checked:true,
       blackout: $('#glBlack')?$('#glBlack').checked:true,
-      commands: idList(($('#glCmds')||{}).value||''),
     };
     sc.notify_overlay = ($('#ovNotify')||{}).value||'';
     sc.pause_overlay  = ($('#ovPause')||{}).value||'';
