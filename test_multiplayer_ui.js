@@ -988,6 +988,29 @@ sandbox.mpRender({ mode: 'multi', state: 'idle', preflight: [] });
      + 'is what lets a stake change without touching the game');
 }
 
+// ---- the red dot on System, and clearing it --------------------------------
+{
+  const dotJs = html.slice(html.indexOf('function renderBlocked('),
+                           html.indexOf('async function clearLog('));
+  ok(/data-go="system"/.test(dotJs), 'the dot goes on the System tab');
+  ok(/tabdot/.test(dotJs) && /dot.remove\(\)/.test(dotJs),
+     '…and is REMOVED when the problems go, not just added');
+  ok(/missing:/.test(dotJs) && /server admin/.test(dotJs),
+     'the banner names the permission and who can grant it — the operator '
+     + 'usually cannot fix this themselves');
+  ok(/Edit Channel/.test(dotJs),
+     '…and where to click, so it is a remedy rather than a complaint');
+
+  const clr = html.slice(html.indexOf('async function clearLog('),
+                         html.indexOf('function renderLog('));
+  ok(/api\('\/api\/log\/clear'/.test(clr),
+     'Clear goes to the server, which owns both the log and the problems');
+  ok(/applyState/.test(clr),
+     '…and re-renders from the response, so the dot goes with the log rather '
+     + 'than lingering until the next poll');
+  ok(/>Clear</.test(html), 'and there is a Clear button to press');
+}
+
 // ---- the permission help says WHY, not just WHAT ---------------------------
 // All four are granted to @everyone by default, so an operator has probably
 // never had to set one and will not recognise the failure when one is revoked.

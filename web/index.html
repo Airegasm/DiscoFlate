@@ -1392,8 +1392,10 @@
         <div class="row" style="gap:14px;align-items:center">
           <label class="row" style="gap:6px" title="Hide the noisy device on/off telemetry from this log (still prints to the console)"><input type="checkbox" id="silenceOnOff" onchange="setSilence(this.checked)"> Silence ON/OFF calls</label>
           <button class="ghost" onclick="copyLog(this)" style="padding:6px 12px">Copy Output</button>
+          <button class="ghost" onclick="clearLog(this)" style="padding:6px 12px" title="Wipes the log and clears the ● on the System tab — clearing it is how you say you've read it">Clear</button>
         </div>
       </div>
+      <div id="blockedBox" style="display:none;margin-bottom:12px"></div>
       <div class="log" id="log"></div>
     </div>
 
@@ -8603,6 +8605,7 @@ function applyState(st, full){
   $('#mockPill').style.display = st.mock_mode ? 'inline-flex' : 'none';
   renderUsers(st.users||[]);
   renderLog(st.log||[]);
+  renderBlocked(st.blocked_channels||[]);
   if($('#silenceOnOff') && document.activeElement!==$('#silenceOnOff')) $('#silenceOnOff').checked = !!st.silence_onoff_log;
   // auto-load the server list once the bot is connected
   if(st.bot_connected && !guildsLoaded){ loadGuilds(); }
@@ -8823,6 +8826,43 @@ function applyState(st, full){
           '\n\nDiscoFlate started from DEFAULTS. Restore a snapshot from data/backups/ '+
           'or Help → Restore from file before changing anything.');
   }
+}
+// A RED DOT on the System tab while Discord is refusing posts.
+//
+// A log scrolls, and the one line explaining why nothing is appearing is
+// twenty lines up by the time anybody wonders. A standing condition needs a
+// standing signal — and something that names the permission, because the
+// person who can grant it is usually somebody else.
+function renderBlocked(list){
+  const box=$('#blockedBox'), tab=document.querySelector('.tab-btn[data-go="system"]');
+  const n=(list||[]).length;
+  if(tab){
+    let dot=tab.querySelector('.tabdot');
+    if(n && !dot){
+      dot=document.createElement('span');
+      dot.className='tabdot';
+      dot.style.cssText='display:inline-block;width:8px;height:8px;border-radius:50%;'+
+        'background:var(--bad);margin-left:6px;vertical-align:middle';
+      tab.appendChild(dot);
+    } else if(!n && dot){ dot.remove(); }
+  }
+  if(!box) return;
+  box.style.display = n ? '' : 'none';
+  if(!n) return;
+  box.innerHTML = (list||[]).map(b=>
+    `<div class="dev" style="border-color:var(--bad)"><div class="grow">`+
+    `<div class="name">🚫 Discord refused ${esc(b.what||'a post')} in ${esc(b.where||'a channel')}</div>`+
+    `<div class="tag">missing: <b>${esc((b.missing||[]).join(', ')||'a permission')}</b></div>`+
+    `<div class="tag">Ask a server admin to grant it for this bot in that channel — `+
+    `Edit Channel → Permissions → add the bot → tick it.</div></div></div>`).join('');
+}
+async function clearLog(btn){
+  try{
+    const st = await api('/api/log/clear', {});
+    applyState(st, false);
+    if(btn){ const t=btn.textContent; btn.textContent='Cleared ✓';
+             setTimeout(()=>btn.textContent=t,1200); }
+  }catch(e){ toastMsg('⚠ '+(e.message||e)); }
 }
 function renderLog(events){
   $('#log').innerHTML = events.map(e =>

@@ -317,6 +317,10 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "mp_actions": cfg.get("mp_actions", []),
         "mp_rounds": cfg.get("mp_rounds", []),
         "mp_sudden": cfg.get("mp_sudden", {}),
+        # Channels Discord has refused a post in — a STANDING condition, so the
+        # panel can put a dot on System rather than hoping somebody scrolls the
+        # log back to the one line that explains why nothing is appearing.
+        "blocked_channels": engine.blocked_list(),
         "mp_end": cfg.get("mp_end", {}),
         "scene_by_mode": cfg.get("scene_by_mode", {}),
         "vendors_set": _mask_vendors(cfg.get("vendors", {})),
@@ -2281,6 +2285,15 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         return web.json_response(await botmgr.mp_search_members(
             str(b.get("q") or ""), int(b.get("limit") or 25)))
 
+    async def log_clear(request):
+        """Clear the Activity log — and the standing problems with it. One
+        gesture, because clearing the log is how an operator says they have
+        read it; leaving the dot lit would make it unclearable noise."""
+        await guard(request)
+        engine.clear_log()
+        engine._log("bot", "log cleared")
+        return web.json_response(_public_state(engine, botmgr))
+
     async def mp_concede(request):
         """Give up. NOT an abort — the End Condition's block runs first."""
         await guard(request)
@@ -2965,6 +2978,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/mp/rounds", mp_rounds),
         web.post("/api/mp/abort", mp_abort),
         web.post("/api/mp/concede", mp_concede),
+        web.post("/api/log/clear", log_clear),
         web.post("/api/mp/members", mp_members),
         web.post("/api/mp/resume", mp_resume),
         web.post("/api/camera/status", camera_status),

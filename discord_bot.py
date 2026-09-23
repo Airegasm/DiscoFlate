@@ -1244,6 +1244,7 @@ class BotManager:
                     #
                     # The VIEW comes with it: buttons need no embed permission,
                     # so the game still plays, it just looks plainer.
+                    self._note_refused(ch, "a card")
                     body = _clip(text) or "\u200b"
                     return await ch.send(
                         body, **({"view": view} if view is not None else {}))
@@ -1255,9 +1256,27 @@ class BotManager:
                 return await ch.send(text, **({"view": view} if view is not None else {}))
             elif view is not None:
                 return await ch.send(view=view)   # a button with no words is still a post
+        except discord.Forbidden:
+            self._note_refused(ch, "a message")
         except Exception as e:  # noqa: BLE001
             self.engine._log("error", f"send failed: {e}")
         return None
+
+    def _where(self, ch) -> str:
+        """A channel as a person would name it, not an id."""
+        g = getattr(getattr(ch, "guild", None), "name", "")
+        n = getattr(ch, "name", None) or getattr(ch, "id", "?")
+        return f"#{n} in {g}" if g else f"#{n}"
+
+    def _note_refused(self, ch, what: str) -> None:
+        """Discord said no. Work out WHICH permission and record it."""
+        try:
+            perms = self.chat_perms(getattr(ch, "id", ""))
+            missing = perms.get("missing") or []
+        except Exception:  # noqa: BLE001
+            missing = []
+        self.engine.note_blocked(str(getattr(ch, "id", "?")),
+                                 self._where(ch), missing, what)
 
     # Embed accent colors per status kind (a colored stripe helps them read apart).
     _EMBED_COLORS = {"capacity": 0x5865F2, "leaderboard": 0xF1C40F,

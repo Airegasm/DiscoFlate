@@ -212,6 +212,12 @@ class Engine:
         # the ON message (+ its [!command]s) has posted — finish_activation()
         # releases them (safety-released after 8s if nothing calls it).
         self._activation_hold: float | None = None
+        # Channels Discord has REFUSED a post in. Kept apart from the log
+        # because a log scrolls: a permission the server never granted is a
+        # standing condition, not an event, and the operator needs it still
+        # visible ten minutes later when they finally wonder why nothing is
+        # appearing. Keyed so one bad channel states its problem ONCE.
+        self._blocked: dict = {}
         # MULTIPLAYER STANDBY: LIVE is on, but in a match nothing starts until
         # the two installs are linked and gated. Unlike _activation_hold this
         # has NO safety timeout — "starting soon" lasts as long as it lasts,
@@ -5530,6 +5536,45 @@ class Engine:
     # -- state / log --------------------------------------------------------- #
     def _log(self, kind: str, msg: str) -> None:
         self.events.appendleft({"t": _now_hms(), "kind": kind, "msg": msg})
+
+    def note_blocked(self, key: str, where: str, missing, what: str) -> None:
+        """Record a post Discord refused, and say what to ask an admin for.
+
+        The message names the channel, the permission and the remedy, because
+        "send failed" tells an operator nothing they can act on — and the
+        person who can fix it is usually somebody else.
+        """
+        k = str(key)
+        miss = [str(m) for m in (missing or [])]
+        first = k not in self._blocked
+        self._blocked[k] = {"where": str(where), "what": str(what),
+                            "missing": miss, "at": _now_hms()}
+        if first:
+            names = ", ".join(miss) or "a permission"
+            self._log("error",
+                      f"Discord refused {what} in {where} — this bot is missing "
+                      f"{names} there. Ask a server admin to grant it for the "
+                      f"bot in that channel.")
+
+    def clear_blocked(self, key: str = "") -> None:
+        """A post that works clears its own complaint."""
+        if key:
+            self._blocked.pop(str(key), None)
+        else:
+            self._blocked.clear()
+
+    def blocked_list(self) -> list:
+        return [{"key": k, **v} for k, v in self._blocked.items()]
+
+    def clear_log(self) -> None:
+        """Wipe the Activity log AND the standing problems with it.
+
+        One gesture, because they are one thing to the operator: clearing the
+        log is how you say "I have read this". Leaving the dot lit afterwards
+        would make it unclearable noise.
+        """
+        self.events.clear()
+        self._blocked.clear()
 
     def _device_log(self, msg: str) -> None:
         """Sink for device telemetry → Activity log. 'Silence ON/OFF calls'

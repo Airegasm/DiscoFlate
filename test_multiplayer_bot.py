@@ -1050,6 +1050,42 @@ ok('"view": view' in fb,
    "still PLAYS, it just looks plainer")
 ok("_clip(text)" in fb, "…carrying the words the embed would have shown")
 
+# ---- a refused post becomes a STANDING problem, not a log line ------------- #
+# A log scrolls. The one line explaining why nothing is appearing is twenty
+# lines up by the time anybody wonders, and the person who can fix it is
+# usually somebody else — so it has to name the permission AND the remedy.
+import engine as _eng
+E2 = _eng.Engine(); E2.set_config({})
+E2.note_blocked("900", "#stage in The Den", ["Embed Links"], "a card")
+E2.note_blocked("900", "#stage in The Den", ["Embed Links"], "a card")
+E2.note_blocked("900", "#stage in The Den", ["Embed Links"], "a card")
+ok(len(E2.blocked_list()) == 1, "one bad channel is ONE problem, not three")
+ok(sum(1 for x in E2.events if "Discord refused" in x["msg"]) == 1,
+   "…and says so ONCE in the log, however many posts it refuses")
+line = next(x["msg"] for x in E2.events if "Discord refused" in x["msg"])
+ok("#stage in The Den" in line, "the line names the CHANNEL, not an id")
+ok("Embed Links" in line, "…and which permission is missing")
+ok("admin" in line, "…and that an admin is who grants it")
+
+E2.note_blocked("901", "#wire", ["Read Message History"], "a message")
+ok(len(E2.blocked_list()) == 2, "a second channel is its own problem")
+E2.clear_blocked("900")
+ok(len(E2.blocked_list()) == 1, "a channel that starts working clears its own")
+
+# Clearing the LOG clears the dot with it — one gesture, because clearing the
+# log is how an operator says they have read it. Leaving the dot lit would
+# make it unclearable noise.
+E2.clear_log()
+ok(not E2.blocked_list() and not len(E2.events),
+   "Clear wipes the log AND the standing problems together")
+
+# and the refusal path really reaches it
+ok("_note_refused(ch" in src2, "a refused send records the problem")
+nr = src2[src2.index("def _note_refused"):]
+nr = nr[:nr.index("\n    async def ")] if "\n    async def " in nr else nr[:600]
+ok("chat_perms" in nr,
+   "…working out WHICH permission is missing rather than saying 'failed'")
+
 print(f"{P} passed, {len(F)} failed")
 for f in F:
     print("  FAIL:", f)
