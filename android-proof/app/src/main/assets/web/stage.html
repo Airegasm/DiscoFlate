@@ -31,6 +31,9 @@
   .wpoll .pb{position:relative;height:1.6em;margin-top:.25em;background:#2e2e36;border-radius:3px}
   .wpoll .pb>i{display:block;height:100%;border-radius:3px}
   .wpoll .pb>b{position:absolute;left:6px;top:0;line-height:1.6em;font-weight:600}
+  /* footer sits in the box's bottom padding, not after the last bar */
+  .wpoll .pf{position:absolute;left:0;right:0;bottom:.3em;text-align:center;
+             font-size:.78em;font-weight:600;opacity:.7}
   /* notification slide: enters from its direction, leaves the same way */
   .anim{transition:transform var(--dur,.3s) ease-out, opacity var(--dur,.3s) ease-out}
   .anim.in{transform:translate(var(--dx,0),var(--dy,0));opacity:0}
@@ -154,7 +157,12 @@ async function loadDesign(){
     (j.stage.overlays||[]).forEach(o=>{
       if(!o.visible) return;   // callable items arrive via the registry poll
       const el = itemEl(o);
-      if(el) $('#layers').appendChild(el);
+      if(!el) return;
+      $('#layers').appendChild(el);
+      applyRadius(el, o);        // needs layout — only real once appended
+      // an always-on item can still slide ON as the scene comes up; it has no
+      // deadline, so there's nothing to time a slide-out against
+      applySlide(el, slideSpec(o), null);
     });
     if(designWidgets.length){ widgetTick(); setInterval(widgetTick, 1000); }
   }catch(e){ /* design unavailable — plain camera stage */ }
@@ -180,6 +188,78 @@ function applyAnim(el, o){
   el.classList.add('anim','in');
   requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.remove('in')));
 }
+// ---- slide in / slide out ------------------------------------------------
+// The server normalises the six slide_* fields into {in,out} legs (stage.py's
+// slide_spec) and hands them over on the overlay, so the page never has to
+// know the field names. Distances are measured from where the layer actually
+// sits, the same way camera.py does it, so the phone Stage and the virtual cam
+// travel the same path.
+const SL_EDGE = {l:'left', r:'right', u:'top', d:'bottom', up:'top', down:'bottom'};
+// Design widgets are read straight from the scene config, so they arrive with
+// the raw slide_* fields — this is stage.py's slide_spec, in JS.
+function slideSpec(o){
+  const leg = (on,d,s)=>{
+    if(!on) return null;
+    d = String(d||'').trim().toLowerCase(); d = SL_EDGE[d] || d;
+    return {dir: ['left','right','top','bottom'].includes(d) ? d : 'left',
+            secs: Math.max(0.05, +s || 0.4)};
+  };
+  o = o||{};
+  return {in:  leg(o.slide_in,  o.slide_in_dir,  o.slide_in_secs),
+          out: leg(o.slide_out, o.slide_out_dir, o.slide_out_secs)};
+}
+function slideOff(el, dir){
+  const fr = $('#frame'), W = fr.clientWidth, H = fr.clientHeight;
+  const x = el.offsetLeft, y = el.offsetTop;
+  // a media layer may not have decoded yet — a whole frame always clears
+  const w = el.offsetWidth || W, h = el.offsetHeight || H;
+  if(dir === 'left')  return [-(x+w), 0];
+  if(dir === 'right') return [W - x, 0];
+  if(dir === 'top')   return [0, -(y+h)];
+  return [0, H - y];                              // bottom
+}
+function slideTo(el, leg, dx, dy){
+  el.style.transition = `transform ${Math.max(0.05, +leg.secs||0.4)}s ease-out`;
+  el._sx = dx+'px'; el._sy = dy+'px'; setXform(el);
+}
+function slideIn(el, leg){
+  if(!leg) return;
+  const [dx,dy] = slideOff(el, leg.dir);
+  el.style.transition = 'none';                   // park it off-frame first…
+  el._sx = dx+'px'; el._sy = dy+'px'; setXform(el);
+  void el.offsetWidth;                            // …commit that, then travel
+  slideTo(el, leg, 0, 0);
+}
+function slideOut(el, leg){
+  if(!leg) return;
+  const [dx,dy] = slideOff(el, leg.dir);
+  slideTo(el, leg, dx, dy);
+}
+// Put a parked layer back on its mark. Only self-gated widgets need this —
+// a fired overlay leaves the DOM — but one that slides OUT and not in would
+// otherwise stay off-frame for the rest of the session.
+function slideHome(el){
+  el.style.transition = 'none'; el._sx = el._sy = ''; setXform(el);
+}
+// Mount an overlay's slide legs. `left` is seconds until the registry drops
+// it (stage.py ships that, not a deadline — clocks don't have to agree).
+function applySlide(el, sl, left){
+  sl = sl || {};
+  if(sl.in) slideIn(el, sl.in);
+  if(sl.out && left != null){
+    const at = (+left - (+sl.out.secs||0.4)) * 1000;
+    el._slideT = setTimeout(()=>slideOut(el, sl.out), Math.max(0, at));
+  }
+}
+// Every transform on a layer is composed HERE, from two halves kept apart:
+// `_base` is where the thing lives (place()'s anchor translate + rotation) and
+// `_sx/_sy` is how far a slide has pushed it off that spot. Writing the whole
+// string each time is what lets a slide animate — a CSS class can't, because
+// the inline transform applyBox() sets would beat it.
+function setXform(el){
+  const slide = (el._sx || el._sy) ? `translate(${el._sx||'0px'},${el._sy||'0px'}) ` : '';
+  el.style.transform = (slide + (el._base || '')).trim() || 'none';
+}
 function applyBox(el, o){
   if(o.opacity!=null){ const v=+o.opacity;
     el.style.opacity = String(Math.max(0, Math.min(1, v>100 ? v/255 : v/100))); }
@@ -188,8 +268,8 @@ function applyBox(el, o){
     el.style.top  = (o.y*100)+'%';
   }
   // keep any translate place() set for anchored items, then add rotation
-  const base = (el.style.transform || '').replace(/rotate\([^)]*\)/g, '').trim();
-  el.style.transform = (base + (o.rot ? ` rotate(${o.rot}deg)` : '')).trim() || 'none';
+  el._base = ((el._base || '') + (o.rot ? ` rotate(${o.rot}deg)` : '')).trim();
+  setXform(el);
   el.style.transformOrigin = 'center center';
   if(o.flash) el.style.animation = `dfflash ${(+o.flash||1)*2}s steps(1,end) infinite`;
 }
@@ -243,6 +323,59 @@ function itemEl(o){
     designWidgets.push({kind, el, o});
   return el;
 }
+// ---- device timer rows: scope, columns, plate --------------------------
+// Mirrors camera.py's timer_rows / _fmt_cols / _rows_sprite so the phone
+// Stage and the virtual cam produce the same table.
+function timerRows(o, st, single){
+  let rows = st.device_timers || [];
+  if(!rows.length)
+    rows = [{id:'', name:'PUMP', primary:true, firing:!!st.firing, remaining:+st.remaining||0}];
+  if(single) return rows.slice(0,1);
+  // `devices` scopes the list; empty/absent = every configured device, and
+  // the reserved id 'primary' follows whichever device is primary
+  const scope = (o.devices||[]).map(String).filter(Boolean);
+  if(scope.length){
+    const keep = rows.filter(r=>scope.includes(String(r.id||''))
+                                || (scope.includes('primary') && r.primary));
+    rows = keep.length ? keep : rows;       // scoped to devices that are gone
+  }
+  if(o.show_idle===false) rows = rows.filter(r=>r.firing);
+  return rows;
+}
+function fmtCols(fmt, name, secs){
+  const s = String(fmt);
+  if(!s.includes('[name]')) return [s.replace('[secs]', secs), ''];
+  const i = s.indexOf('[name]');
+  return [s.slice(0,i)+name, s.slice(i+6).replace(/^\s+/,'').replace('[secs]', secs)];
+}
+// A two-column grid IS the tab stop: every countdown lines up at the same x
+// however long the device names are, and the whole list shares one plate.
+function drawRows(el, o, rows){
+  el.style.display = 'inline-grid';
+  el.style.gridTemplateColumns = 'auto auto';
+  el.style.columnGap = '.55em';
+  el.innerHTML = rows.map(r=>{
+    const [a,b] = fmtCols(r.firing ? (o.fmt_on||'[name] [secs]s') : (o.fmt_off||'[name] idle'),
+                          r.name||'device', Math.round(r.remaining||0));
+    return `<span>${esc(a)}</span><span>${esc(b)}</span>`;
+  }).join('');
+  applyRadius(el, o);
+}
+// ---- rounded corners ---------------------------------------------------
+// `radius` is a PERCENT of the box's shorter side (camera.py does the same),
+// so a plate keeps its shape at any resolution and 50 is a full pill.
+const RADIUS_DEF = {capacity_gauge:15, poll_viewer:3, solid:0};
+function applyRadius(el, o){
+  const kind = o.kind||'text';
+  const painted = kind==='poll_viewer' || kind==='capacity_gauge' || kind==='solid'
+                  || String(o.bg||'').trim();
+  if(!painted){ el.style.borderRadius=''; return; }   // nothing to round
+  let r = o.radius;
+  if(r==null || r==='') r = (RADIUS_DEF[kind]!=null ? RADIUS_DEF[kind] : 12);
+  r = Math.max(0, Math.min(50, +r||0));
+  const side = Math.min(el.offsetWidth, el.offsetHeight);
+  el.style.borderRadius = Math.round(side*r/100)+'px';
+}
 async function widgetTick(){
   try{
     const st = await (await fetch('/api/state', {headers:HDRS})).json();
@@ -258,11 +391,27 @@ async function widgetTick(){
         w.el.querySelector('b').textContent = (w.o.show_pct===false) ? '' : pct.toFixed(0)+'%';
       } else if(w.kind==='poll_viewer'){
         const pv = st.poll;
-        let show = !!pv;
-        if(pv && pv.phase==='results')
-          show = (+pv.results_age||0) <= (+w.o.results_secs||8);
-        w.el.style.display = show ? '' : 'none';
-        if(!show) return;
+        const hold = +w.o.results_secs||8;
+        // seconds until this card is done — only knowable once the poll is
+        // showing RESULTS; while voting is open it has no end yet
+        let ends = null, show = !!pv;
+        if(pv && pv.phase==='results'){ ends = hold - (+pv.results_age||0); show = ends > 0; }
+        // A Poll Viewer is always mounted and gates itself, so its slide legs
+        // ride the POLL's clock rather than an overlay timer.
+        const sl = w.sl || (w.sl = slideSpec(w.o));
+        if(show && !w.on){ w.on = 1; w.el.style.display = ''; slideIn(w.el, sl.in); }
+        if(!show){
+          if(w.on){ w.on = 0; w.exit = 0; if(w.exitT) clearTimeout(w.exitT); slideHome(w.el); }
+          w.el.style.display = 'none';
+          return;
+        }
+        // arm the exit off a timer, not this 1s tick — a 0.4s leg would fall
+        // straight through the gap between two samples
+        if(sl.out && ends != null && !w.exit){
+          w.exit = 1;
+          w.exitT = setTimeout(()=>slideOut(w.el, sl.out),
+                               Math.max(0, (ends - sl.out.secs)*1000));
+        }
         const tot=Math.max(1, pv.total||0), acc=w.o.color||'#f4a828';
         const left = pv.phase==='results'
           ? Math.max(0,(+w.o.results_secs||8)-(+pv.results_age||0)) : (pv.remaining||0);
@@ -272,7 +421,9 @@ async function widgetTick(){
           (pv.options||[]).slice(0,8).map((op,i)=>
             `<div class="pb"><i style="width:${Math.round(100*(op.votes||0)/tot)}%;`+
             `background:${(pv.winner==null||i===pv.winner)?acc:'#6e6e78'}"></i>`+
-            `<b>${(i===pv.winner?'🏆 ':'')}${esc(op.label||'')} · ${op.votes||0}</b></div>`).join('');
+            `<b>${(i===pv.winner?'🏆 ':'')}${esc(op.label||'')} · ${op.votes||0}</b></div>`).join('')+
+          // only while voting is open — the results phase has nothing left to vote on
+          (pv.phase==='results' ? '' : `<div class="pf">Use the Chat Buttons to Vote</div>`);
       } else if(w.kind==='timer'){
         const live=(st.timers||{})[w.o.id];
         const sec = live!=null ? live : (+w.o.seconds||0);
@@ -281,19 +432,11 @@ async function widgetTick(){
         if(!/\[(secs|mmss)\]/.test(t)) t+=' [secs]';
         w.el.textContent = t.replace('[secs]', Math.round(sec))
                             .replace('[mmss]', m+':'+String(s).padStart(2,'0'));
+        applyRadius(w.el, w.o);   // the plate resizes as the digits do
         if(w.o.autovanish && live!=null && live<=0) w.el.style.display='none';
-      } else if(w.kind==='device_timers'){
+      } else if(w.kind==='device_timers' || w.kind==='pump_timer'){
         // one row per device, primary pump first — grows with the rig
-        let rows = st.device_timers || [];
-        if(w.o.show_idle===false) rows = rows.filter(r=>r.firing);
-        w.el.style.whiteSpace = 'pre';
-        w.el.textContent = rows.map(r =>
-          String(r.firing ? (w.o.fmt_on||'[name] [secs]s') : (w.o.fmt_off||'[name] idle'))
-            .replace('[name]', r.name||'device')
-            .replace('[secs]', Math.round(r.remaining||0))).join('\n');
-      } else if(w.kind==='pump_timer'){
-        w.el.textContent = on ? String(w.o.fmt_on||'PUMP [secs]s').replace('[secs]', rem.toFixed(0))
-                              : String(w.o.fmt_off||'PUMP idle');
+        drawRows(w.el, w.o, timerRows(w.o, st, w.kind==='pump_timer'));
       } else {
         let t = String(w.o.text||'')
           .replace(/\[capacity\]/g, pct.toFixed(0)).replace(/\[secs\]/g, rem.toFixed(0))
@@ -301,6 +444,7 @@ async function widgetTick(){
         // [var:x] stays live too, so a countdown label keeps ticking
         t = t.replace(/\[var:([^\]]+)\]/g, (m,k)=> (st.vars&&st.vars[k]!=null)?st.vars[k]:m);
         w.el.textContent = t.replace(/\\n/g,'\n');
+        applyRadius(w.el, w.o);   // a placeholder resolving changes the width
       }
     });
   }catch(e){}
@@ -316,7 +460,7 @@ function place(el, o){
            el.style.objectFit = 'fill'; }
   if(o.x != null && o.y != null){   // stage-designed spot: exact fractions
     el.style.left = (o.x*100)+'%'; el.style.top = (o.y*100)+'%';
-    el.style.transform = 'none';
+    el._base = ''; setXform(el);
     return;
   }
   const p = o.pos || 'center', M = '3%';
@@ -328,7 +472,7 @@ function place(el, o){
   else el.style.top = '50%';
   const tx = (p.includes('left')||p.includes('right')) ? '0' : '-50%';
   const ty = (p.includes('top')||p.includes('bottom')) ? '0' : '-50%';
-  el.style.transform = `translate(${tx},${ty})`;
+  el._base = `translate(${tx},${ty})`; setXform(el);
 }
 function mediaEl(o, onEnded){
   const url = '/images/' + encodeURIComponent(o.media);
@@ -372,11 +516,16 @@ async function pollOverlays(){
       if(o.z!=null || (o.item&&o.item.z!=null))
         el.style.zIndex = String(Math.round(+(o.z ?? o.item.z) || 0) + 10);
       $('#layers').appendChild(el);   // ties fall back to fire order
+      applyRadius(el, (o.kind==='draw' ? (o.item||{}) : o));
       applyAnim(el, (o.kind==='draw' ? (o.item||{}) : o));
+      applySlide(el, o.slide, o.left);   // after append: offsetLeft needs layout
       live[o.id] = el;
     });
     Object.keys(live).forEach(id=>{
-      if(!want[id]){ live[id].remove(); delete live[id]; }
+      if(!want[id]){
+        if(live[id]._slideT) clearTimeout(live[id]._slideT);
+        live[id].remove(); delete live[id];
+      }
     });
   }catch(e){ /* transient — keep the current scene */ }
 }

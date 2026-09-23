@@ -1,6 +1,6 @@
 {
-  "version": "3.82.0",
-  "versionCode": 171,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.82.0/discoflate-v3.82.0.apk",
-  "notes": "DiscoFlate v3.82.0 \u2014 \ud83e\ude9e Mirror now flips the CAMERA only, not your overlays. It used to flip the finished frame, so switching it on to fix your own Discord tile made every viewer read your text backwards. Your text now reads correctly to viewers whichever way it is set. Also fixes /api/state reporting the mirror default as True while every other reader said False, which switched mirroring on without anyone asking."
+  "version": "3.83.0",
+  "versionCode": 172,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.83.0/discoflate-v3.83.0.apk",
+  "notes": "DiscoFlate v3.83.0 — ↔️ Overlays can SLIDE. Every overlay gets Slide in / Slide out tickboxes: pick the edge it arrives from and the edge it leaves toward, each with its own duration, all four directions both ways. The slide time is ADDED to the overlay's seconds rather than eaten out of it, so a 5s alert with 0.3s legs still sits still for the full 5. Also: corner rounding on anything with a background (text, timers, poll card, gauge, solid); the Device Timer List is now one plate with the countdowns on a fixed tab stop instead of a ragged box per row that drifted with each device's name; Scoped Devices lets you tick which devices that list shows. FIXED: the panel only loaded six of the eleven Template kinds, so Bonus Rounds, Broadcasts, Minigames, Rewards and Modes read 0 — and the next template save wrote that short list back over them. All eleven now load, the shipped defaults are generated when missing, a deleted default stays deleted, and 🧩 Regenerate Defaults brings them back."
 }

@@ -21,6 +21,8 @@ import sys
 import threading
 import time
 
+from stage import slide_pad, slide_spec   # shared with the phone Stage registry
+
 try:
     import cv2
     import numpy as np
@@ -244,9 +246,15 @@ class VirtualCam:
                 if key and o.get("layer") != key:
                     continue
                 hit += 1
-                if fade:
-                    o["fade_out"] = fade
-                    o["until"] = min(o["until"], now + fade) if o.get("until") else now + fade
+                # a held layer has no `until` of its own, so a kill is the only
+                # moment its slide-out can be timed — give it that window even
+                # when the caller asked for no fade
+                tail = ((o.get("slide") or {}).get("out") or {}).get("secs", 0.0)
+                if fade or tail:
+                    if fade:
+                        o["fade_out"] = fade
+                    win = max(fade, tail)
+                    o["until"] = min(o["until"], now + win) if o.get("until") else now + win
                 else:
                     o["dead"] = True
         return {"ok": True, "cleared": hit}
@@ -265,7 +273,10 @@ class VirtualCam:
         ent["start_at"] = now + d
         ent["born"] = ent["start_at"]          # fades begin when it appears
         if ent.get("_dur"):
-            ent["until"] = ent["start_at"] + ent["_dur"]
+            # slide legs BRACKET the configured seconds — a 5s layer with 0.3s
+            # legs is up for 5.6s and still holds still for the full 5
+            ent["until"] = (ent["start_at"] + slide_pad(ent.get("slide"))
+                            + ent["_dur"])
 
     def _admit(self, ent: dict, key: str | None) -> dict:
         """Put an overlay on screen, or QUEUE it behind the one already on its
@@ -338,6 +349,7 @@ class VirtualCam:
                "rot": item.get("rot"), "flash": item.get("flash"),
                "fade_in": item.get("fade_in"), "fade_out": item.get("fade_out"),
                "anim": item.get("anim"), "anim_dir": item.get("anim_dir"),
+               "slide": slide_spec(item),
                "queue": item.get("queue"), "delay": item.get("delay"),
                "always_on": always_on, "born": time.monotonic()}
         return self._admit(ent, key)
@@ -354,7 +366,7 @@ class VirtualCam:
                      fade_in=None, fade_out=None, anim=None, anim_dir=None,
                      queue=None, chroma_on=None, chroma=None, chroma_tol=None,
                      chroma_soft=None, z=None, opacity=None, delay=None,
-                     always_on=False) -> dict:
+                     always_on=False, slide=None) -> dict:
         """Show a MEDIA layer over the camera. `media` = an image (PNG alpha
         welcome) or a video file from data/images (or an absolute path).
         mode: "timed"  = shown/looping for `seconds`
@@ -386,7 +398,8 @@ class VirtualCam:
                  "dead": False, "x": x, "y": y,   # fractional coords beat `pos`
                  "rot": rot, "flash": flash, "h": h,
                  "fade_in": fade_in, "fade_out": fade_out, "born": time.monotonic(),
-                 "anim": anim, "anim_dir": anim_dir, "queue": queue,
+                 "anim": anim, "anim_dir": anim_dir, "slide": slide_spec(slide),
+                 "queue": queue,
                  "z": z, "opacity": opacity, "delay": delay,
                  "always_on": always_on,
                  "chroma_on": chroma_on, "chroma": chroma,
@@ -467,6 +480,64 @@ class VirtualCam:
         r, g, b = colorsys.hls_to_rgb(h, 0.45, 0.70)
         return (int(b * 255), int(g * 255), int(r * 255))   # BGR
 
+    # Corner rounding is a PERCENT of the box's shorter side, so a card keeps
+    # its shape at any output resolution and 50 is a full pill. Absent = the
+    # look each kind already had before the field existed.
+    _RADIUS_DEFAULT = {"capacity_gauge": 15, "poll_viewer": 3, "solid": 0}
+
+    @classmethod
+    def _radius_px(cls, item: dict, w: int, h: int) -> int:
+        r = (item or {}).get("radius")
+        if r is None or r == "":
+            r = cls._RADIUS_DEFAULT.get(str((item or {}).get("kind") or ""), 12)
+        try:
+            r = max(0.0, min(50.0, float(r)))
+        except (TypeError, ValueError):
+            return 0
+        return int(min(w, h) * r / 100.0)
+
+    @staticmethod
+    def _rrect_mask(w: int, h: int, r: int, inset: int = 0):
+        """Filled rounded-rectangle mask, optionally pulled in from the edge.
+        One of these is a shape; the difference of two is a BORDER — which is
+        how a rounded card gets an outline that follows its own corners
+        instead of four straight segments with gaps where the curve is."""
+        m = np.zeros((h, w), np.uint8)
+        x0, y0 = inset, inset
+        x1, y1 = w - 1 - inset, h - 1 - inset
+        if x1 <= x0 or y1 <= y0:
+            return m
+        r = int(max(0, min(r, (x1 - x0) // 2, (y1 - y0) // 2)))
+        if r < 1:
+            cv2.rectangle(m, (x0, y0), (x1, y1), 255, -1)
+            return m
+        cv2.rectangle(m, (x0 + r, y0), (x1 - r, y1), 255, -1)
+        cv2.rectangle(m, (x0, y0 + r), (x1, y1 - r), 255, -1)
+        for cx, cy in ((x0 + r, y0 + r), (x1 - r, y0 + r),
+                       (x0 + r, y1 - r), (x1 - r, y1 - r)):
+            cv2.circle(m, (cx, cy), r, 255, -1, cv2.LINE_AA)
+        return m
+
+    @classmethod
+    def _round_corners(cls, sp, r: int):
+        """Clip an RGBA sprite's alpha to a rounded rectangle. Applied LAST by
+        each sprite builder, so one helper rounds every kind of box."""
+        if sp is None or r < 1:
+            return sp
+        h, w = sp.shape[:2]
+        m = cls._rrect_mask(w, h, r).astype("float32") / 255.0
+        sp[:, :, 3] = (sp[:, :, 3].astype("float32") * m).astype("uint8")
+        return sp
+
+    @classmethod
+    def _draw_border(cls, sp, col, thick: int, r: int) -> None:
+        """Outline that hugs a rounded corner: the shape minus an inset copy."""
+        h, w = sp.shape[:2]
+        edge = cv2.subtract(cls._rrect_mask(w, h, r),
+                            cls._rrect_mask(w, h, max(0, r - thick), inset=thick))
+        sp[edge > 127, :3] = col
+        sp[edge > 127, 3] = 255
+
     def _text_sprite(self, txt: str, item: dict, H: int):
         """An RGBA sprite of `txt` honouring color / size / font / bg.
         MULTI-LINE: newlines split into stacked lines, aligned left / center /
@@ -522,7 +593,7 @@ class VirtualCam:
                                 thick + max(2, thick), cv2.LINE_AA)
                 cv2.putText(sp, ln, org, font, scale, (*col, 255), thick, cv2.LINE_AA)
             y += line_h + gap
-        return sp
+        return self._round_corners(sp, self._radius_px(item, w, h)) if bg else sp
 
     def _gauge_sprite(self, item: dict, W: int, H: int, pct: float):
         """Capacity bar as an RGBA sprite; horizontal or vertical."""
@@ -547,7 +618,8 @@ class VirtualCam:
                 sp[h - n:, :, :3] = fill
             else:
                 sp[:, :n, :3] = fill
-        cv2.rectangle(sp, (0, 0), (w - 1, h - 1), (240, 240, 240, 255), 2)
+        rad = self._radius_px(item, w, h)
+        self._draw_border(sp, (240, 240, 240), 2, rad)
         if item.get("show_pct", True):
             lbl = f"{pct:.0f}%"
             fs = max(0.35, thick / 42.0)
@@ -558,48 +630,117 @@ class VirtualCam:
                             max(3, int(fs * 4)), cv2.LINE_AA)
                 cv2.putText(sp, lbl, org, 0, fs, (255, 255, 255, 255),
                             max(1, int(fs * 2)), cv2.LINE_AA)
-        return sp
+        return self._round_corners(sp, rad)
 
-    def _timers_sprite(self, item: dict, H: int, st: dict, single: bool = False):
-        """The Device Timer List: one row per device, PRIMARY PUMP FIRST, each
-        with its own countdown. `single` renders just the primary row (what the
-        old Pump Timer overlay was). Rows appear/disappear as devices are added
-        in settings, so the list grows with the rig."""
+    @staticmethod
+    def timer_rows(item: dict, st: dict, single: bool = False) -> list[dict]:
+        """Which devices this Device Timer List shows, in order. Shared with
+        the Stage page's renderer through /api/state, so both surfaces scope
+        the list the same way.
+
+        `devices` is the SCOPE: a list of device ids to show. Empty or absent
+        means every configured device — a rig that has never touched the
+        setting keeps listing everything. The reserved id `primary` means
+        "whichever device is primary right now", which is what the factory
+        scene ships with: at that point no device has an id yet."""
         rows = list(st.get("device_timers") or [])
         if not rows:   # no devices configured yet — fall back to the bare timer
             rem = float(st.get("remaining") or 0)
             on = bool(st.get("firing"))
             rows = [{"name": "PUMP", "primary": True, "firing": on, "remaining": rem}]
         if single:
-            rows = rows[:1]
-        elif not item.get("show_idle", True):
-            rows = [r for r in rows if r.get("firing")] or []
+            return rows[:1]
+        scope = [str(d) for d in (item.get("devices") or []) if str(d or "").strip()]
+        if scope:
+            keep = [r for r in rows
+                    if str(r.get("id") or "") in scope
+                    or ("primary" in scope and r.get("primary"))]
+            rows = keep or rows          # scoped to devices that are all gone
+        if not item.get("show_idle", True):
+            rows = [r for r in rows if r.get("firing")]
+        return rows
+
+    @staticmethod
+    def _fmt_cols(fmt: str, name: str, secs: str) -> tuple[str, str]:
+        """Split a row template into (label, value) at `[name]`, so the two
+        halves can be column-aligned. Without a `[name]` there's nothing to
+        line the rows up by, so it stays a single column."""
+        s = str(fmt)
+        if "[name]" not in s:
+            return (s.replace("[secs]", secs), "")
+        head, _, tail = s.partition("[name]")
+        return (head + name, tail.lstrip().replace("[secs]", secs))
+
+    def _timers_sprite(self, item: dict, H: int, st: dict, single: bool = False):
+        """The Device Timer List: one row per device, PRIMARY PUMP FIRST, each
+        with its own countdown. `single` renders just the primary row (what the
+        old Pump Timer overlay was). Rows appear/disappear as devices are added
+        in settings, so the list grows with the rig."""
+        rows = self.timer_rows(item, st, single)
         if not rows:
             return None
         fmt_on = str(item.get("fmt_on") or "[name] [secs]s")
         fmt_off = str(item.get("fmt_off") or "[name] idle")
-        lines = []
-        for r in rows:
-            f = fmt_on if r.get("firing") else fmt_off
-            lines.append(f.replace("[name]", str(r.get("name") or "device"))
-                          .replace("[secs]", f"{float(r.get('remaining') or 0):.0f}"))
-        sprites = [self._text_sprite(t, item, H) for t in lines]
-        sprites = [s for s in sprites if s is not None]
-        if not sprites:
+        pairs = [self._fmt_cols(fmt_on if r.get("firing") else fmt_off,
+                                str(r.get("name") or "device"),
+                                f"{float(r.get('remaining') or 0):.0f}")
+                 for r in rows]
+        return self._rows_sprite(item, H, pairs)
+
+    def _rows_sprite(self, item: dict, H: int, pairs: list):
+        """A columnar block: labels down the left, values at a FIXED tab stop,
+        all on ONE background plate.
+
+        Stacking per-row text sprites (what this used to do) gave every row its
+        own ragged background box and let each countdown sit wherever its
+        device's name happened to end — the list drifted instead of reading as
+        a table."""
+        pairs = [(str(a or ""), str(b or "")) for a, b in pairs]
+        if not any(a.strip() or b.strip() for a, b in pairs):
             return None
-        if len(sprites) == 1:
-            return sprites[0]
-        # rows are already padded individually — keep the seam tight so the
-        # list reads as one block, the way the canvas draws it
-        gap = max(1, int(H * 0.002))
-        w = max(s.shape[1] for s in sprites)
-        h = sum(s.shape[0] for s in sprites) + gap * (len(sprites) - 1)
-        out = np.zeros((h, w, 4), np.uint8)
-        y = 0
-        for s in sprites:
-            out[y:y + s.shape[0], :s.shape[1]] = s
-            y += s.shape[0] + gap
-        return out
+        font = self._FONTS.get(str(item.get("font") or "sans").lower(), 0)
+        try:
+            size = max(0.01, min(0.9, float(item.get("size") or 0.06)))
+        except (TypeError, ValueError):
+            size = 0.06
+        px = max(10, int(H * size))
+        scale = px / 22.0
+        thick = max(1, int(round(scale * 1.6)))
+        bg = str(item.get("bg") or "").strip()
+        pad = max(4, int(px * 0.28)) if bg else max(2, int(px * 0.08))
+        gap = max(2, int(px * 0.30))
+
+        def measure(s):
+            (tw, th), base = cv2.getTextSize(s or " ", font, scale, thick)
+            return tw, th, base
+        lm = [measure(a) for a, _ in pairs]
+        rm = [measure(b) for _, b in pairs]
+        lw = max(m[0] for m in lm)
+        rw = max(m[0] for m in rm)
+        # the gutter is the tab: every value starts at the same x, whatever the
+        # longest device name turned out to be
+        gutter = max(pad, int(px * 0.55)) if rw else 0
+        line_h = max(m[1] + m[2] for m in lm + rm)
+        w = lw + gutter + rw + pad * 2
+        h = line_h * len(pairs) + gap * (len(pairs) - 1) + pad * 2
+        sp = np.zeros((h, w, 4), np.uint8)
+        if bg:
+            sp[:, :, :3] = self._bgr(bg, (0, 0, 0))
+            sp[:, :, 3] = 255
+        col = self._bgr(item.get("color"), (255, 255, 255))
+        y = pad
+        for (left, right), (_lw, lth, lbase) in zip(pairs, lm):
+            org_y = y + line_h - lbase
+            for s, x in ((left, pad), (right, pad + lw + gutter)):
+                if not s.strip():
+                    continue
+                if not bg:   # unbacked text gets an outline so it reads anywhere
+                    cv2.putText(sp, s, (x, org_y), font, scale, (0, 0, 0, 255),
+                                thick + max(2, thick), cv2.LINE_AA)
+                cv2.putText(sp, s, (x, org_y), font, scale, (*col, 255),
+                            thick, cv2.LINE_AA)
+            y += line_h + gap
+        return self._round_corners(sp, self._radius_px(item, w, h)) if bg else sp
 
     def _poll_sprite(self, item: dict, W: int, H: int, pv: dict):
         """The Poll Viewer: an embed-style card sized by w/h, listing each
@@ -618,8 +759,9 @@ class VirtualCam:
             bga = item.get("opacity") if (item.get("opacity") or 0) > 100 else 220
         sp[:, :, 3] = int(max(0, min(255, float(bga or 220))))
         accent = self._bgr(item.get("color"), (244, 168, 40))
-        cv2.rectangle(sp, (0, 0), (bw - 1, bh - 1), (*accent, 255), 2)
+        rad = self._radius_px(item, bw, bh)
         cv2.rectangle(sp, (0, 0), (5, bh - 1), (*accent, 255), -1)   # embed spine
+        self._draw_border(sp, accent, 2, rad)
         pad = max(8, int(bh * 0.07))
         fs = max(0.4, bh / 300.0)
         y = pad + int(fs * 26)
@@ -658,7 +800,7 @@ class VirtualCam:
                         0, fs * 0.8, (0, 0, 0, 255), max(3, int(fs * 4)), cv2.LINE_AA)
             cv2.putText(sp, txt, (pad + 10, bar_y2 - max(2, int(rh * 0.12))),
                         0, fs * 0.8, (255, 255, 255, 255), max(1, int(fs * 2)), cv2.LINE_AA)
-        return sp
+        return self._round_corners(sp, rad)
 
     def _live(self, txt: str, st: dict) -> str:
         """Re-render the placeholders still in an overlay's text, so a label
@@ -701,7 +843,7 @@ class VirtualCam:
         sp = np.zeros((bh, bw, 4), np.uint8)
         sp[:, :, :3] = self._bgr(item.get("color"), (0, 0, 0))
         sp[:, :, 3] = 255          # layer opacity is applied later, per-frame
-        return sp
+        return self._round_corners(sp, self._radius_px(item, bw, bh))
 
     def _render_item(self, item: dict, W: int, H: int):
         """RGBA sprite for a non-media overlay, or None to draw nothing."""
@@ -771,23 +913,68 @@ class VirtualCam:
                               borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0, 0))
 
     @staticmethod
+    def _edge_off(d: str, x: int, y: int, w: int, h: int, W: int, H: int) -> tuple:
+        """Offset that parks a sprite completely off-frame past edge `d`.
+        Measured from where it actually sits, so an item hugging the left
+        margin travels a short way out and a centred one travels far — both
+        end up fully hidden, neither leaves a sliver on screen."""
+        if d == "left":
+            return (-(x + w), 0)
+        if d == "right":
+            return (W - x, 0)
+        if d == "top":
+            return (0, -(y + h))
+        return (0, H - y)                       # bottom
+
+    @classmethod
+    def _slide_offset(cls, o: dict, now: float, x: int, y: int,
+                      w: int, h: int, W: int, H: int):
+        """Offset from the slide_in / slide_out legs, or None when neither one
+        is driving right now (so the legacy `anim` can have this frame).
+
+        The legs are INDEPENDENT — different edges, different durations — so
+        "in from the right, out to the left" sweeps across, and an overlay can
+        slide on and still leave by whatever `anim` used to do."""
+        sl = o.get("slide") or {}
+        si, so = sl.get("in"), sl.get("out")
+        try:
+            # the exit owns the tail of the layer's life; _arm reserved it
+            if so and o.get("until") is not None:
+                p = (o["until"] - now) / so["secs"]
+                if p < 1.0:
+                    k = (1.0 - max(0.0, p)) ** 2        # ease IN to the exit
+                    dx, dy = cls._edge_off(so["dir"], x, y, w, h, W, H)
+                    return (int(dx * k), int(dy * k))
+            if si and o.get("born") is not None:
+                p = (now - o["born"]) / si["secs"]
+                if p < 1.0:
+                    k = (1.0 - max(0.0, p)) ** 2        # ease OUT of the entry
+                    dx, dy = cls._edge_off(si["dir"], x, y, w, h, W, H)
+                    return (int(dx * k), int(dy * k))
+        except (TypeError, ValueError, ZeroDivisionError, KeyError):
+            return (0, 0)
+        return None
+
+    @staticmethod
     def _anim_offset(o: dict, now: float, w: int, h: int) -> tuple:
-        """Pixel offset for a sliding overlay: it flies IN from its direction
-        while fading up, sits still, then flies OUT that way while fading down.
-        Pure ease-out on a static direction — no keyframes to author."""
+        """Pixel offset for the LEGACY `anim` slide: it flies IN from its
+        direction while fading up, sits still, then flies OUT that way while
+        fading down. One direction for both legs, timed by the fades.
+        Superseded per-leg by slide_in / slide_out (see _slide_offset)."""
         if not o.get("anim"):
             return (0, 0)
+        sl = o.get("slide") or {}
         d = str(o.get("anim_dir") or "up").lower()
         dist = (h if d in ("up", "down") else w) * 0.9 + 12
         t = 0.0                     # 0 = in place, 1 = fully off in `d`
         try:
             fin = float(o.get("fade_in") or 0)
-            if fin > 0 and o.get("born"):
+            if fin > 0 and o.get("born") and not sl.get("in"):
                 p = (now - o["born"]) / fin
                 if p < 1.0:
                     t = -(1.0 - max(0.0, p)) ** 2       # arrive FROM `d`
             fout = float(o.get("fade_out") or 0)
-            if fout > 0 and o.get("until"):
+            if fout > 0 and o.get("until") and not sl.get("out"):
                 p = (o["until"] - now) / fout
                 if p < 1.0:
                     t = (1.0 - max(0.0, p)) ** 2        # leave TOWARD `d`
@@ -970,11 +1157,13 @@ class VirtualCam:
                                 continue
                     sp = self._render_item(it, W, H)
                     if sp is None:
+                        o["_gate_on"] = None    # self-gated widget went quiet
                         continue
                     sp = self._rotate(sp, it.get("rot"))
                     ih, iw = sp.shape[:2]
                     x, y = self._spot(o, W, H, iw, ih)
-                    ax, ay = self._anim_offset(o, now, iw, ih)
+                    ax, ay = self._motion(self._gate(o, it, now), now,
+                                          x, y, iw, ih, W, H)
                     self._blend(frame, sp, x + ax, y + ay, self._fade_alpha(o, now))
                 except Exception:  # noqa: BLE001 — a bad item never kills the pipe
                     o["dead"] = True
@@ -1009,9 +1198,37 @@ class VirtualCam:
             ov = self._rotate(ov, o.get("rot"))
             th, tw = ov.shape[:2]
             x, y = self._spot(o, W, H, tw, th)
-            ax, ay = self._anim_offset(o, now, tw, th)
+            ax, ay = self._motion(o, now, x, y, tw, th, W, H)
             self._blend(frame, ov, x + ax, y + ay, self._fade_alpha(o, now))
         return frame
+
+    @classmethod
+    def _motion(cls, o: dict, now: float, x: int, y: int,
+                w: int, h: int, W: int, H: int) -> tuple:
+        """One offset for a moving layer: the slide legs first, and whichever
+        leg has no slide of its own falls back to the legacy `anim`."""
+        off = cls._slide_offset(o, now, x, y, w, h, W, H)
+        return off if off is not None else cls._anim_offset(o, now, w, h)
+
+    def _gate(self, o: dict, it: dict, now: float) -> dict:
+        """A SELF-GATED widget (the Poll Viewer) is always mounted and decides
+        frame by frame whether it draws anything — it has no fire time and no
+        `until`, so its slide legs have nothing to hang off. Borrow the poll's
+        own clock: born = the frame it started drawing, until = the end of the
+        results window. Everything else is returned untouched."""
+        if str(it.get("kind") or "") != "poll_viewer":
+            return o
+        if not o.get("_gate_on"):
+            o["_gate_on"] = now
+        until = None
+        pv = (self._get_state() or {}).get("poll") or {}
+        if pv.get("phase") == "results":
+            try:
+                hold = max(0.0, float(it.get("results_secs", 8) or 0))
+            except (TypeError, ValueError):
+                hold = 8.0
+            until = now + max(0.0, hold - float(pv.get("results_age") or 0))
+        return dict(o, born=o["_gate_on"], until=until)
 
     def _spot(self, o: dict, W: int, H: int, w: int, h: int) -> tuple[int, int]:
         """Top-left pixel for an overlay: exact fractional x/y when the stage

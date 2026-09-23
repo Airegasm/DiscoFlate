@@ -82,7 +82,7 @@ GAMEPLAY_KEYS = [
     "events", "capacity_events", "polls", "competitions", "bonus_rounds", "minigames",
     "event_in_process_message", "event_cooldown_message",
     # Templates tab
-    "templates",
+    "templates", "templates_removed",
 ]
 
 def scene_gameplay(cfg: dict, name: str | None = None) -> dict:
@@ -243,6 +243,10 @@ DEFAULTS = {
                   "polls": [], "competitions": [], "capevents": [],
                   "bonus_rounds": [], "broadcasts": [], "minigames": [],
                   "prizes": [], "modes": []},
+    # `_tpl_id`s of the SHIPPED templates the user has deleted. Without this,
+    # seed_templates() would hand every one of them straight back on the next
+    # load — deleting a default has to mean something. Regenerate empties it.
+    "templates_removed": [],
 
     # Also accept commands via DM to the bot (opt-in). Anyone who shares a
     # server with the bot can DM it, so pair this with the user allowlist.
@@ -728,6 +732,7 @@ def load() -> dict:
     # current config_version and skip every step).
     cfg = _coerce_numbers(_deep_merge(DEFAULTS, _migrate(stored)))
     _inject_shipped(cfg)
+    seed_templates(cfg)      # generate any shipped Template that isn't here
     cfg["discord_token"] = _dec_token(cfg.get("discord_token") or "")
     return cfg
 
@@ -1612,6 +1617,45 @@ def _shipped_scenes() -> list:
 def _is_shipped(sc: dict) -> bool:
     return (str((sc or {}).get("name") or "").strip().lower()
             in {n.strip().lower() for n in SHIPPED_SCENE_NAMES})
+
+
+def _shipped_templates() -> dict:
+    """The default Templates we ship, keyed by kind. Read from the factory file
+    so we can keep editing them, exactly like the shipped scenes."""
+    t = (_factory_seed().get("templates") or {})
+    return {k: [copy.deepcopy(x) for x in (v or []) if isinstance(x, dict)]
+            for k, v in t.items() if isinstance(v, list)}
+
+
+def seed_templates(cfg: dict) -> int:
+    """Hand over any shipped Template the config hasn't got, and say how many.
+
+    Unlike the shipped SCENES these are STORED and fully editable — the point
+    is a starting library you can rename, rework or throw away. So the rule is
+    generate-when-missing, keyed by `_tpl_id`, with one exception: a shipped
+    template the user DELETED is remembered in `templates_removed` and never
+    grows back. "Regenerate Defaults" empties that list.
+
+    Templates are global by design: they belong to the config, not to a scene,
+    so one saved here is callable from any of them.
+    """
+    gone = {str(x) for x in (cfg.get("templates_removed") or [])}
+    tpls = cfg.get("templates")
+    if not isinstance(tpls, dict):
+        tpls = {}
+    added = 0
+    for kind, shipped in _shipped_templates().items():
+        cur = [x for x in (tpls.get(kind) or []) if isinstance(x, dict)]
+        have = {str(x.get("_tpl_id")) for x in cur if x.get("_tpl_id")}
+        for x in shipped:
+            tid = str(x.get("_tpl_id") or "")
+            if not tid or tid in have or tid in gone:
+                continue
+            cur.append(x)
+            added += 1
+        tpls[kind] = cur
+    cfg["templates"] = tpls
+    return added
 
 
 def _inject_shipped(cfg: dict) -> None:

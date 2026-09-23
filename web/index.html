@@ -112,6 +112,16 @@
         height:var(--h);white-space:nowrap}
   .pchk input{width:16px;height:16px}
   .pspacer{flex:1 1 20px}
+  /* Scoped Devices: a tickable device list in the narrow column beside the
+     canvas, so a long device name wraps instead of blowing the column out */
+  .pscope{display:flex;flex-direction:column;gap:3px;min-width:0;
+          border:1px solid var(--line);border-radius:8px;padding:7px 9px 8px}
+  .pscope .phead{margin-bottom:2px;display:flex;align-items:center;gap:6px}
+  .pscope .pchk{height:auto;min-height:20px;white-space:normal;line-height:1.2;
+                align-items:flex-start;font-size:12px}
+  .pscope .pchk input{flex:0 0 16px;margin-top:1px}
+  .pscope .muted{font-size:11px;line-height:1.25}
+  .pscope .pmini{padding:0 7px;height:22px;line-height:22px;font-size:12px}
   /* Scenes tab: a palette to add from, and the scene's contents — both scroll */
   .stglists{display:grid;grid-template-columns:1fr 1.4fr;gap:10px;margin-top:8px}
   .stgpane{border:1px solid var(--line);border-radius:10px;background:var(--panel2);padding:8px}
@@ -210,6 +220,8 @@
           display:flex;align-items:center;justify-content:center;font-size:11px;color:#04202a}
   .stgItem .txt{white-space:pre;font-weight:800;line-height:1.15}
   .stgItem .txt.boxed{padding:.25em .6em;border-radius:10px}
+  /* device timers: label column + value column on one fixed tab stop */
+  .stgItem .txt.rowgrid{display:inline-grid;grid-template-columns:auto auto;column-gap:.55em}
   .stgItem .gauge{border:2px solid #eee;border-radius:6px;overflow:hidden;position:relative;
                   background:rgba(20,20,20,.75)}
   .stgItem .gauge>i{display:block;background:#2ecc71}
@@ -531,6 +543,10 @@
               <option>1280x720</option><option>1920x1080</option><option>640x480</option>
               <option>720x1280</option><option>1080x1920</option></select></label>
             <label class="row" style="gap:6px" title="show a 5% grid and snap to it — hold Shift while dragging to place freely"><input type="checkbox" id="stgGridOn" checked style="width:auto" onchange="stgGridToggle()"> grid &amp; snap</label>
+            <!-- which devices the selected Device Timer List shows; empty
+                 until you select one, which is why it lives beside the canvas
+                 rather than in the properties row -->
+            <div id="stgScope" style="margin-top:4px"></div>
           </div>
         </div>
         <div id="stgProps" style="margin-top:8px"></div>
@@ -905,7 +921,11 @@
     <!-- templates: reusable snapshots of any trigger -->
     <div class="card span" data-tab="triggers">
       <details class="help"><summary><b style="font-size:1.02rem">🧩 Templates</b></summary>
-        <div class="hint" style="margin-top:8px">Reusable snapshots saved from the <b>Commands</b>, <b>Events</b>, <b>Ranges</b> (incl. <b>End</b> / <b>End Sequence</b>), <b>Polls</b>, <b>Competitions</b>, and <b>Capacity Events</b> editors — hit the <b>💾</b> on any row to save it here. <b>＋ Add to Config</b> ports one back into your live setup, renaming to dodge clashes. Templates are stored with your config and included in backup/restore.</div>
+        <div class="hint" style="margin-top:8px">Reusable snapshots saved from the <b>Commands</b>, <b>Events</b>, <b>Ranges</b> (incl. <b>End</b> / <b>End Sequence</b>), <b>Polls</b>, <b>Competitions</b>, and <b>Capacity Events</b> editors — hit the <b>💾</b> on any row to save it here. <b>＋ Add to Config</b> ports one back into your live setup, renaming to dodge clashes. Templates are <b>global</b> — they belong to your config, not to a scene, so one saved here is available from any of them, and they travel with backup/restore.</div>
+        <div class="row" style="gap:10px;align-items:center;margin-top:10px">
+          <button class="ghost" onclick="regenTemplates()">🧩 Regenerate Defaults</button>
+          <span class="hint" style="flex:1;margin:0">DiscoFlate ships one template of each kind, marked <b>· default</b>. They're ordinary templates — edit or delete them freely. A deleted default stays gone; this button brings back the ones you binned, and never touches your own.</span>
+        </div>
         <details class="help" style="margin-top:12px"><summary><b>Commands</b> (<span id="tplCmdCount">0</span>)</summary>
           <div id="tplCommands" style="margin-top:8px"></div></details>
         <details class="help"><summary><b>Events</b> (<span id="tplEvtCount">0</span>)</summary>
@@ -2292,7 +2312,11 @@ function stgNewItem(kind, media, visible){
   if(kind==='audio'){ o.w=0.10; o.volume=100; o.visible=false; o.mode='once'; }
   if(kind==='capacity_gauge'){ o.orient='h'; o.show_pct=true; }
   if(kind==='pump_timer'){ o.fmt_on='PUMP [secs]s'; o.fmt_off='PUMP idle'; }
-  if(kind==='device_timers'){ o.fmt_on='[name] [secs]s'; o.fmt_off='[name] idle'; o.show_idle=true; }
+  // a black plate behind the list: the countdowns have to stay readable over
+  // whatever the camera is pointing at, and the two columns need one backdrop
+  if(kind==='device_timers'){ o.fmt_on='[name] [secs]s'; o.fmt_off='[name] idle';
+                              o.show_idle=true; o.bg='#000000'; o.radius=12;
+                              o.devices=[]; }
   if(kind==='timer'){ o.seconds=60; o.text='[secs]'; o.autostart=false; o.autovanish=false; }
   if(kind==='poll_viewer'){ o.w=0.34; o.h=0.30; o.auto_show=true; o.results_secs=8;
                             o.color='#f4a828'; o.bg='#12121a'; o.opacity=220;
@@ -2510,13 +2534,18 @@ function renderStgCanvas(){
       const acc = esc(o.color||'#f4a828');
       inner = `<div style="width:100%;height:100%;box-sizing:border-box;border:2px solid ${acc};`+
         `border-left:6px solid ${acc};border-radius:6px;background:${esc(o.bg||'#12121a')};`+
-        `padding:6px 8px;overflow:hidden;font-size:${Math.max(8,fs*0.55)}px;color:#fff">`+
+        `padding:6px 8px;overflow:hidden;position:relative;`+
+        `font-size:${Math.max(8,fs*0.55)}px;color:#fff">`+
         `<div style="display:flex;justify-content:space-between;font-weight:800">`+
           `<span>${esc(pv? (pv.title||'Poll') : 'Poll title')}</span><span style="color:${acc}">`+
           `${pv&&pv.remaining!=null?Math.round(pv.remaining):12}s</span></div>`+
         opts.slice(0,6).map(op=>`<div style="margin-top:3px;background:#2e2e36;border-radius:3px;position:relative;height:1.5em">`+
           `<div style="width:${Math.round(100*(op.votes||0)/tot)}%;height:100%;background:${acc};border-radius:3px"></div>`+
           `<span style="position:absolute;left:5px;top:0;line-height:1.5em">${esc(op.label||'')} · ${op.votes||0}</span></div>`).join('')+
+        // the live overlay's footer — drawn here too so the canvas isn't a lie
+        (pv && pv.phase==='results' ? '' :
+          `<div style="position:absolute;left:0;right:0;bottom:4px;text-align:center;`+
+          `font-size:.78em;font-weight:600;opacity:.7">Use the Chat Buttons to Vote</div>`)+
         `</div>`;
       box = `width:${(o.w*100).toFixed(2)}%;height:${((o.h||0.3)*100).toFixed(2)}%`;
     } else if(o.kind==='timer'){
@@ -2531,23 +2560,25 @@ function renderStgCanvas(){
         `${esc(t.replace('[secs]', Math.round(sec)).replace('[mmss]', m+':'+String(s).padStart(2,'0')))}</div>`;
       box = 'width:auto';
     } else if(o.kind==='pump_timer' || o.kind==='device_timers' || o.kind==='text'){
-      let txt;
-      if(o.kind==='device_timers'){
-        // preview the REAL device list (primary pump first) so you can size it
-        let rows = (lastState.device_timers||[]);
-        if(!rows.length) rows = [{name:'Main Pump',firing:true,remaining:12},
-                                 {name:'Second Pump',firing:false,remaining:0}];
-        if(o.show_idle===false) rows = rows.filter(r=>r.firing);
-        txt = rows.map(r=>(r.firing?(o.fmt_on||'[name] [secs]s'):(o.fmt_off||'[name] idle'))
-          .replace('[name]', r.name||'device')
-          .replace('[secs]', Math.round(r.remaining||0))).join('\n') || '(no devices firing)';
-      } else if(o.kind==='pump_timer'){
-        txt = (o.fmt_on||'PUMP [secs]s').replace('[secs]','12');
-      } else { txt = stgPreviewText(o.text||''); }
-      inner = `<div class="txt${(o.bg||'').trim()?' boxed':''}" style="color:${esc(o.color||'#fff')};`+
-              `font-family:${fam};font-size:${fs}px;text-align:${esc(o.align||'left')};`+
-              `${(o.bg||'').trim()?`background:${esc(o.bg)}`:'text-shadow:0 1px 3px #000,0 0 2px #000'}">`+
-              `${esc(txt).replace(/\\n|\n/g,'<br>')||'&nbsp;'}</div>`;
+      const plate = (o.bg||'').trim();
+      const skin = `color:${esc(o.color||'#fff')};font-family:${fam};font-size:${fs}px;`+
+                   `${plate?`background:${esc(o.bg)}`:'text-shadow:0 1px 3px #000,0 0 2px #000'}`;
+      if(o.kind==='pump_timer' || o.kind==='device_timers'){
+        // preview the REAL device list (primary pump first) so you can size it,
+        // laid out in the same two columns the stream draws
+        const rows = stgTimerRows(o, lastState, o.kind==='pump_timer');
+        inner = rows.length
+          ? `<div class="txt rowgrid${plate?' boxed':''}" style="${skin}">`+
+            rows.map(r=>{ const c = stgFmtCols(
+                r.firing?(o.fmt_on||'[name] [secs]s'):(o.fmt_off||'[name] idle'),
+                r.name||'device', Math.round(r.remaining||0));
+              return `<span>${esc(c[0])}</span><span>${esc(c[1])}</span>`; }).join('')+
+            `</div>`
+          : `<div class="txt${plate?' boxed':''}" style="${skin}">(no devices firing)</div>`;
+      } else {
+        inner = `<div class="txt${plate?' boxed':''}" style="${skin};text-align:${esc(o.align||'left')}">`+
+                `${esc(stgPreviewText(o.text||'')).replace(/\\n|\n/g,'<br>')||'&nbsp;'}</div>`;
+      }
       box = 'width:auto';   // text sizes itself
     } else if(o.kind==='audio'){
       const nm = o.label || o.media || 'sound';
@@ -2601,6 +2632,95 @@ function renderStgCanvas(){
       ['nw','n','ne','w','e','sw','s','se'].map(h=>`<span class="stgH" data-h="${h}"></span>`).join('')+
       '</div>';
   }
+  // Corner rounding is a percent of the box's SHORTER SIDE, and a text plate
+  // sizes itself — so it can only be measured once the canvas has laid out.
+  cv.querySelectorAll('.stgItem').forEach(it=>{
+    const o=(s.overlays||[]).find(x=>x.id===it.dataset.id);
+    const inner=it.firstElementChild;
+    if(o && inner) stgApplyRadius(inner.classList.contains('stgShellGhost')
+                                  ? inner.firstElementChild : inner, o);
+  });
+}
+// ---- shared with camera.py / stage.html ---------------------------------
+const STG_RADIUS_DEF = {capacity_gauge:15, poll_viewer:3, solid:0};
+function stgApplyRadius(el, o){
+  if(!el) return;
+  const kind=o.kind||'text';
+  const painted = kind==='poll_viewer' || kind==='capacity_gauge' || kind==='solid'
+                  || String(o.bg||'').trim();
+  if(!painted){ el.style.borderRadius=''; return; }
+  let r=o.radius;
+  if(r==null || r==='') r = (STG_RADIUS_DEF[kind]!=null ? STG_RADIUS_DEF[kind] : 12);
+  r = Math.max(0, Math.min(50, +r||0));
+  el.style.borderRadius = Math.round(Math.min(el.offsetWidth, el.offsetHeight)*r/100)+'px';
+}
+// `devices` scopes the Device Timer List; empty/absent = every device
+function stgTimerRows(o, st, single){
+  let rows = ((st||{}).device_timers)||[];
+  if(!rows.length) rows = [{id:'p', name:'Main Pump', primary:true, firing:true, remaining:12},
+                           {id:'s', name:'Second Pump', primary:false, firing:false, remaining:0}];
+  if(single) return rows.slice(0,1);
+  const scope=(o.devices||[]).map(String).filter(Boolean);
+  if(scope.length){
+    const keep=rows.filter(r=>scope.includes(String(r.id||''))
+                              || (scope.includes('primary') && r.primary));
+    rows = keep.length ? keep : rows;
+  }
+  if(o.show_idle===false) rows = rows.filter(r=>r.firing);
+  return rows;
+}
+// ---- Scoped Devices -----------------------------------------------------
+// Which registered devices the Device Timer List shows. Nothing ticked = all
+// of them, so a rig that never touches this keeps listing everything; tick a
+// subset to drop the toy you aren't using tonight without deleting it.
+// Lives in the column beside the canvas (#stgScope), not in the properties
+// row — it's a list, and that column has the height for one.
+function renderStgScope(){
+  const box=$('#stgScope'); if(!box) return;
+  const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===scnSelId);
+  box.innerHTML = (o && (o.kind||'')==='device_timers') ? stgScopeBox(o) : '';
+}
+function stgScopeBox(o){
+  const rows = ((lastState||{}).device_timers)||[];
+  const picked = new Set((o.devices||[]).map(String));
+  if(!rows.length)
+    return `<div class="pscope"><div class="phead">Scoped Devices</div>`+
+           `<span class="muted">no devices registered yet</span></div>`;
+  const all = picked.size===0;
+  const on = r => all || picked.has(String(r.id)) || (picked.has('primary') && r.primary);
+  const shown = rows.filter(on).length;
+  return `<div class="pscope"><div class="phead">Scoped Devices`+
+    `<button class="ghost pmini" title="show every device" onclick="stgScopeSet(null)">all</button></div>`+
+    rows.map(r=>`<label class="pchk" title="${esc(r.id)}">`+
+      `<input type="checkbox" ${on(r)?'checked':''}`+
+      ` onchange="stgScopeToggle('${esc(String(r.id))}',this.checked)"> `+
+      `${esc(r.name||r.id)}${r.primary?' <span class="muted">· primary</span>':''}</label>`).join('')+
+    `<span class="muted">${all?'all devices — tick a subset to narrow it'
+                              :shown+' of '+rows.length+' shown'}</span></div>`;
+}
+function stgScopeToggle(id, on){
+  const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===scnSelId); if(!o) return;
+  const rows=((lastState||{}).device_timers)||[];
+  let cur = (o.devices||[]).map(String);
+  // the factory scene ships the reserved 'primary' token because no device has
+  // an id yet — the first tick in here pins it to real ones
+  if(cur.includes('primary'))
+    cur = cur.filter(x=>x!=='primary')
+             .concat(rows.filter(r=>r.primary).map(r=>String(r.id)));
+  cur = Array.from(new Set(cur));
+  // "nothing ticked = all" means the first untick has to start from the full
+  // list, or clearing one box would blank the whole overlay
+  if(!cur.length) cur = rows.map(r=>String(r.id));
+  cur = on ? Array.from(new Set(cur.concat([id]))) : cur.filter(x=>x!==id);
+  stgItemSet('devices', cur.length===rows.length ? [] : cur);
+}
+function stgScopeSet(v){ stgItemSet('devices', v||[]); }
+// split a row template at [name] so the value lands on a fixed tab stop
+function stgFmtCols(fmt, name, secs){
+  const s=String(fmt);
+  if(!s.includes('[name]')) return [s.replace('[secs]', secs), ''];
+  const i=s.indexOf('[name]');
+  return [s.slice(0,i)+name, s.slice(i+6).replace(/^\s+/,'').replace('[secs]', secs)];
 }
 let vcamWant={device:null, size:null};   // remembered camera + size
 let stgDrag=null;
@@ -3064,6 +3184,7 @@ function stgPickGroup(name){
 function renderStgProps(){
   const s=stgStage(), box=$('#stgProps'); if(!box) return;
   const o = s && (s.overlays||[]).find(x=>x.id===scnSelId);
+  renderStgScope();   // the side column tracks the selection too
   if(!o){ box.innerHTML='<div class="muted">no overlay selected — pick one from the list or the canvas</div>'; return; }
   const kind=o.kind||'media', isMedia=kind==='media', isGauge=kind==='capacity_gauge',
         isText=kind==='text', isPoll=kind==='poll_viewer', isTimer=kind==='timer',
@@ -3085,6 +3206,8 @@ function renderStgProps(){
   const sect=(t,body)=>body?`<div class="psect"><div class="phead">${t}</div><div class="prow">${body}</div></div>`:'';
   const TYPE={media:'🖼 Media',text:'🅣 Text',timer:'⏳ Timer',capacity_gauge:'📊 Capacity Gauge',
               device_timers:'⏱ Device Timers',pump_timer:'⏱ Pump Timer',poll_viewer:'🗳 Poll Viewer'}[kind]||kind;
+  // slide directions name an edge of the frame, not a way to travel
+  const EDGES=[['left','← left'],['right','→ right'],['top','↑ top'],['bottom','↓ bottom']];
 
   // ---- identity ------------------------------------------------------- //
   let head = `<div class="prow">`+
@@ -3113,7 +3236,8 @@ function renderStgProps(){
   if(isDev)
     content = F('Running', `<input value="${esc(o.fmt_on||'[name] [secs]s')}" style="width:190px" onchange="stgItemSet('fmt_on',this.value)">`,'[name] and [secs] per device')+
       F('Idle', `<input value="${esc(o.fmt_off||'[name] idle')}" style="width:160px" onchange="stgItemSet('fmt_off',this.value)">`)+
-      (kind==='device_timers'?chk('show_idle',o.show_idle!==false,'show idle','list devices that are not running'):'');
+      (kind==='device_timers'?chk('show_idle',o.show_idle!==false,'show idle','list devices that are not running')+
+        `<span class="muted">Scoped Devices — beside the canvas ↗</span>`:'');
   if(isGauge)
     content = F('Orientation', sel('orient',[['h','horizontal'],['v','vertical']],String(o.orient||'h')[0]==='v'?'v':'h',118))+
       F('Length %', num('w',Math.round((o.w??0.35)*100),4,100,1))+
@@ -3144,19 +3268,30 @@ function renderStgProps(){
         F('Softness', num('chroma_soft',o.chroma_soft??12,0,80,1)):'');
 
   // ---- style (drawn overlays) ------------------------------------------ //
+  // Corners are a PERCENT of the box's shorter side, so a plate keeps its
+  // shape at any resolution and 50 is a full pill. Only offered where there's
+  // actually a background to round — plain text has no plate to cut.
+  const RDEF={capacity_gauge:15, poll_viewer:3, solid:0};
+  const hasPlate = isSolid || isPoll || isGauge || (o.bg||'').trim();
+  const corner = hasPlate
+    ? F('Corners %', num('radius', o.radius ?? (RDEF[kind]??12), 0, 50, 1, 76),
+        'rounds the background box — 0 is square, 50 a full pill')
+    : '';
   let style='';
   if(isAudio){
     style = '';
   } else if(isSolid){
-    style = F('Colour', `<input type="color" value="${esc(o.color||'#000000')}" class="pcol" onchange="stgItemSet('color',this.value)">`);
-  } else if(!isMedia && !isPoll){
+    style = F('Colour', `<input type="color" value="${esc(o.color||'#000000')}" class="pcol" onchange="stgItemSet('color',this.value)">`)+corner;
+  } else if(isPoll){
+    style = corner;
+  } else if(!isMedia){
     const bgOn=(o.bg||'').trim();
     style = F(isGauge?'Fill':'Colour', `<input type="color" value="${esc(o.color||(isGauge?'#2ecc71':'#ffffff'))}" class="pcol" onchange="stgItemSet('color',this.value)">`)+
       (isGauge?'':F('Font', sel('font',['sans','bold','serif','mono','script'],o.font||'bold',104))+
                  F('Size %', num('size',Math.round((o.size??0.06)*100),1,90,1)))+
       F('Background', `<input type="color" value="${esc(o.bg||'#000000')}" class="pcol" onchange="stgItemSet('bg',this.value)">`+
         `<button class="ghost pmini" title="${bgOn?'make transparent':'currently transparent'}" onclick="stgItemSet('bg','')">${bgOn?'✕':'—'}</button>`,
-        'blank = transparent');
+        'blank = transparent')+corner;
   }
 
   // ---- placement & motion ---------------------------------------------- //
@@ -3170,6 +3305,16 @@ function renderStgProps(){
     chk('center',o.center,'dead centre','ignore X/Y and stay centred on the frame — survives the text changing length when placeholders resolve')+
     chk('anim',o.anim,'animate','slide in and out instead of just appearing')+
     (o.anim?F('Direction', sel('anim_dir',['up','down','left','right'],o.anim_dir||'up',92)):'')+
+    // Two independent legs. The dropdown names the EDGE — in = the side it
+    // arrives from, out = the side it leaves toward — so bottom-right poll
+    // "in from right / out to left" sweeps across the frame.
+    chk('slide_in',o.slide_in,'slide in','fly on from an edge when it appears')+
+    (o.slide_in?F('In from', sel('slide_in_dir',EDGES,o.slide_in_dir||'left',104))+
+                F('In secs', num('slide_in_secs',o.slide_in_secs??0.4,0.05,10,0.05,76)):'')+
+    chk('slide_out',o.slide_out,'slide out','fly off an edge when its time is up')+
+    (o.slide_out?F('Out to', sel('slide_out_dir',EDGES,o.slide_out_dir||'left',104))+
+                 F('Out secs', num('slide_out_secs',o.slide_out_secs??0.4,0.05,10,0.05,76)):'')+
+    ((o.slide_in||o.slide_out)?`<span class="muted">slide time is ADDED to Secs — it still sits still for the full duration</span>`:'')+
     chk('queue',o.queue,'queue if busy','wait your turn instead of replacing what is on screen')+
     `<span class="muted">at x ${((o.x||0)*100).toFixed(0)}% · y ${((o.y||0)*100).toFixed(0)}%</span>`;
 
@@ -3207,6 +3352,8 @@ function stgGridToggle(){
 function stgItemSet(k,v){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===scnSelId); if(!o) return;
   if(k==='size'||k==='w') v = Math.max(0.01, (+v||0)/100);   // panel shows %
   if(k==='fade_in'||k==='fade_out') v = Math.max(0, +v||0);  // plain seconds
+  if(k==='slide_in_secs'||k==='slide_out_secs') v = Math.max(0.05, +v||0.4);
+  if(k==='radius') v = Math.max(0, Math.min(50, +v||0));     // % of shorter side
   if(k==='opacity') v = Math.max(0, Math.min(100, +v||0));   // percent, as stored
   if(k==='h') v = (v===null||v==='') ? null : Math.max(0.02, (+v||0)/100);
   o[k]=v; renderStgCanvas(); renderStgContents(); renderStgProps();
@@ -5871,14 +6018,23 @@ function cleanCapEvents(){
 }
 
 // ---- templates (reusable command / event / range snapshots) ----
-let templatesData = {commands:[], events:[], ranges:[], polls:[], competitions:[], capevents:[]};
+// every template kind the panel knows about — the single list, so adding a
+// kind never again means remembering to update a hand-written load line
+const TPL_KINDS = ['commands','events','ranges','polls','competitions','capevents',
+                   'bonus_rounds','broadcasts','minigames','prizes','modes'];
+let templatesData = Object.fromEntries(TPL_KINDS.map(k=>[k,[]]));
+// `_tpl_id`s of shipped defaults the user deleted — the server checks this
+// before seeding, so a binned default doesn't reappear on the next load
+let templatesRemoved = [];
 function _tplList(kind){ templatesData[kind]=templatesData[kind]||[]; return templatesData[kind]; }
 // persist just the templates map — DON'T full-applyState (that would reload the
 // editor rows from the server and could revert unsaved command/event edits).
 async function saveTemplates(){
   pendingRev++;
   try{
-    const s = await api('/api/config', {templates: templatesData, config_rev: configRev});
+    const s = await api('/api/config', {templates: templatesData,
+                                        templates_removed: templatesRemoved,
+                                        config_rev: configRev});
     configRev = s.config_rev ?? configRev;
   }catch(e){ toastMsg('⚠ template save failed: '+(e.message||e)); }
   finally{ pendingRev--; }
@@ -5962,8 +6118,24 @@ function addTemplateToConfig(kind, idx){
 }
 function removeTemplate(kind, idx){
   const t=(templatesData[kind]||[])[idx]||{};
-  if(!confirm(`Delete template "${_tplLabel(kind,t)}"? This can't be undone.`)) return;
+  const ship=!!t._tpl_id;
+  if(!confirm(`Delete template "${_tplLabel(kind,t)}"?`+
+      (ship?'\n\nThis is a shipped default — it stays gone until you hit Regenerate Defaults.'
+           :" This can't be undone."))) return;
+  // remember a deleted DEFAULT, or the server hands it straight back the next
+  // time the config loads
+  if(ship && !templatesRemoved.includes(t._tpl_id)) templatesRemoved.push(t._tpl_id);
   (templatesData[kind]||[]).splice(idx,1); saveTemplates();
+}
+async function regenTemplates(){
+  if(!confirm('Put the shipped default Templates back?\n\nAnything you saved yourself is left alone — this only adds back the defaults you deleted.')) return;
+  try{
+    const r=await api('/api/templates/regenerate', {});
+    templatesData = r.templates || templatesData;
+    templatesRemoved = [];
+    renderTemplates();
+    toastMsg(r.added ? `🧩 ${r.added} default template${r.added===1?'':'s'} restored` : '🧩 all defaults already present');
+  }catch(e){ toastMsg('⚠ regenerate failed: '+(e.message||e)); }
 }
 function renderTemplates(){
   [['commands','tplCommands','tplCmdCount'],['events','tplEvents','tplEvtCount'],['ranges','tplRanges','tplRangeCount'],
@@ -5984,8 +6156,11 @@ function renderTemplates(){
         : kind==='capevents' ? (t.at!=null?`at ${t.at}%`:'')
         : kind==='polls' ? ((t.title||'').slice(0,50))
         : ((t.announce||t.final_message||'').replace(/\n/g,' ').slice(0,50));
+      // a shipped default is marked so you know what "Regenerate Defaults"
+      // would bring back — it is otherwise an ordinary, editable template
+      const ship = t._tpl_id ? `<span class="muted" title="shipped with DiscoFlate — Regenerate Defaults brings it back">· default</span>` : '';
       return `<div class="row" style="gap:10px;align-items:center;margin-bottom:5px">`+
-        `<b style="min-width:150px">${esc(label)}</b>`+
+        `<b style="min-width:150px">${esc(label)}</b>${ship}`+
         `<span class="muted" style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(sub)}</span>`+
         `<button onclick="addTemplateToConfig('${kind}',${idx})">＋ Add to Config</button>`+
         `<button class="ghost" title="Delete template" onclick="removeTemplate('${kind}',${idx})">✕</button>`+
@@ -6564,7 +6739,15 @@ function applyState(st, full){
     if($('#cmdVote')) $('#cmdVote').value = (st.command_names||{}).vote||'agvote';
     if($('#eventInProcessMsg')) $('#eventInProcessMsg').value = st.event_in_process_message||'';
     if($('#eventCooldownMsg')) $('#eventCooldownMsg').value = st.event_cooldown_message||'';
-    { const t = st.templates || {}; templatesData = {commands:t.commands||[], events:t.events||[], ranges:t.ranges||[], polls:t.polls||[], competitions:t.competitions||[], capevents:t.capevents||[]}; }
+    // Carry EVERY template kind, not a hand-listed six. This used to name only
+    // the original kinds, so bonus rounds / broadcasts / minigames / rewards /
+    // modes were dropped on load — and the next template save wrote that
+    // truncated map straight back over them.
+    { const t = st.templates || {};
+      templatesData = {};
+      TPL_KINDS.forEach(k => templatesData[k] = t[k] || []);
+      Object.keys(t).forEach(k => { if(!templatesData[k]) templatesData[k] = t[k] || []; });
+      templatesRemoved = (st.templates_removed || []).slice(); }
     broadcastRows = JSON.parse(JSON.stringify(st.broadcasts||[]));
     minigameRows = JSON.parse(JSON.stringify(st.minigames||[]));
     prizeRows = JSON.parse(JSON.stringify(st.prizes||[]));

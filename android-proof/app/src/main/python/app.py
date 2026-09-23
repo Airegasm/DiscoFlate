@@ -293,6 +293,7 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "output_headers": cfg.get("output_headers", False),
         "rich_output": cfg.get("rich_output", False),
         "templates": cfg.get("templates", {"commands": [], "events": [], "ranges": []}),
+        "templates_removed": cfg.get("templates_removed", []),
         "allow_dms": cfg.get("allow_dms", False),
         "server_channels": cfg.get("server_channels", {}),
         "invite_url": botmgr.invite_url(),
@@ -799,7 +800,10 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                         "chroma_on": found.get("chroma_on"), "chroma": found.get("chroma"),
                         "chroma_tol": found.get("chroma_tol"),
                         "chroma_soft": found.get("chroma_soft"), "z": found.get("z"),
-                        "opacity": found.get("opacity"), "delay": found.get("delay")}
+                        "opacity": found.get("opacity"), "delay": found.get("delay"),
+                        # drawn overlays carry these on the item; a media one
+                        # has to have them lifted off the design by hand
+                        "slide": {k: found.get(k) for k in stage.SLIDE_KEYS}}
         elif mode == "clear":
             vcam.clear_overlays(spec.get("layer"), fade_out=spec.get("fade_out"))
             stg.clear(spec.get("layer"))
@@ -832,7 +836,8 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                                              chroma_soft=spec.get("chroma_soft"),
                                              z=spec.get("z"),
                                              opacity=spec.get("opacity"),
-                                             delay=spec.get("delay"))
+                                             delay=spec.get("delay"),
+                                             slide=spec.get("slide"))
             except Exception as ex:  # noqa: BLE001
                 vres = {"ok": False, "error": str(ex)}
         sres = stg.fire(spec.get("media"), spec.get("seconds"),
@@ -841,7 +846,8 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                         x=spec.get("x"), y=spec.get("y"), item=item,
                         z=spec.get("z"), opacity=spec.get("opacity"),
                         rot=spec.get("rot"), flash=spec.get("flash"),
-                        anim=spec.get("anim"), anim_dir=spec.get("anim_dir"))
+                        anim=spec.get("anim"), anim_dir=spec.get("anim_dir"),
+                        slide=spec.get("slide"))
         if mode == "clear" or vres.get("ok") or (sres.get("ok") and stg.watching()):
             return {"ok": True}
         return {"ok": False, "error": sres.get("error") if not sres.get("ok")
@@ -1083,6 +1089,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                    "always_on_commands": list, "cooldown_exempt_user_ids": list,
                    "cooldown_exempt_names": list, "command_names": dict, "roll": dict,
                    "auto_report": dict, "templates": dict,
+                   "templates_removed": list,
                    "vendors": dict, "allow": dict, "server_channels": dict}
 
     async def set_config(request):
@@ -1120,7 +1127,8 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                     "allow", "pumpdirect_path", "cooldown_seconds",
                     "cooldown_exempt_user_ids", "cooldown_exempt_names", "operator_name", "auto_report",
                     "listen_guild_id", "listen_channel_id",
-                    "listen_targets", "anon_user_label", "output_headers", "rich_output", "templates",
+                    "listen_targets", "anon_user_label", "output_headers", "rich_output",
+                    "templates", "templates_removed",
                     "allow_dms", "server_channels", "silence_onoff_log",
                     "mock_calibration_seconds_to_100",
                     "always_on_enabled", "always_on_commands",
@@ -1723,6 +1731,22 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         engine.set_config(cfg)
         await botmgr.ensure(cfg.get("discord_token"), force=True)
         return web.json_response({"ok": True})
+
+    async def templates_regenerate(request):
+        """Put the shipped default Templates back (System → Templates).
+
+        Deleting a default is remembered in `templates_removed` so it doesn't
+        grow back on the next load; this clears that memory and re-seeds, which
+        is the only way to get one back after you've binned it. Templates you
+        saved yourself are never touched — seeding only ever ADDS."""
+        await guard(request)
+        cfg = config_store.load()
+        cfg["templates_removed"] = []
+        added = config_store.seed_templates(cfg)
+        cfg = config_store.save(cfg)
+        engine.set_config(cfg)
+        return web.json_response({"ok": True, "added": added,
+                                  "templates": cfg.get("templates") or {}})
 
     async def gameplay_preset(request):
         """Named gameplay presets (System tab). Presets are managed ONLY here —
@@ -2616,6 +2640,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.get("/api/guilds", get_guilds),
         web.get("/images/{name}", serve_image),
         web.post("/api/config", set_config),
+        web.post("/api/templates/regenerate", templates_regenerate),
         web.post("/api/vendors", set_vendors),
         web.post("/api/remote-access", set_remote_access),
         web.post("/api/listener", set_listener),

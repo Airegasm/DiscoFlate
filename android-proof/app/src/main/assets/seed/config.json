@@ -87,7 +87,8 @@
         ],
         "notify_enabled": true,
         "notify": "[user] triggered [command] [command_overlay_desc]",
-        "notify_desc": true
+        "notify_desc": true,
+        "_tpl_id": "df-commands-fill"
       }
     ],
     "events": [
@@ -140,7 +141,8 @@
             "type": "notify",
             "message": "\ud83c\udfb0 [user] added [secs]s to [device] \u00b7 Roulette [current_loop]/[total_loops]"
           }
-        ]
+        ],
+        "_tpl_id": "df-events-pumproulette"
       }
     ],
     "ranges": [
@@ -170,7 +172,8 @@
         },
         "start_command": "",
         "start_command_enabled": false,
-        "event_actions": []
+        "event_actions": [],
+        "_tpl_id": "df-ranges-0-20"
       }
     ],
     "polls": [
@@ -215,7 +218,8 @@
               }
             ]
           }
-        ]
+        ],
+        "_tpl_id": "df-polls-mercy"
       }
     ],
     "competitions": [
@@ -259,7 +263,8 @@
             "type": "message",
             "message": "\ud83c\udfc1 Nobody entered \u2014 the wheel spins on."
           }
-        ]
+        ],
+        "_tpl_id": "df-competitions-rolloff"
       }
     ],
     "capevents": [
@@ -277,7 +282,8 @@
             "message": "\ud83d\udcc8 20% reached"
           }
         ],
-        "post_actions": []
+        "post_actions": [],
+        "_tpl_id": "df-capevents-quarter"
       }
     ],
     "bonus_rounds": [
@@ -305,14 +311,16 @@
             "type": "notify",
             "message": "\ud83e\udd1d Team push \u00b7 [command_overlay_desc]"
           }
-        ]
+        ],
+        "_tpl_id": "df-bonus_rounds-teampush"
       }
     ],
     "broadcasts": [
       {
         "name": "Welcome",
         "message": "\ud83d\udc4b Welcome in. [owner] is at [capacity]%. [syscom_help] for commands.",
-        "enabled": true
+        "enabled": true,
+        "_tpl_id": "df-broadcasts-welcome"
       }
     ],
     "minigames": [
@@ -380,7 +388,8 @@
         "intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it![cmd_remain_note]",
         "intro_embed": false,
         "intro_title": "",
-        "start_events": []
+        "start_events": [],
+        "_tpl_id": "df-minigames-push-your-luck"
       }
     ],
     "prizes": [
@@ -404,7 +413,8 @@
             "type": "message",
             "message": "[mention] has unlocked: [bonus_cmd] \u2014 SUPERPUMP - !superpump triggers a 40s burst of air\\nYou can use this command a total of [charges] times."
           }
-        ]
+        ],
+        "_tpl_id": "df-prizes-superpump-superpump-triggers-a-40s-burst-of-air"
       }
     ],
     "modes": [
@@ -417,7 +427,8 @@
         "events": [],
         "enabled": false,
         "message_on": "\ud83d\udd4a **Gentle mode** \u2014 only the softer commands are live.",
-        "message_off": "Gentle mode off \u2014 everything is back."
+        "message_off": "Gentle mode off \u2014 everything is back.",
+        "_tpl_id": "df-modes-gentle"
       }
     ]
   },
@@ -2211,7 +2222,10 @@
           "group": "Main",
           "z": 0,
           "opacity": 100,
-          "delay": 0
+          "delay": 0,
+          "slide_in": true,
+          "slide_in_dir": "left",
+          "slide_in_secs": 0.45
         },
         {
           "id": "dfdefdevtimer",
@@ -2234,17 +2248,24 @@
           "size": 0.04,
           "color": "#ffffff",
           "font": "bold",
-          "bg": "",
+          "bg": "#000000",
           "fmt_on": "[name] [secs]s",
           "fmt_off": "[name] idle",
-          "show_idle": true
+          "show_idle": true,
+          "radius": 12,
+          "devices": [
+            "primary"
+          ],
+          "slide_in": true,
+          "slide_in_dir": "left",
+          "slide_in_secs": 0.45
         },
         {
           "id": "dfdefhelptext",
           "label": "",
           "kind": "text",
           "media": "",
-          "x": 0.7933,
+          "x": 0.8683,
           "y": 0.0201,
           "w": 0.35,
           "mode": "timed",
@@ -2261,7 +2282,10 @@
           "color": "#ffffff",
           "font": "bold",
           "bg": "",
-          "text": "[syscom_help]"
+          "text": "[syscom_help]",
+          "slide_in": true,
+          "slide_in_dir": "right",
+          "slide_in_secs": 0.45
         },
         {
           "id": "dfdefpollview",
@@ -2344,7 +2368,7 @@
           "y": 0.86,
           "w": 0.44,
           "mode": "timed",
-          "seconds": 3,
+          "seconds": 1,
           "layer": "notify",
           "rot": 0,
           "flash": 0,
@@ -2359,10 +2383,15 @@
           "bg": "#2563ebE6",
           "align": "left",
           "text": "[user] triggered [command] [command_overlay_desc]",
-          "fade_out": 1.2,
-          "anim": true,
-          "anim_dir": "up",
-          "fade_in": 0
+          "fade_out": 0.9,
+          "anim": false,
+          "fade_in": 0,
+          "slide_in": true,
+          "slide_in_dir": "left",
+          "slide_in_secs": 0.25,
+          "slide_out": true,
+          "slide_out_dir": "bottom",
+          "slide_out_secs": 0.9
         },
         {
           "id": "dfdefpausebg",
@@ -4592,7 +4621,10 @@
           "group": "Main",
           "z": 0,
           "opacity": 100,
-          "delay": 0
+          "delay": 0,
+          "slide_in": true,
+          "slide_in_dir": "left",
+          "slide_in_secs": 0.45
         },
         {
           "id": "dfdefdevtimer",
@@ -4615,17 +4647,24 @@
           "size": 0.04,
           "color": "#ffffff",
           "font": "bold",
-          "bg": "",
+          "bg": "#000000",
           "fmt_on": "[name] [secs]s",
           "fmt_off": "[name] idle",
-          "show_idle": true
+          "show_idle": true,
+          "radius": 12,
+          "devices": [
+            "primary"
+          ],
+          "slide_in": true,
+          "slide_in_dir": "left",
+          "slide_in_secs": 0.45
         },
         {
           "id": "dfdefhelptext",
           "label": "",
           "kind": "text",
           "media": "",
-          "x": 0.7933,
+          "x": 0.8683,
           "y": 0.0201,
           "w": 0.35,
           "mode": "timed",
@@ -4642,7 +4681,10 @@
           "color": "#ffffff",
           "font": "bold",
           "bg": "",
-          "text": "[syscom_help]"
+          "text": "[syscom_help]",
+          "slide_in": true,
+          "slide_in_dir": "right",
+          "slide_in_secs": 0.45
         },
         {
           "id": "dfdefpollview",
@@ -4725,7 +4767,7 @@
           "y": 0.86,
           "w": 0.44,
           "mode": "timed",
-          "seconds": 3,
+          "seconds": 1,
           "layer": "notify",
           "rot": 0,
           "flash": 0,
@@ -4740,10 +4782,15 @@
           "bg": "#2563ebE6",
           "align": "left",
           "text": "[user] triggered [command] [command_overlay_desc]",
-          "fade_out": 1.2,
-          "anim": true,
-          "anim_dir": "up",
-          "fade_in": 0
+          "fade_out": 0.9,
+          "anim": false,
+          "fade_in": 0,
+          "slide_in": true,
+          "slide_in_dir": "left",
+          "slide_in_secs": 0.25,
+          "slide_out": true,
+          "slide_out_dir": "bottom",
+          "slide_out_secs": 0.9
         },
         {
           "id": "dfdefpausebg",
@@ -6976,5 +7023,6 @@
   "pause_overlay": "Pause",
   "notify_overlay": "dfdefnotify",
   "resume_embed": true,
-  "resume_title": "\u25b6 Resumed"
+  "resume_title": "\u25b6 Resumed",
+  "templates_removed": []
 }
