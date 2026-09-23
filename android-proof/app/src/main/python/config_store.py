@@ -43,7 +43,7 @@ DEFAULT_PUMPDIRECT_PATH = os.path.normpath(
 
 # Schema version of the stored config. Bump it + add a _migrate step whenever a
 # key is renamed/moved, so old configs upgrade instead of silently stranding data.
-CONFIG_VERSION = 18
+CONFIG_VERSION = 19
 
 # The scene we ship read-only. It is the baseline every install can fall back
 # to and compare against, so nothing may write to it.
@@ -81,8 +81,11 @@ GAMEPLAY_KEYS = [
     # Events tab
     "events", "capacity_events", "polls", "competitions", "bonus_rounds", "minigames",
     "event_in_process_message", "event_cooldown_message",
-    # Templates tab
-    "templates", "templates_removed",
+    # (Templates are deliberately NOT here. They were, which made the library
+    # per-scene: the panel read the LIVE SCENE's copy while seed_templates()
+    # filled the top-level one, so shipped defaults were seeded somewhere
+    # nothing displayed. A template library that can't cross scenes also
+    # defeats "＋ Add to Config", whose whole job is porting a trigger.)
 ]
 
 def scene_gameplay(cfg: dict, name: str | None = None) -> dict:
@@ -1553,6 +1556,38 @@ def _migrate(cfg: dict) -> dict:
         (cfg.get("golive") or {}).pop("standby_text", None)
         if found and not str(cfg.get("standby_text") or "").strip():
             cfg["standby_text"] = found
+    if v < 19:
+        # v19: the Templates library becomes GLOBAL. It used to ride in each
+        # scene's gameplay, so switching scenes switched your saved templates
+        # and the shipped defaults were seeded into a map the panel never read.
+        # Merge every scene's library into the top-level one — nothing is
+        # thrown away — then stop carrying it per scene.
+        top = cfg.get("templates")
+        if not isinstance(top, dict):
+            top = {}
+        for sc in (cfg.get("scenes") or []):
+            gp = sc.get("gameplay")
+            if not isinstance(gp, dict):
+                continue
+            mine = gp.pop("templates", None)
+            gp.pop("templates_removed", None)
+            if not isinstance(mine, dict):
+                continue
+            for kind, items in mine.items():
+                if not isinstance(items, list):
+                    continue
+                cur = [x for x in (top.get(kind) or []) if isinstance(x, dict)]
+                # dedupe on the shipped id, else the name, else the band
+                def key(x):
+                    return (str(x.get("_tpl_id") or "")
+                            or str(x.get("name") or "").strip().lower()
+                            or f"{x.get('min')}-{x.get('max')}")
+                have = {key(x) for x in cur}
+                for x in items:
+                    if isinstance(x, dict) and key(x) not in have:
+                        cur.append(x); have.add(key(x))
+                top[kind] = cur
+        cfg["templates"] = top
     cfg["config_version"] = CONFIG_VERSION
     return cfg
 

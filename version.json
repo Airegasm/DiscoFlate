@@ -1,6 +1,6 @@
 {
-  "version": "3.88.0",
-  "versionCode": 187,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.88.0/discoflate-v3.88.0.apk",
-  "notes": "DiscoFlate v3.88.0 \u2014 \ud83e\uddf9 The command editor lines up. It mixed label-above fields with inline checkboxes in the same flex row, so nothing shared a baseline, and the react emoji sat in an unlabelled box floating beside a tickbox. It now uses the same layout language as the Scenes properties panel \u2014 labelled fields, checkboxes at a matching height, and grouped sections: identity, where it runs, the notify overlay, and what it starts. The emoji field only appears once you've actually turned the reaction on, and the notify line and its explanation only appear when the overlay is enabled."
+  "version": "3.89.0",
+  "versionCode": 189,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.89.0/discoflate-v3.89.0.apk",
+  "notes": "DiscoFlate v3.89.0 \u2014 \ud83e\udde9 Templates are actually global now. They were listed as a per-scene gameplay key, so the panel read the LIVE SCENE's copy while the seeding filled the top-level one \u2014 shipped defaults were being written somewhere nothing displayed, and a scene carrying an older copy showed only the kinds that existed when it was saved. Bonus Rounds, Broadcasts, Minigames, Rewards and Modes weren't empty, they were absent. A v19 migration merges every scene's library into one shared map (nothing saved is lost) and stops carrying it per scene, so switching scenes no longer switches your templates. \ud83e\uddf9 The layout pass also continues: System commands loses the margin hacks that faked its checkbox alignment, hints move out from between a label and its control, five more rows bottom-align so labels of any height leave their controls in line, and events, polls, competitions and bonus rounds group under headings instead of one crowded row."
 }

@@ -705,7 +705,7 @@
         <span class="muted">— prefix each command / minigame / event message with a <code>[label · user]</code> tag so interleaved output stays readable (cross-server shows <code>ANON</code>).</span></label>
       <label class="row" style="gap:8px;margin-bottom:12px"><input type="checkbox" id="richOutput" style="width:auto"> <b>Rich status embeds</b>
         <span class="muted">— post the capacity check, both leaderboards, the auto-report, and custom Broadcasts as bordered embed cards so those blocks stand apart from command chatter.</span></label>
-      <div class="row" style="gap:24px;align-items:flex-start">
+      <div class="row" style="gap:24px;align-items:flex-end">
         <div class="colsec" style="min-width:240px;max-width:320px;flex:1">
           <h3>Owner ID &amp; cooldown</h3>
           <label class="field">Owner user ID <span class="muted">(optional, spoof-proof)</span>
@@ -781,40 +781,51 @@
     <!-- capacity number rather than by a person typing -->
     <div class="card span" data-tab="triggers">
       <details class="help"><summary><h2>System commands</h2></summary>
-      <div class="row" style="gap:16px;align-items:flex-end;margin-top:8px">
-        <label class="field">Prefix <input id="prefix" value="!" style="width:60px"></label>
-        <label class="field">Anti-spam buffer (s) <input type="number" id="systemBuffer" value="8" min="0" step="1" style="width:80px" title="quietly ignore back-to-back uses of the same command within N seconds (0 = off)"></label>
+      <!-- Same layout language as the rest of the panel: label above its
+           control, checkboxes at a matching height, and every hint UNDER its
+           group. The hints used to sit between a label and its field, which
+           pushed that field down and left it out of line with its neighbour —
+           patched over with margin-top:24px on the embed tickboxes. -->
+      <div class="psect" style="border-top:none;margin-top:8px;padding-top:0"><div class="prow">
+        <label class="pfield"><span>Prefix</span><input id="prefix" value="!" style="width:64px"></label>
+        <label class="pfield" title="quietly ignore back-to-back uses of the same command by the same person"><span>Anti-spam buffer (s)</span><input type="number" id="systemBuffer" value="8" min="0" step="1" style="width:92px"></label>
+      </div></div>
+
+      <div class="psect"><div class="phead">📊 Capacity</div><div class="prow">
+        <label class="pfield"><span>Command</span><input id="cmdCapacity" value="capacity" style="width:150px"></label>
+        <label class="pfield grow"><span>Reply</span><textarea id="capacityMsg" rows="2"></textarea></label>
+        <label class="pchk"><input type="checkbox" id="capacityEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
+        <label class="pfield"><span>Titlebar</span><input id="capacityTitle" placeholder="📊 Capacity" style="width:160px"></label>
+      </div></div>
+
+      <div class="psect"><div class="phead">⏱️ Pump timer</div><div class="prow">
+        <label class="pfield"><span>Command</span><input id="cmdPumptimer" value="pumptimer" style="width:150px"></label>
+        <label class="pfield grow"><span>Reply</span><textarea id="pumptimerMsg" rows="2"></textarea></label>
+        <label class="pchk"><input type="checkbox" id="pumptimerEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
+        <label class="pfield"><span>Titlebar</span><input id="pumptimerTitle" placeholder="⏱️ Pump timer" style="width:160px"></label>
       </div>
-      <!-- each command's NAME sits next to ITS reply -->
-      <div class="row" style="gap:12px;align-items:flex-start;margin-top:10px;flex-wrap:nowrap">
-        <label class="field" style="width:160px;flex:none">Capacity command <input id="cmdCapacity" value="capacity"></label>
-        <label class="field" style="flex:1">Reply <textarea id="capacityMsg" rows="2"></textarea></label>
-        <label class="row" style="gap:6px;white-space:nowrap;margin-top:24px"><input type="checkbox" id="capacityEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
-        <label class="field" style="width:170px;flex:none">Titlebar <input id="capacityTitle" placeholder="📊 Capacity"></label>
+      <div class="muted" style="font-size:12px;margin-top:6px"><code>[timer]</code> is the seconds left on the pump.</div></div>
+
+      <div class="psect"><div class="phead">⏳ Cooldown message</div><div class="prow">
+        <label class="pfield grow"><span>Message</span><input id="cooldownMsg" placeholder="⏳ [mention], [cmd] is on cooldown — [cooldown]s left"></label>
+        <label class="pchk"><input type="checkbox" id="cooldownEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
+        <label class="pfield"><span>Titlebar</span><input id="cooldownTitle" placeholder="⏳ Cooldown" style="width:160px"></label>
       </div>
-      <div class="row" style="gap:12px;align-items:flex-start;margin-top:8px;flex-wrap:nowrap">
-        <label class="field" style="width:160px;flex:none">Pump timer command <input id="cmdPumptimer" value="pumptimer"></label>
-        <label class="field" style="flex:1">Reply <span class="muted">([timer])</span> <textarea id="pumptimerMsg" rows="2"></textarea></label>
-        <label class="row" style="gap:6px;white-space:nowrap;margin-top:24px"><input type="checkbox" id="pumptimerEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
-        <label class="field" style="width:170px;flex:none">Titlebar <input id="pumptimerTitle" placeholder="⏱️ Pump timer"></label>
+      <div class="muted" style="font-size:12px;margin-top:6px"><code>[cmd]</code> is the command they tried.</div></div>
+
+      <div class="psect"><div class="phead">💨 Operator pump message</div><div class="prow">
+        <label class="pfield grow"><span>Message</span><textarea id="pumpMsg" rows="2"></textarea></label>
+        <label class="pchk"><input type="checkbox" id="pumpEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
+        <label class="pfield"><span>Titlebar</span><input id="pumpTitle" placeholder="💨 Pump" style="width:160px"></label>
       </div>
-      <div class="row" style="gap:16px;align-items:flex-end;margin-top:8px">
-        <label class="field">Help <input id="cmdHelp" value="aghelp" style="width:130px" title="DMs the command list — output isn't editable"></label>
-        <label class="field">Leaderboard <input id="cmdLeaderboard" value="leaderboard" style="width:140px" title="top pumpers this session — output isn't editable"></label>
-        <label class="field">Lifetime leaderboard <input id="cmdLeaderboardLife" value="toppumpers-life" style="width:150px" title="all-time top pumpers — output isn't editable"></label>
+      <div class="muted" style="font-size:12px;margin-top:6px">Posted by <b>Chat → Controls → 💨 Pump</b>. <code>[secs]</code> <code>[secs2capacity]</code> <code>[capacity]</code> <code>[timer]</code> <code>[operator]</code> — reusable anywhere as <code>[pump_msg]</code>.</div></div>
+
+      <div class="psect"><div class="phead">Fixed-output commands</div><div class="prow">
+        <label class="pfield"><span>Help</span><input id="cmdHelp" value="aghelp" style="width:140px"></label>
+        <label class="pfield"><span>Leaderboard</span><input id="cmdLeaderboard" value="leaderboard" style="width:150px"></label>
+        <label class="pfield"><span>Lifetime leaderboard</span><input id="cmdLeaderboardLife" value="toppumpers-life" style="width:160px"></label>
       </div>
-      <div class="row" style="gap:12px;align-items:flex-end;margin-top:10px;flex-wrap:nowrap">
-        <label class="field" style="flex:1">Cooldown message <span class="muted">([cmd] = the command)</span>
-          <input id="cooldownMsg" placeholder="⏳ [mention], [cmd] is on cooldown — [cooldown]s left"></label>
-        <label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" id="cooldownEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
-        <label class="field" style="width:170px;flex:none">Titlebar <input id="cooldownTitle" placeholder="⏳ Cooldown"></label>
-      </div>
-      <div class="row" style="gap:12px;align-items:flex-end;margin-top:10px;flex-wrap:nowrap">
-        <label class="field" style="flex:1">Operator Pump message <span class="muted">(Chat → Controls → 💨 Pump · [secs] [secs2capacity] [capacity] [timer] [operator] · reuse it anywhere as <code>[pump_msg]</code>)</span>
-          <textarea id="pumpMsg" rows="2"></textarea></label>
-        <label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" id="pumpEmbed" style="width:auto" onchange="scheduleSave()"> embed</label>
-        <label class="field" style="width:170px;flex:none">Titlebar <input id="pumpTitle" placeholder="💨 Pump"></label>
-      </div>
+      <div class="muted" style="font-size:12px;margin-top:6px">Rename them freely — what they print isn't editable. Help DMs the command list.</div></div>
       </details>
 
     </div>
@@ -870,7 +881,7 @@
         <button class="ghost" onclick="addEvent()">+ Add event</button>
         <div style="flex:1"></div>
       </div>
-      <div class="row" style="gap:16px;align-items:flex-start;margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
+      <div class="row" style="gap:16px;align-items:flex-end;margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
         <label class="field" style="flex:1">“In process” message <span class="muted">(a command tried to start a running event)</span>
           <input id="eventInProcessMsg" placeholder="⏳ [event] is already running."></label>
         <label class="field" style="flex:1">“Cooldown” message <span class="muted">([event] on cooldown · [cooldown]s left)</span>
@@ -4683,13 +4694,13 @@ function renderRanges(){
           `<label class="field">${endOnly?'End at %':'End (final) at %'} <select onchange="setEndMax(${i}, this.value)">${capOptions(r.max)}</select></label>`+
           (endOnly?'':`<span class="muted">(${prevMax}%–[start]% uses your last range; [start]%–[end]% is the buildup)</span>`)+
         `</div>`+
-        `<div class="row" style="gap:12px;align-items:flex-start">`+
+        `<div class="row" style="gap:12px;align-items:flex-end">`+
           `<label class="field" style="flex:1;min-width:260px">Final message <span class="muted">(posted once, then session ends &amp; resets — no activation-off message)</span>`+
             `<textarea rows="4" placeholder="💥 Session complete!" onchange="rangeRows[${i}].final_message=this.value">${esc(r.final_message||'')}</textarea></label>`+
           imagePicker(i, 'final_image', 'Final image', '(with the final message)')+
         `</div>`;
       if(!endOnly && open){
-        html += `<div class="row" style="gap:12px;align-items:flex-start">`+
+        html += `<div class="row" style="gap:12px;align-items:flex-end">`+
           `<label class="field" style="flex:1;min-width:260px">Announce <span class="muted">(ongoing in the sequence)</span><textarea rows="4" onchange="rangeRows[${i}].announce=this.value">${esc(r.announce||'')}</textarea></label>`+
           `<label class="field" style="flex:1;min-width:260px">Milestone <span class="muted">(once on entry)</span><textarea rows="4" onchange="rangeRows[${i}].milestone=this.value">${esc(r.milestone||'')}</textarea></label>`+
           imagePicker(i, 'image', 'Milestone image', '(when the sequence is entered)')+
@@ -4708,7 +4719,7 @@ function renderRanges(){
       `</div>`;
       if(open){
         html +=
-        `<div class="row" style="gap:12px;align-items:flex-start">`+
+        `<div class="row" style="gap:12px;align-items:flex-end">`+
           `<label class="field" style="flex:1">Announce <span class="muted">(ongoing)</span><textarea rows="4" onchange="rangeRows[${i}].announce=this.value">${esc(r.announce||'')}</textarea></label>`+
           `<label class="field" style="flex:1">Milestone <span class="muted">(once on entry)</span><textarea rows="4" onchange="rangeRows[${i}].milestone=this.value">${esc(r.milestone||'')}</textarea></label>`+
           imagePicker(i, 'image', 'Milestone image')+
@@ -5366,22 +5377,22 @@ function renderEvents(){
       `</div>`;
     if(open){
       html +=
-      // --- timing: name+mode, then the numeric trio on ONE compact row ---
-      `<div class="row" style="gap:12px;align-items:flex-end">`+
-        `<label class="field">Name <input value="${esc(e.name||'')}" placeholder="event name" style="width:200px" onchange="renameEvent(${i},this.value)"></label>`+
-        `<label class="field">Mode <select style="width:110px" onchange="eventRows[${i}].mode=this.value;renderEvents()">`+
+      // Same layout language as the command row and the Scenes properties
+      // panel: labelled fields above their controls, checkboxes at a matching
+      // height, grouped under headings. Fields and behaviour unchanged.
+      `<div class="psect" style="border-top:none;margin-top:0;padding-top:0"><div class="prow">`+
+        `<label class="pfield"><span>Name</span><input value="${esc(e.name||'')}" placeholder="event name" style="width:190px" onchange="renameEvent(${i},this.value)"></label>`+
+        `<label class="pfield"><span>Mode</span><select style="width:110px" onchange="eventRows[${i}].mode=this.value;renderEvents()">`+
           `<option value="loop" ${mode!=='once'?'selected':''}>loop</option><option value="once" ${mode==='once'?'selected':''}>once</option></select></label>`+
-      `</div>`+
-      `<div class="row" style="gap:12px;align-items:flex-end;flex-wrap:nowrap">`+
-        `<label class="field">Every (s) <input type="number" min="1" step="1" value="${e.every??''}" style="width:90px" onchange="eventRows[${i}].every=+this.value"></label>`+
-        (mode!=='once'?`<label class="field">Max repeats <input type="number" min="0" step="1" value="${e.max_repeats??''}" placeholder="∞" style="width:90px" title="stop after N repeats (blank = unlimited)" onchange="eventRows[${i}].max_repeats=(this.value===''?null:+this.value)"></label>`:'')+
-        `<label class="field">Cooldown (s) <input type="number" min="0" step="1" value="${e.cooldown??''}" placeholder="0" style="width:90px" title="cooldown after it finishes" onchange="eventRows[${i}].cooldown=(this.value===''?null:+this.value)"></label>`+
-      `</div>`+
-      // --- lifecycle ticks ---
-      `<div class="row" style="gap:16px;flex-wrap:wrap">`+
-        `<label class="row" style="gap:6px" title="fire the first loop the moment it's activated, instead of waiting one interval"><input type="checkbox" ${e.fire_immediately?'checked':''} onchange="eventRows[${i}].fire_immediately=this.checked"> Trigger First Loop Immediately</label>`+
-        (mode!=='once'?`<label class="row" style="gap:6px" title="each round's messages replace the previous round's so the channel isn't spammed; the end block's first message replaces the last round"><input type="checkbox" ${e.clean_previous?'checked':''} onchange="eventRows[${i}].clean_previous=this.checked"> Clean up previous round</label>`:'')+
-      `</div>`+
+      `</div></div>`+
+
+      `<div class="psect"><div class="phead">Timing</div><div class="prow">`+
+        `<label class="pfield"><span>Every (s)</span><input type="number" min="1" step="1" value="${e.every??''}" style="width:92px" onchange="eventRows[${i}].every=+this.value"></label>`+
+        (mode!=='once'?`<label class="pfield" title="stop after N repeats (blank = unlimited)"><span>Max repeats</span><input type="number" min="0" step="1" value="${e.max_repeats??''}" placeholder="∞" style="width:92px" onchange="eventRows[${i}].max_repeats=(this.value===''?null:+this.value)"></label>`:'')+
+        `<label class="pfield" title="cooldown after it finishes"><span>Cooldown (s)</span><input type="number" min="0" step="1" value="${e.cooldown??''}" placeholder="0" style="width:92px" onchange="eventRows[${i}].cooldown=(this.value===''?null:+this.value)"></label>`+
+        `<label class="pchk" title="fire the first loop the moment it's activated, instead of waiting one interval"><input type="checkbox" ${e.fire_immediately?'checked':''} onchange="eventRows[${i}].fire_immediately=this.checked"> fire the first loop immediately</label>`+
+        (mode!=='once'?`<label class="pchk" title="each round's messages replace the previous round's so the channel isn't spammed; the end block's first message replaces the last round"><input type="checkbox" ${e.clean_previous?'checked':''} onchange="eventRows[${i}].clean_previous=this.checked"> clean up the previous round</label>`:'')+
+      `</div></div>`+
       // --- the three blocks: activation → each round → end (all collapsible) ---
       actionsSection('🚀 On activation', `eventRows[${i}].activation_actions`, 'renderEvents',
         e.activation_actions, "{type:'message',message:''}",
@@ -6021,13 +6032,16 @@ function renderPolls(){
       `</div>`;
     if(open){
       html +=
-      `<div class="row" style="gap:12px;align-items:flex-end">`+
-        `<label class="field">Name <input value="${esc(p.name||'')}" placeholder="chaos-vote" title="how actions reference it" style="width:200px" onchange="renamePoll(${i},this.value)"></label>`+
-        `<label class="field">Duration (s) <input type="number" min="5" max="3600" value="${p.duration??60}" style="width:90px" onchange="pollRows[${i}].duration=Math.max(5,Math.min(3600,+this.value||60));scheduleSave()"></label>`+
-        `<label class="field">Repeat every (s) <input type="number" min="0" step="5" value="${p.repeat_every??0}" style="width:90px" title="repost the poll every N seconds (0 = off)" onchange="pollRows[${i}].repeat_every=Math.max(0,+this.value||0);scheduleSave()"></label>`+
-      `</div>`+
-      `<label class="field">Title <span class="muted">(embed shows “Poll: &lt;title&gt;”)</span><input value="${esc(p.title||'')}" placeholder="What happens next?" onchange="pollRows[${i}].title=this.value"></label>`+
-      `<label class="field">Body <span class="muted">(under the title · placeholders work)</span><textarea rows="3" onchange="pollRows[${i}].body=this.value">${esc(p.body||'')}</textarea></label>`;
+      `<div class="psect" style="border-top:none;margin-top:0;padding-top:0"><div class="prow">`+
+        `<label class="pfield" title="how actions reference it"><span>Name</span><input value="${esc(p.name||'')}" placeholder="chaos-vote" style="width:190px" onchange="renamePoll(${i},this.value)"></label>`+
+        `<label class="pfield"><span>Duration (s)</span><input type="number" min="5" max="3600" value="${p.duration??60}" style="width:92px" onchange="pollRows[${i}].duration=Math.max(5,Math.min(3600,+this.value||60));scheduleSave()"></label>`+
+        `<label class="pfield" title="repost the poll every N seconds (0 = off)"><span>Repeat every (s)</span><input type="number" min="0" step="5" value="${p.repeat_every??0}" style="width:92px" onchange="pollRows[${i}].repeat_every=Math.max(0,+this.value||0);scheduleSave()"></label>`+
+      `</div></div>`+
+      `<div class="psect"><div class="phead">What people see</div><div class="prow">`+
+        `<label class="pfield grow" title="the embed shows “Poll: &lt;title&gt;”"><span>Title</span><input value="${esc(p.title||'')}" placeholder="What happens next?" onchange="pollRows[${i}].title=this.value"></label>`+
+      `</div><div class="prow" style="margin-top:8px">`+
+        `<label class="pfield grow" title="sits under the title · placeholders work"><span>Body</span><textarea rows="3" onchange="pollRows[${i}].body=this.value">${esc(p.body||'')}</textarea></label>`+
+      `</div></div>`;
       (p.options||[]).forEach((o,k)=>{
         html += `<div class="dev" style="flex-direction:column;align-items:stretch;gap:6px;border-color:${o.fallback?'var(--warn)':'var(--line)'}">`+
           `<div class="row" style="gap:10px;align-items:center">`+
@@ -6067,16 +6081,20 @@ function renderCompetitions(){
       `<button class="ghost" onclick="event.stopPropagation();delCompetition(${i})">✕</button></div>`;
     if(open){
       const cd=c;
-      html+=`<div class="row" style="gap:12px;align-items:flex-end">`+
+      html+=`<div class="psect" style="border-top:none;margin-top:0;padding-top:0">`+
+        `<div class="row" style="gap:12px;align-items:flex-end">`+
         `<label class="field">Name <input value="${esc(cd.name||'')}" style="width:200px" onchange="compRows[${i}].name=this.value"></label>`+
         `<label class="field">Duration (s) <input type="number" min="5" max="3600" value="${cd.duration??60}" style="width:90px" onchange="compRows[${i}].duration=Math.max(5,Math.min(3600,+this.value||60));scheduleSave()"></label>`+
         `<label class="field">Repeat every (s) <input type="number" min="0" step="5" value="${cd.repeat_every??0}" style="width:90px" onchange="compRows[${i}].repeat_every=Math.max(0,+this.value||0);scheduleSave()"></label>`+
+        `</div></div>`+
+      `<div class="psect"><div class="phead">Scoring</div>`+
+        `<div class="row" style="gap:12px;align-items:flex-end;flex-wrap:wrap">`+
         (typ==='rolloff'?`<label class="field">Win by <select style="width:150px" onchange="compRows[${i}].metric=this.value;scheduleSave()">`+
           [['total','highest total'],['highest','highest single'],['count','most rolls']].map(([v,t])=>`<option value="${v}" ${(cd.metric||'total')===v?'selected':''}>${t}</option>`).join('')+`</select></label>`+
         `<label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" ${cd.allow_reroll?'checked':''} onchange="compRows[${i}].allow_reroll=this.checked;renderCompetitions();scheduleSave()"> Allow rerolls</label>`+
         (cd.allow_reroll?`<label class="field">Rerolls <input type="number" min="0" value="${cd.reroll_count??1}" style="width:70px" title="per player — only the latest roll rerolls; earlier rolls lock in" onchange="compRows[${i}].reroll_count=Math.max(0,+this.value||0);scheduleSave()"></label>`:'')+
         `<label class="row" style="gap:6px;white-space:nowrap" title="fire EVERY finisher's total, each credited separately — otherwise add a 'fire [winner_score]' row to the winner block for just the winner's"><input type="checkbox" ${cd.add_all_totals?'checked':''} onchange="compRows[${i}].add_all_totals=this.checked;scheduleSave()"> Add ALL totals</label>`:'')+
-      `</div>`+
+      `</div></div>`+
       ((cd.repeat_every>0)?`<label class="field">Repeat message <span class="muted">(blank = default · [remaining] time left · [standings] the board)</span><textarea rows="2" placeholder="⏳ [remaining] left! Standings:\n[standings]" onchange="compRows[${i}].repeat_message=this.value">${esc(cd.repeat_message||'')}</textarea></label>`:'')+
       (typ==='rolloff'?
       `<div style="border-top:1px solid var(--line);padding-top:8px"><div class="muted" style="margin-bottom:6px"><b>The rolls</b> — each player rolls these in order (one row = one roll). Set the dice &amp; a per-roll luck (±% to force max/min).</div>`+
@@ -6158,16 +6176,23 @@ function renderBonusRounds(){
       `<span class="muted" style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">confirm: ${esc(b.confirm||'all')} · ${b.duration??60}s</span>`+
       `<button class="ghost" title="Save as template" onclick="event.stopPropagation();saveTemplate('bonus_rounds',${i})">💾</button><button class="ghost" onclick="event.stopPropagation();delBonusRound(${i})">✕</button></div>`;
     if(open){
-      html+=`<div class="row" style="gap:12px;align-items:flex-end">`+
+      html+=`<div class="psect" style="border-top:none;margin-top:0;padding-top:0">`+
+        `<div class="row" style="gap:12px;align-items:flex-end">`+
         `<label class="field">Name <input value="${esc(b.name||'')}" style="width:200px" onchange="bonusRoundRows[${i}].name=this.value"></label>`+
         `<label class="field">Duration (s) <input type="number" min="5" max="3600" value="${b.duration??60}" style="width:90px" onchange="bonusRoundRows[${i}].duration=Math.max(5,Math.min(3600,+this.value||60));scheduleSave()"></label>`+
         `<label class="field">Confirm from <select style="width:170px" onchange="bonusRoundRows[${i}].confirm=this.value;scheduleSave()">`+
           [['all','all bonus holders'],['leader','top bonus holder']].map(([v,l])=>`<option value="${v}" ${(b.confirm||'all')===v?'selected':''}>${l}</option>`).join('')+`</select></label>`+
       `</div>`+
+      `</div></div>`+
+      `<div class="psect"><div class="phead">What people see</div>`+
       `<label class="field">Titlebar <input value="${esc(b.title||'')}" placeholder="BONUS ROUND!" onchange="bonusRoundRows[${i}].title=this.value"></label>`+
       `<label class="field">Body <span class="muted">(embed text · [total_bonus_secs] [total_bonus_pct] work)</span><textarea rows="2" onchange="bonusRoundRows[${i}].body=this.value">${esc(b.body||'')}</textarea></label>`+
-      `<label class="field">No-holders message <span class="muted">(nobody has a banked bonus)</span><input value="${esc(b.no_holders_message||'')}" placeholder="(silent)" onchange="bonusRoundRows[${i}].no_holders_message=this.value"></label>`+
-      `<label class="field">Expired message <span class="muted">(not confirmed in time)</span><input value="${esc(b.expire_message||'')}" placeholder="(silent)" onchange="bonusRoundRows[${i}].expire_message=this.value"></label>`+
+      `</div>`+
+      `<div class="psect"><div class="phead">If it doesn't happen</div>`+
+        `<div class="row" style="gap:12px;align-items:flex-end">`+
+      `<label class="field" style="flex:1;min-width:240px">No-holders message <span class="muted">(nobody has a banked bonus)</span><input value="${esc(b.no_holders_message||'')}" placeholder="(silent)" onchange="bonusRoundRows[${i}].no_holders_message=this.value"></label>`+
+      `<label class="field" style="flex:1;min-width:240px">Expired message <span class="muted">(not confirmed in time)</span><input value="${esc(b.expire_message||'')}" placeholder="(silent)" onchange="bonusRoundRows[${i}].expire_message=this.value"></label>`+
+      `</div></div>`+
       `<div style="border-top:1px solid var(--line);padding-top:8px">`+
       actionsSection('🎉 On activation', `bonusRoundRows[${i}].actions`, 'renderBonusRounds',
         b.actions, "{type:'fire',fire_mode:'seconds',seconds:'[total_bonus_secs]'}",
