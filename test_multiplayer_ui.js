@@ -846,6 +846,41 @@ ok(!/data-tab="multi"/.test(html) && !/data-go="multi"/.test(html),
 ok(!/id="mpLimFire"/.test(html) && !/id="mpOnExceed"/.test(html),
    'the ceiling editors are gone with it');
 
+// ---- Max volume: the lose-at capacity, and the unit stakes are priced in ---
+// On the Chat page because it is a dial you reach for while setting up. It is
+// FROZEN during a match: it is agreed at invite time and carried in the
+// envelope, so letting it move afterwards would re-price a deal both players
+// had already agreed to.
+sandbox.mpApply({ mode: 'multi', multiplayer: CFG, listener_enabled: false,
+                  mp_end: { max_capacity: 100 } });
+ok(els.mpMaxVol.value === '100', 'the dial shows the configured ceiling');
+ok(els.mpMaxVol.disabled === false, '…and turns freely before a match');
+ok(els.mpMaxVolNote.textContent === '%', 'at 100 there is no multiplier to mention');
+
+sandbox.mpApply({ mode: 'multi', multiplayer: CFG, listener_enabled: false,
+                  mp_end: { max_capacity: 200 } });
+ok(/×2/.test(els.mpMaxVolNote.textContent),
+   'a bigger ceiling SAYS it doubles every stake — the scaling must not be '
+   + 'invisible, or a row that reads 5 and fires 10 is inexplicable');
+sandbox.mpApply({ mode: 'multi', multiplayer: CFG, listener_enabled: false,
+                  mp_end: { max_capacity: 50 } });
+ok(/×0\.5/.test(els.mpMaxVolNote.textContent), '…and that a smaller one halves them');
+
+sandbox.mpApply({ mode: 'multi', multiplayer: CFG, listener_enabled: false,
+                  mp_end: { max_capacity: 0 } });
+ok(/concede only/.test(els.mpMaxVolNote.textContent),
+   'zero says what it means: no capacity ending, conceding is the only way out');
+
+sandbox.mpApply({ mode: 'multi', multiplayer: CFG, listener_enabled: true,
+                  mp_in_match: true, mp_end: { max_capacity: 100 } });
+ok(els.mpMaxVol.disabled === true, 'it LOCKS once a match is running');
+ok(/locked/.test(els.mpMaxVolNote.textContent), '…and says why');
+
+const mvJs = html.slice(html.indexOf('async function mpMaxVolSet('),
+                        html.indexOf('function mpMaxVolUi('));
+ok(/Math\.min\(999/.test(mvJs) && /Math\.max\(0/.test(mvJs),
+   'the dial clamps to 0-999, so a typo cannot set a ceiling nobody reaches');
+
 // ---- the two match modals --------------------------------------------------
 // ✉ Invite lives in the header and only appears when it could do anything.
 // The invitee's Accept/Decline opens by STATE, never by a button: one that sat

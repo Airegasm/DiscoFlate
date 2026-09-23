@@ -87,6 +87,34 @@ ok(nid in GROUPS["Main"], "…the notify card lives in Main, so it is up during 
 ok(gl.get("after_group") == "Main",
    "…and Go Live switches to it: one layout, nothing to choose at match time")
 
+# ---- the intro is CARD ART plus the two things art cannot know ------------- #
+# The backdrop already says "DiscoFlate VS" and "ONE-ON-ONE PUMP BATTLE". The
+# overlays supply only who is playing and when it starts — anything else would
+# be re-typing what is already painted on.
+ing = {o["id"]: o for o in SCENE["overlays"] if o.get("group") == "Intro"}
+ok(set(ing) == {"bvIntroBg", "bvIntroHost", "bvIntroGuest", "bvIntroBegins"},
+   "four pieces: the art, both names, and the countdown")
+ok(ing["bvIntroBg"]["kind"] == "media", "the backdrop is a media slot")
+ok((ing["bvIntroBg"]["x"], ing["bvIntroBg"]["y"], ing["bvIntroBg"]["w"]) == (0.0, 0.0, 1.0),
+   "…filling the frame, so no edge of it shows")
+ok(ing["bvIntroBg"]["z"] < ing["bvIntroHost"]["z"], "…and BEHIND the names")
+ok(ing["bvIntroHost"]["text"] == "[multi_host_name]"
+   and ing["bvIntroGuest"]["text"] == "[multi_guest_name]",
+   "the names are the SEATS, so left is always the host")
+ok(ing["bvIntroHost"]["align"] == "right" and ing["bvIntroGuest"]["align"] == "left",
+   "…and they align INWARD, so a long name grows away from the VS rather than "
+   "over it")
+ok(ing["bvIntroHost"]["x"] + ing["bvIntroHost"]["w"] < ing["bvIntroGuest"]["x"],
+   "…and the two blocks cannot overlap")
+ok("[intro_timer]" in ing["bvIntroBegins"]["text"], "the countdown counts")
+ok(ing["bvIntroBegins"]["y"] > ing["bvIntroHost"]["y"],
+   "…and sits below the names, above the art's own strapline")
+ok(all(o["mode"] == "hold" for o in ing.values()),
+   "every piece HOLDS — an intro that timed its own pieces out would empty the "
+   "screen while the countdown was still running")
+stg = (SCENE.get("golive") or {}).get("stages") or []
+ok(stg and stg[0]["seconds"] == 20, "a 20 second countdown")
+
 intro = [g for g in (SCENE.get("intro_groups") or [])]
 ok(intro == ["Intro"], "the intro group is FLAGGED as intro")
 ok(all(str(st.get("group")) in intro for st in (gl.get("stages") or [])),
@@ -193,12 +221,13 @@ apps = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 ok('("media", "audio")' in apps and "has no media file yet" in apps,
    "a media overlay with no file is skipped the way a missing id already is")
 
-# The video slots are gone for now, so nothing in the kit relies on the skip —
-# it stays because the next empty slot will, and because a scene you are still
-# building should never be the thing that stops a match.
-ok(not [o for o in SCENE["overlays"]
-        if o.get("kind") == "media" and not str(o.get("media") or "").strip()],
-   "no half-built media slots ship in the versus kit")
+# ONE empty media slot ships: the intro backdrop, waiting for the operator's
+# own card art. That is exactly what the graceful skip is for — with no file in
+# it the intro still plays, names and countdown on black, and the match runs.
+blank = [o["id"] for o in SCENE["overlays"]
+         if o.get("kind") == "media" and not str(o.get("media") or "").strip()]
+ok(blank == ["bvIntroBg"],
+   "the only slot shipped empty is the intro backdrop, for your own art")
 called = {r.get("overlay") for a in list(ACTS.values()) + [{"actions": END["actions"]}]
           for r in walk(a["actions"]) if r.get("type") == "overlay"}
 for r in CFG.get("mp_rounds") or []:

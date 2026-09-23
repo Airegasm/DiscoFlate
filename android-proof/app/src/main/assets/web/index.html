@@ -452,6 +452,11 @@
         <label class="field" data-mode="solo">Channel <select id="chatChan" style="width:280px" onchange="chatSwitch()"></select></label>
         <label class="field" data-mode="multi">Channel
           <div id="chatChanFixed" style="padding:7px 0;font-weight:600">—</div></label>
+        <label class="field" data-mode="multi" style="min-width:150px" title="The lose-at capacity: whoever reaches it FIRST loses. It is also the unit every stake is priced in — the kit is written for a 100% match, so setting 200 doubles every penalty and 80 shrinks them, without rewriting a thing. It travels in the invite and is FROZEN once a match starts.">Max volume
+          <div class="row" style="gap:6px;align-items:center">
+            <input type="number" id="mpMaxVol" min="0" max="999" step="5" style="width:92px" onchange="mpMaxVolSet(this.value)">
+            <span class="muted" id="mpMaxVolNote">%</span>
+          </div></label>
         <button id="introNext" style="display:none;background:var(--accent);color:#04202a;font-weight:700" onclick="introNextStage()" title="finish this intro stage and play the next one">⏭ Next stage</button><button id="introNow" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700" onclick="endIntroNow()" title="end the pre-show and start the session right now">🎬 Start now</button>
         <button class="bad" id="mpConcede" onclick="mpConcede()" style="display:none"
                 title="ends the match for both installs: the handshake drops, both pumps stop, and the guest's panel is released">🏳 Concede</button>
@@ -5596,6 +5601,31 @@ function mpInviteeModal(st){
   };
 }
 
+// THE LOSE-AT CAPACITY, on the Chat page because it is a dial you reach for
+// while setting up, not a setting you bury. It is two things at once: the
+// number that ends a match, and the unit every stake is priced in — the kit is
+// authored for a 100% match, so 200 doubles every penalty and 80 shrinks them.
+//
+// FROZEN during a match. It is agreed at invite time and carried in the
+// envelope; letting it move afterwards would re-price a deal both players had
+// already agreed to.
+async function mpMaxVolSet(v){
+  const n = Math.max(0, Math.min(999, Math.round(+v || 0)));
+  const el = $('#mpMaxVol'); if(el) el.value = n || '';
+  try{ await saveCfg({mp_end: {...(lastState.mp_end||{}), max_capacity: n}}); }
+  catch(e){ toastMsg('⚠ '+(e.message||e)); }
+}
+function mpMaxVolUi(st){
+  const el=$('#mpMaxVol'), note=$('#mpMaxVolNote'); if(!el) return;
+  const live = !!st.mp_in_match;
+  if(document.activeElement!==el) el.value = (+((st.mp_end||{}).max_capacity)||0) || '';
+  el.disabled = live;
+  const n = +el.value||0;
+  note.textContent = !n ? '% — off, concede only'
+                   : live ? `% — locked for this match`
+                   : (n===100 ? '%' : `% — stakes ×${(n/100).toFixed(2).replace(/0+$/,'').replace(/\.$/,'')}`);
+}
+
 async function setSeat(v){
   const want = (v === 'guest') ? 'guest' : 'host';
   mpCfg = mpCfg || {};
@@ -5621,6 +5651,7 @@ function mpApply(st){
   // The seat only exists in multiplayer, and only before you go live. Once
   // LIVE is on, mode AND seat are frozen together: both decide what the other
   // install is agreeing to, and neither may move under a running match.
+  mpMaxVolUi(st);
   const sw=$('#seatTgl'), sel=$('#mpSeat');
   if(sw) sw.style.display = (st.mode==='multi') ? '' : 'none';
   if(sel){
