@@ -424,6 +424,87 @@ class MpSpreadView(discord.ui.View):
         return cb
 
 
+class MpCardsView(discord.ui.View):
+    """Blackjack at a two-seat table. Both hands FACE UP, one dealer, one
+    hidden hole card, and both players acting at once.
+
+    Face-up is how a shoe game actually deals, and it is also what makes this
+    hard rather than solved. Blackjack against a dealer has one right answer
+    per total; but when you can see the other player standing on 20 while you
+    hold 17, the right answer is "stand" and standing loses. Second place
+    pays, so you have to hit into a bad spot.
+    """
+
+    def __init__(self, bot, uids: dict, names: dict, hands: dict, up: int,
+                 timeout: float):
+        super().__init__(timeout=max(15.0, float(timeout)))
+        self.bot = bot
+        self.uids = {k: str(v or "") for k, v in uids.items()}
+        self.names = dict(names)
+        self.hands = {k: list(v) for k, v in hands.items()}
+        self.up = int(up)
+        self.stood: set = set()
+        self.done = asyncio.Event()
+        self.message = None
+        for side in ("me", "peer"):
+            who = self.names.get(side, side)
+            for label, stand in ((f"🃏 {who} hit", False), (f"✋ {who} stand", True)):
+                b = discord.ui.Button(
+                    label=label,
+                    style=(discord.ButtonStyle.success if stand
+                           else discord.ButtonStyle.primary))
+                b.callback = self._press(side, stand)
+                self.add_item(b)
+
+    def _side(self, uid: str) -> str:
+        for side, want in self.uids.items():
+            if want and str(uid) == want:
+                return side
+        return ""
+
+    def table(self, reveal=None) -> str:
+        """The whole table as one block — this is what the room watches."""
+        rows = []
+        for side in ("me", "peer"):
+            h = self.hands[side]
+            t = mp_games.hand_total(h)
+            mark = (" 💥" if t > 21 else (" ✋" if side in self.stood else ""))
+            rows.append(f"**{self.names.get(side, side)}** — "
+                        f"{mp_games.hand_text(h)} = **{t}**{mark}")
+        if reveal is None:
+            rows.append(f"**Dealer** — {('A' if self.up == 11 else self.up)}, 🂠")
+        else:
+            rows.append(f"**Dealer** — {mp_games.hand_text(reveal)} = "
+                        f"**{mp_games.hand_total(reveal)}**"
+                        + (" 💥" if mp_games.hand_total(reveal) > 21 else ""))
+        return "\n".join(rows)
+
+    def _finished(self, side: str) -> bool:
+        return side in self.stood or mp_games.hand_total(self.hands[side]) > 21
+
+    def _press(self, side: str, stand: bool):
+        async def cb(interaction: discord.Interaction):
+            if self._side(interaction.user.id) != side or self._finished(side):
+                await _ignore(interaction)        # not yours, or you're out
+                return
+            if stand:
+                self.stood.add(side)
+            else:
+                self.hands[side].append(mp_games.card_draw())
+            for c in self.children:               # grey out a finished seat
+                for s2 in ("me", "peer"):
+                    if self._finished(s2) and self.names.get(s2, s2) in (c.label or ""):
+                        c.disabled = True
+            if all(self._finished(s2) for s2 in ("me", "peer")):
+                self.done.set()
+            try:
+                await interaction.response.edit_message(
+                    embed=self.bot._mp_card("🃏 Blackjack", self.table()), view=self)
+            except Exception:  # noqa: BLE001
+                pass
+        return cb
+
+
 class MpChoiceView(discord.ui.View):
     """A Player Choice: buttons only one named player may press.
 
@@ -2587,6 +2668,66 @@ class BotManager:
                 xc.update(sub)
         return True
 
+    async def _mp_cards_row(self, a: dict, xc: dict) -> bool:
+        """Blackjack, two seats, one dealer. BLOCKS until both stand or bust.
+
+        The dealer makes no choices — it hits to 17, which is a rule, not a
+        decision. That is what lets it be a shared threat both players face at
+        once rather than a third competitor.
+        """
+        s = self.link
+        ctx = self._mp_ctx()
+        me_nm = ctx.get("multi_me_name") or "You"
+        peer_nm = ctx.get("multi_peer_name") or "Opponent"
+        hands = {"me": [mp_games.card_draw(), mp_games.card_draw()],
+                 "peer": [mp_games.card_draw(), mp_games.card_draw()]}
+        dealer = [mp_games.card_draw(), mp_games.card_draw()]
+        secs = mp_games.choice_deadline(a.get("seconds"))
+        view = MpCardsView(self, {"me": s.link.owner, "peer": s.link.peer_owner},
+                           {"me": me_nm, "peer": peer_nm}, hands, dealer[0], secs)
+        self._register_view(view)
+        view.message = await self._link_say(
+            view.table(), embed=self._mp_card("🃏 Blackjack", view.table()), view=view)
+        try:
+            await asyncio.wait_for(view.done.wait(), timeout=secs + 5)
+        except asyncio.TimeoutError:
+            pass                       # a walked-away hand simply stands as-is
+
+        dealer = mp_games.dealer_play(dealer)
+        r = mp_games.cards_outcome(view.hands["me"], view.hands["peer"], dealer,
+                                   s.link.me, s.link.peer)
+        names = {s.link.me: me_nm, s.link.peer: peer_nm}
+        if r["both"]:
+            head = "🏛 **The house takes both.**"
+        elif r["push"]:
+            head = "🤝 **Push** — level against the dealer, nobody pays."
+        else:
+            head = f"🃏 **{names[r['loser']]}** pays."
+        await self._link_say(
+            f"{head}\n{view.table(reveal=dealer)}",
+            embed=self._mp_card("🃏 Blackjack", f"{head}\n{view.table(reveal=dealer)}"))
+        xc.update({
+            "multi_cards_loser": r["loser"],
+            "multi_cards_winner": ("" if r["both"] or r["push"] or not r["loser"]
+                                   else (s.link.peer if r["loser"] == s.link.me
+                                         else s.link.me)),
+            "multi_cards_loser_name": names.get(r["loser"], ""),
+            "multi_cards_dealer": f"{r['dealer']:g}",
+            "multi_cards_my_score": f"{r['scores'][s.link.me]:g}",
+            "multi_cards_peer_score": f"{r['scores'][s.link.peer]:g}",
+            "multi_cards_margin": f"{abs(r['scores'][s.link.me] - r['scores'][s.link.peer]):g}",
+            "multi_cards_both": "1" if r["both"] else "",
+        })
+        # `both` is a real outcome, so a block can fire at everyone when the
+        # house cleans up without inventing a second row type for it.
+        if r["both"]:
+            xc["multi_cards_who"] = "both"
+        elif r["loser"]:
+            xc["multi_cards_who"] = ("me" if r["loser"] == s.link.me else "peer")
+        else:
+            xc["multi_cards_who"] = ""
+        return True
+
     async def _mp_duel_row(self, a: dict, xc: dict) -> bool:
         """Both racers pick at once, hidden, then it reveals. BLOCKS until both
         have answered or the deadline passes."""
@@ -2714,6 +2855,8 @@ class BotManager:
             return await self._mp_roll_row(a, xc)
         if typ == mp_games.T_CHOICE:
             return await self._mp_choice_row(a, xc)
+        if typ == mp_games.T_CARDS:
+            return await self._mp_cards_row(a, xc)
         if typ == mp_games.T_DUEL:
             return await self._mp_duel_row(a, xc)
         if typ == mp_games.T_RUN:
@@ -2739,8 +2882,13 @@ class BotManager:
         ids = mp_games.resolve_who(
             who, me=s.link.me, peer=s.link.peer,
             chosen=str(xc.get("multi_chosen") or ""),
-            winner=str(xc.get("multi_duel_winner") or ""),
-            loser=str(xc.get("multi_duel_loser") or ""),
+            # "the loser" means whoever lost the LAST contest, whichever kind
+            # it was. Without this a fire aimed at the loser only ever saw a
+            # duel, and a blackjack round would quietly hit nobody.
+            winner=str(xc.get("multi_duel_winner")
+                       or xc.get("multi_cards_winner") or ""),
+            loser=str(xc.get("multi_duel_loser")
+                      or xc.get("multi_cards_loser") or ""),
             caps={s.link.me: float(self.engine.capacity),
                   s.link.peer: float(s.peer_cap or 0)},
             role=s.link.role)

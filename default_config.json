@@ -616,6 +616,75 @@
           "seconds": 15
         }
       ]
+    },
+    {
+      "name": "MultiBlackjack",
+      "actions": [
+        {
+          "type": "mp_cards",
+          "seconds": 45
+        },
+        {
+          "type": "var",
+          "variable": "bj",
+          "operation": "set",
+          "value": "6 + [multi_cards_margin] / 2"
+        },
+        {
+          "type": "if",
+          "match": "all",
+          "conditions": [
+            {
+              "left": "[multi_cards_who]",
+              "op": "==",
+              "right": "both"
+            }
+          ],
+          "actions": [
+            {
+              "type": "notify",
+              "message": "🏛 The house takes both — **+[var:bj]%** each"
+            },
+            {
+              "type": "fire",
+              "fire_mode": "add",
+              "fill_pct": "([var:bj]) * [multi_scale]",
+              "multi_who": "both",
+              "block_during": false
+            }
+          ],
+          "else_actions": [
+            {
+              "type": "if",
+              "match": "all",
+              "conditions": [
+                {
+                  "left": "[multi_cards_loser_name]",
+                  "op": "!=",
+                  "right": ""
+                }
+              ],
+              "actions": [
+                {
+                  "type": "notify",
+                  "message": "🃏 [multi_cards_loser_name] takes **+[var:bj]%**"
+                },
+                {
+                  "type": "fire",
+                  "fire_mode": "add",
+                  "fill_pct": "([var:bj]) * [multi_scale]",
+                  "multi_who": "loser",
+                  "block_during": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "wait",
+          "seconds": 10
+        }
+      ]
     }
   ],
   "mp_rounds": [
@@ -694,6 +763,39 @@
         "stake": 12,
         "seconds": 45
       }
+    },
+    {
+      "name": "Round 3",
+      "until": "count",
+      "count": 4,
+      "done_message": "🃏 **Round 3** done.",
+      "spread_bet": {
+        "enabled": true,
+        "stake": 12,
+        "seconds": 45
+      },
+      "intro": [
+        {
+          "type": "scene_group",
+          "group": "Round Intro",
+          "fade_in": 0.35
+        },
+        {
+          "type": "wait",
+          "seconds": 2
+        },
+        {
+          "type": "scene_group_kill",
+          "group": "Round Intro",
+          "fade_out": 0.6
+        }
+      ],
+      "actions": [
+        {
+          "type": "mp_action",
+          "action": "MultiBlackjack"
+        }
+      ]
     }
   ],
   "mode": "solo",

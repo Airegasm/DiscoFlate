@@ -28,6 +28,7 @@ T_SPIN = "mp_spin"
 T_ROLL = "mp_roll"
 T_CHOICE = "mp_choice"
 T_DUEL = "mp_duel"
+T_CARDS = "mp_cards"
 T_RUN = "mp_action"          # run a named Multiplayer Action inline
 T_TELL = "mp_tell"           # ask the OTHER bot to run one of its own
 RUN_DEPTH = 4                # an Action that runs itself must not spiral

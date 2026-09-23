@@ -1000,6 +1000,35 @@ for view in ("MpChoiceView", "MpReadyView", "MpDuelView"):
        and "That's " not in blk.split("_ignore")[0][-300:],
        f"…and {view} no longer tells them off")
 
+# ---- blackjack: two seats, one dealer, both hands face up ------------------ #
+src2 = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         "discord_bot.py"), encoding="utf-8").read()
+cv = src2[src2.index("class MpCardsView"):]
+cv = cv[:cv.index("\nclass ")]
+ok("_ignore(interaction)" in cv, "a viewer pressing Hit is ignored, not told off")
+ok("self._finished(side)" in cv,
+   "…and so is a player who already stood or busted — a dead button must not "
+   "deal them a card")
+ok("hand_text" in cv and "🂠" in cv,
+   "the table shows BOTH hands face up and keeps the dealer's hole card down — "
+   "which is how a shoe game actually deals, and what the room watches")
+ok("edit_message" in cv,
+   "each press edits the SAME embed, so the table updates in place rather "
+   "than scrolling the venue")
+
+rowsrc = src2[src2.index("async def _mp_cards_row"):]
+rowsrc = rowsrc[:rowsrc.index("async def _mp_duel_row")]
+ok("dealer_play(dealer)" in rowsrc, "the dealer plays out AFTER both players act")
+d_at, o_at = rowsrc.index("dealer_play(dealer)"), rowsrc.index("cards_outcome(")
+ok(d_at < o_at, "…and before anyone is scored against it")
+ok("wait_for(view.done.wait()" in rowsrc,
+   "it BLOCKS: nothing may fire until the hand is over")
+ok("multi_cards_margin" in rowsrc and "multi_cards_who" in rowsrc,
+   "it publishes who pays and by how much, so the stake can scale on the margin")
+ok('"both"' in rowsrc,
+   "…including BOTH, so a block can fire at everyone when the house cleans up "
+   "without needing a second row type")
+
 print(f"{P} passed, {len(F)} failed")
 for f in F:
     print("  FAIL:", f)

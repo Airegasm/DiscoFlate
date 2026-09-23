@@ -1558,6 +1558,11 @@
             <tr><td><code>[multi_roll]</code></td><td>the last <b>mp_roll</b> total — spend it as a <b>percent</b> in a fire row (seconds are refused over the wire; they're a different amount of inflation on every rig)</td></tr>
             <tr><td><code>[multi_roll_dice]</code> <code>[multi_roll_faces]</code> <code>[multi_roll_max]</code></td><td>what was rolled (<code>1d7</code>), the individual faces, and the best possible total — for narrating a roll properly</td></tr>
             <tr><td><code>[multi_odds]</code></td><td>the last spin's odds, already worded. Uneven odds are announced automatically: a wheel the audience can't see is indistinguishable from a rigged one.</td></tr>
+            <tr><td><code>[multi_cards_loser]</code> / <code>[multi_cards_loser_name]</code> / <code>[multi_cards_winner]</code></td><td>who paid the last <b>blackjack</b> hand, and who didn't. Empty on a push or when the house took both.</td></tr>
+            <tr><td><code>[multi_cards_who]</code></td><td><code>me</code>, <code>peer</code>, <code>both</code> — or empty on a push. <code>both</code> is a real outcome: if you both bust or both lose to the dealer, the house cleaned up and you <i>both</i> pay.</td></tr>
+            <tr><td><code>[multi_cards_margin]</code></td><td>how far apart the two hands finished, so a stake can scale on it — losing 20-to-19 a scratch, losing 20-to-0 a beating. Makes every card cost something instead of only the final flip.</td></tr>
+            <tr><td><code>[multi_cards_my_score]</code> / <code>[multi_cards_peer_score]</code> / <code>[multi_cards_dealer]</code></td><td>each hand's worth (its total if it BEAT the dealer, <b>0</b> if it busted or the dealer held it off) and the dealer's final total.</td></tr>
+            <tr><td><code>[multi_cards_both]</code></td><td><code>1</code> when the house took both, blank otherwise — for a condition that just wants a yes/no.</td></tr>
             <tr><td><code>[multi_duel_me]</code> / <code>[multi_duel_peer]</code></td><td>what each racer played in an <b>mp_duel</b> — <code>—</code> if they never answered</td></tr>
             <tr><td><code>[multi_duel_winner_name]</code> / <code>[multi_duel_loser_name]</code></td><td>who won and who lost it. <b>Both empty on a draw</b>, so <code>[if multi_duel_loser_name]</code> is how a line only appears when somebody actually lost.</td></tr>
             <tr><td><code>[multi_duel_winner]</code> <code>[multi_duel_loser]</code> <code>[multi_duel_draw]</code></td><td>the same as install ids, and a flag set only when it drew — for a <b>condition</b> rather than a message</td></tr>
@@ -1951,6 +1956,11 @@ esphome dashboard config/</code></pre>
             <tr><td><code>[multi_roll]</code></td><td>the last <b>mp_roll</b> total — spend it as a <b>percent</b> in a fire row (seconds are refused over the wire; they're a different amount of inflation on every rig)</td></tr>
             <tr><td><code>[multi_roll_dice]</code> <code>[multi_roll_faces]</code> <code>[multi_roll_max]</code></td><td>what was rolled (<code>1d7</code>), the individual faces, and the best possible total — for narrating a roll properly</td></tr>
             <tr><td><code>[multi_odds]</code></td><td>the last spin's odds, already worded. Uneven odds are announced automatically: a wheel the audience can't see is indistinguishable from a rigged one.</td></tr>
+            <tr><td><code>[multi_cards_loser]</code> / <code>[multi_cards_loser_name]</code> / <code>[multi_cards_winner]</code></td><td>who paid the last <b>blackjack</b> hand, and who didn't. Empty on a push or when the house took both.</td></tr>
+            <tr><td><code>[multi_cards_who]</code></td><td><code>me</code>, <code>peer</code>, <code>both</code> — or empty on a push. <code>both</code> is a real outcome: if you both bust or both lose to the dealer, the house cleaned up and you <i>both</i> pay.</td></tr>
+            <tr><td><code>[multi_cards_margin]</code></td><td>how far apart the two hands finished, so a stake can scale on it — losing 20-to-19 a scratch, losing 20-to-0 a beating. Makes every card cost something instead of only the final flip.</td></tr>
+            <tr><td><code>[multi_cards_my_score]</code> / <code>[multi_cards_peer_score]</code> / <code>[multi_cards_dealer]</code></td><td>each hand's worth (its total if it BEAT the dealer, <b>0</b> if it busted or the dealer held it off) and the dealer's final total.</td></tr>
+            <tr><td><code>[multi_cards_both]</code></td><td><code>1</code> when the house took both, blank otherwise — for a condition that just wants a yes/no.</td></tr>
             <tr><td><code>[multi_duel_me]</code> / <code>[multi_duel_peer]</code></td><td>what each racer played in an <b>mp_duel</b> — <code>—</code> if they never answered</td></tr>
             <tr><td><code>[multi_duel_winner_name]</code> / <code>[multi_duel_loser_name]</code></td><td>who won and who lost it. <b>Both empty on a draw</b>, so <code>[if multi_duel_loser_name]</code> is how a line only appears when somebody actually lost.</td></tr>
             <tr><td><code>[multi_duel_winner]</code> <code>[multi_duel_loser]</code> <code>[multi_duel_draw]</code></td><td>the same as install ids, and a flag set only when it drew — for a <b>condition</b> rather than a message</td></tr>
@@ -6870,6 +6880,7 @@ function actGist(a){
   if(t==='mp_roll') return `roll ${(a.dice||1)}d${(a.sides||7)} → [multi_roll]`;
   if(t==='mp_action') return `run "${s(a.action)||'—'}"`;
   if(t==='mp_tell') return `tell their bot: run "${s(a.action)||'—'}"`;
+  if(t==='mp_cards') return `blackjack · both hands face up · waits ${a.seconds??45}s`;
   if(t==='mp_duel'){ const n=(a.options||[]).length;
     return `${s(a.title)||'duel'} · ${n} move${n===1?'':'s'} · both pick · waits ${a.seconds??30}s`; }
   if(t==='mp_choice'){ const n=(a.options||[]).length;
@@ -6927,7 +6938,7 @@ function actionRow(base, rr, j, a, condLabels){
   // The three multiplayer rows are offered only in multiplayer mode — a solo
   // block has nobody to spin between, and a type you can pick but never run is
   // worse than one that isn't listed.
-  const MP_ROWS = ['mp_action','mp_tell','mp_spin','mp_roll','mp_choice','mp_duel'];
+  const MP_ROWS = ['mp_action','mp_tell','mp_spin','mp_roll','mp_choice','mp_duel','mp_cards'];
   const inMulti = (typeof appMode==='function') && appMode()==='multi';
   const typeSel = `<select onchange="${T('type')}=this.value;${rr}();scheduleSave()">`+
     (inMulti?MP_ROWS:[]).concat(
@@ -7001,6 +7012,11 @@ function actionRow(base, rr, j, a, condLabels){
         (missing?`<option selected>${esc(cur)} (missing)</option>`:'')+
       `</select></label>`+
       `<span class="muted" style="align-self:center">runs another Multiplayer Action here. Wrap it in a <b>repeat</b> to do it N times — that is how a round becomes "four passes, a video, four more".</span>`;
+  }
+  if(typ==='mp_cards'){
+    fields += `<label class="field">Deadline <input type="number" min="15" max="300" step="5" value="${a.seconds??45}" style="width:90px" title="seconds. A hand nobody finishes simply STANDS as it is — a round must not stall on someone who walked away." onchange="${T('seconds')}=+this.value||45;scheduleSave()"></label>`+
+      `<span class="muted" style="flex:1 1 100%;min-width:0">Blackjack at a two-seat table: <b>both hands face up</b>, one dealer, one hidden hole card, and you both act at once. Face-up is how a shoe game really deals — and it is what makes it hard, because when you can see them standing on 20 and you hold 17, the textbook answer is "stand" and standing <i>loses</i>.<br>`+
+      `A hand is worth its total only if it <b>beat the dealer</b>, and nothing if it busted or the dealer held it off — so the house is a threat you both face rather than scenery. Publishes <code>[multi_cards_loser]</code>, <code>[multi_cards_margin]</code> and <code>[multi_cards_who]</code> (<code>me</code>/<code>peer</code>/<code>both</code>); aim a fire at <b>the cards loser</b>, and scale it on the margin if you want every card to matter.</span>`;
   }
   if(typ==='mp_duel'){
     fields += `<label class="field">Titlebar <input value="${esc(a.title||'')}" placeholder="Rock, Paper, Scissors" style="width:180px" onchange="${T('title')}=this.value;scheduleSave()"></label>`+
@@ -7748,6 +7764,7 @@ function cleanActionRows(arr){
     if(t==='mp_tell'){ o.action=s(a.action);
       if(a.values && typeof a.values==='object') o.values=a.values;
       return o; }
+    if(t==='mp_cards'){ o.seconds=Math.max(15,Math.min(300,+a.seconds||45)); return o; }
     if(t==='mp_duel'){ o.message=a.message||''; o.title=s(a.title);
       o.seconds=Math.max(5,Math.min(180,+a.seconds||30));
       o.options=(Array.isArray(a.options)?a.options:[]).map(op=>({
