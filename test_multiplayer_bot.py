@@ -1,7 +1,7 @@
 """Headless proof of the multiplayer TRANSPORT — discord_bot's adapter.
 
 test_multiplayer.py proves the protocol; this proves the wiring around it: the
-envelope path, multiplayer's own send paths, the ceiling reaching a real action
+envelope path, multiplayer's own send paths, a crossed row reaching a real action
 row, and the two channels staying out of each other's business.
 
 Two BotManagers are pointed at one fake bot_network channel and made to play a
@@ -249,7 +249,7 @@ class Engine:
         return xc
 
 
-def cfg_for(peer_name, net="900", cast="901", limits=None, mode="multi", **kw):
+def cfg_for(peer_name, net="900", cast="901", mode="multi", **kw):
     return {
         "mode": mode,
         "multiplayer": {
@@ -262,8 +262,6 @@ def cfg_for(peer_name, net="900", cast="901", limits=None, mode="multi", **kw):
             "blocked": [],
             "video": {"guest_cam_group": "", "no_guest_cam_group": ""},
             "peer": {"bot_id": "", "owner_id": "", "name": ""},
-            "limits": limits or {"max_pct_per_fire": 15, "max_session_pct": 100,
-                                 "max_pct": 200, "on_exceed": "refuse"},
             "role_pref": "either", "auto_accept": False,
         },
         "listen_targets": [], "cooldown_exempt_user_ids": ["55"],
@@ -360,9 +358,14 @@ ok(len(EB.ran) == 1 and EB.ran[0]["fill_pct"] == 10,
 ok(not EA.ran, "…and the host's own engine is untouched by its own do row")
 ok(sa.peer_cap == 10, "the ack brought the guest's capacity back")
 
+# No percentage gate any more — safety is the hardware's, not a panel's.
 run(A._link_apply(sa.send_do(1000.0, {"type": "fire", "fire_mode": "add", "fill_pct": 40})))
-ok(len(EB.ran) == 1, "an over-ceiling row never reaches the device")
-ok(any("over ceiling" in n for n in A._link_notes), "…and the host is told why, by name")
+ok(len(EB.ran) == 2, "a large fire reaches the guest's device rather than being swallowed")
+
+# SECONDS still never cross: a unit that means something different on each rig.
+run(A._link_apply(sa.send_do(1000.0, {"type": "fire", "fire_mode": "seconds", "seconds": 20})))
+ok(len(EB.ran) == 2, "a seconds fire is refused at the wire")
+ok(any("% only" in n for n in A._link_notes), "…and the host is told why, by name")
 
 # a message row speaks in the GUEST's voice, through multiplayer's own send
 before = len(CAST_A.sent)
@@ -748,7 +751,15 @@ run(H.mp_run_action("One button"))
 ok(any("at least two options" in x for x in H._link_notes),
    "one button is refused with a reason, not posted as a fake decision")
 
-ok(not run(H.mp_run_action("Nope"))["ok"], "an action that doesn't exist is refused")
+# A missing or empty Action is SKIPPED, not a failure. It is a blank you
+# haven't filled in (or one deleted out from under a round) — stopping a whole
+# match over it is the worse answer, and announcing it puts your unfinished
+# homework on the stream.
+r_missing = run(H.mp_run_action("Nope"))
+ok(r_missing["ok"] and r_missing.get("skipped"),
+   "an Action that doesn't exist is skipped quietly, and the result says so")
+ok(any("skipped" in x for x in H._link_notes),
+   "…recorded in the link log, where the operator can find it")
 ok(not run(G.mp_run_action("Roulette round"))["ok"],
    "the guest never runs a multiplayer action — the host is the only referee")
 ok(H.engine.mp_row_cb is None,

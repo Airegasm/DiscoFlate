@@ -737,12 +737,6 @@
     "video": {
       "required": true
     },
-    "limits": {
-      "max_pct_per_fire": 0,
-      "max_session_pct": 0,
-      "max_pct": 0,
-      "on_exceed": "refuse"
-    },
     "role_pref": "host",
     "auto_accept": false
   },
@@ -7555,7 +7549,7 @@
   "resume_title": "▶ Resumed",
   "templates_removed": [],
   "mp_end": {
-    "max_capacity": 0,
+    "max_capacity": 145,
     "actions": [
       {
         "type": "stop_devices"
@@ -7563,8 +7557,8 @@
       {
         "type": "message",
         "style": "embed",
-        "title": "🏁 Match over",
-        "message": "🏁 **[multi_winner]** takes it.\n**[multi_loser]** — [multi_end_why].\n[multi_host_name] **[multi_host_capacity]%** · [multi_guest_name] **[multi_guest_capacity]%**"
+        "title": "🏁 That’s the match",
+        "message": "**[multi_loser]** is done — [multi_end_why].\n**[multi_winner]** takes it.\n\n[multi_host_name] finished at **[multi_host_capacity]%**\n[multi_guest_name] finished at **[multi_guest_capacity]%**\n\n-# both pumps are off"
       },
       {
         "type": "scene_group_kill",

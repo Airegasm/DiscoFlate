@@ -88,58 +88,16 @@ ok(fresh.accept(e4)[0] is True, "tail replay applies the missed one")
 link.reset()
 ok(link.state == mp.S_IDLE and link.sid == "" and link.peer == "A", "reset keeps identity")
 
-# ---- ceiling (percent only) ------------------------------------------------ #
-c = mp.Ceiling(max_pct_per_fire=15, max_session_pct=100, max_pct=200)
-okk, why, row = c.check({"type": "fire", "fire_mode": "add", "fill_pct": 10})
-ok(okk and c.spent == 10 and row["fill_pct"] == 10, "under ceiling fires")
-okk, why, _ = c.check({"type": "fire", "fire_mode": "add", "fill_pct": 40})
-ok(not okk and "over ceiling" in why, "over per-fire refused")
-ok(c.spent == 10, "refused fire costs nothing")
-
-okk, why, _ = c.check({"type": "fire", "fire_mode": "seconds", "seconds": 20})
-ok(not okk and "% only" in why, "a seconds fire is refused, never converted")
-
-okk, _, _ = c.check({"type": "message", "text": "hi"})
-ok(okk, "message row passes")
-okk, _, _ = c.check({"type": "fire", "fire_mode": "add", "fill_pct": "[amount]"})
-ok(okk, "placeholder passes to the engine")
-
-c.armed = False
-okk, why, _ = c.check({"type": "fire", "fire_mode": "add", "fill_pct": 5})
-ok(not okk and "kill switch" in why, "kill switch stops fires")
-okk, _, _ = c.check({"type": "stop_devices"})
-ok(okk, "stop is NEVER gated")
-c.armed = True
-
-# fill-to is charged on the GAIN, not the target number
-c2 = mp.Ceiling(max_pct_per_fire=20, max_session_pct=100)
-okk, why, row = c2.check({"type": "fire", "fire_mode": "to", "fill_pct": 130}, capacity=120)
-ok(okk and c2.spent == 10 and row["fill_pct"] == 130, "fill-to charges only the gain")
-okk, why, _ = c2.check({"type": "fire", "fire_mode": "to", "fill_pct": 200}, capacity=120)
-ok(not okk and "over ceiling" in why, "fill-to gain over per-fire refused")
-
-# session budget
-c3 = mp.Ceiling(max_session_pct=50)
-c3.check({"type": "fire", "fire_mode": "add", "fill_pct": 30})
-okk, why, _ = c3.check({"type": "fire", "fire_mode": "add", "fill_pct": 30})
-ok(not okk and "session limit" in why, "session budget refuses")
-ok(c3.remaining() == 20, "remaining reported")
-
-# absolute cap
-c4 = mp.Ceiling(max_pct=150)
-okk, why, _ = c4.check({"type": "fire", "fire_mode": "add", "fill_pct": 40}, capacity=130)
-ok(not okk and "pass cap" in why, "add that would pass the cap refused")
-okk, _, _ = c4.check({"type": "fire", "fire_mode": "add", "fill_pct": 10}, capacity=130)
-ok(okk, "add under the cap allowed")
-
-# clamp mode
-c5 = mp.Ceiling(max_pct_per_fire=15, max_session_pct=100, on_exceed="clamp")
-okk, why, row = c5.check({"type": "fire", "fire_mode": "add", "fill_pct": 40})
-ok(okk and row["fill_pct"] == 15, "clamp shortens instead of refusing")
-
-c6 = mp.Ceiling()   # all zeros = unlimited
-okk, _, _ = c6.check({"type": "fire", "fire_mode": "add", "fill_pct": 9999})
-ok(okk and c6.remaining() == float("inf"), "unset ceiling = no limit")
+# ---- NO percentage gate ----------------------------------------------------- #
+#
+# There used to be a Ceiling here: a per-fire / per-match / absolute limit that
+# refused or clamped an incoming row. It is gone on purpose. Safety is the
+# HARDWARE's job — a pump's own limits and a plug you can reach — not a number
+# in a web panel that the other machine cannot see and that silently swallows
+# a fire with nowhere to look for why.
+ok(not hasattr(mp, "Ceiling"), "the ceiling gate is gone, not merely unset")
+ok(not hasattr(mp.Session(mp.Link("1"), net="n", cast="c"), "ceiling"),
+   "…and no session carries one")
 
 # ---- pacing: two different pumps, one fair race ---------------------------- #
 ok(abs(mp.fill_rate(60) - 1.6667) < 0.001, "rate from calibration")
@@ -224,10 +182,8 @@ def rows(made):
 def pair(**kw):
     """Curtis (fast pump) hosts; Dave (half the rate) guests."""
     a = mp.Session(mp.Link("100", name="Curtis-bot", owner="o1", version="3.90.2"),
-                   mp.Ceiling(max_pct_per_fire=50, max_session_pct=500),
                    peer_name="Dave-bot", net="net1", cast="cast1", calibration=60)
     b = mp.Session(mp.Link("200", name="Dave-bot", owner="o2", version="3.90.2"),
-                   mp.Ceiling(max_pct_per_fire=15, max_session_pct=40, max_pct=200),
                    peer_name="Curtis-bot", net=kw.get("net", "net1"),
                    cast=kw.get("cast", "cast1"), calibration=120)
     return a, b
@@ -266,7 +222,6 @@ ok(A.link.sid == "m7k2" and A.is_host, "host owns the sid")
 bus.post(B.respond(T, True, video=True))
 bus.settle(T)
 ok(A.state == mp.S_LINKED and B.state == mp.S_LINKED, "accepted both ways")
-ok(A.peer_limits.get("per_fire") == 15, "accept carries the guest's ceilings")
 
 bus.post(A.arm(T))
 bus.post(B.arm(T))
@@ -289,14 +244,19 @@ made = bus.settle(T)
 ok("Dave-bot: fired 10% ✓" in notes(made), "the host narrates what ACTUALLY happened")
 ok(A.peer_cap == 10, "capacity piggybacks on the ack for free")
 
+# No percentage gate any more — a big ask goes through, because what stops it
+# is the pump's own hardware, not a number in a web panel.
 bus.post(A.send_do(T, {"type": "fire", "fire_mode": "add", "fill_pct": 40}))
 made = bus.settle(T)
-ok(not rows(made), "an over-ceiling row never reaches the device")
-ok("over ceiling" in notes(made), "…and the refusal is narratable")
+ok(len(rows(made)) == 1, "a large fire is no longer refused by the panel")
 
+# SECONDS still never cross. Not a limit — a unit problem: 20 seconds is a
+# different amount of inflation on every rig, so the row would mean something
+# different over here than it did over there.
 bus.post(A.send_do(T, {"type": "fire", "fire_mode": "seconds", "seconds": 20}))
 made = bus.settle(T)
 ok(not rows(made) and "% only" in notes(made), "a seconds fire is refused over the wire")
+ok("aren't portable" in notes(made), "…and says why, so it reads as a unit rule")
 
 bus.post(A.send_do(T, {"type": "message", "text": "Dave's pump is charging…"}))
 ok(len(rows(bus.settle(T))) == 1, "a message row passes the gate untouched")
@@ -437,7 +397,7 @@ bus6.settle(T)
 snap = B6.snapshot()
 ok(snap["role"] == "guest" and snap["round"] == 3 and snap["sid"] == "rsm1", "guest snapshot")
 
-B7 = mp.Session(mp.Link("200", name="Dave-bot"), mp.Ceiling(max_pct_per_fire=15),
+B7 = mp.Session(mp.Link("200", name="Dave-bot"),
                 peer_name="Curtis-bot", net="net1", cast="cast1", calibration=120)
 res = B7.restore(snap, T)
 ok(B7.state == mp.S_MATCH and "resumed" in " ".join(res.notes), "guest resumes, and says so")
@@ -473,7 +433,7 @@ ok(any(o.stop for o in made) and "restarted mid-match" in notes(made),
 # who it is from and who it is for, and carries a session id, so four bots can
 # share one channel without ever hearing each other's game.
 def bot(bid, name, want):
-    return mp.Session(mp.Link(bid, name=name), mp.Ceiling(),
+    return mp.Session(mp.Link(bid, name=name),
                       peer_name=want, net="n", cast="c", calibration=60,
                       player=name.replace("-bot", ""))
 
@@ -549,9 +509,9 @@ ok(B2.video is True, "…and the answer is recorded")
 # guest may take it. Both pumps then run the same seconds-to-100% for the
 # length of the match — and go back to their own the moment it ends.
 def paired(hcal, gcal):
-    H = mp.Session(mp.Link("301", name="H-bot"), mp.Ceiling(), peer_name="G-bot",
+    H = mp.Session(mp.Link("301", name="H-bot"), peer_name="G-bot",
                    net="n", cast="c", calibration=hcal, player="Host")
-    G = mp.Session(mp.Link("302", name="G-bot"), mp.Ceiling(), peer_name="H-bot",
+    G = mp.Session(mp.Link("302", name="G-bot"), peer_name="H-bot",
                    net="n", cast="c", calibration=gcal, player="Guest")
     b = Bus(H, G)
     for x in (H, G):
@@ -617,7 +577,7 @@ H, G, b = paired(40.0, 80.0)
 b.post(H.offer(T, game="Crash", base_target=100, split=True)); b.settle(T)
 b.post(G.respond(T, True, video=True, split=True)); b.settle(T)
 snap = G.snapshot()
-G2 = mp.Session(mp.Link("302", name="G-bot"), mp.Ceiling(), peer_name="H-bot",
+G2 = mp.Session(mp.Link("302", name="G-bot"), peer_name="H-bot",
                 net="n", cast="c", calibration=999, player="Guest")
 G2.restore(snap, T)
 ok(G2.cal_before == 80.0 and G2.calibration == 60.0,

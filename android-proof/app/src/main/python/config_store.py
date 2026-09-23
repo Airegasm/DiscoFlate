@@ -424,14 +424,6 @@ DEFAULTS = {
         # reaches this pump is whatever survives this gate, and the refusal goes
         # back as an ack so the host narrates truth instead of intent. All in
         # PERCENT — a second is not a portable unit across two rigs. 0 = no limit.
-        # DEFAULT TO NO LIMIT. The gate itself stays — it is still the only
-        # thing standing between you and whatever the other install asks for,
-        # and it still refuses over the wire with a reason. But there is no
-        # longer a panel for it, and a ceiling nobody can see or change is
-        # worse than none: a match would quietly refuse fires with nothing to
-        # tell you why or where to fix it. Set these in the config to arm it.
-        "limits": {"max_pct_per_fire": 0, "max_session_pct": 0,
-                   "max_pct": 0, "on_exceed": "refuse"},
         # HOST or GUEST — picked in the header before going live, frozen
         # after. Never "either": a negotiated seat is a seat you can end up in
         # by accident.

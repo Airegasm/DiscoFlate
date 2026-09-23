@@ -801,6 +801,15 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                 return {"ok": True,
                         "skipped": f"group '{found.get('group')}' is an intro group "
                                    f"and Go Live isn't set to open with an intro"}
+            # A media overlay with no file is a slot you haven't filled in yet.
+            # Skip it the same way a missing overlay id is skipped — quietly,
+            # and say so in the result rather than drawing an empty box or
+            # stalling a round waiting for a video that was never picked.
+            if ((found.get("kind") or "") in ("media", "audio")
+                    and not str(found.get("media") or "").strip()
+                    and spec.get("mode") != "clear"):
+                return {"ok": True,
+                        "skipped": f"overlay {oid} has no media file yet"}
             if (found.get("kind") or "") == "audio":
                 # A sound cue: nothing is composited, it just plays here. Fires
                 # from a group like any other overlay, so an intro can open with
@@ -2284,11 +2293,6 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         return web.json_response(await botmgr.link_abort(
             str(b.get("why") or "stopped from the panel")))
 
-    async def mp_kill(request):
-        await guard(request)
-        b = await _json(request)
-        return web.json_response(botmgr.link_kill(bool(b.get("armed"))))
-
     async def mp_resume(request):
         await guard(request)
         b = await _json(request)
@@ -2959,7 +2963,6 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/mp/action", mp_action),
         web.post("/api/mp/rounds", mp_rounds),
         web.post("/api/mp/abort", mp_abort),
-        web.post("/api/mp/kill", mp_kill),
         web.post("/api/mp/concede", mp_concede),
         web.post("/api/mp/members", mp_members),
         web.post("/api/mp/resume", mp_resume),

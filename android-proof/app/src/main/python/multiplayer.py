@@ -1,7 +1,7 @@
 """DiscoFlate — multiplayer protocol core.
 
 The wire between two installs: envelope encode/decode, sequencing, dedup, the
-link state machine, and the local ceiling gate.
+link state machine.
 
 This module deliberately imports NOTHING from discord or engine. Everything in
 here is pure, so the whole rail can be verified headlessly instead of needing
@@ -270,96 +270,6 @@ class Link:
             self.mark_seen(self.peer, self.sid, snap.get("last_seq") or 0)
 
 
-class Ceiling:
-    """The guest's local limits. THIS is the safety guarantee — not
-    authenticity, not trust. The host may ask for anything; what actually
-    reaches a device is whatever survives this gate, and the refusal travels
-    back as an `ack` so the host narrates truth instead of intent.
-
-    Everything here is in PERCENT, because multiplayer fires are %-only. A
-    second is not a portable unit across two rigs — "20 seconds" is a different
-    amount of inflation on every pump — whereas 10% is 10% everywhere. Rate
-    fairness is a separate problem, solved by exchanging calibration in the
-    handshake (see `fill_rate` / `compensate`), not by the gate.
-    """
-
-    # A stop is never gated. Blocking a stop to enforce a limit would be the
-    # gate causing the exact harm it exists to prevent.
-    ALWAYS_ALLOW = frozenset({"stop_devices"})
-
-    def __init__(self, max_pct_per_fire: float = 0, max_session_pct: float = 0,
-                 max_pct: float = 0, on_exceed: str = "refuse") -> None:
-        self.max_pct_per_fire = float(max_pct_per_fire or 0)   # 0 = no limit
-        self.max_session_pct = float(max_session_pct or 0)     # total gained
-        self.max_pct = float(max_pct or 0)                     # absolute ceiling
-        self.on_exceed = "clamp" if str(on_exceed) == "clamp" else "refuse"
-        self.spent = 0.0
-        self.armed = True            # the kill switch
-
-    def reset(self) -> None:
-        self.spent = 0.0
-
-    def remaining(self) -> float:
-        if self.max_session_pct <= 0:
-            return float("inf")
-        return max(0.0, self.max_session_pct - self.spent)
-
-    def check(self, row: dict, *, capacity: float = 0.0) -> tuple[bool, str, dict]:
-        """Gate one action row. Returns (ok, reason, row-to-run).
-
-        With on_exceed="clamp" an over-limit fire comes back shortened rather
-        than refused; the ack reports the real number either way, so the host's
-        narration matches what the pump actually did.
-        """
-        row = dict(row or {})
-        rtype = str(row.get("type") or "")
-        if rtype in self.ALWAYS_ALLOW:
-            return True, "", row
-        if not self.armed:
-            return False, "refused: kill switch", row
-        if rtype != "fire":
-            # message / overlay / scene_group and friends touch no device
-            return True, "", row
-
-        mode = str(row.get("fire_mode") or "add")
-        if mode == "seconds":
-            # Refuse loudly rather than convert. Converting with our own
-            # calibration would silently reintroduce the unfairness that made
-            # this %-only in the first place, and the host would never know.
-            return False, "refused: multiplayer fires are % only", row
-
-        amount = _num(row.get("fill_pct"))
-        if amount is None:
-            # a [placeholder] we can't resolve here — the engine renders it and
-            # the gate runs again on the resolved value
-            return True, "", row
-
-        # How much capacity this row would ADD, which is what both budgets and
-        # the absolute cap actually care about.
-        gain = amount if mode == "add" else max(0.0, amount - capacity)
-
-        if self.max_pct_per_fire > 0 and gain > self.max_pct_per_fire:
-            if self.on_exceed == "refuse":
-                return False, (f"refused: over ceiling ({gain:g}% > "
-                               f"{self.max_pct_per_fire:g}%)"), row
-            gain = self.max_pct_per_fire
-
-        left = self.remaining()
-        if gain > left:
-            if self.on_exceed == "refuse" or left <= 0:
-                return False, f"refused: session limit ({left:g}% left)", row
-            gain = left
-
-        if self.max_pct > 0 and (capacity + gain) > self.max_pct:
-            if self.on_exceed == "refuse":
-                return False, f"refused: would pass cap ({self.max_pct:g}%)", row
-            gain = max(0.0, self.max_pct - capacity)
-
-        row["fill_pct"] = gain if mode == "add" else capacity + gain
-        self.spent += gain
-        return True, "", row
-
-
 # ---- pacing: making two different pumps a fair race ------------------------ #
 # % fixes how MUCH. It does nothing about how FAST. A rig that fills 100% in
 # 60s reaches any finish line twice as quickly as one that takes 120s, so the
@@ -479,6 +389,7 @@ def dead_heat(a_ms, b_ms, window: float = DEAD_HEAT_MS) -> bool:
     return abs(a - b) <= window
 
 
+
 class Out:
     """What the adapter must actually do. The protocol decides; the caller
     performs. Keeping those apart is the whole reason a rail whose natural test
@@ -531,12 +442,11 @@ class Session:
     it messages and performs what comes back; that's the entire contract.
     """
 
-    def __init__(self, link: Link, ceiling: Ceiling = None, *,
+    def __init__(self, link: Link, *,
                  peer_name: str = "", net: str = "", cast: str = "",
                  calibration=0, caps=(), role_pref: str = "either",
                  player: str = "") -> None:
         self.link = link
-        self.ceiling = ceiling or Ceiling()
         # The BOT is who the protocol addresses; the PLAYER is who the messages
         # are about. "Dave-bot fired 10%" is plumbing leaking into the show.
         self.player = str(player or "")
@@ -573,7 +483,6 @@ class Session:
         self.peer_cap = 0.0                        # their capacity, from ack/tele
         self.pump_left = 0.0                       # MY pump's seconds remaining
         self.peer_pump = 0.0                       # theirs, off their heartbeat
-        self.peer_limits = {}
         self.peer_claim = None
 
         self.game = ""
@@ -628,11 +537,6 @@ class Session:
     def _mine(self) -> dict:
         return {"net": self.channels.get("net", ""), "cast": self.channels.get("cast", "")}
 
-    def _limits(self) -> dict:
-        c = self.ceiling
-        return {"per_fire": c.max_pct_per_fire, "session": c.max_session_pct,
-                "cap": c.max_pct, "on_exceed": c.on_exceed}
-
     def is_blocked(self, bot_id: str) -> bool:
         return str(bot_id or "") in {str(b.get("bot_id") or "")
                                      for b in (self.blocked or []) if isinstance(b, dict)}
@@ -656,7 +560,7 @@ class Session:
                 "phase": self.phase, "round": self.round,
                 "targets": dict(self.targets), "paced": self.paced,
                 "capacity": self.capacity, "peer_capacity": self.peer_cap,
-                "armed": self.ceiling.armed, "spent": self.ceiling.spent,
+
                 "invite": dict(self.invite), "why": self.last_why}
 
     # -- handshake ----------------------------------------------------------- #
@@ -827,7 +731,6 @@ class Session:
         self.cost = str(self.invite.get("cost") or "")
         self.targets = dict(self.invite.get("targets") or {})
         self.paced = bool(self.invite.get("paced", True))
-        self.ceiling.reset()
         self.ready_me = self.ready_peer = False
         self.invite = {}
         self._expires = now + LINK_TTL
@@ -835,7 +738,7 @@ class Session:
         out.dirty = True
         out.notes.append(f"accepted: {self.cost}")
         self.video = bool(video)
-        return self._emit(out, T_ACCEPT, limits=self._limits(), caps=self.caps,
+        return self._emit(out, T_ACCEPT, caps=self.caps,
                           cal=self.calibration, player=self.player,
                           video=self.video, split_cal=mid, **self._mine())
 
@@ -868,7 +771,6 @@ class Session:
             return out
         self.link.state = S_MATCH
         self.match_at = now
-        self.ceiling.reset()
         return out.merge(self.push_state(now, phase=phase, rnd=rnd, left=left))
 
     def push_state(self, now: float, *, phase: str = "", rnd=None,
@@ -895,7 +797,13 @@ class Session:
                           tick=self.tick, left=round(float(left), 2))
 
     def send_do(self, now: float, row: dict) -> Out:
-        """Host→guest: run this action row, gated by YOUR ceiling."""
+        """Host→guest: run this action row.
+
+        Nothing gates it here. Safety is the HARDWARE's job — a pump's own
+        limits, a plug you can reach — not a number in a web panel that the
+        other machine cannot see and that would silently swallow a fire with
+        nowhere to look for why.
+        """
         out = Out()
         if not self.is_host:
             out.notes.append("only the host sends rows")
@@ -1078,7 +986,6 @@ class Session:
         self.match_at = 0.0
         self.targets = {}
         self.peer_claim = None
-        self.ceiling.reset()
         self._expires = 0.0
         self.link.state = S_ADVERTISED if self.advertising else S_IDLE
 
@@ -1267,7 +1174,6 @@ class Session:
         bad = check_channels(self._mine(), {"net": env.get("net"), "cast": env.get("cast")})
         if bad:
             return out.merge(self.abort(now, "; ".join(bad)))
-        self.peer_limits = dict(env.get("limits") or {})
         self.peer_caps = list(env.get("caps") or self.peer_caps)
         self.peer_video = bool(env.get("video"))
         self.peer_player = str(env.get("player") or "") or self.peer_player
@@ -1312,7 +1218,6 @@ class Session:
         if self.link.state in (S_LINKED, S_READY):
             self.link.state = S_MATCH
             self.match_at = now
-            self.ceiling.reset()
             out.notes.append("match started")
         out.dirty = True
         return out
@@ -1328,11 +1233,16 @@ class Session:
         if not isinstance(row, dict) or not row.get("type"):
             return out.merge(self.ack(now, re=env["seq"], ok=False,
                                       why="refused: not an action row"))
-        ok, why, gated = self.ceiling.check(row, capacity=self.capacity)
-        if not ok:
-            out.notes.append(f"{row.get('type')} {why}")
+        # SECONDS NEVER CROSS. Not a limit — a unit problem: 20 seconds is a
+        # different amount of inflation on every rig, so a row in seconds means
+        # something different over here than it did over there. Percent is the
+        # only portable unit, and this is the last place to catch it.
+        if (str(row.get("type")) == "fire"
+                and str(row.get("fire_mode") or "") == "seconds"):
+            why = "refused: % only — seconds aren't portable between rigs"
+            out.notes.append(f"fire {why}")
             return out.merge(self.ack(now, re=env["seq"], ok=False, why=why))
-        out.rows.append({"re": int(env["seq"]), "row": gated})
+        out.rows.append({"re": int(env["seq"]), "row": dict(row)})
         return out
 
     def _on_ack(self, env: dict, now: float, out: Out) -> Out:
@@ -1409,7 +1319,6 @@ class Session:
         snap.update({"game": self.game, "input": self.input, "cost": self.cost,
                      "phase": self.phase, "round": self.round, "tick": self.tick,
                      "targets": self.targets, "paced": self.paced,
-                     "spent": self.ceiling.spent,
                      # A split-the-difference outlives a crash: without this the
                      # rig would come back still tuned to the other person's
                      # match, with nothing left that knows what it used to be.
@@ -1431,7 +1340,6 @@ class Session:
         self.tick = int(_num(snap.get("tick")) or 0)
         self.targets = dict(snap.get("targets") or {})
         self.paced = bool(snap.get("paced", True))
-        self.ceiling.spent = float(_num(snap.get("spent")) or 0.0)
         self.ready_me = bool(snap.get("ready_me"))
         self.ready_peer = bool(snap.get("ready_peer"))
         if _num(snap.get("cal_before")) is not None:

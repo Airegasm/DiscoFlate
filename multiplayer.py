@@ -1233,6 +1233,15 @@ class Session:
         if not isinstance(row, dict) or not row.get("type"):
             return out.merge(self.ack(now, re=env["seq"], ok=False,
                                       why="refused: not an action row"))
+        # SECONDS NEVER CROSS. Not a limit — a unit problem: 20 seconds is a
+        # different amount of inflation on every rig, so a row in seconds means
+        # something different over here than it did over there. Percent is the
+        # only portable unit, and this is the last place to catch it.
+        if (str(row.get("type")) == "fire"
+                and str(row.get("fire_mode") or "") == "seconds"):
+            why = "refused: % only — seconds aren't portable between rigs"
+            out.notes.append(f"fire {why}")
+            return out.merge(self.ack(now, re=env["seq"], ok=False, why=why))
         out.rows.append({"re": int(env["seq"]), "row": dict(row)})
         return out
 

@@ -168,7 +168,7 @@ sandbox.mpRender({ mode: 'multi', state: 'idle', preflight: [] });
 // ---- the race, mid-flight --------------------------------------------------
 const LIVE = { mode: 'multi', state: 'match', peer_online: true, peer_name: 'Dave-bot',
                me: '100', peer: '200', player: 'Curtis', peer_player: 'Dave',
-               role: 'host', capacity: 63.4, peer_capacity: 41, spent: 30, armed: true,
+               role: 'host', capacity: 63.4, peer_capacity: 41,
                preflight: [], notes: ['fired 10% ✓'],
                race: { game: 'Race to N%', targets: { '100': 150, '200': 75 } } };
 sandbox.mpRender(LIVE);
@@ -852,7 +852,7 @@ ok(!/id="mpLimFire"/.test(html) && !/id="mpOnExceed"/.test(html),
 // unnoticed behind a tab is one that times out.
 sandbox.modals.length = 0;
 const seatAs = r => vm.runInContext(
-  `mpCfg = {role_pref:'${r}', limits:{}}`, sandbox);
+  `mpCfg = {role_pref:'${r}'}`, sandbox);
 seatAs('host');
 const inviteBtn = els.mpInviteBtn;
 

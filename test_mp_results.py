@@ -143,9 +143,16 @@ ok(len(GROUPS.get(pg) or []) >= 2,
 END = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                   "default_config.json"), encoding="utf-8"))["mp_end"]
 ok(END.get("actions"), "the End Condition ships a block — a match needs an outro")
-ok(END.get("max_capacity") == 0,
-   "…but NO lose-at number: how much inflation someone agrees to is their "
-   "decision, and a default would be making it for them")
+top = END.get("max_capacity")
+ok(1 <= top <= 999, f"…and a lose-at capacity inside 1–999 ({top})")
+msg = next(r for r in walk(END["actions"]) if r.get("type") == "message")
+ok(msg.get("style") == "embed", "the result posts as an EMBED, not a chat line")
+ok(msg.get("title"), "…with a title, so it reads as the end of something")
+for token in ("[multi_loser]", "[multi_winner]", "[multi_end_why]",
+              "[multi_host_capacity]", "[multi_guest_capacity]"):
+    ok(token in msg["message"], f"…and carries {token}")
+ok("[capacity]" not in msg["message"],
+   "…and never the bare [capacity], which names only one rig")
 kinds = [r.get("type") for r in walk(END["actions"])]
 ok("stop_devices" in kinds, "it stops both pumps first")
 ok("message" in kinds, "…says who won in the venue")
@@ -157,6 +164,46 @@ for r in walk(END["actions"]):
 txt = json.dumps(END["actions"], ensure_ascii=False)
 ok("[multi_winner]" in txt and "[multi_loser]" in txt,
    "…naming both players from the placeholders the end sets")
+
+# ---- a blank you haven't filled in is SKIPPED, never a failure ------------- #
+# Unfinished work is the normal state of a show being built. An empty round, an
+# Action you haven't written, a video you haven't made — none of them should
+# stop a match, and none should announce your homework on the stream.
+import re
+bot = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "discord_bot.py"), encoding="utf-8").read()
+i = bot.index('body = rnd.get("actions")')
+blk = bot[i:i + 700]
+ok("return True" in blk.split("if not body:")[1][:400],
+   "an empty ROUND is skipped and the driver carries on to the next")
+ok("_link_say" not in blk.split("if not body:")[1][:400],
+   "…and says nothing in the venue about it")
+
+# BOTH paths that can call an Action: the mp_action ROW inside a round, and
+# mp_run_action driving one directly.
+row_site = bot[bot.index("blk = self.mp_action(name)"):][:600]
+ok("return True" in row_site,
+   "an mp_action ROW for a missing Action is skipped, and the round carries on")
+run_site = bot[bot.index("async def mp_run_action"):][:1200]
+ok('"ok": True' in run_site and "skipped" in run_site,
+   "…and so is running one directly — neither stops a match")
+
+apps = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         "app.py"), encoding="utf-8").read()
+ok('("media", "audio")' in apps and "has no media file yet" in apps,
+   "a media overlay with no file is skipped the way a missing id already is")
+
+# and the shipped videos are exactly that case — placeholders, not breakage
+blank = [o["id"] for o in SCENE["overlays"]
+         if o.get("kind") == "media" and not str(o.get("media") or "").strip()]
+ok(blank, "the versus kit ships video slots with no file yet")
+called = {r.get("overlay") for a in list(ACTS.values()) + [{"actions": END["actions"]}]
+          for r in walk(a["actions"]) if r.get("type") == "overlay"}
+for r in CFG.get("mp_rounds") or []:
+    called |= {x.get("overlay") for x in walk(r.get("actions")) if x.get("type") == "overlay"}
+ok(set(blank) & called,
+   "…and rounds really do call them, so the skip is the thing keeping a match "
+   "running rather than an untested path")
 
 # ---- the announced number is the number that fires ------------------------- #
 rps = ACTS["MultiRPS"]["actions"]

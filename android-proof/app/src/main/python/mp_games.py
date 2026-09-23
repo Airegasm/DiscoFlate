@@ -55,14 +55,6 @@ ROLL_DICE, ROLL_SIDES = 1, 7
 WHO = ("chosen", "other", "both", "host", "guest", "me", "peer",
        "leader", "trailer", "winner", "loser")
 
-# The ONLY rows that may cross to the other machine.
-#
-# A pump is hardware and a curtain is a shared agreement, so those travel. A
-# picture does not: an overlay is named by an id that exists in THAT machine's
-# scene, so the same row means something different — or nothing — over there,
-# and someone else's production is not the host's to drive. `capacity` is out
-# too: the ceiling gates `fire`, not a direct write to the meter, so allowing
-# it across would be a hole straight through the safety model.
 # What one install may ask the other to do.
 #
 # OVERLAYS cross because the shipped scene is the SAME FILE on both machines —

@@ -1874,17 +1874,12 @@ class BotManager:
         # they change what messages say, never what the match agreed to.
         s.player = self._mp_player(cfg)
         if s.state in (mp.S_IDLE, mp.S_ADVERTISED):
-            lim = m.get("limits") or {}
             s.peer_name = str(m.get("peer_bot_name") or "")
             s.role_pref = str(m.get("role_pref") or "host")
             s.blocked = [b for b in (m.get("blocked") or []) if isinstance(b, dict)]
             s.channels = {"net": self._mp_chan(cfg, "bot_network"),
                           "cast": self._mp_chan(cfg, "broadcast")}
             s.calibration = self._mp_calibration()
-            armed = s.ceiling.armed
-            s.ceiling = mp.Ceiling(lim.get("max_pct_per_fire"), lim.get("max_session_pct"),
-                                   lim.get("max_pct"), lim.get("on_exceed"))
-            s.ceiling.armed = armed          # the kill switch is not a config knob
         # Read-only match values, always available to render(): an overlay
         # label tracking [multi_peer_pct] has to keep resolving on screen, and
         # the compositor re-renders text through engine.render ~4x/sec.
@@ -2714,7 +2709,12 @@ class BotManager:
         blk = self.mp_action(name)
         rows = blk.get("actions") or []
         if not rows:
-            return {"ok": False, "error": f"no Multiplayer Action called {name!r}"}
+            # An Action you haven't filled in, or one that was deleted out from
+            # under a round. Neither is worth stopping a match for: skip it and
+            # let the round carry on, the same as an empty round.
+            why = ("is empty" if blk else "doesn't exist (any more)")
+            self._link_notes.append(f"Action {name!r} {why} — skipped")
+            return {"ok": True, "skipped": f"Action {name!r} {why}"}
         self.engine.mp_row_cb = self._mp_row_router
         try:
             await self.engine._run_action_block(
@@ -2830,9 +2830,12 @@ class BotManager:
 
         body = rnd.get("actions") if isinstance(rnd.get("actions"), list) else []
         if not body:
-            self._link_notes.append(f"{name} has nothing to run")
-            await self._link_say(f"⚠ **{name}** has nothing to run.")
-            return False
+            # Nothing to run is not a failure — it is a round you haven't
+            # filled in yet. Skip it and carry on to the next; stopping the
+            # whole match over a blank you left for later is the worse answer,
+            # and announcing it puts your unfinished homework on the stream.
+            self._link_notes.append(f"{name} is empty — skipped")
+            return True
 
         # The round's BLOCK is what repeats. One mechanism: with a count of 1
         # it is a plain sequence, with 4 it runs four times, and with a target
@@ -3139,15 +3142,6 @@ class BotManager:
         out = s.unblock(bot_id)
         self._mp_save_blocked()
         await self._link_apply(out)
-        return {"ok": True, "status": self.link_status()}
-
-    def link_kill(self, armed: bool) -> dict:
-        """The kill switch. Not a config knob — it takes effect this instant and
-        a stop is never gated by it."""
-        s = self.link
-        if s is not None:
-            s.ceiling.armed = bool(armed)
-            self._link_notes.append("ceiling armed" if armed else "KILL SWITCH — fires refused")
         return {"ok": True, "status": self.link_status()}
 
     # -- resume ---------------------------------------------------------------- #

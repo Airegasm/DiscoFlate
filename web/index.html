@@ -1436,8 +1436,14 @@
       </ul>
       <div class="hint" style="margin-top:8px;max-width:860px">They don't have to be in the same server — bot_network in a private two-person server and broadcast in the public one is the nicer arrangement. But then <b>both bots need inviting to both servers</b>, and somebody always forgets one. The <b>Preflight</b> list on the Multiplayer tab names exactly which check failed rather than leaving you at a silent dead end.</div>
 
-      <h3 style="margin:14px 0 6px">Your ceilings are the safety model</h3>
-      <div class="hint" style="margin-top:0;max-width:860px">Not trust, not authenticity — <b>your limits</b>. The host may ask for anything; what actually reaches your pump is whatever survives your gate, and the refusal travels back so the host narrates the truth instead of what they asked for. A hostile peer's best available move is <b>lying about who won</b>. Everything is in <b>percent</b>: a second is a different amount of inflation on every rig, 10% is 10% everywhere. <b>0 = no limit.</b> A <b>stop</b> is never gated, because blocking a stop to enforce a limit would be the gate causing the exact harm it exists to prevent. To end a match outright, use <b>Concede</b> on the Chat tab.</div>
+      <h3 style="margin:14px 0 6px">Safety is the hardware's job</h3>
+      <div class="hint" style="margin-top:0;max-width:860px">There is no percentage gate in this panel, on purpose.
+        A ceiling in a web UI is a number the other machine cannot see, that silently swallows a fire and leaves
+        nobody anywhere to look for why — and it is not what is actually keeping you safe. <b>Your pump's own
+        limits and a plug you can reach are.</b> Everything still travels in <b>percent</b> rather than seconds,
+        because a second is a different amount of inflation on every rig and 10% is 10% everywhere.<br>
+        What ends a match is the <b>End Condition</b>: somebody concedes, somebody reaches the lose-at capacity,
+        or somebody comes off air. A <b>stop</b> is never gated by anything.</div>
 
       <h3 style="margin:14px 0 6px">Fair races between unequal pumps</h3>
       <div class="hint" style="margin-top:0;max-width:860px">Percent fixes <i>how much</i>. It says nothing about <i>how fast</i>: a pump that fills 100% in 60s reaches any finish line twice as quickly as one that takes 120s. So the handshake exchanges each side's <b>calibration</b> and the finish lines are scaled — base 150% with a 60s pump against a 120s pump becomes <b>150% vs 75%</b>, and both take 90 seconds of pumping. Compensation only ever brings a line <b>down</b>, never past the number the other person already agreed to. If either pump isn't calibrated the match says so out loud rather than pretending the race is even.</div>
@@ -5539,7 +5545,7 @@ let mpInvOpen = false;
 function mpInviteeModal(st){
   if(mpInvOpen) return;
   mpInvOpen = true;
-  const inv=st.invite||{}, ven=inv.venue||{}, lim=(mpCfg&&mpCfg.limits)||{};
+  const inv=st.invite||{}, ven=inv.venue||{};
   const where = w => { const v=ven[w]||{};
     return v.channel ? `#${esc(v.channel)}${v.guild?` in ${esc(v.guild)}`:''}${v.kind==='voice'?' 🔊':''}`
                      : '<span style="color:var(--warn)">not set</span>'; };
