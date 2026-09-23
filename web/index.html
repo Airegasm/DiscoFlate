@@ -4392,7 +4392,7 @@ async function saveAutomation(){
     resume_title: $('#resumeTitle')?$('#resumeTitle').value:'',
     resume_message: $('#resumeMsg').value,
     paused_notice_message: $('#pausedNoticeMsg').value,
-    activation_off_notice: $('#activationOffNotice')?$('#activationOffNotice').checked:true,
+    activation_off_notice: $('#activationOffNotice')?$('#activationOffNotice').checked:false,
     output_headers: $('#outputHeaders').checked,
     rich_output: $('#richOutput').checked,
   });
@@ -6807,7 +6807,7 @@ function applyState(st, full){
     if($('#pauseMsg')) $('#pauseMsg').value = st.pause_message||'';
     if($('#resumeMsg')) $('#resumeMsg').value = st.resume_message||'';
     if($('#pausedNoticeMsg')) $('#pausedNoticeMsg').value = st.paused_notice_message||'';
-    if($('#activationOffNotice')) $('#activationOffNotice').checked = st.activation_off_notice!==false;
+    if($('#activationOffNotice')) $('#activationOffNotice').checked = !!st.activation_off_notice;
     if($('#outputHeaders')) $('#outputHeaders').checked = !!st.output_headers;
     if($('#richOutput')) $('#richOutput').checked = !!st.rich_output;
     $('#tokenState').textContent = st.has_token ? '✓ token saved' : 'no token yet';
@@ -7092,7 +7092,7 @@ function gatherConfig(){
     resume_title: $('#resumeTitle')?$('#resumeTitle').value:'',
     resume_message: $('#resumeMsg') ? $('#resumeMsg').value : '',
     paused_notice_message: $('#pausedNoticeMsg') ? $('#pausedNoticeMsg').value : '',
-    activation_off_notice: $('#activationOffNotice') ? $('#activationOffNotice').checked : true,
+    activation_off_notice: $('#activationOffNotice') ? $('#activationOffNotice').checked : false,
     output_headers: $('#outputHeaders') ? $('#outputHeaders').checked : false,
     rich_output: $('#richOutput') ? $('#richOutput').checked : false,
     prizes:cleanPrizes(),

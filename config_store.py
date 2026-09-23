@@ -197,10 +197,12 @@ DEFAULTS = {
     "resume_message": "▶️ **Session resumed** by [user] — pump away!",
     # Reply to someone who runs a command while paused (per-user, buffered).
     "paused_notice_message": "⏸️ [mention], the session is paused — hang tight until the operator resumes.",
-    # Tell people when a command arrives while Activation is off. Once per
-    # person per off period either way — this switches it off entirely, for
-    # a second install that is only ever meant to sit quiet.
-    "activation_off_notice": True,
+    # Tell people when a command arrives while Activation is off. OFF by
+    # default: a player gets silence either way, the operator already knows,
+    # and it is the one thing a non-participating install says out loud — so
+    # a spare install on the same token spends its whole life announcing that
+    # it isn't the one doing the work. Switch it on if you want the notice.
+    "activation_off_notice": False,
     # ONE embed toggle + titlebar shared by all three pause/resume messages.
     "pause_embed": True,
     "pause_title": "⏸ Paused",

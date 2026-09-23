@@ -292,7 +292,7 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "anon_user_label": cfg.get("anon_user_label", ""),
         "output_headers": cfg.get("output_headers", False),
         "rich_output": cfg.get("rich_output", False),
-        "activation_off_notice": cfg.get("activation_off_notice", True),
+        "activation_off_notice": cfg.get("activation_off_notice", False),
         "templates": cfg.get("templates", {"commands": [], "events": [], "ranges": []}),
         "templates_removed": cfg.get("templates_removed", []),
         "allow_dms": cfg.get("allow_dms", False),

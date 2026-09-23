@@ -26,6 +26,51 @@ import config_store
 import minigames
 
 
+def _install_id() -> str:
+    """Which INSTALL this is: version + host. Stamped on the Activation-off
+    notice, because that notice is the only thing a spare install on the same
+    token ever says — and without a stamp two of them are indistinguishable
+    from one, which is exactly the hole this fell into."""
+    import json as _json
+    import socket
+    ver = "?"
+    try:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "version.json"), "r", encoding="utf-8") as fh:
+            ver = str(_json.load(fh).get("version") or "?")
+    except (OSError, ValueError):
+        pass
+    try:
+        host = socket.gethostname()[:24]
+    except Exception:  # noqa: BLE001
+        host = "?"
+    return f"v{ver} on {host}"
+
+
+# Rich output is a property of the BOT, not of each call site. Wiring it at
+# every send is how half the messages ended up plain: the games, the game
+# intros, the pause notice, the Activation notice — each one a separate path
+# somebody had to remember. _auto_embed() is consulted by the two chokepoints
+# below instead, so a message is a card because rich output is on, full stop.
+_RICH_CFG = None          # set by BotManager.__init__ -> () -> cfg dict
+
+
+def _auto_embed(text, embed=None, image=None):
+    """The card a plain message becomes when rich output is on. Returns the
+    caller's own embed untouched when it has one, and None when there's
+    nothing to wrap (an image post IS the picture; empty text is not a card)."""
+    if embed is not None or image:
+        return embed
+    if not str(text or "").strip():
+        return None
+    try:
+        if not (_RICH_CFG and (_RICH_CFG() or {}).get("rich_output")):
+            return None
+        return discord.Embed(description=str(text)[:4096], color=0x3BA55D)
+    except Exception:  # noqa: BLE001 — never lose a message to a bad embed
+        return None
+
+
 def _resolve_img(image: str | None) -> str | None:
     """Uploaded images are stored as 'images/<name>' relative paths — resolve
     them against the data dir (absolute paths from older configs pass through)."""
@@ -260,6 +305,8 @@ class BotManager:
         # who has already been told Activation is off during THIS off period —
         # cleared the moment a command runs again
         self._off_told: set = set()
+        global _RICH_CFG          # the two senders ask this, not each caller
+        _RICH_CFG = self.get_config
         # Owner voice: per-channel webhook (posts AS the owner — their name +
         # avatar) and the cached owner (avatar url, display name).
         self._webhooks: dict = {}
@@ -602,6 +649,11 @@ class BotManager:
         When `embed` is given the text is carried as the embed (rich card) instead."""
         text = _clip(text)
         image = _resolve_img(image)
+        # a view (a Play button) is content in its own right; everything else
+        # empty means there is no message to send
+        if embed is None and view is None and not image and not str(text or "").strip():
+            return None
+        embed = _auto_embed(text, embed, image)
         try:
             if embed is not None:
                 kw = {"embed": embed}
@@ -616,7 +668,9 @@ class BotManager:
             elif image and os.path.exists(image):
                 return await ch.send(content=text or None, file=discord.File(image))
             elif text:
-                return await ch.send(text)
+                return await ch.send(text, **({"view": view} if view is not None else {}))
+            elif view is not None:
+                return await ch.send(view=view)   # a button with no words is still a post
         except Exception as e:  # noqa: BLE001
             self.engine._log("error", f"send failed: {e}")
         return None
@@ -962,7 +1016,10 @@ class BotManager:
             intro = (res.get("reply") or "").strip() or f"🎮 **{who}** started **{name}** — press Play!"
             view = minigames.make_play_view(self, gcmd, who, uid)
             try:
-                view.message = await ch.send(self._hdr(cfg, glabel, who) + intro, view=view)
+                itxt = self._hdr(cfg, glabel, who) + intro
+                iemb = _auto_embed(itxt) or self._out_embed(cfg, glabel, who, intro)
+                view.message = await (ch.send(embed=iemb, view=view) if iemb
+                                      else ch.send(itxt, view=view))
             except Exception as e:  # noqa: BLE001
                 return {"ok": False, "error": f"couldn't start the game: {e}"}
             return {"ok": True}
@@ -1371,9 +1428,13 @@ class BotManager:
             # every command was the loudest thing in the channel — especially
             # with a second install up whose Activation is off, which answers
             # commands the first one is busy running.
-            if cfg.get("activation_off_notice", True) and message.author.id not in self._off_told:
+            if cfg.get("activation_off_notice") and message.author.id not in self._off_told:
                 self._off_told.add(message.author.id)
-                await _reply(message, "🔇 Activation is currently **off**.")
+                # stamped, so two installs answering the same command are
+                # telling you apart instead of looking like one bug
+                await _reply(message,
+                             f"🔇 Activation is currently **off**. "
+                             f"-# ({_install_id()})")
             return
         self._off_told.clear()   # back on: everyone gets told again next time
 
@@ -1474,7 +1535,10 @@ class BotManager:
                         emb = discord.Embed(title=ttl[:256], description=intro[:4096], color=0x9B59B6)
                         view.message = await message.channel.send(embed=emb, view=view)
                     else:
-                        view.message = await message.channel.send(self._hdr(cfg, glabel, who) + intro, view=view)
+                        itxt = self._hdr(cfg, glabel, who) + intro
+                        iemb = _auto_embed(itxt) or self._out_embed(cfg, glabel, who, intro)
+                        view.message = await (message.channel.send(embed=iemb, view=view) if iemb
+                                              else message.channel.send(itxt, view=view))
                 except Exception as e:  # noqa: BLE001
                     await _reply(message, f"⚠️ couldn't start the game: {e}")
                 return
@@ -1594,6 +1658,11 @@ def _clip(text: str) -> str:
 
 
 async def _reply(message: discord.Message, text: str, as_reply: bool = False, embed=None) -> None:
+    # Nothing to say = nothing posted. A blank reply used to go out as an empty
+    # message with just the bot's name on it.
+    if embed is None and not str(text or "").strip():
+        return
+    embed = _auto_embed(text, embed)
     kwargs = {"embed": embed} if embed is not None else {"content": _clip(text)}
     try:
         if as_reply:
