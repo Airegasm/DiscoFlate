@@ -78,11 +78,20 @@ ok(abs((mg[0]["y"] + mg[0]["w"] / 2) - 0.5) < 0.02, "…and centred vertically")
 ok(any(o["kind"] == "pump_timer" for o in main),
    "…beside its own pump timer, which this install updates itself")
 lbls = " ".join(o.get("text", "") for o in main if o["kind"] == "text")
-ok("[multi_me_name]" in lbls, "the label names the player, live")
+# NOT the player's name. Your own camera tile already says who you are —
+# Discord labels it and the face is yours — so a name here is the one thing on
+# screen that tells a viewer nothing they don't have. The number is what
+# Discord cannot show, so that is what the label carries.
+ok("[multi_me_name]" not in lbls, "your own tile does not re-label you")
+ok("[multi_my_pct]" in lbls and "[multi_my_target]" in lbls,
+   "…it carries your meter against your own line, which Discord cannot show")
 
 # ---- the pre-shows --------------------------------------------------------- #
 stages = (BV.get("golive") or {}).get("stages") or []
-ok(len(stages) >= 2, "Go Live has an intro AND a round intro — the 'intro2'")
+# One stage for now. The second was a video slot with no file in it; a
+# pre-show that plays nothing is worse than no pre-show, so it went rather
+# than sitting there waiting to be filled.
+ok(len(stages) >= 1, "Go Live opens with an intro")
 ok(all(st["group"] in groups for st in stages),
    "…and every stage names a group the scene has")
 ok((BV.get("golive") or {}).get("after_group") == "Main",
@@ -344,10 +353,13 @@ ok(introgroups and introgroups <= groups,
 
 r1 = [r for r in ship if r["name"] == "Round 1"][0]
 seq = [b["type"] for b in r1["actions"]]
-ok(seq == ["repeat", "overlay", "repeat", "overlay"],
-   "Round 1 is four spins, a video, four more, a video")
+# It was four spins, a video, four more, a video. With the videos gone the two
+# halves had nothing between them, so they are one loop of eight — two
+# back-to-back repeats of four is just a confusing way to write that.
+ok(seq == ["repeat"], "Round 1 is one loop")
+ok(int(float(r1["actions"][0]["iterations"])) == 8, "…of eight spins")
 ok(r1["until"] == "count" and r1["count"] == 1,
-   "…run once, because the sequence already says four-and-four")
+   "…run once, because the loop already says eight")
 r2 = [r for r in ship if r["name"] == "Round 2"][0]
 ok(r2["until"] == "count" and r2["count"] == 6,
    "Round 2 is one match, run six times — the round itself is the loop")

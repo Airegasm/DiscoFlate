@@ -644,7 +644,7 @@
         {
           "type": "repeat",
           "mode": "fixed",
-          "iterations": "4",
+          "iterations": "8",
           "max_iterations": "100",
           "actions": [
             {
@@ -652,32 +652,6 @@
               "action": "MultiRoulette"
             }
           ]
-        },
-        {
-          "type": "overlay",
-          "overlay": "bvVidR1a",
-          "mode": "once",
-          "fade_in": 0.2,
-          "fade_out": 0.3
-        },
-        {
-          "type": "repeat",
-          "mode": "fixed",
-          "iterations": "4",
-          "max_iterations": "100",
-          "actions": [
-            {
-              "type": "mp_action",
-              "action": "MultiRoulette"
-            }
-          ]
-        },
-        {
-          "type": "overlay",
-          "overlay": "bvVidR1b",
-          "mode": "once",
-          "fade_in": 0.2,
-          "fade_out": 0.3
         }
       ],
       "done_message": "✅ **[multi_round_name]** done."
@@ -6915,14 +6889,11 @@
         "Round Intro",
         "Main",
         "Result",
-        "Intro Video",
-        "Round Video",
         "Pause"
       ],
       "hidden_groups": [],
       "intro_groups": [
-        "Intro",
-        "Intro Video"
+        "Intro"
       ],
       "overlays": [
         {
@@ -7133,7 +7104,7 @@
           "color": "#ffffff",
           "font": "bold",
           "bg": "",
-          "text": "[multi_me_name] · [multi_my_pct]% of [multi_my_target]%",
+          "text": "[multi_my_pct]% of [multi_my_target]%",
           "slide_in": false,
           "slide_in_dir": "right",
           "slide_in_secs": 0.45
@@ -7247,118 +7218,6 @@
           "slide_in_secs": 0.35
         },
         {
-          "id": "bvVidIntro",
-          "label": "Intro video",
-          "kind": "media",
-          "media": "",
-          "x": 0.0,
-          "y": 0.0,
-          "w": 1.0,
-          "mode": "once",
-          "seconds": 0,
-          "layer": "",
-          "rot": 0,
-          "flash": 0,
-          "visible": false,
-          "group": "Intro Video",
-          "z": 50,
-          "opacity": 100,
-          "delay": 0,
-          "size": 0.16,
-          "color": "#ffffff",
-          "font": "bold",
-          "bg": "",
-          "text": "",
-          "slide_in": false,
-          "slide_in_dir": "right",
-          "slide_in_secs": 0.45,
-          "h": 1.0
-        },
-        {
-          "id": "bvVidR1a",
-          "label": "Round 1 · first video",
-          "kind": "media",
-          "media": "",
-          "x": 0.0,
-          "y": 0.0,
-          "w": 1.0,
-          "mode": "once",
-          "seconds": 0,
-          "layer": "",
-          "rot": 0,
-          "flash": 0,
-          "visible": false,
-          "group": "Round Video",
-          "z": 50,
-          "opacity": 100,
-          "delay": 0,
-          "size": 0.16,
-          "color": "#ffffff",
-          "font": "bold",
-          "bg": "",
-          "text": "",
-          "slide_in": false,
-          "slide_in_dir": "right",
-          "slide_in_secs": 0.45,
-          "h": 1.0
-        },
-        {
-          "id": "bvVidR1b",
-          "label": "Round 1 · second video",
-          "kind": "media",
-          "media": "",
-          "x": 0.0,
-          "y": 0.0,
-          "w": 1.0,
-          "mode": "once",
-          "seconds": 0,
-          "layer": "",
-          "rot": 0,
-          "flash": 0,
-          "visible": false,
-          "group": "Round Video",
-          "z": 50,
-          "opacity": 100,
-          "delay": 0,
-          "size": 0.16,
-          "color": "#ffffff",
-          "font": "bold",
-          "bg": "",
-          "text": "",
-          "slide_in": false,
-          "slide_in_dir": "right",
-          "slide_in_secs": 0.45,
-          "h": 1.0
-        },
-        {
-          "id": "bvVidR2",
-          "label": "Round 2 · video",
-          "kind": "media",
-          "media": "",
-          "x": 0.0,
-          "y": 0.0,
-          "w": 1.0,
-          "mode": "once",
-          "seconds": 0,
-          "layer": "",
-          "rot": 0,
-          "flash": 0,
-          "visible": false,
-          "group": "Round Video",
-          "z": 50,
-          "opacity": 100,
-          "delay": 0,
-          "size": 0.16,
-          "color": "#ffffff",
-          "font": "bold",
-          "bg": "",
-          "text": "",
-          "slide_in": false,
-          "slide_in_dir": "right",
-          "slide_in_secs": 0.45,
-          "h": 1.0
-        },
-        {
           "id": "bvNotify",
           "label": "Notification",
           "kind": "text",
@@ -7445,17 +7304,6 @@
           {
             "group": "Intro",
             "seconds": 15
-          },
-          {
-            "group": "Intro Video",
-            "seconds": 0,
-            "actions": [
-              {
-                "type": "overlay",
-                "overlay": "bvVidIntro",
-                "mode": "once"
-              }
-            ]
           }
         ],
         "seconds": 15,

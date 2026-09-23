@@ -88,7 +88,7 @@ ok(gl.get("after_group") == "Main",
    "…and Go Live switches to it: one layout, nothing to choose at match time")
 
 intro = [g for g in (SCENE.get("intro_groups") or [])]
-ok(set(intro) == {"Intro", "Intro Video"}, "both intro groups are FLAGGED as intro")
+ok(intro == ["Intro"], "the intro group is FLAGGED as intro")
 ok(all(str(st.get("group")) in intro for st in (gl.get("stages") or [])),
    "…and every Go Live stage names one of them — an unflagged stage group is "
    "offered by nothing and plays during normal gameplay")
@@ -193,17 +193,18 @@ apps = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 ok('("media", "audio")' in apps and "has no media file yet" in apps,
    "a media overlay with no file is skipped the way a missing id already is")
 
-# and the shipped videos are exactly that case — placeholders, not breakage
-blank = [o["id"] for o in SCENE["overlays"]
-         if o.get("kind") == "media" and not str(o.get("media") or "").strip()]
-ok(blank, "the versus kit ships video slots with no file yet")
+# The video slots are gone for now, so nothing in the kit relies on the skip —
+# it stays because the next empty slot will, and because a scene you are still
+# building should never be the thing that stops a match.
+ok(not [o for o in SCENE["overlays"]
+        if o.get("kind") == "media" and not str(o.get("media") or "").strip()],
+   "no half-built media slots ship in the versus kit")
 called = {r.get("overlay") for a in list(ACTS.values()) + [{"actions": END["actions"]}]
           for r in walk(a["actions"]) if r.get("type") == "overlay"}
 for r in CFG.get("mp_rounds") or []:
     called |= {x.get("overlay") for x in walk(r.get("actions")) if x.get("type") == "overlay"}
-ok(set(blank) & called,
-   "…and rounds really do call them, so the skip is the thing keeping a match "
-   "running rather than an untested path")
+ok(called <= set(CARDS),
+   "every overlay any round or action calls still exists in the scene")
 
 # ---- the lose-at capacity is tested EVERY PASS ----------------------------- #
 # A round of six duels can carry somebody past it on the second one. Testing
