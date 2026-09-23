@@ -75,6 +75,7 @@ GAMEPLAY_KEYS = [
     "listener_on_embed", "listener_on_title", "listener_off_embed", "listener_off_title",
     "pause_message", "resume_message", "paused_notice_message",
     "pause_embed", "pause_title",
+    "resume_embed", "resume_title",
     "output_headers", "rich_output",
     "capacity_ranges", "always_on_enabled", "always_on_commands",
     # Events tab
@@ -160,7 +161,7 @@ DEFAULTS = {
     # The !pumptimer built-in reply (always available). Placeholders: [timer]/[total_secs].
     "pumptimer_message": "⏱️ [timer] seconds left on the pump timer.",
     # Per-message embed toggles + titlebars for the built-in replies/broadcasts.
-    "capacity_embed": False, "capacity_title": "",
+    "capacity_embed": True, "capacity_title": "📊 Capacity",
     "pumptimer_embed": False, "pumptimer_title": "",
     "cooldown_embed": False, "cooldown_title": "",
     "pump_embed": False, "pump_title": "",
@@ -180,10 +181,10 @@ DEFAULTS = {
     "listener_message_on": "",
     "listener_message_off": "",
     # Post the ON/OFF message as an embed with this titlebar (blank = default).
-    "listener_on_embed": False,
-    "listener_on_title": "",
-    "listener_off_embed": False,
-    "listener_off_title": "",
+    "listener_on_embed": True,
+    "listener_on_title": "🟢 Session LIVE",
+    "listener_off_embed": True,
+    "listener_off_title": "🔴 Session ended",
 
     # Session pause (the dashboard STOP/RESUME button). While paused every
     # device-on path is latched off, running fires/events/minigames are
@@ -197,8 +198,14 @@ DEFAULTS = {
     # Reply to someone who runs a command while paused (per-user, buffered).
     "paused_notice_message": "⏸️ [mention], the session is paused — hang tight until the operator resumes.",
     # ONE embed toggle + titlebar shared by all three pause/resume messages.
-    "pause_embed": False,
-    "pause_title": "",
+    "pause_embed": True,
+    "pause_title": "⏸ Paused",
+    # Announcement-style messages that stand on their own read better as a
+    # card; short replies to a command stay PLAIN so the channel isn't a wall
+    # of boxes — that's why the paused notice and the two event rejections
+    # deliberately have no toggle. Resume pairs with Pause, so it matches it.
+    "resume_embed": True,
+    "resume_title": "▶ Resumed",
 
     # The single server + channel the bot listens on (legacy / primary).
     # listen_channel_id "" = any channel in the selected server.

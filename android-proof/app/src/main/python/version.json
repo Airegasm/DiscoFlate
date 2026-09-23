@@ -1,6 +1,6 @@
 {
-  "version": "3.80.0",
-  "versionCode": 168,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.80.0/discoflate-v3.80.0.apk",
-  "notes": "DiscoFlate v3.80.0 \u2014 intro stages get their own action blocks; the shipped scenes are GENERATED rather than stored (rename Your Scene to claim it); Templates move to Triggers with five new categories; Device Sync is now PC \u2194 Android Config Sync; and the shipped scenes come furnished \u2014 two polls with chat buttons, capacity events at 20/50/70/90, a competition, a bonus round, broadcasts, a mode, and one template of every kind."
+  "version": "3.81.0",
+  "versionCode": 169,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.81.0/discoflate-v3.81.0.apk",
+  "notes": "DiscoFlate v3.81.0 \u2014 embeds are consistent now. Anything the bot says about the SESSION is a card (capacity, going live, going dark, pause, resume, the auto-report); anything that replies to something a person just did stays plain text. Resume had been borrowing Pause's tickbox and now has its own."
 }

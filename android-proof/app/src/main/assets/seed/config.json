@@ -17,8 +17,8 @@
     "vote": "agvote"
   },
   "pumptimer_message": "\u23f1\ufe0f [timer] seconds left on the pump timer.",
-  "capacity_embed": false,
-  "capacity_title": "",
+  "capacity_embed": true,
+  "capacity_title": "\ud83d\udcca Capacity",
   "pumptimer_embed": false,
   "pumptimer_title": "",
   "cooldown_embed": false,
@@ -29,17 +29,17 @@
   "capacity_message": "[announce] - Current Capacity: **[capacity]%**\n[capacity_bar]",
   "listener_message_on": "[Bot Status] **[operator]'s DiscoFlate Inflation Bot is now LIVE!**\n[commands]\n",
   "listener_message_off": "[Bot Status] **[operator]'s DiscoFlate Inflation Bot is now OFFLINE after running for [uptime]**\n[toppump]\n**Thanks for pumping!**",
-  "listener_on_embed": false,
-  "listener_on_title": "",
-  "listener_off_embed": false,
-  "listener_off_title": "",
+  "listener_on_embed": true,
+  "listener_on_title": "\ud83d\udfe2 Session LIVE",
+  "listener_off_embed": true,
+  "listener_off_title": "\ud83d\udd34 Session ended",
   "session_paused": false,
   "session_paused_by": "",
   "pause_message": "\u23f8\ufe0f **Session paused** by [user] \u2014 pumps are off and commands are disabled until the operator resumes.",
   "resume_message": "\u25b6\ufe0f **Session resumed** by [user] \u2014 pump away!",
   "paused_notice_message": "\u23f8\ufe0f [mention], the session is paused \u2014 hang tight until the operator resumes.",
-  "pause_embed": false,
-  "pause_title": "",
+  "pause_embed": true,
+  "pause_title": "\u23f8 Paused",
   "listen_guild_id": "",
   "listen_channel_id": "",
   "listen_targets": [],
@@ -432,8 +432,8 @@
     "enabled": true,
     "seconds": 300,
     "message": "\ud83d\udccb **Bot Report** \u2014 **[operator]'s DiscoFlate Inflation Bot is now LIVE! ([uptime])**\n\n[announce] - Current Capacity: **[capacity]%**\n[capacity_bar]\n\n**[syscom_help]** for a list of commands.",
-    "embed": false,
-    "title": ""
+    "embed": true,
+    "title": "\ud83d\udccb Bot Report"
   },
   "announce_channel_id": "",
   "roll": {
@@ -2443,8 +2443,8 @@
         "pumptimer_message": "\u23f1\ufe0f [timer] seconds left on the pump timer.",
         "pump_message": "**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
         "cooldown_message": "\u23f3 [mention], [cmd] is on cooldown \u2014 [cooldown]s left until you can use it again.",
-        "capacity_embed": false,
-        "capacity_title": "",
+        "capacity_embed": true,
+        "capacity_title": "\ud83d\udcca Capacity",
         "pumptimer_embed": false,
         "pumptimer_title": "",
         "cooldown_embed": false,
@@ -3126,20 +3126,20 @@
           "enabled": true,
           "seconds": 300,
           "message": "\ud83d\udccb **Bot Report** \u2014 **[operator]'s DiscoFlate Inflation Bot is now LIVE! ([uptime])**\n\n[announce] - Current Capacity: **[capacity]%**\n[capacity_bar]\n\n**[syscom_help]** for a list of commands.",
-          "embed": false,
-          "title": ""
+          "embed": true,
+          "title": "\ud83d\udccb Bot Report"
         },
         "listener_message_on": "[Bot Status] **[operator]'s DiscoFlate Inflation Bot is now LIVE!**\n[commands]\n",
         "listener_message_off": "[Bot Status] **[operator]'s DiscoFlate Inflation Bot is now OFFLINE after running for [uptime]**\n[toppump]\n**Thanks for pumping!**",
-        "listener_on_embed": false,
-        "listener_on_title": "",
-        "listener_off_embed": false,
-        "listener_off_title": "",
+        "listener_on_embed": true,
+        "listener_on_title": "\ud83d\udfe2 Session LIVE",
+        "listener_off_embed": true,
+        "listener_off_title": "\ud83d\udd34 Session ended",
         "pause_message": "\u23f8\ufe0f **Session paused** by [user] \u2014 pumps are off and commands are disabled until the operator resumes.",
         "resume_message": "\u25b6\ufe0f **Session resumed** by [user] \u2014 pump away!",
         "paused_notice_message": "\u23f8\ufe0f [mention], the session is paused \u2014 hang tight until the operator resumes.",
-        "pause_embed": false,
-        "pause_title": "",
+        "pause_embed": true,
+        "pause_title": "\u23f8 Paused",
         "output_headers": true,
         "rich_output": true,
         "capacity_ranges": [
@@ -4545,7 +4545,9 @@
             "intro_title": "",
             "start_events": []
           }
-        ]
+        ],
+        "resume_embed": true,
+        "resume_title": "\u25b6 Resumed"
       },
       "golive": {
         "intro_enabled": true,
@@ -4821,8 +4823,8 @@
         "pumptimer_message": "\u23f1\ufe0f [timer] seconds left on the pump timer.",
         "pump_message": "**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
         "cooldown_message": "\u23f3 [mention], [cmd] is on cooldown \u2014 [cooldown]s left until you can use it again.",
-        "capacity_embed": false,
-        "capacity_title": "",
+        "capacity_embed": true,
+        "capacity_title": "\ud83d\udcca Capacity",
         "pumptimer_embed": false,
         "pumptimer_title": "",
         "cooldown_embed": false,
@@ -5504,20 +5506,20 @@
           "enabled": true,
           "seconds": 300,
           "message": "\ud83d\udccb **Bot Report** \u2014 **[operator]'s DiscoFlate Inflation Bot is now LIVE! ([uptime])**\n\n[announce] - Current Capacity: **[capacity]%**\n[capacity_bar]\n\n**[syscom_help]** for a list of commands.",
-          "embed": false,
-          "title": ""
+          "embed": true,
+          "title": "\ud83d\udccb Bot Report"
         },
         "listener_message_on": "[Bot Status] **[operator]'s DiscoFlate Inflation Bot is now LIVE!**\n[commands]\n",
         "listener_message_off": "[Bot Status] **[operator]'s DiscoFlate Inflation Bot is now OFFLINE after running for [uptime]**\n[toppump]\n**Thanks for pumping!**",
-        "listener_on_embed": false,
-        "listener_on_title": "",
-        "listener_off_embed": false,
-        "listener_off_title": "",
+        "listener_on_embed": true,
+        "listener_on_title": "\ud83d\udfe2 Session LIVE",
+        "listener_off_embed": true,
+        "listener_off_title": "\ud83d\udd34 Session ended",
         "pause_message": "\u23f8\ufe0f **Session paused** by [user] \u2014 pumps are off and commands are disabled until the operator resumes.",
         "resume_message": "\u25b6\ufe0f **Session resumed** by [user] \u2014 pump away!",
         "paused_notice_message": "\u23f8\ufe0f [mention], the session is paused \u2014 hang tight until the operator resumes.",
-        "pause_embed": false,
-        "pause_title": "",
+        "pause_embed": true,
+        "pause_title": "\u23f8 Paused",
         "output_headers": true,
         "rich_output": true,
         "capacity_ranges": [
@@ -6923,7 +6925,9 @@
             "intro_title": "",
             "start_events": []
           }
-        ]
+        ],
+        "resume_embed": true,
+        "resume_title": "\u25b6 Resumed"
       },
       "golive": {
         "intro_enabled": true,
@@ -6970,5 +6974,7 @@
   },
   "vcam_last": {},
   "pause_overlay": "Pause",
-  "notify_overlay": "dfdefnotify"
+  "notify_overlay": "dfdefnotify",
+  "resume_embed": true,
+  "resume_title": "\u25b6 Resumed"
 }

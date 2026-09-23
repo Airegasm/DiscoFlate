@@ -4830,7 +4830,7 @@ class Engine:
             except Exception as e:  # noqa: BLE001
                 self._log("error", f"pause overlay clear failed: {e}")
         tmpl = self.cfg.get("resume_message") or "▶️ **Session resumed** by [user] — pump away!"
-        await self._announce_maybe_embed("pause", self.render(tmpl, {"user": who, "mention": who}),
+        await self._announce_maybe_embed("resume", self.render(tmpl, {"user": who, "mention": who}),
                                          "▶️ Session resumed")
         return {"ok": True, "paused": False}
 

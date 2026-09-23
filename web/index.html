@@ -689,6 +689,7 @@
             <textarea id="pauseMsg" rows="3" placeholder="⏸️ Session paused by [user]…"></textarea></label>
           <label class="field">Resumed broadcast
             <textarea id="resumeMsg" rows="3" placeholder="▶️ Session resumed by [user]…"></textarea></label>
+          <div class="row" style="gap:10px;align-items:flex-end;margin-top:4px"><label class="row" style="gap:6px;white-space:nowrap"><input type="checkbox" id="resumeEmbed" style="width:auto" onchange="scheduleSave()"> embed</label><label class="field" style="flex:1">Titlebar <input id="resumeTitle" placeholder="▶ Resumed" onchange="scheduleSave()"></label></div>
           <label class="field">Paused notice <span class="muted">(reply to a command while paused)</span>
             <input id="pausedNoticeMsg" placeholder="⏸️ [mention], the session is paused…"></label>
         </div>
@@ -4147,6 +4148,8 @@ async function saveAutomation(){
     pause_message: $('#pauseMsg').value,
     pause_embed: $('#pauseEmbed')?$('#pauseEmbed').checked:false,
     pause_title: $('#pauseTitle')?$('#pauseTitle').value:'',
+    resume_embed: $('#resumeEmbed')?$('#resumeEmbed').checked:false,
+    resume_title: $('#resumeTitle')?$('#resumeTitle').value:'',
     resume_message: $('#resumeMsg').value,
     paused_notice_message: $('#pausedNoticeMsg').value,
     output_headers: $('#outputHeaders').checked,
@@ -6527,6 +6530,7 @@ function applyState(st, full){
     $('#autoMessage').value = ar.message||'';
     if($('#autoEmbed')){ $('#autoEmbed').checked = !!ar.embed; $('#autoTitle').value = ar.title||''; }
     if($('#pauseEmbed')){ $('#pauseEmbed').checked = !!st.pause_embed; $('#pauseTitle').value = st.pause_title||''; }
+    if($('#resumeEmbed')){ $('#resumeEmbed').checked = !!st.resume_embed; $('#resumeTitle').value = st.resume_title||''; }
     $('#listenerOn').value = st.listener_message_on||'';
     $('#listenerOff').value = st.listener_message_off||'';
     if($('#listenerOnEmbed')){ $('#listenerOnEmbed').checked = !!st.listener_on_embed; $('#listenerOnTitle').value = st.listener_on_title||''; }
@@ -6806,6 +6810,8 @@ function gatherConfig(){
     pause_message: $('#pauseMsg') ? $('#pauseMsg').value : '',
     pause_embed: $('#pauseEmbed')?$('#pauseEmbed').checked:false,
     pause_title: $('#pauseTitle')?$('#pauseTitle').value:'',
+    resume_embed: $('#resumeEmbed')?$('#resumeEmbed').checked:false,
+    resume_title: $('#resumeTitle')?$('#resumeTitle').value:'',
     resume_message: $('#resumeMsg') ? $('#resumeMsg').value : '',
     paused_notice_message: $('#pausedNoticeMsg') ? $('#pausedNoticeMsg').value : '',
     output_headers: $('#outputHeaders') ? $('#outputHeaders').checked : false,
