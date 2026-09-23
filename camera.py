@@ -135,10 +135,16 @@ class VirtualCam:
         return {"ok": True, "frozen": self._frozen}
 
     def set_mirror(self, on: bool) -> dict:
-        """Flip the whole outgoing frame horizontally (live) — camera AND
-        overlays. Exists to cancel Discord's un-disableable self-view mirror:
-        ON = your own Discord tile reads correctly but viewers see everything
-        mirrored; OFF (default) = viewers get the true image."""
+        """Flip the CAMERA IMAGE horizontally (live). Overlays are drawn on
+        top afterwards, so your text always reads the right way round to
+        viewers whichever way this is set.
+
+        Use it when your camera hands you a reversed picture, or when
+        something in shot (a sign, a label) reads backwards. It is NOT a fix
+        for Discord's self-view: Discord mirrors your own tile and gives no
+        way to disable that, so your overlays will read backwards TO YOU there
+        regardless. Judge your layout in the panel's preview, which is the
+        finished frame exactly as sent."""
         self._mirror = bool(on)
         return {"ok": True, "mirror": self._mirror}
 
@@ -1055,6 +1061,13 @@ class VirtualCam:
                         self._raw = frame
                     frame = frame[:H, :W]
                     mode = self._gate_mode()
+                    if self._mirror:
+                        # The CAMERA IMAGE only, before anything is drawn on it.
+                        # Flipping the finished frame took the overlays with it,
+                        # so turning Mirror on to fix your own Discord tile made
+                        # every viewer read your text backwards. A mirrored face
+                        # is imperceptible; mirrored text is not.
+                        frame = cv2.flip(frame, 1)
                     if self._black or mode != "live":
                         frame = np.zeros_like(frame)
                     if mode == "off":
@@ -1066,13 +1079,6 @@ class VirtualCam:
                         self._standby(frame)
                     else:
                         frame = self._composite(frame, intro=(mode == "intro"))
-                    if self._mirror:
-                        # Flip the FINISHED frame (camera + overlays together).
-                        # Discord mirrors your own self-view and offers no way
-                        # to turn that off, so this exists to cancel it: ON =
-                        # your Discord tile reads correctly, viewers see
-                        # everything mirrored. OFF (default) = viewers correct.
-                        frame = cv2.flip(frame, 1)
                     self._last = frame   # cap.read() hands out fresh arrays
                     cam.send(cv2.cvtColor(frame, cv2.COLOR_BGR2YUV_I420) if i420
                              else cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
