@@ -1,6 +1,6 @@
 {
-  "version": "3.81.0",
-  "versionCode": 169,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.81.0/discoflate-v3.81.0.apk",
-  "notes": "DiscoFlate v3.81.0 \u2014 embeds are consistent now. Anything the bot says about the SESSION is a card (capacity, going live, going dark, pause, resume, the auto-report); anything that replies to something a person just did stays plain text. Resume had been borrowing Pause's tickbox and now has its own."
+  "version": "3.81.1",
+  "versionCode": 170,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.81.1/discoflate-v3.81.1.apk",
+  "notes": "DiscoFlate v3.81.1 \u2014 fixes a stream that went out mirrored. /api/state reported vcam_mirror as True for an absent key while every other reader defaulted it False, so the panel ticked its own \ud83e\ude9e Mirror box and passed it into camera.start(): your own Discord tile looked right while everyone else saw the feed backwards. Leave Mirror OFF \u2014 Discord mirrors your own tile no matter what, so use the panel's preview to check your look."
 }

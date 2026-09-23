@@ -334,7 +334,12 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "scene_globals": cfg.get("scene_globals") or [],
         "scene_globals_meta": cfg.get("scene_globals_meta") or {},
         "chat_scene": cfg.get("chat_scene", ""),
-        "vcam_mirror": bool(cfg.get("vcam_mirror", True)),
+        # Default FALSE, like config_store and set_mirror. Reporting True for
+        # an absent key made the panel tick its own Mirror box, and vcamStart
+        # passes that tick straight into camera.start(mirror=...) — so the feed
+        # went out flipped to viewers while the operator's own Discord tile
+        # (which Discord mirrors anyway) looked correct.
+        "vcam_mirror": bool(cfg.get("vcam_mirror", False)),
         "standby_text": cfg.get("standby_text", "STARTING SOON"),
         # How long each scene group needs on screen before it cuts its own
         # content off, so a stage can't be set shorter than the clip it plays.
