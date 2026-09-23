@@ -472,6 +472,13 @@ class Session:
         # Who gave up, and why — set on BOTH installs so either can narrate it.
         self.conceded = ""
         self.conceded_why = ""
+        # THE LOSE-AT CAPACITY, agreed at invite time and held by BOTH sides.
+        #
+        # Each install watches its OWN meter against it, on its own clock. The
+        # host does not police the guest: it only ever sees a rounded number a
+        # heartbeat late, while the guest knows its own exactly and instantly.
+        # The machine that crosses the line is the machine that says so.
+        self.end_max = 0.0
         self.peer_caps = []
         self.peer_install = ""
         self.peer_pref = "either"
@@ -625,6 +632,7 @@ class Session:
         # number is only settled once they do.
         self.split_offer = bool(split)
         self.base_target = float(_num(base_target) or 0)
+        self.end_max = float(_num(cap) or 0)
         self.game = str(game)
         self.input = str(input or "operators")
         self.ready_me = self.ready_peer = False
@@ -726,6 +734,9 @@ class Session:
                              "the header to accept an invite")
             return out
         self.link.bind(self.link.peer, sid, ROLE_GUEST, state=S_LINKED)
+        # The host's number becomes the guest's own, so both watch the same
+        # line without having to ask each other where it is.
+        self.end_max = float(_num(self.invite.get("cap")) or 0)
         self.game = str(self.invite.get("game") or "")
         self.input = str(self.invite.get("input") or "operators")
         self.cost = str(self.invite.get("cost") or "")
@@ -906,6 +917,23 @@ class Session:
         out.dirty = True
         return out
 
+    def check_end(self, now: float, capacity=None) -> Out:
+        """Have I reached the line? Then I have lost, and I say so.
+
+        Run on BOTH installs, on each one's own clock — the same place any
+        other live capacity threshold would be watched. Deliberately only ever
+        tests THIS install's own meter: the other machine's number arrives
+        rounded and a heartbeat late, and a match must not be decided on a
+        stale copy of a meter its owner holds exactly.
+        """
+        out = Out()
+        if self.link.state not in LIVE or self.conceded or self.end_max <= 0:
+            return out
+        cap = _num(self.capacity if capacity is None else capacity)
+        if cap is None or float(cap) < self.end_max:
+            return out
+        return out.merge(self.concede(now, f"reached {self.end_max:g}%"))
+
     def concede(self, now: float, why: str = "conceded", who: str = "") -> Out:
         """Give up. Tells the other bot, and leaves the match STANDING.
 
@@ -968,6 +996,7 @@ class Session:
         the rig cannot keep a calibration it only agreed to for one match.
         """
         self.conceded = self.conceded_why = ""
+        self.end_max = 0.0
         if self.cal_before is not None:
             back = self.cal_before
             self.cal_before = None
@@ -1323,6 +1352,7 @@ class Session:
                      # rig would come back still tuned to the other person's
                      # match, with nothing left that knows what it used to be.
                      "cal": self.calibration, "cal_before": self.cal_before,
+                     "end_max": self.end_max,
                      "ready_me": self.ready_me, "ready_peer": self.ready_peer})
         return snap
 
@@ -1342,6 +1372,7 @@ class Session:
         self.paced = bool(snap.get("paced", True))
         self.ready_me = bool(snap.get("ready_me"))
         self.ready_peer = bool(snap.get("ready_peer"))
+        self.end_max = float(_num(snap.get("end_max")) or 0)
         if _num(snap.get("cal_before")) is not None:
             self.cal_before = float(_num(snap.get("cal_before")))
             self.calibration = float(_num(snap.get("cal")) or self.calibration)

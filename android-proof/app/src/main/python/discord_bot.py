@@ -2846,6 +2846,12 @@ class BotManager:
         for i in range(cap):
             if s.state != mp.S_MATCH:
                 return False
+            # EVERY PASS, not just between rounds. A round of six duels can
+            # carry somebody past the lose-at capacity on the second one, and a
+            # match that kept playing until the round happened to finish would
+            # be ignoring the only thing that ends it.
+            if await self._mp_end_check():
+                return False
             if mp_games.round_cleared(rnd, self._mp_caps(), until, passes=i):
                 cleared = True
                 break
@@ -3239,6 +3245,18 @@ class BotManager:
                 # The panel's own meter reads off the session, so keep it live:
                 # the host never pushes `tele`, so nothing else would update it.
                 s.capacity = float(self.engine.capacity)
+                # LIVE CAPACITY WATCH, on this install's own clock — four times
+                # a second, on BOTH machines. The lose-at line is the first
+                # thing watched here and anything else that has to react to a
+                # meter crossing a number belongs here too: a round's pass loop
+                # only comes round between actions, which can be a 15-second
+                # wait, and a pump does not stop climbing while it waits.
+                if s.state in mp.LIVE and not s.conceded:
+                    ended = s.check_end(now)
+                    if ended:
+                        await self._link_apply(ended)
+                        await self._mp_run_end()
+                        continue
                 if not s.advertising and self._mp_chan(cfg, "bot_network") \
                         and s.state == mp.S_IDLE and not self._link_resume:
                     await self._link_apply(s.start_advertising(now))

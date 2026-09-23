@@ -205,6 +205,18 @@ ok(set(blank) & called,
    "…and rounds really do call them, so the skip is the thing keeping a match "
    "running rather than an untested path")
 
+# ---- the lose-at capacity is tested EVERY PASS ----------------------------- #
+# A round of six duels can carry somebody past it on the second one. Testing
+# only between rounds would keep playing until the round happened to finish,
+# ignoring the only thing that ends a match.
+drv = bot[bot.index("async def _run_round"):]
+drv = drv[:drv.index("async def ", 10)]
+ok("_mp_end_check" in drv,
+   "the pass loop tests the end condition, not just the round boundary")
+ok(drv.index("_mp_end_check") < drv.index("round_cleared"),
+   "…before the clear-test, so a match that is already over does not run "
+   "one more pass first")
+
 # ---- the announced number is the number that fires ------------------------- #
 rps = ACTS["MultiRPS"]["actions"]
 stake = next(r for r in walk(rps) if r.get("type") == "var")

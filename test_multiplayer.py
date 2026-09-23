@@ -607,6 +607,60 @@ G.role_pref = mp.ROLE_GUEST
 b.post(G.respond(T, True, video=True)); b.settle(T)
 ok(G.link.state == mp.S_LINKED, "…and taking the guest seat lets it through")
 
+# ---- the lose-at line is held by BOTH, watched by EACH ---------------------- #
+# The host must not police the guest: it only ever sees a rounded meter a
+# heartbeat late, while the guest holds its own exactly and instantly. So the
+# machine that crosses the line is the machine that says so.
+H, G, b = paired(60.0, 60.0)
+b.post(H.offer(T, game="Cap", base_target=100, cap=145)); b.settle(T)
+ok(H.end_max == 145, "the host holds the number it offered")
+ok(G.invite.get("cap") == 145, "…and it travels in the invite")
+b.post(G.respond(T, True, video=True)); b.settle(T)
+ok(G.end_max == 145, "…and becomes the guest's OWN once accepted")
+
+b.post(H.arm(T)); b.post(G.arm(T)); b.settle(T)
+b.post(H.begin(T)); b.settle(T)
+
+ok(not G.check_end(T, capacity=144.9), "under the line, nothing happens")
+out = G.check_end(T, capacity=145)
+ok(out.send and G.conceded == G.link.me,
+   "the GUEST names itself the loser the moment its own meter reaches it")
+ok("145" in G.conceded_why, "…with the reason in words")
+b.post(out); b.settle(T)
+ok(H.conceded == G.link.me,
+   "…and the host learns it from the wire rather than from watching a stale copy")
+
+# the host's own line works the same way, from its own meter
+H2, G2b, b2 = paired(60.0, 60.0)
+b2.post(H2.offer(T, game="Cap", base_target=100, cap=145)); b2.settle(T)
+b2.post(G2b.respond(T, True, video=True)); b2.settle(T)
+b2.post(H2.arm(T)); b2.post(G2b.arm(T)); b2.settle(T)
+b2.post(H2.begin(T)); b2.settle(T)
+b2.post(H2.check_end(T, capacity=200)); b2.settle(T)
+ok(H2.conceded == H2.link.me and G2b.conceded == H2.link.me,
+   "the host reaching it loses too — it is a lose condition, not a finish line")
+
+# it cannot fire twice, and it is gone when the match is
+H3, G3, b3 = paired(60.0, 60.0)
+b3.post(H3.offer(T, game="Cap", base_target=100, cap=145)); b3.settle(T)
+b3.post(G3.respond(T, True, video=True)); b3.settle(T)
+b3.post(H3.arm(T)); b3.post(G3.arm(T)); b3.settle(T)
+b3.post(H3.begin(T)); b3.settle(T)
+b3.post(G3.check_end(T, capacity=150)); b3.settle(T)
+ok(not G3.check_end(T, capacity=150).send,
+   "a meter still over the line does not concede again every quarter second")
+G3.abort(T, "done")
+ok(G3.end_max == 0 and not G3.conceded, "the match ending clears the line with it")
+
+# no line set = no capacity ending at all
+H4, G4, b4 = paired(60.0, 60.0)
+b4.post(H4.offer(T, game="NoCap", base_target=100)); b4.settle(T)
+b4.post(G4.respond(T, True, video=True)); b4.settle(T)
+b4.post(H4.arm(T)); b4.post(G4.arm(T)); b4.settle(T)
+b4.post(H4.begin(T)); b4.settle(T)
+ok(G4.end_max == 0 and not G4.check_end(T, capacity=9999).send,
+   "with no lose-at number, no capacity ends it — conceding is the only way out")
+
 print(f"{P} passed, {len(F)} failed")
 for f in F:
     print("  FAIL:", f)
