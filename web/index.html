@@ -277,6 +277,8 @@
                   border:1px solid var(--line);border-radius:6px;padding:1px 6px;cursor:pointer}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--off)}
   .dot.on{background:var(--on);box-shadow:0 0 8px var(--on)}
+  /* 👁 Hide cam, while the camera image is blanked */
+  #vcamHide.on{color:#fff;border-color:transparent;background:#b4453c}
   .dot.bad{background:var(--bad)}
   /* master switch */
   .switch{position:relative;display:inline-block;width:58px;height:32px}
@@ -435,6 +437,8 @@
          <div class="row vcamrow" style="gap:8px;align-items:center;margin-top:8px">
           <button onclick="vcamStart()">▶ Start virtual cam</button>
           <button class="ghost" onclick="vcamStop()">⏹ Stop</button>
+          <button class="ghost" id="vcamHide" onclick="vcamHideToggle()"
+                  title="blank the CAMERA IMAGE while the overlays keep playing — the frame is blacked out before anything is composited, so you can lay a scene out and watch it live without the room in shot">👁 Hide cam</button>
           <button class="ghost" onclick="vcamDetect()">🔍 Detect</button>
           <button class="ghost" onclick="vcamDriver()" title="check the virtual-camera driver; offers a one-click install when it's missing">🩺 Driver</button>
           <span class="muted" id="vcamMsg" style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span>
@@ -2124,10 +2128,30 @@ async function vcamSectionInit(){
 // previews at THIS, so overlay sizes on the canvas match the outgoing feed.
 let vcamLive = {w:0, h:0};
 function vcamLiveSet(st){
+  if(st && st.hidden !== undefined && st.hidden !== vcamHidden){
+    vcamHidden = !!st.hidden; vcamHideUi();      // the server is the truth
+  }
   const w = +(st&&st.running ? st.width : 0)||0, h = +(st&&st.running ? st.height : 0)||0;
   if(w===vcamLive.w && h===vcamLive.h) return;
   vcamLive = {w, h};
   if(typeof renderStgCanvas==='function') renderStgCanvas();
+}
+// 👁 Hide cam — blank the camera image, keep the overlays. The compositor
+// zeroes the frame BEFORE drawing, so this is the real on-air picture minus
+// the room, not an approximation; better than taping over the webcam because
+// the overlays still tell you what the scene is doing.
+let vcamHidden = false;
+function vcamHideUi(){
+  const b = $('#vcamHide'); if(!b) return;
+  b.textContent = vcamHidden ? '🚫 Cam hidden' : '👁 Hide cam';
+  b.style.opacity = vcamHidden ? 1 : '';
+  b.classList.toggle('on', vcamHidden);
+}
+async function vcamHideToggle(){
+  vcamHidden = !vcamHidden;
+  vcamHideUi();
+  try{ await api('/api/camera/blackout', {on: vcamHidden}); }
+  catch(e){ vcamHidden = !vcamHidden; vcamHideUi(); toastMsg('⚠ '+(e.message||e)); }
 }
 let vcamModes = {};   // device index -> ["WxH", ...] from 🔍 Detect
 async function vcamDetect(){

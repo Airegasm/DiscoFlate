@@ -2237,6 +2237,14 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         b = await _json(request)
         return web.json_response(vcam.set_frozen(bool(b.get("frozen"))))
 
+    async def camera_blackout(request):
+        """Hide the CAMERA IMAGE while the overlays keep playing — the 👁 Hide
+        cam toggle. The frame is blanked before anything is composited, so the
+        scene reads exactly as it will on air without the room in shot."""
+        await guard(request)
+        b = await _json(request)
+        return web.json_response(vcam.set_blackout(bool(b.get("on"))))
+
     async def camera_mirror(request):
         """Flip the camera horizontally, live (the 🪞 toggle). Persisted so the
         pipeline comes back the same way next start."""
@@ -2706,6 +2714,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/camera/stop", camera_stop),
         web.post("/api/camera/mirror", camera_mirror),
         web.post("/api/camera/freeze", camera_freeze),
+        web.post("/api/camera/blackout", camera_blackout),
         web.post("/api/camera/detect", camera_detect),
         web.post("/api/camera/driver", camera_driver),
         web.get("/api/camera/preview", camera_preview),

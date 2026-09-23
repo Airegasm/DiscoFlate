@@ -1,6 +1,6 @@
 {
-  "version": "3.86.0",
-  "versionCode": 184,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.86.0/discoflate-v3.86.0.apk",
-  "notes": "DiscoFlate v3.86.0 \u2014 \ud83c\udfad Scenes tab, properly laid out. The canvas, its controls and the properties panel are one column now, so the two lists beside them run the FULL height of the section, equal to each other, with their right edge on the same gutter the canvas has on the left. \u21a9 Ctrl+Z undoes canvas changes \u2014 move, resize, rotate, add, delete, reorder, any property \u2014 60 deep, and a snapshot taken in one scene can never be applied to another. Clicking an overlay in the list no longer yanks the page down to the properties panel; it sits under the canvas now, already in view. Export/Import Scene move out of the top row into the controls strip under the canvas."
+  "version": "3.87.0",
+  "versionCode": 185,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.87.0/discoflate-v3.87.0.apk",
+  "notes": "DiscoFlate v3.87.0 \u2014 \ud83d\udc41 Hide cam. A one-click toggle on the Chat tab that blanks the CAMERA IMAGE while the overlays keep playing, so you can lay out and rehearse a scene live without the room in shot \u2014 no tape over the webcam. The frame is blacked out BEFORE anything is composited, so what you see is the real on-air picture minus the camera, not an approximation. The compositor already worked this way (Go Live's intro uses it); it simply had no button. The toggle reflects the server, so it survives a panel reload, and it is kept distinct from the automatic blackout that applies whenever you are off air."
 }

@@ -97,7 +97,11 @@ class VirtualCam:
                 "info": self._info, "device": self._device,
                 "width": self._size[0], "height": self._size[1], "fps": self._fps,
                 "mirror": self._mirror, "frozen": self._frozen,
+                # `blackout` is the EFFECTIVE state (off-air counts); `hidden`
+                # is only the manual toggle, which is what a UI button must
+                # reflect or it would look stuck on whenever LIVE is off
                 "blackout": self._black or self._gate_mode() != "live",
+                "hidden": self._black,
                 "gate": self._gate_mode(),
                 "overlays": len(self._overlays)}
 
