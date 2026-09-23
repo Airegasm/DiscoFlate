@@ -125,8 +125,70 @@ class CompetitionEnterView(discord.ui.View):
         if not res.get("ok"):
             await interaction.response.send_message("🚫 " + res.get("error", "can't join"), ephemeral=True)
             return
+        if res.get("wordle"):
+            view = WordleView(self.bot, interaction.user.display_name,
+                              str(interaction.user.id), res["rows"])
+            await interaction.response.send_message(view.text(res["board"]),
+                                                    view=view, ephemeral=True)
+            return
         view = RollerView(self.bot, interaction.user.display_name, res["rolls"], res["rerolls"])
         await interaction.response.send_message(view.text(), view=view, ephemeral=True)
+
+
+class WordleGuessModal(discord.ui.Modal, title="Your guess"):
+    """Text entry for one guess. A modal rather than buttons because 26 letters
+    don't fit on a component row, and typing is the game."""
+
+    word = discord.ui.TextInput(label="Five-letter word", min_length=2,
+                                max_length=12, placeholder="crane", required=True)
+
+    def __init__(self, view):
+        super().__init__()
+        self._view = view
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await self._view.submit(interaction, str(self.word.value))
+
+
+class WordleView(discord.ui.View):
+    """A player's private board in a Wordle competition. Everyone races the
+    SAME answer, so the grid stays ephemeral — a public board would hand the
+    word to the rest of the field."""
+
+    def __init__(self, bot, who, uid, rows):
+        super().__init__(timeout=900)
+        self.bot, self.who, self.uid, self.rows = bot, who, uid, rows
+
+    def text(self, board, head=None):
+        return (head or f"🟩 **Word race** — {self.rows} guesses.") + "\n" + board
+
+    @discord.ui.button(label="✏️ Guess", style=discord.ButtonStyle.success)
+    async def guess_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_modal(WordleGuessModal(self))
+
+    async def submit(self, interaction: discord.Interaction, guess: str):
+        r = self.bot.engine.wordle_guess(self.uid, self.who, guess)
+        if not r.get("ok"):
+            await interaction.response.send_message("🚫 " + r.get("error", "no"), ephemeral=True)
+            return
+        if r.get("done"):
+            for c in self.children:
+                c.disabled = True
+            self.stop()
+            head = (f"🎉 **Solved in {r['used']}** — worth **{r['score']:g}**."
+                    if r.get("solved")
+                    else f"❌ Out of guesses. It was **{r.get('word','').upper()}**.")
+            await interaction.response.edit_message(content=self.text(r["board"], head), view=self)
+            # the channel hears the RESULT, never the word — the rest of the
+            # field is still racing it
+            await self.bot.broadcast(
+                f"🟩 **{self.who}** " + (f"solved it in **{r['used']}**!"
+                                         if r.get("solved") else "ran out of guesses."), None)
+            return
+        left = r["rows"] - r["used"]
+        await interaction.response.edit_message(
+            content=self.text(r["board"], f"🟩 **Word race** — {left} guess{'' if left==1 else 'es'} left."),
+            view=self)
 
 
 class RollerView(discord.ui.View):

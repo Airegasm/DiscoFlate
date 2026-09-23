@@ -1,6 +1,6 @@
 {
-  "version": "3.89.0",
-  "versionCode": 189,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.89.0/discoflate-v3.89.0.apk",
-  "notes": "DiscoFlate v3.89.0 \u2014 \ud83e\udde9 Templates are actually global now. They were listed as a per-scene gameplay key, so the panel read the LIVE SCENE's copy while the seeding filled the top-level one \u2014 shipped defaults were being written somewhere nothing displayed, and a scene carrying an older copy showed only the kinds that existed when it was saved. Bonus Rounds, Broadcasts, Minigames, Rewards and Modes weren't empty, they were absent. A v19 migration merges every scene's library into one shared map (nothing saved is lost) and stops carrying it per scene, so switching scenes no longer switches your templates. \ud83e\uddf9 The layout pass also continues: System commands loses the margin hacks that faked its checkbox alignment, hints move out from between a label and its control, five more rows bottom-align so labels of any height leave their controls in line, and events, polls, competitions and bonus rounds group under headings instead of one crowded row."
+  "version": "3.90.0",
+  "versionCode": 190,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.90.0/discoflate-v3.90.0.apk",
+  "notes": "DiscoFlate v3.90.0 \u2014 \ud83d\udfe9 Word race: a group Wordle, built as a COMPETITION rather than a minigame. Everyone opts in with Enter Challenge and races the same hidden word in their own private grid, so nobody is locked up alone while the channel waits. Your score is the guesses you had LEFT \u2014 solve it in 2 of 5 and you score 4, fail and you score 0 \u2014 so the payout scales with how fast you got there, ties go to whoever solved it first, and Add all player totals pays the whole field by how well they did. The Competition Viewer card shows every player's progress live WITHOUT revealing the answer, which turns the thinking time into the show. Set the guess count per competition (2-10); no dictionary needed."
 }

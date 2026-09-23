@@ -32,6 +32,7 @@ import uuid
 from collections import deque
 
 import kasa_legacy as kasa
+import wordlist
 import device_control
 import config_store
 
@@ -2918,9 +2919,58 @@ class Engine:
         if p.get("done_at") is not None:
             return {"ok": False, "error": "You've already locked in your rolls!"}
         p["entered"] = True
+        if (self._comp.get("type") or "") == "wordle":
+            p.setdefault("guesses", [])
+            return {"ok": True, "wordle": True, "rows": self._comp["rows"],
+                    "used": len(p["guesses"]), "board": self.wordle_board(uid)}
         rerolls = int(cd.get("reroll_count") or 0) if cd.get("allow_reroll") else 0
         return {"ok": True, "rolls": self._comp_rolls(cd), "rerolls": max(0, rerolls),
                 "metric": self._comp.get("metric", "total")}
+
+    # ---- Wordle competition -------------------------------------------------
+    def wordle_board(self, uid) -> str:
+        """That player's grid so far — emoji rows plus the word they guessed."""
+        if self._comp is None:
+            return ""
+        p = self._comp["players"].get(str(uid)) or {}
+        word = self._comp.get("word") or ""
+        out = []
+        for g in (p.get("guesses") or []):
+            out.append(f"{wordlist.render_row(g, word)}  `{g.upper()}`")
+        left = self._comp["rows"] - len(p.get("guesses") or [])
+        out += ["⬜⬜⬜⬜⬜"] * max(0, left)
+        return "\n".join(out)
+
+    def wordle_guess(self, uid, who: str, guess: str) -> dict:
+        """One guess. Scores it, and finishes the player when they solve it or
+        run out of rows. SCORE = rows left when solved (solve in 2 of 5 -> 4),
+        0 for a failure — so 'highest wins' needs no special case and the
+        payout scales with how fast they got there."""
+        if self._comp is None or (self._comp.get("type") or "") != "wordle":
+            return {"ok": False, "error": "This challenge has ended."}
+        guess = str(guess or "").strip().lower()
+        word = self._comp.get("word") or ""
+        if len(guess) != len(word) or not guess.isalpha():
+            return {"ok": False, "error": f"{len(word)} letters, letters only."}
+        p = self._comp_player(uid, who)
+        if p.get("done_at") is not None:
+            return {"ok": False, "error": "You've already finished this one!"}
+        p["entered"] = True
+        p.setdefault("guesses", [])
+        if guess in p["guesses"]:
+            return {"ok": False, "error": "You've already tried that word."}
+        p["guesses"].append(guess)
+        rows = self._comp["rows"]
+        solved = guess == word
+        used = len(p["guesses"])
+        if solved or used >= rows:
+            p["score"] = float(rows - used + 1) if solved else 0.0
+            p["entries"] = used
+            p["done_at"] = time.monotonic()
+        return {"ok": True, "solved": solved, "used": used, "rows": rows,
+                "done": p.get("done_at") is not None,
+                "score": p.get("score", 0.0), "board": self.wordle_board(uid),
+                "word": word if p.get("done_at") is not None else ""}
 
     def competition_roll_value(self, slot=None) -> float:
         """Produce one roll value for the given 0-based slot. With per-roll specs
@@ -3073,6 +3123,9 @@ class Engine:
             repeat = 5.0
         self._comp = {"def": cd, "cmd": entry_key, "metric": cd.get("metric", "total"),
                       "cap": int(cd.get("max_entries") or 0), "players": {}, "type": typ,
+                      # one answer for the whole field, so it IS a race
+                      "word": (wordlist.pick(cd.get("words")) if typ == "wordle" else None),
+                      "rows": max(2, min(10, int(cd.get("wd_rows") or 5))),
                       "required_entries": int(cd.get("required_entries") or 0),
                       # the Competition Viewer counts down against this
                       "title": self.render((cd.get("title") or name).strip()),
@@ -3122,7 +3175,14 @@ class Engine:
             if elig:
                 top = max(p["score"] for _, p in elig)
                 winners = [(u, p) for u, p in elig if p["score"] == top]
-                winner_uid, winner = random.choice(winners)
+                if typ == "wordle" and len(winners) > 1:
+                    # two people solving in three guesses is not a coin toss —
+                    # the one who got there first won. done_at was always
+                    # recorded; nothing used it.
+                    winner_uid, winner = min(
+                        winners, key=lambda kv: kv[1].get("done_at") or float("inf"))
+                else:
+                    winner_uid, winner = random.choice(winners)
         except asyncio.CancelledError:
             self._log("bot", f"COMPETITION '{name}' cancelled")
             self._comp = None
@@ -5417,6 +5477,30 @@ class Engine:
         if not c:
             return []
         players = [(u, p) for u, p in c["players"].items() if p.get("entered")]
+        wordle = (c.get("type") or "") == "wordle"
+        if wordle:
+            # Spectators watch the race WITHOUT being shown the answer: how many
+            # rows each player has burned, and whether they got it. This is the
+            # whole reason a group Wordle works — the minutes one player spends
+            # thinking are the minutes everyone else spends watching a board
+            # fill in, instead of staring at a quiet channel.
+            rows_n = c.get("rows") or 5
+            players.sort(key=lambda kv: (kv[1].get("done_at") is None,
+                                         -(float(kv[1].get("score") or 0)),
+                                         kv[1].get("done_at") or 0))
+            out = []
+            for u, p in players[:8]:
+                used = len(p.get("guesses") or [])
+                done = p.get("done_at") is not None
+                solved = done and float(p.get("score") or 0) > 0
+                out.append({"label": p.get("name") or "?",
+                            "value": (f"{used}/{rows_n} ✅" if solved
+                                      else f"{used}/{rows_n} ❌" if done
+                                      else f"{used}/{rows_n}"),
+                            "frac": min(1.0, used / max(1, rows_n)),
+                            "win": winner_uid is not None and str(u) == str(winner_uid),
+                            "done": done})
+            return out
         players.sort(key=lambda kv: (-(float(kv[1].get("score") or 0)),
                                      kv[1].get("name") or ""))
         top = max([float(p.get("score") or 0) for _, p in players] or [0.0])
