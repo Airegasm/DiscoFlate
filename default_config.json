@@ -654,7 +654,12 @@
           ]
         }
       ],
-      "done_message": "✅ **[multi_round_name]** done."
+      "done_message": "✅ **[multi_round_name]** done.",
+      "spread_bet": {
+        "enabled": true,
+        "stake": 12,
+        "seconds": 45
+      }
     },
     {
       "_tpl_id": "mp_vs_r2",
@@ -683,7 +688,12 @@
           "action": "MultiRPS"
         }
       ],
-      "done_message": "✅ **[multi_round_name]** done."
+      "done_message": "✅ **[multi_round_name]** done.",
+      "spread_bet": {
+        "enabled": true,
+        "stake": 12,
+        "seconds": 45
+      }
     }
   ],
   "mode": "solo",

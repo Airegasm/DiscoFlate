@@ -357,6 +357,73 @@ async def _ignore(interaction) -> None:
         pass
 
 
+class MpSpreadModal(discord.ui.Modal):
+    """The number box. A modal rather than buttons because the answer is a
+    quantity, and preset buttons would turn a judgement into a menu."""
+
+    def __init__(self, view, side: str, gap: float):
+        super().__init__(title="Your bet")
+        self._view, self._side = view, side
+        self.bet = discord.ui.TextInput(
+            label=f"The gap is {gap:g}% now — where will it END?",
+            placeholder="a number, e.g. 18", max_length=4, required=True)
+        self.add_item(self.bet)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        self._view.place(self._side, str(self.bet.value or ""))
+        await interaction.response.send_message(
+            f"Locked in: **{mp_games.spread_clamp(self.bet.value):g}%**",
+            ephemeral=True)
+
+
+class MpSpreadView(discord.ui.View):
+    """Two buttons, one per player. Each opens a private number box.
+
+    Bets stay HIDDEN until the round ends. If you could bet second and see
+    their number you would simply bid one under it, which is the flaw in
+    every 'closest without going over' game played in the open.
+    """
+
+    def __init__(self, bot, uids: dict, names: dict, gap: float, timeout: float):
+        super().__init__(timeout=max(10.0, float(timeout)))
+        self.bot = bot
+        self.uids = {k: str(v or "") for k, v in uids.items()}
+        self.names = dict(names)
+        self.gap = float(gap)
+        self.bets: dict = {}
+        self.done = asyncio.Event()
+        self.message = None
+        for side in ("host", "guest"):
+            b = discord.ui.Button(label=f"{self.names.get(side, side)} — place bet",
+                                  style=discord.ButtonStyle.primary)
+            b.callback = self._press(side)
+            self.add_item(b)
+
+    def _side(self, uid: str) -> str:
+        for side, want in self.uids.items():
+            if want and str(uid) == want:
+                return side
+        return ""
+
+    def place(self, side: str, raw) -> None:
+        self.bets[side] = mp_games.spread_clamp(raw)
+        if len(self.bets) >= 2:
+            self.done.set()
+
+    def _press(self, side: str):
+        async def cb(interaction: discord.Interaction):
+            who = self._side(interaction.user.id)
+            if who != side:
+                await _ignore(interaction)        # not your button; say nothing
+                return
+            if side in self.bets:
+                await _ignore(interaction)        # already placed
+                return
+            await interaction.response.send_modal(
+                MpSpreadModal(self, side, self.gap))
+        return cb
+
+
 class MpChoiceView(discord.ui.View):
     """A Player Choice: buttons only one named player may press.
 
@@ -2801,6 +2868,96 @@ class BotManager:
         finally:
             self._rounds_task = None
 
+    async def _spread_open(self, rnd: dict):
+        """Take both bets before the round plays. Returns the live view, or
+        None when this round has no bet on it."""
+        bet = rnd.get("spread_bet") or {}
+        s = self.link
+        if not bet.get("enabled") or s is None or s.state != mp.S_MATCH:
+            return None
+        caps = self._mp_caps()
+        gap = mp_games.spread_now(caps, s.link.me, s.link.peer)
+        ctx = self._mp_ctx()
+        names = {"host": ctx.get("multi_host_name") or "host",
+                 "guest": ctx.get("multi_guest_name") or "guest"}
+        uids = ({"host": s.link.owner, "guest": s.link.peer_owner} if s.is_host
+                else {"host": s.link.peer_owner, "guest": s.link.owner})
+        secs = max(10.0, float(mp_games._num(bet.get("seconds")) or 45))
+        view = MpSpreadView(self, uids, names, gap, secs)
+        self._register_view(view)
+        # The gap is ANNOUNCED. A bet placed without knowing where you stand is
+        # a guess; knowing it makes the number a calculation — and tells you
+        # whether you want to take a hit this round or avoid one.
+        body = (f"**{names['host']} {ctx.get('multi_host_capacity', '0')}%** · "
+                f"**{names['guest']} {ctx.get('multi_guest_capacity', '0')}%**\n"
+                f"You are **{gap:g}% apart** right now.\n"
+                f"Where will the gap be when this round ends? "
+                f"Closest **without going over** takes it.")
+        view.message = await self._link_say(
+            body, embed=self._mp_card("🎯 Spread bet", body), view=view)
+        try:
+            await asyncio.wait_for(view.done.wait(), timeout=secs + 5)
+        except asyncio.TimeoutError:
+            pass
+        for c in view.children:
+            c.disabled = True
+        try:
+            if view.message is not None:
+                await view.message.edit(view=view)
+        except Exception:  # noqa: BLE001
+            pass
+        return view
+
+    async def _spread_settle(self, rnd: dict, view) -> None:
+        """Resolve the bet AFTER the round. The spread is measured FIRST and
+        the payout applied second — paying first would move the very number
+        the bet was placed on."""
+        s = self.link
+        if view is None or s is None or s.state != mp.S_MATCH:
+            return
+        bet = rnd.get("spread_bet") or {}
+        stake = float(mp_games._num(bet.get("stake")) or 0)
+        caps = self._mp_caps()
+        actual = mp_games.spread_now(caps, s.link.me, s.link.peer)   # measured first
+        seat_of = {"host": (s.link.me if s.is_host else s.link.peer),
+                   "guest": (s.link.peer if s.is_host else s.link.me)}
+        bets = {seat_of[k]: v for k, v in view.bets.items()}
+        ctx = self._mp_ctx()
+        r = mp_games.spread_outcome(bets, actual, s.link.me, s.link.peer)
+        name_of = {s.link.me: ctx.get("multi_me_name") or "you",
+                   s.link.peer: ctx.get("multi_peer_name") or "them"}
+        shown = " · ".join(
+            f"**{name_of[i]}** bet {bets.get(i, 0):g}%" for i in (s.link.me, s.link.peer))
+        if r["push"]:
+            head = f"🤝 Both bet {r['bets'][s.link.me]:g}% — push, nobody pays."
+        elif r["both"]:
+            head = f"💥 The gap came in at **{actual:g}%** — you both went over."
+        else:
+            head = (f"🎯 The gap came in at **{actual:g}%** — "
+                    f"**{name_of[r['loser']]}** pays.")
+        await self._link_say(f"{head}\n{shown}")
+        if stake <= 0 or r["push"]:
+            return
+        # The loser pays the stake; the WINNER PAYS HALF. Both meters always
+        # climb, so the ceiling stays reachable and the gap only moves by half
+        # a stake — which is what keeps the next bet reasonable-about.
+        scale = float(mp_games._num(ctx.get("multi_scale")) or 1)
+        if r["both"]:
+            pay = {s.link.me: stake, s.link.peer: stake}
+        else:
+            won = s.link.peer if r["loser"] == s.link.me else s.link.me
+            pay = {r["loser"]: stake, won: stake / 2.0}
+        for who, amt in pay.items():
+            row = {"type": "fire", "fire_mode": "add",
+                   "fill_pct": round(amt * scale, 2), "block_during": False,
+                   "multi_who": "me" if who == s.link.me else "peer"}
+            self.engine.mp_row_cb = self._mp_row_router
+            try:
+                await self.engine._run_action_block(
+                    [row], name="multiplayer:spread", extra_ctx=dict(ctx))
+            finally:
+                self.engine.mp_row_cb = None
+
     async def _run_sudden(self) -> bool:
         """Sudden Death — overtime, run only if the rounds ended undecided.
 
@@ -2863,6 +3020,7 @@ class BotManager:
                 self.engine.mp_row_cb = None
                 self.engine.mp_ctx_cb = None
 
+        view = await self._spread_open(rnd)
         body = rnd.get("actions") if isinstance(rnd.get("actions"), list) else []
         if not body:
             # Nothing to run is not a failure — it is a round you haven't
@@ -2906,8 +3064,10 @@ class BotManager:
             # The cap is a backstop, not a rule. Say so out loud rather than
             # moving on as though the band was cleared fairly.
             self._link_notes.append(f"{name} hit its pass limit ({cap})")
+            await self._spread_settle(rnd, view)
             await self._link_say(f"⏭ **{name}** ran out of passes.")
             return False
+        await self._spread_settle(rnd, view)
         done = str(rnd.get("done_message") or "").strip()
         if done:
             await self._link_say(self.engine.render(done, self._mp_ctx(

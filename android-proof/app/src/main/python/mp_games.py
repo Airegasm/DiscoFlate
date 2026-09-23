@@ -341,6 +341,65 @@ def placeholders(session, chosen="", extra=None) -> dict:
 
 ROUND_CAP = 200          # passes per round, so a band nobody can clear still ends
 
+# ---- the spread bet --------------------------------------------------------- #
+#
+# At a round's start both players predict THE GAP between them when it ends.
+# Closest without going over takes it.
+#
+# What makes it more than a guess: once you have named a number, you want the
+# round to land on it. Bet wide and you want to lose a hand; bet tight and you
+# want it close. So throwing a duel on purpose can be correct play, and a luck
+# round acquires a decision it did not have.
+#
+# The loser pays the stake and the WINNER PAYS HALF. That is a rubber band:
+# both meters always climb, so the ceiling stays reachable, and the gap only
+# moves by half a stake — which makes the spread predictable enough to reason
+# about, which in turn makes the next bet a calculation instead of a guess.
+
+SPREAD_MAX = 999
+
+
+def spread_clamp(v) -> float:
+    n = _num(v)
+    return 0.0 if n is None else float(min(SPREAD_MAX, max(0, n)))
+
+
+def spread_outcome(bets: dict, actual, a="a", b="b") -> dict:
+    """Closest to `actual` WITHOUT going over.
+
+    A bet nobody placed is 0 — which is a real bet ("you two will finish
+    level"), usually a losing one, and never a way to stall the round or dodge
+    the wager by walking away.
+
+    Both over → the round beat them both, and they both pay. Same shape as
+    both busting at blackjack, and for the same reason: a round that resolves
+    to nothing is the outcome worth avoiding.
+    """
+    act = spread_clamp(actual)
+    ba, bb = spread_clamp(bets.get(a)), spread_clamp(bets.get(b))
+    out = {"actual": act, "bets": {a: ba, b: bb},
+           "loser": "", "both": False, "push": False}
+    over_a, over_b = ba > act, bb > act
+    if over_a and over_b:
+        out["both"] = True
+    elif over_a:
+        out["loser"] = a
+    elif over_b:
+        out["loser"] = b
+    elif ba == bb:
+        out["push"] = True
+    else:
+        out["loser"] = b if (act - ba) < (act - bb) else a
+    return out
+
+
+def spread_now(caps, a="a", b="b") -> float:
+    """The gap right now — announced when the betting opens, because a bet you
+    place without knowing where you stand is not a decision."""
+    return abs(float(_num((caps or {}).get(a)) or 0)
+               - float(_num((caps or {}).get(b)) or 0))
+
+
 # ---- cards: blackjack, two seats, one dealer -------------------------------- #
 #
 # A REAL table, not a solitaire game with a second player bolted on. Both hands

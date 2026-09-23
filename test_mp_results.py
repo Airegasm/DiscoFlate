@@ -170,6 +170,32 @@ ok(pg in GROUPS or pg in CARDS,
 ok(len(GROUPS.get(pg) or []) >= 2,
    "…with something to cover the picture AND something that says why")
 
+# ---- the spread bet is wired, and settled in the RIGHT ORDER --------------- #
+for r in SHIP["mp_rounds"]:
+    sb = r.get("spread_bet") or {}
+    ok(sb.get("enabled") and sb.get("stake"),
+       f"{r['name']} carries a spread bet with a stake on it")
+
+op = bot[bot.index("async def _spread_open"):]
+op = op[:op.index("async def _spread_settle")]
+ok("spread_now" in op and "_link_say" in op,
+   "the CURRENT gap is announced when betting opens — a bet placed without "
+   "knowing where you stand is a guess, not a decision")
+ok("send_modal" in bot, "the bet is a number box, not a menu of presets")
+
+st = bot[bot.index("async def _spread_settle"):]
+st = st[:st.index("async def _run_sudden")]
+meas = st.index("spread_now(")
+fire = st.index('"type": "fire"')
+ok(meas < fire,
+   "the spread is MEASURED before anybody is paid — paying first would move "
+   "the very number the bet was placed on")
+ok("stake / 2.0" in st,
+   "the winner pays half: both meters climb so the ceiling stays reachable, "
+   "and the gap moves by half a stake rather than a whole one")
+ok("multi_scale" in st,
+   "…and the payout scales to the ceiling like every other stake")
+
 # ---- Sudden Death: overtime that is a CONTEST, not a countdown ------------- #
 SUD = SHIP["mp_sudden"]
 ok(SUD.get("actions"), "sudden death ships with something to play")

@@ -176,6 +176,35 @@ ok(g.round_passes({"max_passes": 5}) == 5, "…and an author's limit is honoured
 ok(g.round_passes({"max_passes": 99999}) == g.ROUND_CAP,
    "…but never above it: a target nobody can reach still has to end")
 
+# ---- the spread bet --------------------------------------------------------- #
+# Predict THE GAP at the round's end. Closest without going over.
+A, B = "a", "b"
+def sp(ba, bb, act): return g.spread_outcome({A: ba, B: bb}, act, A, B)
+
+ok(sp(10, 14, 15)["loser"] == A, "14 is closer to 15 than 10 — the further bet pays")
+ok(sp(16, 14, 15)["loser"] == A, "…and a bet OVER the actual is out, however close")
+ok(sp(14, 16, 15)["loser"] == B, "…whichever seat goes over")
+r = sp(20, 30, 15)
+ok(r["both"] and not r["loser"],
+   "BOTH over → the round beat them both and they both pay. A round that "
+   "resolves to nothing is the outcome worth avoiding")
+ok(sp(15, 15, 15)["push"], "the same bet is a push — nobody pays")
+ok(sp(15, 10, 15)["loser"] == B, "an EXACT bet wins, it does not count as over")
+ok(sp(0, 0, 0)["push"], "a round that ends level, with both saying so, is a push")
+
+# a bet nobody placed is 0 — a real bet, usually a losing one, and never a way
+# to stall the round or dodge the wager by walking away
+ok(sp(None, 12, 14)["loser"] == A, "no answer bets ZERO and usually loses")
+ok(sp(None, None, 0)["push"], "…but two non-answers on a level round still push")
+ok(sp(None, 30, 14)["loser"] == B,
+   "…and a wild bet still loses to it, because 0 is at least not over")
+
+ok(g.spread_clamp(9999) == 999 and g.spread_clamp(-5) == 0,
+   "a bet is clamped to 0-999, so a typo cannot win by being absurd")
+ok(g.spread_now({A: 34, B: 22}, A, B) == 12
+   and g.spread_now({A: 22, B: 34}, A, B) == 12,
+   "the gap announced at the open is absolute — it is a distance, not a lead")
+
 # ---- cards: two seats, one dealer, both hands face up ----------------------- #
 ok(g.hand_total([11, 10]) == 21, "an ace plays high when it fits")
 ok(g.hand_total([11, 10, 5]) == 16, "…and softens to 1 rather than busting")

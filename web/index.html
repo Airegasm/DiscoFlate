@@ -5360,12 +5360,36 @@ function renderMpRounds(){
                        'or a scene group plays on <i>this</i> one. It is inside an '+
                        '<b>Action</b> that it matters \u2014 that is where '+
                        '<i>the racer the spin picked</i> gets inflated.')+
+        // THE SPREAD BET — placed before the round, settled after it.
+        `<div class="dev" style="flex-direction:column;align-items:stretch;margin-top:8px">`+
+        `<label class="row" style="gap:8px"><input type="checkbox" style="width:auto" `+
+          `${(r.spread_bet||{}).enabled?'checked':''} `+
+          `onchange="mpRndBet(${i},'enabled',this.checked)"> `+
+          `<b>🎯 Spread bet</b> <span class="muted">— both predict the GAP between them when this round ends</span></label>`+
+        ((r.spread_bet||{}).enabled ? `<div class="row" style="gap:8px;align-items:flex-end;margin-top:6px">`+
+          `<label class="field" style="min-width:130px">Stake %`+
+            `<input type="number" min="0" max="999" step="1" value="${+((r.spread_bet||{}).stake)||0}" `+
+            `onchange="mpRndBet(${i},'stake',+this.value||0)"></label>`+
+          `<label class="field" style="min-width:130px">Seconds to bet`+
+            `<input type="number" min="10" max="300" step="5" value="${+((r.spread_bet||{}).seconds)||45}" `+
+            `onchange="mpRndBet(${i},'seconds',+this.value||45)"></label>`+
+          `<span class="muted" style="flex:1;min-width:230px">Closest <b>without going over</b>. `+
+            `Both over → they both pay. The loser pays the stake and the <b>winner pays half</b>, so both meters `+
+            `climb and the gap only moves by half — which keeps the next bet worth thinking about. `+
+            `The current gap is announced when betting opens.</span>`+
+        `</div>` : '')+
+        `</div>`+
         actionsSection('Round card \u2014 runs ONCE as the round opens',
                        `mpRounds[${i}].intro`, 'renderMpRounds', r.intro||[],
                        `{type:'scene_group',group:''}`,
                        'Its own pre-show: a scene group, different words, a sound cue.')+
       `</div></details>`;
   }).join('');
+}
+function mpRndBet(i, k, v){
+  const r = mpRounds[i]; if(!r) return;
+  r.spread_bet = {enabled:false, stake:0, seconds:45, ...(r.spread_bet||{}), [k]:v};
+  renderMpRounds(); saveMpRounds();
 }
 function mpRndMove(i, d){
   const j=i+d; if(j<0||j>=mpRounds.length) return;
@@ -5390,6 +5414,10 @@ function cleanMpRounds(){
     const o={name:(r.name||'').trim()||'Round', until,
              done_message:(r.done_message||'').trim(),
              intro:cleanActionRows(r.intro), actions:cleanActionRows(r.actions)};
+    const sb = r.spread_bet||{};
+    if(sb.enabled) o.spread_bet = {enabled:true,
+      stake:Math.max(0,Math.min(999,+sb.stake||0)),
+      seconds:Math.max(10,Math.min(300,+sb.seconds||45))};
     if(until==='count') o.count=Math.max(1,Math.min(200,+r.count||1));
     else { o.max=+r.max||0;
            o.max_passes=Math.max(1,Math.min(200,+r.max_passes||40)); }

@@ -793,6 +793,25 @@ ok(cb2.max === 30 && cb2.max_passes === 200 && !('count' in cb2),
 setR([{ name: 'C', until: 'count', count: 2, actions: [] }]);
 ok(rbox.cleanMpRounds().length === 0,
    'a round with no actions is dropped \u2014 there is nothing to run');
+
+// ---- the spread bet, per round ---------------------------------------------
+setR([{ name: 'D', until: 'count', count: 1, actions: [{ type: 'mp_action' }] }]);
+ok(!('spread_bet' in rbox.cleanMpRounds()[0]),
+   'a round with no bet on it stores nothing — the tickbox is opt-in');
+setR([{ name: 'E', until: 'count', count: 1, actions: [{ type: 'mp_action' }],
+        spread_bet: { enabled: true, stake: 9999, seconds: 1 } }]);
+const sb = rbox.cleanMpRounds()[0].spread_bet;
+ok(sb && sb.enabled === true, 'a ticked round carries its bet');
+ok(sb.stake === 999, '…with the stake clamped, so a typo cannot end a match instantly');
+ok(sb.seconds === 10,
+   '…and a floor on the deadline: two seconds to type a number is not a decision');
+vm.runInContext('mpRndOpen = new Set([0]);', rbox);
+rbox.renderMpRounds();
+const rD = rEls.mpRndList.innerHTML;
+ok(/Spread bet/.test(rD) && /without going over/.test(rD),
+   'the editor states the rule rather than assuming you remember it');
+ok(/winner pays half/.test(rD),
+   '…and that the winner still pays half, which is the whole balance of it');
 setR([{ name: 'D', until: 'leader', max: 0, actions: [{ type: 'mp_action' }] }]);
 ok(rbox.cleanMpRounds().length === 0,
    '\u2026and so is a % round with no target: it could never end');
