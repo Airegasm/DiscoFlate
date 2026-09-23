@@ -1,6 +1,6 @@
 {
-  "version": "3.84.3",
-  "versionCode": 176,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.84.3/discoflate-v3.84.3.apk",
-  "notes": "DiscoFlate v3.84.3 \u2014 \ud83c\udfb4 EVERY bot message is a card when rich output is on. It was being wired in at individual call sites, which is why half of them stayed plain however many got fixed: the games, the game intros with their Play button, the pause notice, the Activation notice, errors. Rich output is a property of the bot, not of each call site, so the two senders every message passes through now apply it and no caller has to remember. An image post stays plain \u2014 the picture IS the message \u2014 and a caller that built its own embed keeps it. Also: a message with nothing to say no longer posts as an empty line with just the bot's name on it, and the Activation-off notice now DEFAULTS OFF and stamps its version and hostname when it does fire, so a spare install on the same token identifies itself instead of looking like a bug in the one doing the work."
+  "version": "3.84.5",
+  "versionCode": 178,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.84.5/discoflate-v3.84.5.apk",
+  "notes": "DiscoFlate v3.84.5 \u2014 \ud83d\udd07 The \"Activation is currently off\" reply is gone. One change, one file: the command handler returns silently instead of answering. Nothing else moved \u2014 v3.84.4 tried to tear out the config key, the panel checkbox and the surrounding plumbing at the same time and broke things, so this is that single line and nothing more. Activation off means the command is ignored and nothing is posted. Your LIVE and OFFLINE session announcements are untouched."
 }

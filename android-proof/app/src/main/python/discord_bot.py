@@ -1422,21 +1422,11 @@ class BotManager:
         if not self._allowed(cfg, message):
             return
         if not cfg.get("listener_enabled"):
-            # ONE notice per person per OFF PERIOD, not per command and not per
-            # buffer window: while we're off, nothing changes between one
-            # command and the next, so there is nothing new to say. Answering
-            # every command was the loudest thing in the channel — especially
-            # with a second install up whose Activation is off, which answers
-            # commands the first one is busy running.
-            if cfg.get("activation_off_notice") and message.author.id not in self._off_told:
-                self._off_told.add(message.author.id)
-                # stamped, so two installs answering the same command are
-                # telling you apart instead of looking like one bug
-                await _reply(message,
-                             f"🔇 Activation is currently **off**. "
-                             f"-# ({_install_id()})")
+            # Activation off = say nothing. The command isn't going to run, so
+            # there is nothing to report; the operator already knows they
+            # turned it off. This used to reply "🔇 Activation is currently
+            # off." to every command.
             return
-        self._off_told.clear()   # back on: everyone gets told again next time
 
         who = message.author.display_name
 
