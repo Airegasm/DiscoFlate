@@ -552,11 +552,17 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
 
     def _vcam_state():
         s = engine.snapshot()
-        return {"capacity": s.get("capacity"), "firing": s.get("firing"),
-                "remaining": s.get("remaining"),
-                "device_timers": s.get("device_timers") or [],
-                "poll": s.get("poll"),
-                "timers": _timer_map()}
+        out = {"capacity": s.get("capacity"), "firing": s.get("firing"),
+               "remaining": s.get("remaining"),
+               "device_timers": s.get("device_timers") or [],
+               "timers": _timer_map()}
+        # Every SELF-GATED card overlay reads its own key here. Listing them
+        # from one place instead of naming `poll` by hand is the point: a new
+        # card added to camera.py used to draw nothing at all, because this
+        # hand-picked dict silently never carried its state.
+        for k in ("poll", "competition", "bonus_round", "broadcast"):
+            out[k] = s.get(k)
+        return out
     vcam.state_cb = _vcam_state
     stg = stage.Stage(IMAGES_DIR)   # /stage overlay registry (phone screen-share path)
     net["stage"] = stg

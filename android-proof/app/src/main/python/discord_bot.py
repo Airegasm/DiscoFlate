@@ -413,8 +413,16 @@ class BotManager:
 
     async def announce(self, text: str, image: str | None = None, replace_key: str | None = None) -> None:
         """Called by the engine to post events/milestones — broadcast to every
-        listen channel across all servers (plus the announce channel)."""
-        await self.broadcast(text, image, replace_key=replace_key)
+        listen channel across all servers (plus the announce channel).
+
+        With `rich_output` on these go out as embed cards. That toggle used to
+        reach only the status/report blocks, so a config whose action rows were
+        all plain `message` rows — which every shipped one is — produced a wall
+        of bare text however rich you'd asked for. A row that sets `style:
+        embed` still gets one with the toggle off; this is the default, not an
+        override. An image post stays plain: the picture IS the message."""
+        embed = None if image else self._status_embed("command", text)
+        await self.broadcast(text, image, replace_key=replace_key, embed=embed)
 
     async def _auto_loop(self) -> None:
         """Post the capacity/commands report every auto_report.seconds."""
@@ -1228,7 +1236,11 @@ class BotManager:
             show_real = bool(real) and author_id is not None and await self._is_member(getattr(ch, "guild", None), author_id)
             text = real if show_real else (anon or real)
             if text:
-                await self._send(ch, self._hdr(cfg, label, who if show_real else _HDR_ANON) + text, None)
+                seen = who if show_real else _HDR_ANON
+                # a minigame result is a per-player result like any other — it
+                # was the one that still went out as bare text with rich output on
+                await self._send(ch, self._hdr(cfg, label, seen) + text, None,
+                                 embed=self._out_embed(cfg, label, seen, text))
 
     async def game_payoff(self, cmd: dict, score, who: str, uid) -> None:
         """A minigame finished — fire the tier's devices (credited to the player)
@@ -1325,7 +1337,12 @@ class BotManager:
         if not self._allowed(cfg, message):
             return
         if not cfg.get("listener_enabled"):
-            await _reply(message, "🔇 Activation is currently **off**.")
+            # ONE notice per person per buffer window, repeats silent — the same
+            # rule the paused notice uses. Answering every command with this was
+            # the loudest thing in the channel whenever a second install was up
+            # with Activation off, or after an End Sequence deactivated us.
+            if self.engine.buffer_ok(f"offnote:{message.author.id}"):
+                await _reply(message, "🔇 Activation is currently **off**.")
             return
 
         who = message.author.display_name
