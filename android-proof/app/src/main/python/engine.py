@@ -1481,7 +1481,16 @@ class Engine:
         self._intro_until = None
         self._intro_pending = False
         t, self._intro_task = self._intro_task, None
-        if t and not t.done():
+        # NEVER cancel the task we are standing in. When the intro runs out on
+        # its own clock, _intro_loop calls this from inside that very task —
+        # cancelling it here raised CancelledError at the next await, which is
+        # intro_done_cb() a few lines down. So the go-live handover (the LIVE
+        # announcement, its [!command] tokens, finish_activation releasing the
+        # events) was skipped, and silently: CancelledError is a BaseException,
+        # so the `except Exception` around the callback never saw it and
+        # nothing reached the log. Ending the intro from the button worked,
+        # because that runs on a different task.
+        if t and not t.done() and t is not asyncio.current_task():
             t.cancel()
         g = self.golive()
         cur = (self._intro_stages[self._intro_stage]

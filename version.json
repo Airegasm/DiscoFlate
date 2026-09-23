@@ -1,6 +1,6 @@
 {
-  "version": "3.84.7",
-  "versionCode": 180,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.84.7/discoflate-v3.84.7.apk",
-  "notes": "DiscoFlate v3.84.7 \u2014 \ud83d\udcf1 THE ANDROID APP BOOTS AGAIN. It has been unbootable since v3.79.0: app.py started importing media_len.py, nobody added that file to the APK's hand-listed module set, and the import threw before the server could bind \u2014 so the app sat on \"booting local server\" until it timed out. Invisible on desktop, where the file is simply there. Fixed, and check.sh now parses the imports of every shipped module and fails the build if one isn't in the list, so the list cannot silently drift again."
+  "version": "3.84.8",
+  "versionCode": 181,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.84.8/discoflate-v3.84.8.apk",
+  "notes": "DiscoFlate v3.84.8 \u2014 \ud83c\udfac An intro that ran out on its own clock never handed over. end_intro() cancelled the intro task \u2014 but when the countdown expires, end_intro is called FROM that task, so it cancelled itself, and the CancelledError landed on the very next await: the go-live handover. So the LIVE announcement with your command list never posted, its [!command] tokens never fired, and finish_activation() never released the events. Silently, because CancelledError is a BaseException and the guard there only caught Exception. Pressing Start now always worked, because that runs on a different task."
 }
