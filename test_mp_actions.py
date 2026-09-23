@@ -176,6 +176,47 @@ ok(g.round_passes({"max_passes": 5}) == 5, "…and an author's limit is honoured
 ok(g.round_passes({"max_passes": 99999}) == g.ROUND_CAP,
    "…but never above it: a target nobody can reach still has to end")
 
+# ---- cards: two seats, one dealer, both hands face up ----------------------- #
+ok(g.hand_total([11, 10]) == 21, "an ace plays high when it fits")
+ok(g.hand_total([11, 10, 5]) == 16, "…and softens to 1 rather than busting")
+ok(g.hand_total([11, 11]) == 12, "two aces cannot both be 11")
+ok(g.hand_total([11, 11, 9]) == 21, "…and soften one at a time, only as far as needed")
+ok(g.hand_total([10, 10, 10]) == 30, "a bust is reported as its real total, not clamped")
+ok(g.card_draw(0.0) == 2 and g.card_draw(0.999) == 11, "the deck is injectable for tests")
+
+# the dealer has no choices — that is the whole point of a dealer
+ok(g.dealer_play([6], draws=[5, 7]) == [6, 5, 7], "the dealer hits below 17")
+ok(g.dealer_play([10, 7]) == [10, 7], "…and stands on 17, every time")
+ok(g.hand_total(g.dealer_play([2], draws=[2, 2, 2, 2, 2, 2, 2, 2, 2, 2])) >= 17,
+   "…and always finishes, whatever it is dealt")
+
+# a hand is worth NOTHING if the dealer held it off — that is what makes the
+# house a shared threat instead of scenery
+ok(g.hand_score([10, 10], [10, 8]) == 20, "a winning hand is worth its total")
+ok(g.hand_score([10, 9], [10, 10]) == 0, "a 19 that lost to 20 is worth nothing…")
+ok(g.hand_score([10, 10, 5], [10, 6]) == 0, "…and so is a bust")
+ok(g.hand_score([10, 8], [10, 8]) == 0,
+   "a TIE with the dealer is worth nothing: the house wins pushes at this table, "
+   "which is what stops both players simply standing on 17 forever")
+ok(g.hand_score([10, 9], [10, 10, 5]) == 19, "a dealer bust pays everyone still in")
+
+H, G = "H", "G"
+r = g.cards_outcome([10, 10], [10, 7], [10, 8], H, G)
+ok(r["loser"] == G and not r["both"], "the lower surviving hand pays")
+r = g.cards_outcome([10, 7], [10, 10], [10, 8], H, G)
+ok(r["loser"] == H, "…whichever seat it is in")
+r = g.cards_outcome([10, 10], [10, 10], [10, 8], H, G)
+ok(r["push"] and not r["loser"], "equal surviving hands push — nobody pays")
+r = g.cards_outcome([10, 10, 10], [10, 9], [10, 10], H, G)
+ok(r["both"] and not r["loser"],
+   "one busts, the other loses to the dealer → the HOUSE cleaned up, and they "
+   "both pay. A round where nothing happens is the one outcome worth avoiding")
+r = g.cards_outcome([10, 10, 5], [9, 9, 9], [10, 8], H, G)
+ok(r["both"], "…both busting is the same answer")
+r = g.cards_outcome([10, 9], [10, 8], [10, 10, 4], H, G)
+ok(r["loser"] == G and r["dealer"] == 24,
+   "when the dealer busts, both survive and it is decided between the players")
+
 # ---- the end condition ------------------------------------------------------ #
 # Always last, never one of the rounds. Three things trigger it — a concession,
 # reaching the lose-at capacity, or somebody going off air — and all three are

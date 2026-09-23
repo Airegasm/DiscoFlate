@@ -326,6 +326,89 @@ def placeholders(session, chosen="", extra=None) -> dict:
 
 ROUND_CAP = 200          # passes per round, so a band nobody can clear still ends
 
+# ---- cards: blackjack, two seats, one dealer -------------------------------- #
+#
+# A REAL table, not a solitaire game with a second player bolted on. Both hands
+# are face-up — which is how a shoe game actually deals — and only the dealer
+# holds a hole card. Both players act at once against the same upcard.
+#
+# Face-up is also what makes it hard. Blackjack against a dealer is SOLVED:
+# basic strategy gives one right answer for your total against their upcard.
+# But when you can see the other player sitting on 20 and you are holding 17,
+# the solved answer is "stand" and standing loses. Second place pays, so you
+# have to hit into a bad spot. No strategy card covers that.
+
+CARD_DECK = (2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10, 10, 11)   # 11 = ace
+DEALER_STANDS = 17
+
+
+def card_draw(pick=None) -> int:
+    """One card from an infinite shoe. `pick` (0..1) makes it testable."""
+    if pick is None:
+        return random.choice(CARD_DECK)
+    i = int(max(0.0, min(0.999999, float(pick))) * len(CARD_DECK))
+    return CARD_DECK[i]
+
+
+def hand_total(cards) -> int:
+    """Best total: aces soften from 11 to 1 only as far as needed."""
+    t = sum(int(c) for c in (cards or []))
+    aces = list(cards or []).count(11)
+    while t > 21 and aces:
+        t -= 10
+        aces -= 1
+    return t
+
+
+def hand_text(cards) -> str:
+    return ", ".join("A" if c == 11 else str(c) for c in (cards or []))
+
+
+def dealer_play(cards, draws=None) -> list:
+    """The dealer's rule, and it is only a rule — the house makes no choices.
+    Hits to 17, then stops. `draws` injects cards for a test."""
+    hand = list(cards or [])
+    feed = list(draws or [])
+    while hand_total(hand) < DEALER_STANDS and len(hand) < 12:
+        hand.append(feed.pop(0) if feed else card_draw())
+    return hand
+
+
+def hand_score(cards, dealer) -> int:
+    """What this hand is WORTH in the round: its total if it beat the dealer,
+    zero if it busted or the dealer held it off.
+
+    Zero rather than the raw total on purpose. A 20 that lost to a dealer 21 is
+    worth exactly as much as a bust — nothing — which is what makes the dealer
+    a shared threat rather than scenery.
+    """
+    mine, theirs = hand_total(cards), hand_total(dealer)
+    if mine > 21:
+        return 0
+    if theirs <= 21 and theirs >= mine:
+        return 0
+    return mine
+
+
+def cards_outcome(a_cards, b_cards, dealer, a="a", b="b") -> dict:
+    """Who pays. Both scored against the dealer, then compared to each other.
+
+    - one higher score       → the other pays
+    - BOTH zero              → the house took both; they BOTH pay
+    - equal and not zero     → push, nobody pays
+    """
+    sa, sb = hand_score(a_cards, dealer), hand_score(b_cards, dealer)
+    out = {"scores": {a: sa, b: sb}, "loser": "", "both": False, "push": False,
+           "dealer": hand_total(dealer)}
+    if sa == 0 and sb == 0:
+        out["both"] = True                 # the house cleaned up
+    elif sa == sb:
+        out["push"] = True
+    else:
+        out["loser"] = b if sa > sb else a
+    return out
+
+
 # ---- the end condition ---------------------------------------------------- #
 #
 # Always last, never one of the rounds. A match has to be able to END for a

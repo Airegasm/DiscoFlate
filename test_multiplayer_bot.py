@@ -982,6 +982,24 @@ ok(EG.camera == ["reveal"],
    "…and the SAME row crosses the wire to reveal the guest's, which is how "
    "the host says 'we're live' to a machine it doesn't control")
 
+# ---- an audience pressing buttons is IGNORED, not told off ------------------ #
+# A match is watched. Every viewer who clicks a Hit, a Ready or a duel button
+# would otherwise get the bot saying "that's not yours" — in the venue, during
+# the show. Deferring acknowledges the click so Discord does not flash
+# "interaction failed" at them, and says nothing at all.
+src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "discord_bot.py"), encoding="utf-8").read()
+ok("async def _ignore(interaction)" in src, "there is one way to ignore a click")
+ok("interaction.response.defer()" in src.split("async def _ignore")[1][:400],
+   "…and it DEFERS rather than replying, so nothing lands in the channel")
+for view in ("MpChoiceView", "MpReadyView", "MpDuelView"):
+    blk = src[src.index(f"class {view}"):]
+    blk = blk[:blk.index("\nclass ")] if "\nclass " in blk else blk[:4000]
+    ok("_ignore(interaction)" in blk, f"{view} ignores a stranger's press")
+    ok("isn't your" not in blk and "This one's between" not in blk
+       and "That's " not in blk.split("_ignore")[0][-300:],
+       f"…and {view} no longer tells them off")
+
 print(f"{P} passed, {len(F)} failed")
 for f in F:
     print("  FAIL:", f)

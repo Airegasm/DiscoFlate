@@ -346,6 +346,17 @@ def _does(t: dict, job: str) -> bool:
     return bool(t.get("active", True))
 
 
+async def _ignore(interaction) -> None:
+    """Acknowledge a click from somebody this button isn't for, and say
+    nothing. Deferring stops Discord showing them "interaction failed" while
+    putting no message in the channel — a match is watched, and an audience
+    pressing things must not be able to fill the venue with refusals."""
+    try:
+        await interaction.response.defer()
+    except Exception:  # noqa: BLE001 — a click we are ignoring anyway
+        pass
+
+
 class MpChoiceView(discord.ui.View):
     """A Player Choice: buttons only one named player may press.
 
@@ -375,14 +386,12 @@ class MpChoiceView(discord.ui.View):
 
     def _press(self, value: str, label: str):
         async def cb(interaction: discord.Interaction):
-            # Gated to ONE person. Anyone else gets an ephemeral no rather than
-            # silence — a dead button is indistinguishable from a broken bot.
+            # Gated to ONE person. Anyone else is IGNORED — deferred, so
+            # Discord doesn't show them "interaction failed", but told nothing.
+            # A match has an audience, and an audience clicking things should
+            # not be able to fill the channel with the bot telling them off.
             if self.allow_uid and str(interaction.user.id) != self.allow_uid:
-                try:
-                    await interaction.response.send_message(
-                        f"This one's {self.who}'s call.", ephemeral=True)
-                except Exception:  # noqa: BLE001
-                    pass
+                await _ignore(interaction)
                 return
             if self.picked is not None:
                 return
@@ -436,11 +445,7 @@ class MpReadyView(discord.ui.View):
         async def cb(interaction: discord.Interaction):
             want = self.uids.get(seat) or ""
             if want and str(interaction.user.id) != want:
-                try:
-                    await interaction.response.send_message(
-                        f"That's {self.names[seat]}'s button.", ephemeral=True)
-                except Exception:  # noqa: BLE001
-                    pass
+                await _ignore(interaction)      # not yours; say nothing
                 return
             self.ready[seat] = True
             for i, s2 in enumerate(("host", "guest")):
@@ -504,11 +509,7 @@ class MpDuelView(discord.ui.View):
         async def cb(interaction: discord.Interaction):
             side = self._side(interaction.user.id)
             if not side:
-                try:
-                    await interaction.response.send_message(
-                        "This one's between the two racers.", ephemeral=True)
-                except Exception:  # noqa: BLE001
-                    pass
+                await _ignore(interaction)   # a viewer pressing it; say nothing
                 return
             if side in self.picks:
                 try:
