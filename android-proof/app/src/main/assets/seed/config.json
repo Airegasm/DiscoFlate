@@ -266,6 +266,47 @@
           }
         ],
         "_tpl_id": "df-competitions-rolloff"
+      },
+      {
+        "name": "WordRace",
+        "type": "wordle",
+        "wd_rows": 5,
+        "words": [],
+        "duration": 180,
+        "repeat_every": 45,
+        "metric": "total",
+        "max_entries": 0,
+        "required_entries": 1,
+        "title": "\ud83d\udfe9 Word Race!",
+        "body": "Press **Enter Challenge** for your own private grid. Everyone races the **same** hidden word \u2014 fewer guesses wins, and a tie goes to whoever got there first. \ud83d\udfe9 right letter, right place \u00b7 \ud83d\udfe8 right letter, wrong place.",
+        "allow_reroll": false,
+        "reroll_count": 1,
+        "roll_specs": [],
+        "require_enter": true,
+        "add_all_totals": true,
+        "win_actions": [
+          {
+            "type": "message",
+            "message": "\ud83d\udfe9 **[winner]** took the Word Race with **[winner_score]** to spare!"
+          },
+          {
+            "type": "fire",
+            "fire_mode": "seconds",
+            "seconds": "[winner_score]",
+            "device_id": null
+          },
+          {
+            "type": "notify",
+            "message": "\ud83d\udfe9 [winner] won the Word Race"
+          }
+        ],
+        "no_winner_actions": [
+          {
+            "type": "message",
+            "message": "\ud83d\udfe9 Nobody cracked it \u2014 the word lives to fight another day."
+          }
+        ],
+        "_tpl_id": "df-competitions-wordrace"
       }
     ],
     "capevents": [
@@ -1743,6 +1784,10 @@
     {
       "label": "\ud83c\udf9b Which pump?",
       "name": "pickpump"
+    },
+    {
+      "label": "\ud83d\udfe9 Word Race",
+      "name": "wordrace"
     }
   ],
   "chat_isolate": false,
@@ -3188,6 +3233,20 @@
             ],
             "start_events": [],
             "notify_enabled": false
+          },
+          {
+            "name": "wordrace",
+            "type": "actions",
+            "enabled": true,
+            "range_gate": "all",
+            "description": "start a group Word Race",
+            "actions": [
+              {
+                "type": "competition",
+                "competition": "WordRace"
+              }
+            ],
+            "notify_enabled": false
           }
         ],
         "broadcasts": [
@@ -3248,6 +3307,10 @@
           {
             "label": "\ud83c\udf9b Which pump?",
             "name": "pickpump"
+          },
+          {
+            "label": "\ud83d\udfe9 Word Race",
+            "name": "wordrace"
           }
         ],
         "cooldown_seconds": 120,
@@ -3531,6 +3594,24 @@
             "name": "agblackjack",
             "cooldown": 300,
             "max_uses": 3,
+            "luck": null
+          },
+          {
+            "name": "wordrace",
+            "cooldown": 600,
+            "max_uses": 0,
+            "luck": null
+          },
+          {
+            "name": "mercypoll",
+            "cooldown": 300,
+            "max_uses": 0,
+            "luck": null
+          },
+          {
+            "name": "pickpump",
+            "cooldown": 300,
+            "max_uses": 0,
             "luck": null
           }
         ],
@@ -3817,6 +3898,46 @@
               {
                 "type": "message",
                 "message": "\ud83c\udfc1 Nobody entered \u2014 the wheel spins on."
+              }
+            ]
+          },
+          {
+            "name": "WordRace",
+            "type": "wordle",
+            "wd_rows": 5,
+            "words": [],
+            "duration": 180,
+            "repeat_every": 45,
+            "metric": "total",
+            "max_entries": 0,
+            "required_entries": 1,
+            "title": "\ud83d\udfe9 Word Race!",
+            "body": "Press **Enter Challenge** for your own private grid. Everyone races the **same** hidden word \u2014 fewer guesses wins, and a tie goes to whoever got there first. \ud83d\udfe9 right letter, right place \u00b7 \ud83d\udfe8 right letter, wrong place.",
+            "allow_reroll": false,
+            "reroll_count": 1,
+            "roll_specs": [],
+            "require_enter": true,
+            "add_all_totals": true,
+            "win_actions": [
+              {
+                "type": "message",
+                "message": "\ud83d\udfe9 **[winner]** took the Word Race with **[winner_score]** to spare!"
+              },
+              {
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": "[winner_score]",
+                "device_id": null
+              },
+              {
+                "type": "notify",
+                "message": "\ud83d\udfe9 [winner] won the Word Race"
+              }
+            ],
+            "no_winner_actions": [
+              {
+                "type": "message",
+                "message": "\ud83d\udfe9 Nobody cracked it \u2014 the word lives to fight another day."
               }
             ]
           }
@@ -5309,6 +5430,20 @@
             ],
             "start_events": [],
             "notify_enabled": false
+          },
+          {
+            "name": "wordrace",
+            "type": "actions",
+            "enabled": true,
+            "range_gate": "all",
+            "description": "start a group Word Race",
+            "actions": [
+              {
+                "type": "competition",
+                "competition": "WordRace"
+              }
+            ],
+            "notify_enabled": false
           }
         ],
         "broadcasts": [
@@ -5369,6 +5504,10 @@
           {
             "label": "\ud83c\udf9b Which pump?",
             "name": "pickpump"
+          },
+          {
+            "label": "\ud83d\udfe9 Word Race",
+            "name": "wordrace"
           }
         ],
         "cooldown_seconds": 120,
@@ -5652,6 +5791,24 @@
             "name": "agblackjack",
             "cooldown": 300,
             "max_uses": 3,
+            "luck": null
+          },
+          {
+            "name": "wordrace",
+            "cooldown": 600,
+            "max_uses": 0,
+            "luck": null
+          },
+          {
+            "name": "mercypoll",
+            "cooldown": 300,
+            "max_uses": 0,
+            "luck": null
+          },
+          {
+            "name": "pickpump",
+            "cooldown": 300,
+            "max_uses": 0,
             "luck": null
           }
         ],
@@ -5938,6 +6095,46 @@
               {
                 "type": "message",
                 "message": "\ud83c\udfc1 Nobody entered \u2014 the wheel spins on."
+              }
+            ]
+          },
+          {
+            "name": "WordRace",
+            "type": "wordle",
+            "wd_rows": 5,
+            "words": [],
+            "duration": 180,
+            "repeat_every": 45,
+            "metric": "total",
+            "max_entries": 0,
+            "required_entries": 1,
+            "title": "\ud83d\udfe9 Word Race!",
+            "body": "Press **Enter Challenge** for your own private grid. Everyone races the **same** hidden word \u2014 fewer guesses wins, and a tie goes to whoever got there first. \ud83d\udfe9 right letter, right place \u00b7 \ud83d\udfe8 right letter, wrong place.",
+            "allow_reroll": false,
+            "reroll_count": 1,
+            "roll_specs": [],
+            "require_enter": true,
+            "add_all_totals": true,
+            "win_actions": [
+              {
+                "type": "message",
+                "message": "\ud83d\udfe9 **[winner]** took the Word Race with **[winner_score]** to spare!"
+              },
+              {
+                "type": "fire",
+                "fire_mode": "seconds",
+                "seconds": "[winner_score]",
+                "device_id": null
+              },
+              {
+                "type": "notify",
+                "message": "\ud83d\udfe9 [winner] won the Word Race"
+              }
+            ],
+            "no_winner_actions": [
+              {
+                "type": "message",
+                "message": "\ud83d\udfe9 Nobody cracked it \u2014 the word lives to fight another day."
               }
             ]
           }
