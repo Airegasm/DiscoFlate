@@ -963,6 +963,31 @@ ok(!/id="mpiTakeSplit"/.test(sandbox.modals[0].innerHTML),
    'no split box unless the host offered one — you cannot re-tune their rig');
 sandbox.mpRender({ mode: 'multi', state: 'idle', preflight: [] });
 
+// ---- Help describes the game that actually ships ---------------------------
+// A help page describing a game that was removed is worse than no help page:
+// it sends somebody looking for a screen that does not exist.
+{
+  const mp = html.slice(html.indexOf('two installs, one game'),
+                        html.indexOf('Custom commands — how to set them up'));
+  ok(!/Race to N%/.test(mp),
+     'the removed fallback game is gone from Help, not left describing a '
+     + 'screen nobody can find');
+  ok(!/!boost/.test(mp) && !/!stall/.test(mp),
+     '…and so are its commands');
+  for (const row of ['mp_spin', 'mp_roll', 'mp_choice', 'mp_duel',
+                     'mp_cards', 'mp_simon', 'mp_ttt', 'mp_tell']) {
+    ok(mp.includes('<code>' + row + '</code>'), `Help lists ${row}`);
+  }
+  ok(/Round 4 · Simon/.test(mp) && /Round 3 · Blackjack/.test(mp),
+     'the shipped four rounds are described');
+  ok(/who cracks first/.test(mp),
+     'Sudden Death explains why a solved game is the RIGHT decider');
+  ok(/winner pays half/.test(mp), 'the spread bet explains its own balance');
+  ok(/none of them\s*\n?\s*fires a pump on its own|fires a pump on its own/.test(mp),
+     'and that a game decides who lost while a separate fire spends it — which '
+     + 'is what lets a stake change without touching the game');
+}
+
 // ---- the permission help says WHY, not just WHAT ---------------------------
 // All four are granted to @everyone by default, so an operator has probably
 // never had to set one and will not recognise the failure when one is revoked.

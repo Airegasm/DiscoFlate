@@ -1466,24 +1466,62 @@
       <h3 style="margin:14px 0 6px">Fair races between unequal pumps</h3>
       <div class="hint" style="margin-top:0;max-width:860px">Percent fixes <i>how much</i>. It says nothing about <i>how fast</i>: a pump that fills 100% in 60s reaches any finish line twice as quickly as one that takes 120s. So the handshake exchanges each side's <b>calibration</b> and the finish lines are scaled — base 150% with a 60s pump against a 120s pump becomes <b>150% vs 75%</b>, and both take 90 seconds of pumping. Compensation only ever brings a line <b>down</b>, never past the number the other person already agreed to. If either pump isn't calibrated the match says so out loud rather than pretending the race is even.</div>
 
-      <h3 style="margin:14px 0 6px">Race to N%</h3>
-      <div class="hint" style="margin-top:0;max-width:860px">First pump to its own finish line wins. The target can exceed 100% — capacity runs to 999%. <b>Who plays</b> is a dial on the same game, not a different game:</div>
-      <ul style="line-height:1.7;padding-left:22px;margin:6px 0 0;max-width:860px">
-        <li><b>Versus</b> — the two racers drive their own pumps with <code>!pump</code>. The guest's press is resolved by the host and sent across as an action row.</li>
-        <li><b>Gameshow</b> — the audience drives it: <code>!boost &lt;name&gt;</code> pushes a racer toward their line, <code>!stall &lt;name&gt;</code> freezes them for a few seconds. Sabotage <b>freezes</b> rather than draining anyone — nobody's physical state gets rewritten by a stranger in chat.</li>
-        <li><b>Both</b> — racers and audience together.</li>
-      </ul>
-      <div class="hint" style="margin-top:8px;max-width:860px">Each press is worth a fixed <b>%</b>, with a per-person <b>cooldown</b> so a race isn't a typing-speed contest. <code>!board</code> posts the scoreboard. If the <b>time limit</b> runs out with nobody across, whoever is the larger fraction of <b>their own</b> line wins. Two crossings within half a second are a <b>draw</b> — which is a constant, not a policy, and it's why there are no tie-break rules to argue about.</div>
-
       <h3 style="margin:16px 0 6px">🧩 The rows multiplayer adds</h3>
-<div class="hint" style="margin-top:8px;max-width:880px"><b>Three of them:</b>
-        <code>mp_spin</code> picks a racer (even by default; a weight tilts it, and uneven odds get announced —
-        a wheel the audience can't see is indistinguishable from a rigged one) ·
-        <code>mp_roll</code> rolls dice and publishes <code>[multi_roll]</code> but <b>fires nothing</b>, so a
-        separate fire row spends it as a <b>percent</b> (seconds are refused over the wire — they're a different
-        amount of inflation on every rig) ·
-        <code>mp_choice</code> is a <b>Player Choice</b>: buttons only the named player may press, and it
-        <b>blocks</b> until they answer or the deadline passes.</div>
+      <div class="hint" style="margin-top:8px;max-width:880px">Each is a <b>game</b> you drop into an Action. None of them
+        fires a pump on its own — they decide <i>who lost</i> and publish it, and a separate <b>fire</b> row spends it. That
+        separation is what lets you change a stake without touching the game, and scale every stake to the ceiling at once.</div>
+      <ul style="line-height:1.7;padding-left:22px;margin:6px 0 0;max-width:880px">
+        <li><code>mp_spin</code> — picks a racer. Even by default; a weight tilts it, and uneven odds are <b>announced</b>,
+          because a wheel the audience can't see is indistinguishable from a rigged one.</li>
+        <li><code>mp_roll</code> — rolls dice and publishes <code>[multi_roll]</code>, firing nothing.</li>
+        <li><code>mp_choice</code> — buttons only the named player may press. <b>Blocks</b> until they answer or the deadline
+          passes, which is what makes "double or nothing" possible at all.</li>
+        <li><code>mp_duel</code> — both pick at once, hidden until both are in. Rock-paper-scissors is just data.</li>
+        <li><code>mp_cards</code> — <b>blackjack</b>, two seats and one dealer, both hands face up. A hand is worth its total
+          only if it <b>beat the dealer</b> and nothing otherwise, so the house is a threat you both face. Both worth nothing
+          means the house cleaned up and you <b>both</b> pay.</li>
+        <li><code>mp_simon</code> — a sequence shown, hidden, reproduced. Each pass is one pad longer so the round ends on its
+          own; scored as a correct <b>prefix</b>, because five of seven should beat four of seven.</li>
+        <li><code>mp_ttt</code> — tic tac toe, for overtime. <b>A draw costs you both</b>; see below.</li>
+        <li><code>mp_tell</code> — asks the other bot to run one of <i>its</i> Actions.</li>
+      </ul>
+
+      <h3 style="margin:14px 0 6px">🎯 The spread bet</h3>
+      <div class="hint" style="margin-top:0;max-width:860px">A tickbox on a <b>round</b>. Before it plays, both of you predict
+        <b>the gap between you</b> when it ends — closest <b>without going over</b> takes it. The current gap is announced when
+        betting opens, because a bet placed without knowing where you stand is a guess rather than a decision, and bets stay
+        hidden until settlement (betting second against a visible number is just bidding one under it).<br>
+        What makes it more than a guess: <b>once you have named a number you want the round to land on it</b>. Bet wide and you
+        want to lose a hand; bet tight and you want it close. Throwing a duel on purpose becomes correct play, and a luck round
+        acquires a decision it did not have.<br>
+        The loser pays the stake and the <b>winner pays half</b>. Both meters always climb so the ceiling stays reachable, and
+        the gap only moves by half a stake — which keeps it predictable enough that the next bet is a calculation.</div>
+
+      <h3 style="margin:14px 0 6px">⚔ Sudden Death</h3>
+      <div class="hint" style="margin-top:0;max-width:860px">Pinned under Rounds, run only if every round finished with nobody
+        at the ceiling. It has <b>no target and no count</b> — it loops, and the End Condition is the only way out.<br>
+        Put a <b>game</b> in it, not a pump. "Both pumps on until somebody pops" decides nothing: whoever is closer to the
+        ceiling gets there first, so the loser is already fixed before overtime starts. A game that can land on <i>either</i> of
+        you is what gives the one behind a way back.<br>
+        The shipped kit uses <b>tic tac toe</b>, and its being a solved game is the mechanism rather than the flaw: perfect play
+        always draws, <b>a draw costs you both</b>, so playing perfectly still walks you into the ceiling. The only escape from
+        the shared damage is to try to <i>win</i> — which means leaving perfect play, which is how you lose. The game is not the
+        board, it is who cracks first.</div>
+
+      <h3 style="margin:14px 0 6px">The shipped game</h3>
+      <div class="hint" style="margin-top:0;max-width:860px"><b>DiscoFlate Versus</b> ships four rounds that escalate in
+        <i>kind</i>, not just in number — luck, then bluff, then judgement, then memory, then nerve:</div>
+      <ul style="line-height:1.7;padding-left:22px;margin:6px 0 0;max-width:860px">
+        <li><b>Round 1 · Roulette</b> — eight spins, 1d8 each. Pure luck; it sets the gap and never ends the match.</li>
+        <li><b>Round 2 · Rock Paper Scissors</b> — six duels. Near-random, but throwable to hit your spread bet.</li>
+        <li><b>Round 3 · Blackjack</b> — four hands. Real decisions, and the stake is the <b>margin</b>, so every card costs
+          something instead of only the final flip.</li>
+        <li><b>Round 4 · Simon</b> — six sequences, lengthening. Memory, which goes first the more inflated you are.</li>
+        <li><b>Sudden Death · Tic tac toe</b> — only if it is somehow still undecided.</li>
+      </ul>
+      <div class="hint" style="margin-top:8px;max-width:860px">Every round carries a spread bet, and the ceiling is <b>100%</b>
+        — set on the <b>Chat</b> page, where stakes rescale to whatever you choose. Simulated over 20,000 matches it ends in
+        Round 3 about 29% of the time and Round 4 about 68%, with Sudden Death catching the last 2%. It always ends.</div>
             <h3 style="margin:16px 0 6px">Who does a row act on?</h3>
       <div class="hint" style="max-width:860px;margin-top:0"><b>Who</b> appears only on rows that touch a
         <b>pump or a picture</b>, because those belong to one machine and multiplayer has two. Blank means
