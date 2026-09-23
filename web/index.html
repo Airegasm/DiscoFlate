@@ -4246,7 +4246,18 @@ async function checkUpdates(){
       m.textContent = `Update available: v${r.latest_version} (you have v${r.current_version}).`;
       if(window.Android && window.Android.openUrl) act.innerHTML = `<button onclick="installUpdate()">⬇ Download &amp; install</button>`;
       else act.innerHTML = `<button onclick="pullUpdates()">⬇ Pull latest code</button>`;
-      if(r.notes){ hint.textContent=r.notes; hint.style.display=''; }
+      // A HEADLINE, not the changelog. version.json's notes can run to
+      // paragraphs and this is a one-line hint under a button — the full
+      // story lives on the release page, one click away.
+      if(r.notes){
+        const all = String(r.notes).replace(/\s+/g,' ').trim();
+        const cut = all.length > 150 ? all.slice(0,147).replace(/\s+\S*$/,'') + '…' : all;
+        const url = `https://github.com/Airegasm/DiscoFlate/releases/tag/v${r.latest_version}`;
+        hint.innerHTML = esc(cut) +
+          ` <a href="${esc(url)}" target="_blank" rel="noopener"` +
+          ` onclick="return openExternal('${esc(url)}', event)">what&rsquo;s new &#8599;</a>`;
+        hint.style.display='';
+      }
     } else {
       m.textContent = `You're up to date (v${r.current_version}).`;
     }

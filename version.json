@@ -1,6 +1,6 @@
 {
-  "version": "3.90.1",
-  "versionCode": 191,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.90.1/discoflate-v3.90.1.apk",
-  "notes": "DiscoFlate v3.90.1 \u2014 \ud83d\udfe9 A ready-made Word Race ships with a Chat button, and FIXES the Chat buttons that never worked. The shipped \ud83d\udd4a Mercy or More? and \ud83c\udf9b Which pump? buttons pointed at real commands that belonged to no capacity range and weren't always-on \u2014 so the bot silently refused them and the buttons did nothing at all. All three are now always-on, and the buttons live in the SCENE's gameplay where the panel reads them rather than at the top level where they were invisible. Word Race ships as a competition, a !wordrace command, a Chat button and a saved template, in both shipped scenes."
+  "version": "3.90.2",
+  "versionCode": 192,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.90.2/discoflate-v3.90.2.apk",
+  "notes": "DiscoFlate v3.90.2 \u2014 \ud83d\udfe9 Word Race ships ready to run, the Chat buttons that never fired now work, and the update check shows a headline instead of the whole changelog."
 }
