@@ -1228,7 +1228,25 @@ class BotManager:
                 if image and not image.lower().startswith(("http://", "https://")) \
                         and os.path.exists(image):
                     kw["file"] = discord.File(image)   # shows inside the embed via attachment://
-                return await ch.send(**kw)
+                try:
+                    return await ch.send(**kw)
+                except discord.Forbidden:
+                    # EMBED LINKS REVOKED. Degrade to plain text rather than
+                    # losing the message entirely — an invite or a Ready check
+                    # that never appears looks like a broken bot.
+                    #
+                    # Forbidden is the ONLY error safe to retry after: Discord
+                    # refused the request outright, so nothing was posted and a
+                    # second send cannot double up. A timeout or a 5xx might
+                    # have landed, so those are NOT retried — they fall through
+                    # to the handler below and the message is simply lost,
+                    # which is the lesser of the two wrongs.
+                    #
+                    # The VIEW comes with it: buttons need no embed permission,
+                    # so the game still plays, it just looks plainer.
+                    body = _clip(text) or "\u200b"
+                    return await ch.send(
+                        body, **({"view": view} if view is not None else {}))
             if image and image.lower().startswith(("http://", "https://")):
                 return await ch.send(_clip(f"{text}\n{image}" if text else image))
             elif image and os.path.exists(image):

@@ -1029,6 +1029,27 @@ ok('"both"' in rowsrc,
    "…including BOTH, so a block can fire at everyone when the house cleans up "
    "without needing a second row type")
 
+# ---- an embed the bot may not send DEGRADES, and never double-posts -------- #
+# _send carries the text AS the embed, so a revoked Embed Links used to lose
+# the message outright: an invite or a Ready check that never appears looks
+# like a broken bot rather than a permissions problem.
+snd = src2[src2.index("    async def _send(self"):]
+snd = snd[:snd.index("    # Embed accent colors")]
+ok("except discord.Forbidden" in snd,
+   "a refused embed falls back to plain text")
+ok("Forbidden is the ONLY error safe to retry" in snd,
+   "…and ONLY on Forbidden: Discord refused outright, so nothing was posted "
+   "and a second send cannot double up")
+ok("except Exception" in snd.split("except discord.Forbidden")[0]
+   or "except Exception" in snd,
+   "…while a timeout or 5xx is NOT retried, because that one might have landed")
+fb = snd[snd.index("except discord.Forbidden"):]
+fb = fb[:fb.index("if image and image.lower()")]
+ok('"view": view' in fb,
+   "the buttons come with it — a view needs no embed permission, so the game "
+   "still PLAYS, it just looks plainer")
+ok("_clip(text)" in fb, "…carrying the words the embed would have shown")
+
 print(f"{P} passed, {len(F)} failed")
 for f in F:
     print("  FAIL:", f)
