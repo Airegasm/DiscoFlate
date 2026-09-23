@@ -38,6 +38,7 @@
   "pause_message": "\u23f8\ufe0f **Session paused** by [user] \u2014 pumps are off and commands are disabled until the operator resumes.",
   "resume_message": "\u25b6\ufe0f **Session resumed** by [user] \u2014 pump away!",
   "paused_notice_message": "\u23f8\ufe0f [mention], the session is paused \u2014 hang tight until the operator resumes.",
+  "activation_off_notice": false,
   "pause_embed": true,
   "pause_title": "\u23f8 Paused",
   "listen_guild_id": "",

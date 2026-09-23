@@ -26,6 +26,51 @@ import config_store
 import minigames
 
 
+def _install_id() -> str:
+    """Which INSTALL this is: version + host. Stamped on the Activation-off
+    notice, because that notice is the only thing a spare install on the same
+    token ever says — and without a stamp two of them are indistinguishable
+    from one, which is exactly the hole this fell into."""
+    import json as _json
+    import socket
+    ver = "?"
+    try:
+        with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "version.json"), "r", encoding="utf-8") as fh:
+            ver = str(_json.load(fh).get("version") or "?")
+    except (OSError, ValueError):
+        pass
+    try:
+        host = socket.gethostname()[:24]
+    except Exception:  # noqa: BLE001
+        host = "?"
+    return f"v{ver} on {host}"
+
+
+# Rich output is a property of the BOT, not of each call site. Wiring it at
+# every send is how half the messages ended up plain: the games, the game
+# intros, the pause notice, the Activation notice — each one a separate path
+# somebody had to remember. _auto_embed() is consulted by the two chokepoints
+# below instead, so a message is a card because rich output is on, full stop.
+_RICH_CFG = None          # set by BotManager.__init__ -> () -> cfg dict
+
+
+def _auto_embed(text, embed=None, image=None):
+    """The card a plain message becomes when rich output is on. Returns the
+    caller's own embed untouched when it has one, and None when there's
+    nothing to wrap (an image post IS the picture; empty text is not a card)."""
+    if embed is not None or image:
+        return embed
+    if not str(text or "").strip():
+        return None
+    try:
+        if not (_RICH_CFG and (_RICH_CFG() or {}).get("rich_output")):
+            return None
+        return discord.Embed(description=str(text)[:4096], color=0x3BA55D)
+    except Exception:  # noqa: BLE001 — never lose a message to a bad embed
+        return None
+
+
 def _resolve_img(image: str | None) -> str | None:
     """Uploaded images are stored as 'images/<name>' relative paths — resolve
     them against the data dir (absolute paths from older configs pass through)."""
@@ -257,6 +302,9 @@ class BotManager:
         # already got a one-time history backfill.
         self._chat_logs: dict[str, deque] = {}
         self._chat_hist: set = set()
+        # who has already been told Activation is off during THIS off period —
+        # cleared the moment a command runs again
+        self._off_told: set = set()
         global _RICH_CFG          # the two senders ask this, not each caller
         _RICH_CFG = self.get_config
         # Owner voice: per-channel webhook (posts AS the owner — their name +
@@ -1374,11 +1422,21 @@ class BotManager:
         if not self._allowed(cfg, message):
             return
         if not cfg.get("listener_enabled"):
-            # Activation off = we are not playing. Say NOTHING: a command we
-            # are not going to run is not an event worth announcing, and any
-            # spare install on the same token would otherwise spend its whole
-            # life narrating that it isn't the one doing the work.
+            # ONE notice per person per OFF PERIOD, not per command and not per
+            # buffer window: while we're off, nothing changes between one
+            # command and the next, so there is nothing new to say. Answering
+            # every command was the loudest thing in the channel — especially
+            # with a second install up whose Activation is off, which answers
+            # commands the first one is busy running.
+            if cfg.get("activation_off_notice") and message.author.id not in self._off_told:
+                self._off_told.add(message.author.id)
+                # stamped, so two installs answering the same command are
+                # telling you apart instead of looking like one bug
+                await _reply(message,
+                             f"🔇 Activation is currently **off**. "
+                             f"-# ({_install_id()})")
             return
+        self._off_told.clear()   # back on: everyone gets told again next time
 
         who = message.author.display_name
 
