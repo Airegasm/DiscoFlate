@@ -1,6 +1,6 @@
 {
-  "version": "3.83.0",
-  "versionCode": 172,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.83.0/discoflate-v3.83.0.apk",
-  "notes": "DiscoFlate v3.83.0 — ↔️ Overlays can SLIDE. Every overlay gets Slide in / Slide out tickboxes: pick the edge it arrives from and the edge it leaves toward, each with its own duration, all four directions both ways. The slide time is ADDED to the overlay's seconds rather than eaten out of it, so a 5s alert with 0.3s legs still sits still for the full 5. Also: corner rounding on anything with a background (text, timers, poll card, gauge, solid); the Device Timer List is now one plate with the countdowns on a fixed tab stop instead of a ragged box per row that drifted with each device's name; Scoped Devices lets you tick which devices that list shows. FIXED: the panel only loaded six of the eleven Template kinds, so Bonus Rounds, Broadcasts, Minigames, Rewards and Modes read 0 — and the next template save wrote that short list back over them. All eleven now load, the shipped defaults are generated when missing, a deleted default stays deleted, and 🧩 Regenerate Defaults brings them back."
+  "version": "3.84.0",
+  "versionCode": 173,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.84.0/discoflate-v3.84.0.apk",
+  "notes": "DiscoFlate v3.84.0 — 🃏 One card, one corner, one message. Competition, Bonus Round and Broadcast join the Poll Viewer as on-screen cards, all four drawn by the same renderer so they can't drift apart. A poll, a competition and a bonus round can no longer run at the same time — whichever you try second is refused and told what's in the way. A broadcast fired while one is running WAITS for the slot instead of being refused, then posts and takes the card. FIXED: a command used to speak three or four times — its block's message rows, then its reply, then its event lines, each its own post seconds apart. One invocation is now one message (one embed when rich output is on). Also fixes an action-driven command posting a bare \"[name · user]\" header with nothing under it, because the header made an empty reply look non-empty."
 }

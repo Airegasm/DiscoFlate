@@ -613,7 +613,7 @@ class BotManager:
     # Embed accent colors per status kind (a colored stripe helps them read apart).
     _EMBED_COLORS = {"capacity": 0x5865F2, "leaderboard": 0xF1C40F,
                      "leaderboard_life": 0xE67E22, "auto": 0x2ECC71,
-                     "broadcast": 0x9B59B6}
+                     "broadcast": 0x9B59B6, "command": 0x3BA55D}
 
     def _status_embed(self, kind: str, text: str, title: str | None = None):
         """Wrap a status/report block in a bordered, colored embed card. Returns None
@@ -640,6 +640,22 @@ class BotManager:
             return discord.Embed(title=ttl[:256], description=(text or "")[:4096],
                                  color=self._EMBED_COLORS.get(kind, 0x5865F2))
         except Exception:  # noqa: BLE001
+            return None
+
+    def _out_embed(self, cfg, label: str, who: str, body: str):
+        """One command, one embed. `rich_output` decides; the title carries the
+        command and who ran it, which is what the **[label · name]** header did
+        when it rode on top of the first of several plain posts.
+
+        Returns None when rich output is off, and _reply then posts the header
+        + body as plain text exactly as before."""
+        if not cfg.get("rich_output") or not str(body or "").strip():
+            return None
+        try:
+            ttl = f"{label} · {who}" if (label and who) else (label or who or "​")
+            return discord.Embed(title=ttl[:256], description=str(body)[:4096],
+                                 color=self._EMBED_COLORS.get("command", 0x5865F2))
+        except Exception:  # noqa: BLE001 — never lose a reply to a bad embed
             return None
 
     def _track_msg(self, replace_key: str, cid: str, msg) -> None:
@@ -1376,7 +1392,7 @@ class BotManager:
         if custom is not None:
             if custom.get("owner_only") and not self.engine.is_owner(message.author.id, who):
                 return  # owner-only command → silently ignore for everyone else
-            res = await self.engine.run_custom(custom, who, uid=str(message.author.id))
+            res = await self.engine.run_custom_collected(custom, who, uid=str(message.author.id))
             if res.get("silent"):
                 return  # gated out (wrong range) → ignore quietly
             if not res.get("ok"):
@@ -1413,7 +1429,20 @@ class BotManager:
                 except Exception as e:  # noqa: BLE001
                     await _reply(message, f"⚠️ couldn't start the game: {e}")
                 return
-            line = res["reply"]
+            # ONE POST PER COMMAND. The reply, everything the action block said
+            # while it ran (res["posts"]) and any event-activation lines are the
+            # same event as far as a reader is concerned — they used to arrive
+            # as three or four separate messages seconds apart.
+            posts = [p for p in (res.get("posts") or []) if str(p or "").strip()]
+            evt_lines, evt_special = [], []
+            for post in (res.get("events_posted") or []):
+                # a replace_key / image post has to stay its own message: the
+                # next round deletes it by that key
+                if isinstance(post, dict):
+                    evt_special.append(post)
+                elif str(post or "").strip():
+                    evt_lines.append(str(post))
+            line = "\n".join([x for x in [res["reply"], *posts, *evt_lines] if str(x or "").strip()])
             tail = "\n⏳ (a fire is already running — ignored)" if (res.get("device") and not res.get("started")) else ""
             label = custom.get("name") or ""
             # react_only: acknowledge with a reaction instead of a text reply (spam
@@ -1428,17 +1457,25 @@ class BotManager:
                 except Exception as e:  # noqa: BLE001
                     self.engine._log("error", f"react failed ({emoji}): {e}")
             if not reacted:
-                await _reply(message, self._hdr(cfg, label, who) + line + tail, as_reply=bool(custom.get("mention")))
-                await self._echo(message, res.get("reply_anon"), tail, res.get("reply"), label=label)
-            # Event activation / in-process / cooldown lines come AFTER the reply.
+                body = (line + tail).strip()
+                # An action-driven command usually has no `reply` of its own —
+                # the block does the talking. Posting the header anyway put a
+                # bare "**[inflate · Stan]**" in chat with nothing under it.
+                if body:
+                    await _reply(message, self._hdr(cfg, label, who) + body,
+                                 as_reply=bool(custom.get("mention")),
+                                 embed=self._out_embed(cfg, label, who, body))
+                    echo_real = "\n".join([x for x in [res.get("reply"), *posts, *evt_lines]
+                                           if str(x or "").strip()])
+                    echo_anon = "\n".join([x for x in [res.get("reply_anon"), *posts, *evt_lines]
+                                           if str(x or "").strip()])
+                    await self._echo(message, echo_anon, tail, echo_real, label=label)
             # A clean_previous loop's first round arrives as a dict carrying its
-            # replace_key so subsequent rounds can delete it; others are plain text.
-            for post in (res.get("events_posted") or []):
-                if isinstance(post, dict):
-                    await self.broadcast(post.get("text", ""), post.get("image"),
-                                         replace_key=post.get("replace_key"))
-                else:
-                    await self.broadcast(post, None)
+            # replace_key so subsequent rounds can delete it — those can't be
+            # folded in, so they still post on their own.
+            for post in evt_special:
+                await self.broadcast(post.get("text", ""), post.get("image"),
+                                     replace_key=post.get("replace_key"))
             return
         # (no trailing builtin here: the old chat dice-roll is a custom command now)
 

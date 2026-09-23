@@ -133,6 +133,19 @@ class Engine:
         # winner gets their total fired + optional winner-only range command.
         self._comp: dict | None = None          # {def, cmd, ends_at, metric, cap, scores:{uid:{name,score,entries}}}
         self._comp_task: asyncio.Task | None = None
+        # Results held past the end for the Competition / Bonus Round viewers,
+        # exactly like _poll_results — the overlay decides how long to show
+        # them. NOT `_comp_results`: that name is already a method ([results]),
+        # and an attribute would shadow it into a TypeError.
+        self._comp_card: dict | None = None
+        self._bonus_card: dict | None = None
+        # The broadcast currently on the card, and the ones waiting for the slot.
+        self._broadcast_card: dict | None = None
+        self._broadcast_q: list = []
+        # id(task) -> list: while a command runs, everything it wants to say is
+        # collected here and posted as ONE message instead of a handful. See
+        # _sink_for().
+        self._sinks: dict[int, list] = {}
         self._last_winner: str = ""             # [winner] placeholder (most recent competition winner)
         self._last_winner_score: float = 0.0
         self._last_runnerup: str = ""           # [runnerup] placeholder (2nd place, last competition)
@@ -283,7 +296,8 @@ class Engine:
             self._vars.clear()
             self._uvars.clear()
             self._once_fired.clear()
-            self._poll_results = None
+            self._claim_card()          # drop every held card + its results
+            self._broadcast_q.clear()   # a new session doesn't owe the old one
             self._event_cooldown_until.clear()
             self._event_activator.clear()
             self._current_range_key = None
@@ -312,6 +326,8 @@ class Engine:
             self._cancel_winner_button()
             self._cancel_bonus_round()
             self._cancel_deadline()
+            self._claim_card()          # nothing holds the card slot any more
+            self._broadcast_q.clear()
             self._clear_winner_grants(all_incl_stash=True)
             self._cmd_gate_block = False
             self._cmd_gate_allow.clear()
@@ -922,10 +938,37 @@ class Engine:
                 self._log("error", f"{key} embed failed: {ex}")
         await self._announce(body, None)
 
+    # exactly what _evt_hdr / _hdr emit, so nothing else gets clipped
+    _HDR_TAG = re.compile(r"^\*\*\[[^\]\n]*\]\*\*[ \t]*")
+
+    def _sink_for(self) -> list | None:
+        """The output sink belonging to the CURRENT task, if one is collecting.
+
+        Keyed by task, not global: a command's block and a background event can
+        be mid-await at the same moment, and the event's lines must not get
+        swept into the command's embed. A task spawned inside a command (a poll
+        the block kicks off) is a different task, so it posts normally — which
+        is right, it outlives the command that started it."""
+        try:
+            t = asyncio.current_task()
+        except RuntimeError:          # no running loop (sync tests)
+            return None
+        return self._sinks.get(id(t)) if t is not None else None
+
     async def _announce(self, text: str, image: str | None, replace_key: str | None = None) -> None:
         text = await self._run_inline_commands(text)
         if not text and image is None:
             return   # message was only [!command] token(s) — fired, nothing to post
+        sink = self._sink_for()
+        # Only PLAIN lines are collected. An image is its own post, and a
+        # replace_key one has to stay a separate message or the next round has
+        # nothing to delete.
+        if sink is not None and image is None and replace_key is None:
+            # Drop the per-line **[name]** tag: it earned its place when every
+            # line was its own message, but the combined post carries one
+            # header already and three copies of it is just noise.
+            sink.append(self._HDR_TAG.sub("", text, count=1))
+            return
         if self.announce_cb:
             try:
                 await self.announce_cb(text, image, replace_key)
@@ -2036,7 +2079,10 @@ class Engine:
                         # the same way a disabled command doesn't run
                         self._log("bot", f"{name}: broadcast '{row.get('name')}' is inactive — skipped")
                     elif (row.get("message") or "").strip():
-                        await self._post_broadcast(R(row["message"].strip()))
+                        # WAITS for the card slot instead of being refused —
+                        # see queue_broadcast()
+                        await self.queue_broadcast(R(row["message"].strip()),
+                                                   row.get("name") or "")
                     continue
                 if typ == "poll":
                     pd = self.find_poll(a.get("poll"))
@@ -2551,6 +2597,83 @@ class Engine:
     def poll_active(self) -> bool:
         return self._poll is not None
 
+    # ---- the card slot -----------------------------------------------------
+    # A poll, a competition and a bonus round all want the SAME corner card, so
+    # only one may run at a time. That isn't a rendering nicety: they all ask
+    # the same chat to do different things at once, and two countdowns racing
+    # each other is unreadable however they're laid out.
+    _CARD_LABEL = {"poll": "🗳 a poll", "competition": "🏁 a competition",
+                   "bonus": "🤝 a bonus round"}
+    _BROADCAST_Q_MAX = 12          # a deeper backlog is noise; drop the rest
+
+    def card_busy(self, ignore: str = "") -> str:
+        """Which card feature is live right now ('poll' | 'competition' |
+        'bonus'), or "" when the slot is free. `ignore` skips one, so each
+        starter can ask about the OTHERS without tripping on itself."""
+        if self._poll is not None and ignore != "poll":
+            return "poll"
+        if self._comp is not None and ignore != "competition":
+            return "competition"
+        if self._bonus_round is not None and ignore != "bonus":
+            return "bonus"
+        return ""
+
+    def _card_blocked(self, kind: str, what: str) -> dict | None:
+        """The refusal a starter returns when the slot is taken, or None."""
+        busy = self.card_busy(ignore=kind)
+        if not busy:
+            return None
+        return {"ok": False,
+                "error": f"{self._CARD_LABEL[busy]} is already running — "
+                         f"wait for it to finish before starting {what}."}
+
+    def _claim_card(self) -> None:
+        """Take the slot for something new: drop every held result so a stale
+        card can't sit under the one coming up."""
+        self._poll_results = None
+        self._comp_card = None
+        self._bonus_card = None
+        self._broadcast_card = None
+
+    async def queue_broadcast(self, text: str, name: str = "") -> bool:
+        """Post a broadcast now, or hold it until the card slot frees.
+
+        Broadcasts are the one thing that WAITS rather than being refused —
+        an announcement is still worth saying a minute later, where a poll
+        starting late is just a poll nobody was told about. Returns True when
+        it went out, False when it was queued."""
+        text = (text or "").strip()
+        if not text:
+            return True
+        if not self.card_busy():
+            await self._show_broadcast(text, name)
+            return True
+        if len(self._broadcast_q) >= self._BROADCAST_Q_MAX:
+            self._log("bot", f"broadcast '{name or text[:24]}' dropped — "
+                             f"{self._BROADCAST_Q_MAX} already waiting")
+            return False
+        self._broadcast_q.append({"text": text, "name": name})
+        self._log("bot", f"broadcast '{name or text[:24]}' queued behind "
+                         f"{self.card_busy()} ({len(self._broadcast_q)} waiting)")
+        return False
+
+    async def _show_broadcast(self, text: str, name: str = "") -> None:
+        """Post a broadcast and put it on the card."""
+        self._broadcast_card = {"text": text, "name": name, "at": time.monotonic()}
+        await self._post_broadcast(text)
+
+    async def _drain_broadcasts(self) -> None:
+        """Release whatever queued up while the slot was busy. Called as each
+        card feature ends; posts them in the order they were asked for."""
+        if not self._broadcast_q or self.card_busy():
+            return
+        pending, self._broadcast_q = self._broadcast_q, []
+        for b in pending:
+            try:
+                await self._show_broadcast(b["text"], b.get("name", ""))
+            except Exception as e:  # noqa: BLE001 — one bad post can't eat the rest
+                self._log("error", f"queued broadcast failed: {e}")
+
     async def _post_broadcast(self, text: str) -> None:
         """Post a Broadcast-preset action as a rich embed (falls back to text)."""
         if not (text or "").strip():
@@ -2622,7 +2745,7 @@ class Engine:
             repeat = 5.0
         self._poll = {"def": pd, "opts": opts, "votes": {}, "voters": {},
                       "title": title, "ends_at": time.monotonic() + duration}
-        self._poll_results = None      # a new poll supersedes the old results
+        self._claim_card()             # a new poll supersedes any held card
         self._log("bot", f"POLL '{name}' started ({duration:g}s, {len(opts)} options) [{source}]")
         winner_idx = None
         labels = [o.get("label", "") for o in opts]
@@ -2668,6 +2791,7 @@ class Engine:
             raise
         finally:
             self._poll = None
+            await self._drain_broadcasts()   # the card slot is free again
         # Remember the winner so post-event commands can gate on it.
         self._last_poll_winner = winner_idx
         if winner_idx is not None:
@@ -2709,6 +2833,9 @@ class Engine:
             return {"ok": False, "error": f"no poll named '{name}' — create it in Events → Polls"}
         if self._poll is not None:
             return {"ok": False, "error": "🗳 A poll is already running — wait for it to finish."}
+        blocked = self._card_blocked("poll", "a poll")
+        if blocked:
+            return blocked
         if self._paused:
             return {"ok": False, "error": "session is paused"}
         self._poll_task = asyncio.create_task(self._run_poll(pd, source=source))
@@ -2907,6 +3034,9 @@ class Engine:
             return {"ok": False, "error": f"no competition named '{name}'"}
         if self._comp is not None:
             return {"ok": False, "error": "a competition is already running"}
+        blocked = self._card_blocked("competition", "a competition")
+        if blocked:
+            return blocked
         if self._paused:
             return {"ok": False, "error": "session is paused"}
         self._comp_task = asyncio.create_task(self._run_competition(cd, source))
@@ -2929,7 +3059,11 @@ class Engine:
             repeat = 5.0
         self._comp = {"def": cd, "cmd": entry_key, "metric": cd.get("metric", "total"),
                       "cap": int(cd.get("max_entries") or 0), "players": {}, "type": typ,
-                      "required_entries": int(cd.get("required_entries") or 0)}
+                      "required_entries": int(cd.get("required_entries") or 0),
+                      # the Competition Viewer counts down against this
+                      "title": self.render((cd.get("title") or name).strip()),
+                      "ends_at": time.monotonic() + duration}
+        self._claim_card()
         rolls = self._comp_rolls(cd)
         rerolls = int(cd.get("reroll_count") or 0) if cd.get("allow_reroll") else 0
         title = "🏁 " + self.render((cd.get("title") or name).strip())
@@ -2997,7 +3131,13 @@ class Engine:
         results_text = self._comp_results()   # capture the scoreboard before clearing
         ru_name, ru_score = self._comp_runnerup(winner_uid)   # 2nd place, before clearing
         total_score = self._comp_total_score()   # combined total, before clearing
+        # the Competition Viewer's final board, held past the end like a poll's
+        self._comp_card = {"title": self._comp.get("title") or name,
+                           "at": time.monotonic(),
+                           "rows": self._comp_rows(winner_uid),
+                           "winner": (winner or "")}
         self._comp = None
+        await self._drain_broadcasts()        # the card slot is free again
         self._last_results = results_text
         self._last_runnerup, self._last_runnerup_score = ru_name, ru_score
         self._last_total_score = total_score
@@ -3199,6 +3339,9 @@ class Engine:
             return {"ok": False, "error": f"no bonus round named '{name}'"}
         if self._bonus_round is not None:
             return {"ok": False, "error": "a bonus round is already running"}
+        blocked = self._card_blocked("bonus", "a bonus round")
+        if blocked:
+            return blocked
         if self._paused:
             return {"ok": False, "error": "session is paused"}
         self._bonus_round_task = asyncio.create_task(self._run_bonus_round(brd, source))
@@ -3225,7 +3368,11 @@ class Engine:
         except (TypeError, ValueError):
             duration = 60.0
         self._bonus_round = {"def": brd, "name": name, "holders": set(holders),
-                             "needed": set(needed), "pressed": set(), "done": False}
+                             "needed": set(needed), "pressed": set(), "done": False,
+                             # the Bonus Round Viewer counts down against this
+                             "title": self.render((brd.get("title") or name).strip()),
+                             "ends_at": time.monotonic() + duration}
+        self._claim_card()
         title = "🤝 " + self.render((brd.get("title") or name).strip())
         body = self.render((brd.get("body") or "").strip()) or self._bonus_round_intro(confirm, needed)
         meta = {"name": name, "holders": [self._name_for(u) or "?" for u in holders]}
@@ -3252,7 +3399,11 @@ class Engine:
             raise
         # expired without full confirmation
         if self._bonus_round is not None and not self._bonus_round["done"]:
+            self._bonus_card = {"title": self._bonus_round.get("title") or name,
+                                "at": time.monotonic(), "rows": self._bonus_rows(),
+                                "note": "expired — not everyone confirmed"}
             self._bonus_round = None
+            await self._drain_broadcasts()     # the card slot is free again
             fmsg = (brd.get("expire_message") or "").strip()
             if fmsg:
                 await self._announce(self.render(fmsg), None)
@@ -3301,7 +3452,11 @@ class Engine:
         brd = br["def"]
         name = br["name"]
         secs, pct = self.total_bonus()   # pooled totals BEFORE clearing
+        self._bonus_card = {"title": br.get("title") or name, "at": time.monotonic(),
+                            "rows": self._bonus_rows(),
+                            "note": f"🤝 activated — {secs:g}s / {pct:g}% pooled"}
         self._bonus_round = None
+        await self._drain_broadcasts()   # the card slot is free again
         self._log("bot", f"BONUS ROUND '{name}' ACTIVATED — pooled {secs:g}s / {pct:g}%")
         xc = {"total_bonus_secs": f"{secs:g}", "total_bonus_pct": f"{pct:g}"}
         # spent & cleared: the block sees the pooled totals, then banks reset
@@ -3520,8 +3675,10 @@ class Engine:
             if row is None:
                 self._log("error", f"event '{name}': no broadcast named '{ev.get('broadcast')}'")
             elif (row.get("message") or "").strip():
-                # broadcast actions post as a rich embed (not sink text)
-                await self._post_broadcast(self.render(row["message"].strip(), extra))
+                # broadcast actions post as a rich embed (not sink text), and
+                # wait for the card slot rather than being refused
+                await self.queue_broadcast(self.render(row["message"].strip(), extra),
+                                           row.get("name") or "")
             if msg:
                 await self._emit(self.render(msg, extra), sink, replace_key=replace_key)
             return
@@ -3969,6 +4126,32 @@ class Engine:
                 "extended": extended, "added": fr.get("added"), "remaining": fr.get("remaining"),
                 **p, "reply": reply, "reply_anon": reply_anon,
                 "announce": self.render(p["announce"]) if p.get("announce") else ""}
+
+    async def run_custom_collected(self, cmd: dict, who: str, uid: str | None,
+                                   as_owner: bool = False) -> dict:
+        """run_custom, with everything the command SAYS collected into
+        `res["posts"]` instead of posted line by line — so one invocation can
+        go out as one message instead of the three or four it used to be.
+
+        OPT-IN on purpose. Only a caller that actually posts `posts` may turn
+        the sink on; every internal caller keeps announcing as it goes, because
+        a collector nobody drains is a command that silently says nothing.
+
+        A `command` row nested inside the block reaches run_custom on the SAME
+        task and finds the sink already open, so its lines join this one's
+        message rather than opening a second collector that would clobber it."""
+        task = asyncio.current_task()
+        key = id(task) if task is not None else None
+        own = key is not None and key not in self._sinks
+        if own:
+            self._sinks[key] = []
+        try:
+            res = await self.run_custom(cmd, who, uid, as_owner=as_owner)
+        finally:
+            posts = self._sinks.pop(key, []) if own else []
+        if isinstance(res, dict):
+            res.setdefault("posts", posts)
+        return res
 
     async def run_custom(self, cmd: dict, who: str, uid: str | None,
                          as_owner: bool = False) -> dict:
@@ -5211,6 +5394,101 @@ class Engine:
                         "results_age": round(age, 1)}
         return None
 
+    def _comp_rows(self, winner_uid=None) -> list[dict]:
+        """Scoreboard rows for the Competition Viewer, best first. `frac` is
+        the share of the leader's score, which is what the card draws as a bar
+        — an absolute scale would be meaningless when one roll-off tops out at
+        18 and the next at 400."""
+        c = self._comp
+        if not c:
+            return []
+        players = [(u, p) for u, p in c["players"].items() if p.get("entered")]
+        players.sort(key=lambda kv: (-(float(kv[1].get("score") or 0)),
+                                     kv[1].get("name") or ""))
+        top = max([float(p.get("score") or 0) for _, p in players] or [0.0])
+        rows = []
+        for u, p in players[:8]:
+            score = float(p.get("score") or 0)
+            rows.append({"label": p.get("name") or "?",
+                         "value": f"{score:g}",
+                         "frac": (score / top) if top > 0 else 0.0,
+                         "win": winner_uid is not None and str(u) == str(winner_uid),
+                         "done": p.get("done_at") is not None})
+        return rows
+
+    def competition_view(self) -> dict | None:
+        """What the Competition Viewer should show, or None for nothing. Same
+        contract as poll_view(): live board + countdown while it runs, then the
+        final board carrying its AGE so each overlay applies its own hold."""
+        c = self._comp
+        if c:
+            rows = self._comp_rows()
+            waiting = max(0, int(c.get("required_entries") or 0) - len(rows))
+            return {"phase": "live", "title": c.get("title") or "Competition",
+                    "rows": rows, "winner": None,
+                    "note": (f"needs {waiting} more" if waiting else
+                             f"{len(rows)} in"),
+                    "remaining": round(max(0.0, c.get("ends_at", 0) - time.monotonic()), 1)}
+        r = self._comp_card
+        if r:
+            age = time.monotonic() - r["at"]
+            if age <= 3600:
+                return {"phase": "results", "title": r["title"] + " — RESULTS",
+                        "rows": r["rows"], "winner": r.get("winner") or None,
+                        "note": (f"🏆 {r['winner']}" if r.get("winner") else "no winner"),
+                        "results_age": round(age, 1)}
+        return None
+
+    def _bonus_rows(self) -> list[dict]:
+        """One row per bonus holder for the Bonus Round Viewer — a full bar
+        once they've pressed, so the card reads as a checklist at a glance."""
+        b = self._bonus_round
+        if not b:
+            return []
+        rows = []
+        for u in sorted(b["holders"], key=lambda x: (self._name_for(x) or "?").lower()):
+            pressed = u in b["pressed"]
+            needed = u in b["needed"]
+            rows.append({"label": self._name_for(u) or "?",
+                         "value": "✔" if pressed else ("…" if needed else "—"),
+                         "frac": 1.0 if pressed else 0.0,
+                         "win": pressed, "done": pressed})
+        return rows[:8]
+
+    def bonus_round_view(self) -> dict | None:
+        """What the Bonus Round Viewer should show, or None for nothing."""
+        b = self._bonus_round
+        if b:
+            rows = self._bonus_rows()
+            left = len(b["needed"] - b["pressed"])
+            return {"phase": "live",
+                    "title": b.get("title") or b.get("name") or "Bonus Round",
+                    "rows": rows, "winner": None,
+                    "note": (f"{left} still to confirm" if left else "everyone in!"),
+                    "remaining": round(max(0.0, b.get("ends_at", 0) - time.monotonic()), 1)}
+        r = self._bonus_card
+        if r:
+            age = time.monotonic() - r["at"]
+            if age <= 3600:
+                return {"phase": "results", "title": r["title"],
+                        "rows": r["rows"], "winner": None,
+                        "note": r.get("note", ""), "results_age": round(age, 1)}
+        return None
+
+    def broadcast_view(self) -> dict | None:
+        """What the Broadcast Viewer should show. A broadcast has no duration
+        of its own — it's a message, not a round — so the card only ever has a
+        'results' phase and the overlay's own hold decides how long it stays."""
+        b = self._broadcast_card
+        if not b:
+            return None
+        age = time.monotonic() - b["at"]
+        if age > 3600:
+            return None
+        return {"phase": "results", "title": b.get("name") or "Announcement",
+                "rows": [], "body": b.get("text") or "", "winner": None,
+                "note": "", "results_age": round(age, 1)}
+
     def device_timers(self) -> list[dict]:
         """Rows for the Device Timer List overlay: the PRIMARY pump first
         (the active device, when it's a pump), then every other configured
@@ -5244,6 +5522,12 @@ class Engine:
             "fires": fires,
             "device_timers": self.device_timers(),
             "poll": self.poll_view(),
+            "competition": self.competition_view(),
+            "bonus_round": self.bonus_round_view(),
+            "broadcast": self.broadcast_view(),
+            # what currently owns the corner card slot ("" = free)
+            "card_busy": self.card_busy(),
+            "broadcasts_queued": len(self._broadcast_q),
             "intro": ({"active": True, "remaining": round(self.intro_remaining(), 1),
                        "open_ended": self._intro_until is None,
                        "stage": self._intro_stage + 1,

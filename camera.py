@@ -742,10 +742,44 @@ class VirtualCam:
             y += line_h + gap
         return self._round_corners(sp, self._radius_px(item, w, h)) if bg else sp
 
-    def _poll_sprite(self, item: dict, W: int, H: int, pv: dict):
-        """The Poll Viewer: an embed-style card sized by w/h, listing each
-        option with a vote bar, plus its own countdown (time left while the
-        poll runs, then how long the results stay up)."""
+    @staticmethod
+    def _card_rows(v: dict) -> list:
+        """Normalise a card view's body to rows of {label,value,frac,win}.
+
+        A poll ships options+votes and its bar is the share of the vote; a
+        competition and a bonus round ship rows already. One shape here means
+        ONE card renderer, so the four viewers cannot drift apart visually."""
+        if v.get("rows") is not None:
+            return list(v["rows"])[:8]
+        opts = (v.get("options") or [])[:8]
+        total = max(1, int(v.get("total") or 0))
+        win = v.get("winner")
+        return [{"label": o.get("label", ""), "value": str(int(o.get("votes") or 0)),
+                 "frac": (int(o.get("votes") or 0) / total) if v.get("total") else 0.0,
+                 "win": (win is not None and i == win)}
+                for i, o in enumerate(opts)]
+
+    @staticmethod
+    def _wrap(txt: str, font, scale: float, thick: int, width: int) -> list:
+        """Greedy word wrap to a pixel width — the Broadcast card is a
+        paragraph, not a list, so it needs real wrapping."""
+        out, line = [], ""
+        for word in str(txt or "").split():
+            trial = (line + " " + word).strip()
+            (tw, _), _b = cv2.getTextSize(trial, font, scale, thick)
+            if tw <= width or not line:
+                line = trial
+            else:
+                out.append(line)
+                line = word
+        if line:
+            out.append(line)
+        return out[:8]
+
+    def _card_sprite(self, item: dict, W: int, H: int, v: dict, footer: str = ""):
+        """The shared embed-style card behind the Poll / Competition / Bonus
+        Round / Broadcast viewers: a w x h rect with an accent spine, a title
+        and countdown on the header row, then either bars or a paragraph."""
         try:
             bw = max(120, int(W * float(item.get("w") or 0.34)))
             bh = max(80, int(H * float(item.get("h") or 0.30)))
@@ -765,42 +799,95 @@ class VirtualCam:
         pad = max(8, int(bh * 0.07))
         fs = max(0.4, bh / 300.0)
         y = pad + int(fs * 26)
-        cv2.putText(sp, str(pv.get("title") or "Poll")[:42], (pad + 8, y),
+        cv2.putText(sp, str(v.get("title") or "")[:42], (pad + 8, y),
                     0, fs * 1.05, (255, 255, 255, 255), max(1, int(fs * 2)), cv2.LINE_AA)
         # countdown, right-aligned on the title row
-        rem = pv.get("remaining")
-        if rem is None and pv.get("_hold") is not None:
-            rem = pv["_hold"]
+        rem = v.get("remaining")
+        if rem is None and v.get("_hold") is not None:
+            rem = v["_hold"]
         if rem is not None:
             lbl = f"{float(rem):.0f}s"
             (tw_, _t), _b = cv2.getTextSize(lbl, 0, fs * 0.95, max(1, int(fs * 2)))
             cv2.putText(sp, lbl, (bw - pad - tw_ - 4, y), 0, fs * 0.95,
                         (*accent, 255), max(1, int(fs * 2)), cv2.LINE_AA)
-        opts = pv.get("options") or []
-        total = max(1, int(pv.get("total") or 0))
-        rows = opts[:8]
-        room = bh - y - pad
-        rh = max(14, int(room / max(1, len(rows))))
-        winner = pv.get("winner")
-        for i, o in enumerate(rows):
-            ry = y + int(rh * (i + 0.35)) + 4
-            if ry + 6 > bh - 2:
-                break
-            votes = int(o.get("votes") or 0)
-            frac = votes / total if pv.get("total") else 0.0
-            barw = int((bw - pad * 2 - 8) * max(0.0, min(1.0, frac)))
-            bar_y2 = min(bh - 2, ry + max(6, int(rh * 0.42)))
-            cv2.rectangle(sp, (pad + 4, ry), (bw - pad - 4, bar_y2), (46, 46, 54, 255), -1)
-            if barw > 1:
-                col = (*accent, 255) if (winner is None or i == winner) else (110, 110, 120, 255)
-                cv2.rectangle(sp, (pad + 4, ry), (pad + 4 + barw, bar_y2), col, -1)
-            txt = ("🏆 " if i == winner else "") + f"{o.get('label', '')[:26]} · {votes}"
-            txt = txt.replace("🏆 ", "> ")      # cv2 can't draw emoji
-            cv2.putText(sp, txt, (pad + 10, bar_y2 - max(2, int(rh * 0.12))),
-                        0, fs * 0.8, (0, 0, 0, 255), max(3, int(fs * 4)), cv2.LINE_AA)
-            cv2.putText(sp, txt, (pad + 10, bar_y2 - max(2, int(rh * 0.12))),
-                        0, fs * 0.8, (255, 255, 255, 255), max(1, int(fs * 2)), cv2.LINE_AA)
+        foot_h = int(fs * 22) if footer else 0
+        rows = self._card_rows(v)
+        body = str(v.get("body") or "").strip()
+        room = bh - y - pad - foot_h
+        if rows:
+            rh = max(14, int(room / max(1, len(rows))))
+            # grey the also-rans only once something has actually won
+            any_win = any(r.get("win") for r in rows)
+            for i, o in enumerate(rows):
+                ry = y + int(rh * (i + 0.35)) + 4
+                if ry + 6 > bh - pad - foot_h:
+                    break
+                frac = max(0.0, min(1.0, float(o.get("frac") or 0)))
+                barw = int((bw - pad * 2 - 8) * frac)
+                bar_y2 = min(bh - 2, ry + max(6, int(rh * 0.42)))
+                cv2.rectangle(sp, (pad + 4, ry), (bw - pad - 4, bar_y2), (46, 46, 54, 255), -1)
+                if barw > 1:
+                    col = (*accent, 255) if (not any_win or o.get("win")) else (110, 110, 120, 255)
+                    cv2.rectangle(sp, (pad + 4, ry), (pad + 4 + barw, bar_y2), col, -1)
+                val = str(o.get("value", ""))
+                txt = ("> " if o.get("win") else "") + str(o.get("label", ""))[:26]
+                if val:
+                    txt += f" · {val}"
+                cv2.putText(sp, txt, (pad + 10, bar_y2 - max(2, int(rh * 0.12))),
+                            0, fs * 0.8, (0, 0, 0, 255), max(3, int(fs * 4)), cv2.LINE_AA)
+                cv2.putText(sp, txt, (pad + 10, bar_y2 - max(2, int(rh * 0.12))),
+                            0, fs * 0.8, (255, 255, 255, 255), max(1, int(fs * 2)), cv2.LINE_AA)
+        elif body:
+            # a Broadcast has no rows — it's the message itself
+            th_ = max(1, int(fs * 2))
+            lines = self._wrap(body, 0, fs * 0.85, th_, bw - pad * 2 - 12)
+            lh = int(fs * 26)
+            by = y + lh
+            for ln in lines:
+                if by > bh - pad - foot_h:
+                    break
+                cv2.putText(sp, ln, (pad + 8, by), 0, fs * 0.85,
+                            (235, 235, 240, 255), th_, cv2.LINE_AA)
+                by += lh
+        if footer:
+            (tw_, _t), _b = cv2.getTextSize(footer, 0, fs * 0.72, max(1, int(fs * 1.6)))
+            cv2.putText(sp, footer, ((bw - tw_) // 2, bh - pad // 2 - 2), 0, fs * 0.72,
+                        (190, 190, 200, 255), max(1, int(fs * 1.6)), cv2.LINE_AA)
         return self._round_corners(sp, rad)
+
+    # The four SELF-GATED card overlays: each is always mounted and decides
+    # frame by frame whether it draws, from the matching key in state. They all
+    # want the same corner, which is why the engine only lets one run at a time.
+    _CARD_KINDS = {"poll_viewer": "poll", "competition_viewer": "competition",
+                   "bonus_round_viewer": "bonus_round",
+                   "broadcast_viewer": "broadcast"}
+
+    @classmethod
+    def _card_view(cls, item: dict, st: dict) -> dict | None:
+        """The view a card overlay should draw, or None for nothing.
+
+        Each ships its results with an AGE rather than a verdict, so every
+        overlay applies its OWN `results_secs` — two viewers of the same thing
+        can hold it for different lengths."""
+        v = (st or {}).get(cls._CARD_KINDS.get(str(item.get("kind") or ""), ""))
+        if not v:
+            return None
+        if v.get("phase") != "results":
+            return v
+        try:
+            hold = max(0.0, float(item.get("results_secs", 8) or 0))
+        except (TypeError, ValueError):
+            hold = 8.0
+        age = float(v.get("results_age") or 0)
+        if age > hold:
+            return None                         # results window elapsed
+        return {**v, "_hold": max(0.0, hold - age)}
+
+    def _poll_sprite(self, item: dict, W: int, H: int, pv: dict):
+        """The Poll Viewer — the shared card, plus the how-to-vote line while
+        voting is open (there's nothing left to vote on once results are up)."""
+        foot = "" if pv.get("phase") == "results" else "Use the Chat Buttons to Vote"
+        return self._card_sprite(item, W, H, pv, footer=foot)
 
     def _live(self, txt: str, st: dict) -> str:
         """Re-render the placeholders still in an overlay's text, so a label
@@ -859,20 +946,13 @@ class VirtualCam:
             except (TypeError, ValueError):
                 pct = 0.0
             return self._gauge_sprite(item, W, H, pct)
-        if kind == "poll_viewer":
-            pv = st.get("poll")
-            if not pv:
-                return None                     # no poll → nothing on screen
-            if pv.get("phase") == "results":
-                try:
-                    hold = max(0.0, float(item.get("results_secs", 8) or 0))
-                except (TypeError, ValueError):
-                    hold = 8.0
-                age = float(pv.get("results_age") or 0)
-                if age > hold:
-                    return None                 # results window elapsed
-                pv = {**pv, "_hold": max(0.0, hold - age)}
-            return self._poll_sprite(item, W, H, pv)
+        if kind in self._CARD_KINDS:
+            v = self._card_view(item, st)
+            if v is None:
+                return None                     # nothing running → nothing drawn
+            if kind == "poll_viewer":
+                return self._poll_sprite(item, W, H, v)
+            return self._card_sprite(item, W, H, v, footer=str(v.get("note") or ""))
         if kind == "timer":
             # a countdown the action blocks start/stop; before it ever runs it
             # just shows its configured length, so the scene reads right idle
@@ -1211,23 +1291,24 @@ class VirtualCam:
         return off if off is not None else cls._anim_offset(o, now, w, h)
 
     def _gate(self, o: dict, it: dict, now: float) -> dict:
-        """A SELF-GATED widget (the Poll Viewer) is always mounted and decides
-        frame by frame whether it draws anything — it has no fire time and no
-        `until`, so its slide legs have nothing to hang off. Borrow the poll's
-        own clock: born = the frame it started drawing, until = the end of the
+        """A SELF-GATED card overlay is always mounted and decides frame by
+        frame whether it draws anything — it has no fire time and no `until`,
+        so its slide legs have nothing to hang off. Borrow the card's own
+        clock: born = the frame it started drawing, until = the end of the
         results window. Everything else is returned untouched."""
-        if str(it.get("kind") or "") != "poll_viewer":
+        key = self._CARD_KINDS.get(str(it.get("kind") or ""))
+        if not key:
             return o
         if not o.get("_gate_on"):
             o["_gate_on"] = now
         until = None
-        pv = (self._get_state() or {}).get("poll") or {}
-        if pv.get("phase") == "results":
+        v = (self._get_state() or {}).get(key) or {}
+        if v.get("phase") == "results":
             try:
                 hold = max(0.0, float(it.get("results_secs", 8) or 0))
             except (TypeError, ValueError):
                 hold = 8.0
-            until = now + max(0.0, hold - float(pv.get("results_age") or 0))
+            until = now + max(0.0, hold - float(v.get("results_age") or 0))
         return dict(o, born=o["_gate_on"], until=until)
 
     def _spot(self, o: dict, W: int, H: int, w: int, h: int) -> tuple[int, int]:

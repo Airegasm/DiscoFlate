@@ -1317,7 +1317,7 @@
           <ul style="margin:4px 0 0 18px">
             <li><b>The camera holds your webcam</b> while it runs. Anything else wanting that same device will find it busy.</li>
             <li><b>Black is deliberate.</b> Not LIVE = a genuinely black frame with no overlays at all, so you can start the camera, pick it in Discord and get ready without anyone seeing the room. During an intro it stays black with just the intro playing on it (untick <b>black during intro</b> in Go Live Options to show the camera behind it instead).</li>
-            <li><b>🪞 Mirror</b> exists only to cancel Discord's un-disableable self-view mirror. ON = your own tile reads correctly but <b>viewers see everything mirrored</b>. Leave it OFF unless you know you want that.</li>
+            <li><b>🪞 Mirror</b> flips the <b>camera image only</b>, before overlays are drawn — use it if your camera hands you a reversed picture, or something in shot reads backwards. It does <b>not</b> fix your own Discord tile, and cannot: Discord mirrors your self-view and offers no way to turn that off, so your overlays read backwards <b>to you</b> there whatever this is set to. It has no effect at all on <b>STARTING SOON</b> or an <b>intro</b> — those frames are blanked before anything is drawn, so there is no camera image left to flip. The preview above is the finished frame exactly as sent; judge your layout there, not in your own tile.</li>
             <li><b>🔍 Detect</b> lists the sizes each attached camera really supports, portrait modes included.</li>
             <li><b>⏸ Pause</b> covers the stream with your pause overlay and stops the pumps; ▶ Resume clears it.</li>
             <li><b>Audio overlays play on this machine's speakers</b>, not down the video pipe. To get them to viewers, route your system audio into Discord (a loopback / monitor source).</li>
@@ -2318,9 +2318,11 @@ function stgNewItem(kind, media, visible){
                               o.show_idle=true; o.bg='#000000'; o.radius=12;
                               o.devices=[]; }
   if(kind==='timer'){ o.seconds=60; o.text='[secs]'; o.autostart=false; o.autovanish=false; }
-  if(kind==='poll_viewer'){ o.w=0.34; o.h=0.30; o.auto_show=true; o.results_secs=8;
-                            o.color='#f4a828'; o.bg='#12121a'; o.opacity=220;
-                            o.visible=true; o.fade_out=0.6; }
+  // every card viewer is the same box in the same place — they are mutually
+  // exclusive, so stacking them costs nothing and keeps the corner consistent
+  if(CARD_KINDS[kind]){ o.w=0.34; o.h=0.30; o.auto_show=true; o.results_secs=8;
+                        o.color=CARD_ACCENT[kind]; o.bg='#12121a'; o.opacity=220;
+                        o.visible=true; o.fade_out=0.6; }
   return o;
 }
 const STG_FONTS={sans:'system-ui,-apple-system,sans-serif',bold:'system-ui,sans-serif',
@@ -2527,25 +2529,36 @@ function renderStgCanvas(){
       // vertical gauges take their LENGTH from w along the y axis
       box = vert ? `width:${thick}px;height:${(o.w*100).toFixed(2)}%`
                  : `width:${(o.w*100).toFixed(2)}%`;
-    } else if(o.kind==='poll_viewer'){
-      const pv = lastState.poll;
-      const opts = pv ? (pv.options||[]) : [{label:'Yes',votes:2},{label:'No',votes:1}];
-      const tot = Math.max(1, pv? (pv.total||0) : 3);
-      const acc = esc(o.color||'#f4a828');
+    } else if(CARD_KINDS[o.kind]){
+      // Preview the REAL thing when it's running, a worked example otherwise —
+      // all four cards share one renderer so the canvas can't drift from the
+      // stream, the way the poll preview used to.
+      const live = lastState[CARD_KINDS[o.kind]];
+      const mock = CARD_MOCK[o.kind] || CARD_MOCK.poll_viewer;
+      const v = live || mock;
+      const rows = stgCardRows(v).slice(0,6), anyWin = rows.some(r=>r.win);
+      const acc = esc(o.color||CARD_ACCENT[o.kind]||'#f4a828');
+      const foot = live
+        ? (o.kind==='poll_viewer'
+            ? (live.phase==='results' ? '' : 'Use the Chat Buttons to Vote')
+            : (live.note||''))
+        : mock.foot;
+      const secs = (live && live.remaining!=null) ? Math.round(live.remaining) : 12;
       inner = `<div style="width:100%;height:100%;box-sizing:border-box;border:2px solid ${acc};`+
         `border-left:6px solid ${acc};border-radius:6px;background:${esc(o.bg||'#12121a')};`+
         `padding:6px 8px;overflow:hidden;position:relative;`+
         `font-size:${Math.max(8,fs*0.55)}px;color:#fff">`+
         `<div style="display:flex;justify-content:space-between;font-weight:800">`+
-          `<span>${esc(pv? (pv.title||'Poll') : 'Poll title')}</span><span style="color:${acc}">`+
-          `${pv&&pv.remaining!=null?Math.round(pv.remaining):12}s</span></div>`+
-        opts.slice(0,6).map(op=>`<div style="margin-top:3px;background:#2e2e36;border-radius:3px;position:relative;height:1.5em">`+
-          `<div style="width:${Math.round(100*(op.votes||0)/tot)}%;height:100%;background:${acc};border-radius:3px"></div>`+
-          `<span style="position:absolute;left:5px;top:0;line-height:1.5em">${esc(op.label||'')} · ${op.votes||0}</span></div>`).join('')+
-        // the live overlay's footer — drawn here too so the canvas isn't a lie
-        (pv && pv.phase==='results' ? '' :
-          `<div style="position:absolute;left:0;right:0;bottom:4px;text-align:center;`+
-          `font-size:.78em;font-weight:600;opacity:.7">Use the Chat Buttons to Vote</div>`)+
+          `<span>${esc(v.title||'')}</span><span style="color:${acc}">${secs}s</span></div>`+
+        (rows.length
+          ? rows.map(r=>`<div style="margin-top:3px;background:#2e2e36;border-radius:3px;position:relative;height:1.5em">`+
+              `<div style="width:${Math.round(100*Math.max(0,Math.min(1,+r.frac||0)))}%;height:100%;`+
+              `background:${(!anyWin||r.win)?acc:'#6e6e78'};border-radius:3px"></div>`+
+              `<span style="position:absolute;left:5px;top:0;line-height:1.5em">`+
+              `${r.win?'🏆 ':''}${esc(r.label)}${r.value?' · '+esc(r.value):''}</span></div>`).join('')
+          : (v.body ? `<div style="margin-top:4px;line-height:1.3;opacity:.92">${esc(v.body)}</div>` : ''))+
+        (foot ? `<div style="position:absolute;left:0;right:0;bottom:4px;text-align:center;`+
+                `font-size:.78em;font-weight:600;opacity:.7">${esc(foot)}</div>` : '')+
         `</div>`;
       box = `width:${(o.w*100).toFixed(2)}%;height:${((o.h||0.3)*100).toFixed(2)}%`;
     } else if(o.kind==='timer'){
@@ -2642,11 +2655,35 @@ function renderStgCanvas(){
   });
 }
 // ---- shared with camera.py / stage.html ---------------------------------
-const STG_RADIUS_DEF = {capacity_gauge:15, poll_viewer:3, solid:0};
+// The four SELF-GATED card overlays -> the state key each one reads. They all
+// want the same corner, which is why the engine runs only one at a time.
+const CARD_KINDS = {poll_viewer:'poll', competition_viewer:'competition',
+                    bonus_round_viewer:'bonus_round', broadcast_viewer:'broadcast'};
+const CARD_ACCENT = {poll_viewer:'#f4a828', competition_viewer:'#4ade80',
+                     bonus_round_viewer:'#60a5fa', broadcast_viewer:'#f472b6'};
+const CARD_LABEL = {poll_viewer:'🗳 Poll Viewer', competition_viewer:'🏁 Competition Viewer',
+                    bonus_round_viewer:'🤝 Bonus Round Viewer',
+                    broadcast_viewer:'📣 Broadcast Viewer'};
+// what the canvas shows when nothing is actually running
+const CARD_MOCK = {
+  poll_viewer:       {title:'Poll title', rows:[{label:'Yes',value:'2',frac:1,win:false},
+                                                {label:'No',value:'1',frac:0.5,win:false}],
+                      foot:'Use the Chat Buttons to Vote'},
+  competition_viewer:{title:'Roll-off', rows:[{label:'Stan',value:'18',frac:1,win:false},
+                                              {label:'Ava',value:'11',frac:0.61,win:false}],
+                      foot:'2 in'},
+  bonus_round_viewer:{title:'Team Push', rows:[{label:'Stan',value:'✔',frac:1,win:true},
+                                               {label:'Ava',value:'…',frac:0,win:false}],
+                      foot:'1 still to confirm'},
+  broadcast_viewer:  {title:'Announcement', rows:[],
+                      body:'Last call — get your entries in before the window shuts!', foot:''},
+};
+const STG_RADIUS_DEF = {capacity_gauge:15, poll_viewer:3, solid:0,
+                        competition_viewer:3, bonus_round_viewer:3, broadcast_viewer:3};
 function stgApplyRadius(el, o){
   if(!el) return;
   const kind=o.kind||'text';
-  const painted = kind==='poll_viewer' || kind==='capacity_gauge' || kind==='solid'
+  const painted = !!CARD_KINDS[kind] || kind==='capacity_gauge' || kind==='solid'
                   || String(o.bg||'').trim();
   if(!painted){ el.style.borderRadius=''; return; }
   let r=o.radius;
@@ -2715,6 +2752,14 @@ function stgScopeToggle(id, on){
   stgItemSet('devices', cur.length===rows.length ? [] : cur);
 }
 function stgScopeSet(v){ stgItemSet('devices', v||[]); }
+// a card view's body as {label,value,frac,win} rows — camera.py's _card_rows
+function stgCardRows(v){
+  if(v.rows) return v.rows;
+  const opts=(v.options||[]), tot=Math.max(1, v.total||0), win=v.winner;
+  return opts.map((o,i)=>({label:o.label||'', value:String(o.votes||0),
+                           frac: v.total ? (o.votes||0)/tot : 0,
+                           win: (win!=null && i===win)}));
+}
 // split a row template at [name] so the value lands on a fixed tab stop
 function stgFmtCols(fmt, name, secs){
   const s=String(fmt);
@@ -2831,7 +2876,12 @@ const OV_KINDS = [
   ['timer','⏳','Timer','a countdown you start and stop'],
   ['capacity_gauge','📊','Capacity Gauge','live fill bar'],
   ['device_timers','⏱','Device Timers','one row per device'],
+  // the four card viewers: each shows only while its own thing is running,
+  // and the engine only ever lets one of them run at a time
   ['poll_viewer','🗳','Poll Viewer','shows while a poll runs'],
+  ['competition_viewer','🏁','Competition Viewer','live scoreboard while a competition runs'],
+  ['bonus_round_viewer','🤝','Bonus Round Viewer','who has confirmed, while one runs'],
+  ['broadcast_viewer','📣','Broadcast Viewer','puts an announcement on screen'],
 ];
 function renderStgPalette(){
   const box=$('#stgPalette'); if(!box) return;
@@ -3123,10 +3173,10 @@ function renderStgContents(){
     .map(({o,i})=>{
       const nm=o.label||o.text||o.media||OV_KINDS.find(x=>x[0]===(o.kind||'media'))?.[2]||o.kind;
       return `<div class="stgrow${o.id===scnSelId?' sel':''}" onclick="stgSelect('${esc(o.id)}')">`+
-        // A Poll Viewer draws itself only while a poll is running, so whether
-        // it's "always on" was never a real choice — its GROUP governs it.
-        (o.kind==='poll_viewer'
-          ? `<span class="pmini" title="shows itself whenever a poll runs — turn its scene group off to stop it" style="opacity:.5;cursor:default">🗳</span>`
+        // A card viewer draws itself only while its own thing is running, so
+        // whether it's "always on" was never a real choice — its GROUP governs it.
+        (CARD_KINDS[o.kind]
+          ? `<span class="pmini" title="shows itself whenever its round runs — turn its scene group off to stop it" style="opacity:.5;cursor:default">${(CARD_LABEL[o.kind]||'🗳').split(' ')[0]}</span>`
           : `<button class="ghost" style="opacity:${o.visible?1:.4}" title="${
               o.visible?'always on — click to make it callable instead'
                        :'callable — click to make it always on'
@@ -3187,7 +3237,7 @@ function renderStgProps(){
   renderStgScope();   // the side column tracks the selection too
   if(!o){ box.innerHTML='<div class="muted">no overlay selected — pick one from the list or the canvas</div>'; return; }
   const kind=o.kind||'media', isMedia=kind==='media', isGauge=kind==='capacity_gauge',
-        isText=kind==='text', isPoll=kind==='poll_viewer', isTimer=kind==='timer',
+        isText=kind==='text', isPoll=!!CARD_KINDS[kind], isTimer=kind==='timer',
         isDev=kind==='device_timers'||kind==='pump_timer',
         isSolid=kind==='solid', isAudio=kind==='audio';
   // Keep labels SHORT and on one line — a wrapping label makes its field taller
@@ -3205,7 +3255,8 @@ function renderStgProps(){
   const chk=(k,on,lab,tip)=>`<label class="pchk" title="${esc(tip||'')}"><input type="checkbox" ${on?'checked':''} onchange="stgItemSet('${k}',this.checked)"> ${lab}</label>`;
   const sect=(t,body)=>body?`<div class="psect"><div class="phead">${t}</div><div class="prow">${body}</div></div>`:'';
   const TYPE={media:'🖼 Media',text:'🅣 Text',timer:'⏳ Timer',capacity_gauge:'📊 Capacity Gauge',
-              device_timers:'⏱ Device Timers',pump_timer:'⏱ Pump Timer',poll_viewer:'🗳 Poll Viewer'}[kind]||kind;
+              device_timers:'⏱ Device Timers',pump_timer:'⏱ Pump Timer',
+              ...CARD_LABEL}[kind]||kind;
   // slide directions name an edge of the frame, not a way to travel
   const EDGES=[['left','← left'],['right','→ right'],['top','↑ top'],['bottom','↓ bottom']];
 
@@ -3243,13 +3294,20 @@ function renderStgProps(){
       F('Length %', num('w',Math.round((o.w??0.35)*100),4,100,1))+
       F('Thickness %', num('size',Math.round((o.size??0.05)*100),1,90,1))+
       chk('show_pct',o.show_pct!==false,'show %');
-  if(isPoll)
-    content = chk('auto_show',o.auto_show!==false,'show while a poll runs')+
-      F('Hold results', num('results_secs',o.results_secs??8,0,600,1,84),'seconds the results stay up before fading')+
+  if(isPoll){
+    const CARD_WHAT = {poll_viewer:'a poll', competition_viewer:'a competition',
+                       bonus_round_viewer:'a bonus round', broadcast_viewer:'an announcement'}[kind];
+    content = chk('auto_show',o.auto_show!==false,`show while ${CARD_WHAT} runs`)+
+      F(kind==='broadcast_viewer'?'Hold for':'Hold results',
+        num('results_secs',o.results_secs??8,0,600,1,84),
+        kind==='broadcast_viewer'?'seconds the announcement stays on screen'
+                                 :'seconds the results stay up before fading')+
       F('Width %', num('w',Math.round((o.w??0.34)*100),8,100,1))+
       F('Height %', num('h',Math.round((o.h??0.3)*100),8,100,1))+
       F('Card bg', `<input type="range" min="0" max="255" step="5" value="${o.bg_opacity??220}" class="prange" oninput="this.nextElementSibling.textContent=Math.round(this.value/2.55)+'%'" onchange="stgItemSet('bg_opacity',+this.value)"><span class="pval">${Math.round((o.bg_opacity??220)/2.55)}%</span>`,
-        'how solid the card background is');
+        'how solid the card background is')+
+      `<span class="muted">A poll, a competition and a bonus round can never run at the same time, so all four cards can share one spot. A broadcast fired while one is running <b>waits</b> for it rather than being refused.</span>`;
+  }
   if(isAudio)
     content = F('Sound', `<span class="pmedia">${esc(o.media||'—')}</span>`+
       `<button class="ghost" title="pick a sound from the media library" onclick="mediaBrowse(n=>stgItemSet('media',n), 'audio')">🗂</button>`, 'mp3 / wav / ogg / m4a / flac / opus')+
@@ -3271,10 +3329,9 @@ function renderStgProps(){
   // Corners are a PERCENT of the box's shorter side, so a plate keeps its
   // shape at any resolution and 50 is a full pill. Only offered where there's
   // actually a background to round — plain text has no plate to cut.
-  const RDEF={capacity_gauge:15, poll_viewer:3, solid:0};
   const hasPlate = isSolid || isPoll || isGauge || (o.bg||'').trim();
   const corner = hasPlate
-    ? F('Corners %', num('radius', o.radius ?? (RDEF[kind]??12), 0, 50, 1, 76),
+    ? F('Corners %', num('radius', o.radius ?? (STG_RADIUS_DEF[kind]??12), 0, 50, 1, 76),
         'rounds the background box — 0 is square, 50 a full pill')
     : '';
   let style='';
@@ -3319,10 +3376,10 @@ function renderStgProps(){
     `<span class="muted">at x ${((o.x||0)*100).toFixed(0)}% · y ${((o.y||0)*100).toFixed(0)}%</span>`;
 
   // ---- firing ----------------------------------------------------------- //
-  // A Poll Viewer gates ITSELF — it draws nothing unless a poll is running —
-  // so always-on/callable decides whether it's MOUNTED, not whether it shows.
-  const fire = `<span class="muted">${o.kind==='poll_viewer'
-      ? 'Shows itself whenever a poll is running (plus its results window) and nothing the rest of the time — so it has no always-on/callable switch. To stop it appearing, turn its <b>scene group</b> off.'
+  // A card viewer gates ITSELF — it draws nothing unless its round is running
+  // — so always-on/callable decides whether it's MOUNTED, not whether it shows.
+  const fire = `<span class="muted">${CARD_KINDS[o.kind]
+      ? 'Shows itself whenever its round is running (plus its results window) and nothing the rest of the time — so it has no always-on/callable switch. To stop it appearing, turn its <b>scene group</b> off.'
       : o.visible
       ? 'Always on — up whenever the scene is live, and HOLDS when a scene group plays it.'
       : 'Callable — plays when an action, button or scene group fires it.'}</span>`+
