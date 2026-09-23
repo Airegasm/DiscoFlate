@@ -1,6 +1,6 @@
 {
-  "version": "3.87.1",
-  "versionCode": 186,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.87.1/discoflate-v3.87.1.apk",
-  "notes": "DiscoFlate v3.87.1 \u2014 \ud83c\udfa8 The shipped scene now matches a real working layout instead of a guess. The Main group's positions, sizes and opacities are ported from a scene that actually runs a show: the four cards are spread rather than stacked, the gauge and device timers sit tighter to the corner, and the cards and notification run at 67\u201377% opacity so the picture reads through them. The activation and auto-report announcements come across too, so a fresh install sounds like a show rather than a status page."
+  "version": "3.88.0",
+  "versionCode": 187,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.88.0/discoflate-v3.88.0.apk",
+  "notes": "DiscoFlate v3.88.0 \u2014 \ud83e\uddf9 The command editor lines up. It mixed label-above fields with inline checkboxes in the same flex row, so nothing shared a baseline, and the react emoji sat in an unlabelled box floating beside a tickbox. It now uses the same layout language as the Scenes properties panel \u2014 labelled fields, checkboxes at a matching height, and grouped sections: identity, where it runs, the notify overlay, and what it starts. The emoji field only appears once you've actually turned the reaction on, and the notify line and its explanation only appear when the overlay is enabled."
 }
