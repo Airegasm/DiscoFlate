@@ -743,21 +743,34 @@ class VirtualCam:
         return self._round_corners(sp, self._radius_px(item, w, h)) if bg else sp
 
     @staticmethod
-    def _card_rows(v: dict) -> list:
+    def _card_rows(v: dict, item: dict | None = None) -> list:
         """Normalise a card view's body to rows of {label,value,frac,win}.
 
         A poll ships options+votes and its bar is the share of the vote; a
         competition and a bonus round ship rows already. One shape here means
         ONE card renderer, so the four viewers cannot drift apart visually."""
         if v.get("rows") is not None:
-            return list(v["rows"])[:8]
-        opts = (v.get("options") or [])[:8]
-        total = max(1, int(v.get("total") or 0))
-        win = v.get("winner")
-        return [{"label": o.get("label", ""), "value": str(int(o.get("votes") or 0)),
-                 "frac": (int(o.get("votes") or 0) / total) if v.get("total") else 0.0,
-                 "win": (win is not None and i == win)}
-                for i, o in enumerate(opts)]
+            rows = list(v["rows"])
+        else:
+            opts = list(v.get("options") or [])
+            total = max(1, int(v.get("total") or 0))
+            win = v.get("winner")
+            rows = [{"label": o.get("label", ""), "value": str(int(o.get("votes") or 0)),
+                     "frac": (int(o.get("votes") or 0) / total) if v.get("total") else 0.0,
+                     "win": (win is not None and i == win)}
+                    for i, o in enumerate(opts)]
+        try:
+            cap = int(item.get("max_rows") or 0) if item else 0
+        except (TypeError, ValueError):
+            cap = 0
+        cap = cap if cap > 0 else 8
+        if len(rows) > cap:
+            # SAY what was dropped. Silently showing the first 8 of 12 reads as
+            # "these are the entrants", which is a lie.
+            hidden = len(rows) - cap
+            rows = rows[:cap] + [{"label": f"+{hidden} more", "value": "",
+                                  "frac": 0.0, "win": False, "more": True}]
+        return rows
 
     @staticmethod
     def _wrap(txt: str, font, scale: float, thick: int, width: int) -> list:
@@ -778,16 +791,56 @@ class VirtualCam:
 
     def _card_sprite(self, item: dict, W: int, H: int, v: dict, footer: str = ""):
         """The shared embed-style card behind the Poll / Competition / Bonus
-        Round / Broadcast viewers: a w x h rect with an accent spine, a title
-        and countdown on the header row, then either bars or a paragraph."""
+        Round / Broadcast viewers.
+
+        The configured w/h is a MINIMUM, not a cage. Everything is measured
+        first, then the card is made tall enough to hold it. It used to divide
+        the fixed height by the row count, so every entrant made the text
+        smaller until, at six rows, a 16px glyph was being drawn inside a 13px
+        bar and the card was unreadable exactly when it had something to say.
+
+        Text size comes from the CONFIGURED height, never the grown one, or
+        adding a row would change the font and the card would breathe.
+        """
         try:
             bw = max(120, int(W * float(item.get("w") or 0.34)))
-            bh = max(80, int(H * float(item.get("h") or 0.30)))
+            bh_min = max(80, int(H * float(item.get("h") or 0.30)))
         except (TypeError, ValueError):
-            bw, bh = int(W * 0.34), int(H * 0.30)
+            bw, bh_min = int(W * 0.34), int(H * 0.30)
+        pad = max(8, int(bh_min * 0.07))
+        fs = max(0.4, bh_min / 300.0)
+        th = max(1, int(fs * 2))
+        head_h = pad + int(fs * 26)
+        foot_h = int(fs * 22) if footer else 0
+        inner_w = bw - pad * 2 - 8
+        line_h = max(13, int(fs * 20))
+
+        rows = self._card_rows(v, item)
+        body = str(v.get("body") or "").strip()
+
+        # ---- measure -----------------------------------------------------
+        laid = []
+        for o in rows:
+            txt = ("> " if o.get("win") else "") + str(o.get("label", ""))
+            val = str(o.get("value", ""))
+            if val:
+                txt += f" \u00b7 {val}"
+            # wrap rather than truncate — a long display name used to be cut
+            # at 26 characters mid-word
+            lines = self._wrap(txt, 0, fs * 0.8, th, inner_w - 14) or [""]
+            laid.append((o, lines))
+        body_lines = (self._wrap(body, 0, fs * 0.85, th, inner_w - 4)
+                      if (body and not rows) else [])
+
+        row_pad = max(4, int(fs * 7))
+        gap = max(3, int(fs * 5))
+        content = (sum(len(l) * line_h + row_pad * 2 for _, l in laid)
+                   + gap * max(0, len(laid) - 1)) if laid else len(body_lines) * line_h
+        bh = max(bh_min, head_h + content + pad + foot_h)
+
+        # ---- draw --------------------------------------------------------
         sp = np.zeros((bh, bw, 4), np.uint8)
-        bg = self._bgr(item.get("bg"), (18, 18, 22))
-        sp[:, :, :3] = bg
+        sp[:, :, :3] = self._bgr(item.get("bg"), (18, 18, 22))
         bga = item.get("bg_opacity")
         if bga is None:                 # pre-3.53 configs stored 0-255 here
             bga = item.get("opacity") if (item.get("opacity") or 0) > 100 else 220
@@ -796,59 +849,44 @@ class VirtualCam:
         rad = self._radius_px(item, bw, bh)
         cv2.rectangle(sp, (0, 0), (5, bh - 1), (*accent, 255), -1)   # embed spine
         self._draw_border(sp, accent, 2, rad)
-        pad = max(8, int(bh * 0.07))
-        fs = max(0.4, bh / 300.0)
-        y = pad + int(fs * 26)
+        y = head_h
         cv2.putText(sp, str(v.get("title") or "")[:42], (pad + 8, y),
-                    0, fs * 1.05, (255, 255, 255, 255), max(1, int(fs * 2)), cv2.LINE_AA)
-        # countdown, right-aligned on the title row
+                    0, fs * 1.05, (255, 255, 255, 255), th, cv2.LINE_AA)
         rem = v.get("remaining")
         if rem is None and v.get("_hold") is not None:
             rem = v["_hold"]
         if rem is not None:
             lbl = f"{float(rem):.0f}s"
-            (tw_, _t), _b = cv2.getTextSize(lbl, 0, fs * 0.95, max(1, int(fs * 2)))
+            (tw_, _t), _b = cv2.getTextSize(lbl, 0, fs * 0.95, th)
             cv2.putText(sp, lbl, (bw - pad - tw_ - 4, y), 0, fs * 0.95,
-                        (*accent, 255), max(1, int(fs * 2)), cv2.LINE_AA)
-        foot_h = int(fs * 22) if footer else 0
-        rows = self._card_rows(v)
-        body = str(v.get("body") or "").strip()
-        room = bh - y - pad - foot_h
-        if rows:
-            rh = max(14, int(room / max(1, len(rows))))
-            # grey the also-rans only once something has actually won
-            any_win = any(r.get("win") for r in rows)
-            for i, o in enumerate(rows):
-                ry = y + int(rh * (i + 0.35)) + 4
-                if ry + 6 > bh - pad - foot_h:
-                    break
-                frac = max(0.0, min(1.0, float(o.get("frac") or 0)))
-                barw = int((bw - pad * 2 - 8) * frac)
-                bar_y2 = min(bh - 2, ry + max(6, int(rh * 0.42)))
-                cv2.rectangle(sp, (pad + 4, ry), (bw - pad - 4, bar_y2), (46, 46, 54, 255), -1)
+                        (*accent, 255), th, cv2.LINE_AA)
+        any_win = any(o.get("win") for o, _ in laid)
+        ry = y + gap
+        for o, lines in laid:
+            rh = len(lines) * line_h + row_pad * 2
+            frac = max(0.0, min(1.0, float(o.get("frac") or 0)))
+            if not o.get("more"):
+                cv2.rectangle(sp, (pad + 4, ry), (bw - pad - 4, ry + rh),
+                              (46, 46, 54, 255), -1)
+                barw = int(inner_w * frac)
                 if barw > 1:
                     col = (*accent, 255) if (not any_win or o.get("win")) else (110, 110, 120, 255)
-                    cv2.rectangle(sp, (pad + 4, ry), (pad + 4 + barw, bar_y2), col, -1)
-                val = str(o.get("value", ""))
-                txt = ("> " if o.get("win") else "") + str(o.get("label", ""))[:26]
-                if val:
-                    txt += f" · {val}"
-                cv2.putText(sp, txt, (pad + 10, bar_y2 - max(2, int(rh * 0.12))),
-                            0, fs * 0.8, (0, 0, 0, 255), max(3, int(fs * 4)), cv2.LINE_AA)
-                cv2.putText(sp, txt, (pad + 10, bar_y2 - max(2, int(rh * 0.12))),
-                            0, fs * 0.8, (255, 255, 255, 255), max(1, int(fs * 2)), cv2.LINE_AA)
-        elif body:
-            # a Broadcast has no rows — it's the message itself
-            th_ = max(1, int(fs * 2))
-            lines = self._wrap(body, 0, fs * 0.85, th_, bw - pad * 2 - 12)
-            lh = int(fs * 26)
-            by = y + lh
+                    cv2.rectangle(sp, (pad + 4, ry), (pad + 4 + barw, ry + rh), col, -1)
+            ty = ry + row_pad + line_h - max(2, int(fs * 5))
             for ln in lines:
-                if by > bh - pad - foot_h:
-                    break
+                col_t = (170, 170, 180, 255) if o.get("more") else (255, 255, 255, 255)
+                if not o.get("more"):
+                    cv2.putText(sp, ln, (pad + 10, ty), 0, fs * 0.8,
+                                (0, 0, 0, 255), max(3, int(fs * 4)), cv2.LINE_AA)
+                cv2.putText(sp, ln, (pad + 10, ty), 0, fs * 0.8, col_t, th, cv2.LINE_AA)
+                ty += line_h
+            ry += rh + gap
+        if body_lines:
+            by = y + line_h
+            for ln in body_lines:
                 cv2.putText(sp, ln, (pad + 8, by), 0, fs * 0.85,
-                            (235, 235, 240, 255), th_, cv2.LINE_AA)
-                by += lh
+                            (235, 235, 240, 255), th, cv2.LINE_AA)
+                by += line_h
         if footer:
             (tw_, _t), _b = cv2.getTextSize(footer, 0, fs * 0.72, max(1, int(fs * 1.6)))
             cv2.putText(sp, footer, ((bw - tw_) // 2, bh - pad // 2 - 2), 0, fs * 0.72,
@@ -1242,6 +1280,18 @@ class VirtualCam:
                     sp = self._rotate(sp, it.get("rot"))
                     ih, iw = sp.shape[:2]
                     x, y = self._spot(o, W, H, iw, ih)
+                    # A card grows DOWNWARD from its configured top-left. Near
+                    # the bottom of the frame that would run off the edge, so
+                    # flip it: keep the configured box's BOTTOM and grow up.
+                    # Without this a bottom-corner card silently loses its last
+                    # rows the moment it had more than its height allowed for.
+                    if self._CARD_KINDS.get(str(it.get("kind") or "")):
+                        try:
+                            bh_min = max(80, int(H * float(it.get("h") or 0.30)))
+                        except (TypeError, ValueError):
+                            bh_min = int(H * 0.30)
+                        if ih > bh_min and y + ih > H:
+                            y = max(0, y + bh_min - ih)
                     ax, ay = self._motion(self._gate(o, it, now), now,
                                           x, y, iw, ih, W, H)
                     self._blend(frame, sp, x + ax, y + ay, self._fade_alpha(o, now))

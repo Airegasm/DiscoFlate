@@ -24,15 +24,24 @@
          text-shadow:0 1px 3px #000,0 0 2px #000}
   .wtext.boxed{padding:.25em .6em;border-radius:10px;text-shadow:none}
   @keyframes dfflash{0%,49%{opacity:1}50%,100%{opacity:0}}
+  /* The configured h is a MINIMUM: the card grows to hold its rows rather than
+     squashing them, and a long name wraps instead of being cut. Height is set
+     as min-height in JS; a flex column lets the footer sit in the spare space
+     when there is some and get pushed down honestly when there isn't. */
   .wpoll{position:absolute;pointer-events:none;box-sizing:border-box;overflow:hidden;
+         display:flex;flex-direction:column;
          border:2px solid var(--acc);border-left:6px solid var(--acc);border-radius:6px;
          padding:.5em .6em;color:#fff;font-size:min(2.6vh,15px);transition:opacity .5s}
   .wpoll .ph{display:flex;justify-content:space-between;font-weight:800;margin-bottom:.3em}
-  .wpoll .pb{position:relative;height:1.6em;margin-top:.25em;background:#2e2e36;border-radius:3px}
-  .wpoll .pb>i{display:block;height:100%;border-radius:3px}
-  .wpoll .pb>b{position:absolute;left:6px;top:0;line-height:1.6em;font-weight:600}
-  /* footer sits in the box's bottom padding, not after the last bar */
-  .wpoll .pf{position:absolute;left:0;right:0;bottom:.3em;text-align:center;
+  .wpoll .pb{position:relative;margin-top:.25em;background:#2e2e36;border-radius:3px;
+             padding:.2em .45em;overflow:hidden}
+  .wpoll .pb>i{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
+  .wpoll .pb>b{position:relative;display:block;font-weight:600;line-height:1.25;
+               overflow-wrap:anywhere}
+  .wpoll .pb.more{background:none;padding-left:.1em}
+  .wpoll .pb.more>b{opacity:.65;font-weight:500}
+  /* pinned to the bottom while there's slack, pushed along once there isn't */
+  .wpoll .pf{margin-top:auto;padding-top:.35em;text-align:center;
              font-size:.78em;font-weight:600;opacity:.7}
   /* a Broadcast card has no rows — it IS the message */
   .wpoll .pbody{margin-top:.35em;white-space:pre-wrap;line-height:1.3;opacity:.92}
@@ -305,7 +314,9 @@ function itemEl(o){
     const el = document.createElement('div');
     el.className = 'wpoll';
     el.style.left=((o.x??0.05)*100)+'%'; el.style.top=((o.y??0.05)*100)+'%';
-    el.style.width=((o.w||0.34)*100)+'%'; el.style.height=((o.h||0.3)*100)+'%';
+    el.style.width=((o.w||0.34)*100)+'%';
+    el.style.minHeight=((o.h||0.3)*100)+'%';   // a floor, not a cage
+    el._cardTop = (o.y??0.05); el._cardH = (o.h||0.3);
     el.style.setProperty('--acc', o.color||'#f4a828');
     el.style.background = o.bg||'#12121a';
     el.style.display='none';                 // invisible until a poll runs
@@ -331,18 +342,40 @@ function itemEl(o){
 // a time. Mirrors camera.py's _CARD_KINDS / _card_rows / _card_sprite.
 const CARD_KINDS = {poll_viewer:'poll', competition_viewer:'competition',
                     bonus_round_viewer:'bonus_round', broadcast_viewer:'broadcast'};
-function cardRows(v){
-  if(v.rows) return v.rows.slice(0,8);
-  const opts=(v.options||[]).slice(0,8), tot=Math.max(1, v.total||0), win=v.winner;
-  return opts.map((o,i)=>({label:o.label||'', value:String(o.votes||0),
-                           frac: v.total ? (o.votes||0)/tot : 0,
-                           win: (win!=null && i===win)}));
+function cardRows(v, o){
+  let rows;
+  if(v.rows) rows = v.rows.slice();
+  else {
+    const opts=(v.options||[]), tot=Math.max(1, v.total||0), win=v.winner;
+    rows = opts.map((x,i)=>({label:x.label||'', value:String(x.votes||0),
+                             frac: v.total ? (x.votes||0)/tot : 0,
+                             win: (win!=null && i===win)}));
+  }
+  const cap = Math.max(1, +((o||{}).max_rows) || 8);
+  if(rows.length > cap){
+    const hidden = rows.length - cap;   // say so rather than quietly cutting
+    rows = rows.slice(0, cap).concat([{label:`+${hidden} more`, value:'', frac:0, more:true}]);
+  }
+  return rows;
 }
-function cardHtml(v, acc, left, footer){
-  const rows=cardRows(v), anyWin=rows.some(r=>r.win);
+// A card grows DOWNWARD from its configured top. Near the bottom of the frame
+// that would run off the edge, so keep the configured box's BOTTOM and grow
+// upward instead — the same rule camera.py applies to the composited sprite,
+// so the phone and the stream put it in the same place.
+function cardAnchor(el){
+  const fr=$('#frame');
+  if(!fr || el._cardTop==null) return;
+  const H = fr.clientHeight || 1;
+  const top0 = el._cardTop * H, min = el._cardH * H, h = el.offsetHeight;
+  const y = (h > min && top0 + h > H) ? Math.max(0, top0 + min - h) : top0;
+  el.style.top = (y / H * 100) + '%';
+}
+function cardHtml(v, acc, left, footer, o){
+  const rows=cardRows(v, o), anyWin=rows.some(r=>r.win);
   const body = rows.length
-    ? rows.map(r=>`<div class="pb"><i style="width:${Math.round(100*Math.max(0,Math.min(1,+r.frac||0)))}%;`+
-        `background:${(!anyWin||r.win)?acc:'#6e6e78'}"></i>`+
+    ? rows.map(r=>`<div class="pb${r.more?' more':''}">`+
+        (r.more ? '' : `<i style="width:${Math.round(100*Math.max(0,Math.min(1,+r.frac||0)))}%;`+
+                       `background:${(!anyWin||r.win)?acc:'#6e6e78'}"></i>`)+
         `<b>${r.win?'🏆 ':''}${esc(r.label)}${r.value?' · '+esc(r.value):''}</b></div>`).join('')
     : (v.body ? `<div class="pbody">${esc(v.body)}</div>` : '');
   return `<div class="ph"><span>${esc(v.title||'')}</span>`+
@@ -445,7 +478,8 @@ async function widgetTick(){
         const foot = (w.kind==='poll_viewer')
           ? (pv.phase==='results' ? '' : 'Use the Chat Buttons to Vote')
           : (pv.note||'');
-        w.el.innerHTML = cardHtml(pv, acc, left, foot);
+        w.el.innerHTML = cardHtml(pv, acc, left, foot, w.o);
+        cardAnchor(w.el);
       } else if(w.kind==='timer'){
         const live=(st.timers||{})[w.o.id];
         const sec = live!=null ? live : (+w.o.seconds||0);

@@ -122,10 +122,18 @@
   .pscope .pchk input{flex:0 0 16px;margin-top:1px}
   .pscope .muted{font-size:11px;line-height:1.25}
   .pscope .pmini{padding:0 7px;height:22px;line-height:22px;font-size:12px}
-  /* Scenes tab: a palette to add from, and the scene's contents — both scroll */
-  .stglists{display:grid;grid-template-columns:1fr 1.4fr;gap:10px;margin-top:8px}
-  .stgpane{border:1px solid var(--line);border-radius:10px;background:var(--panel2);padding:8px}
-  .stglist{max-height:184px;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+  /* Scenes tab: the two lists live BESIDE the canvas, stacked and equal, so
+     the canvas keeps the full width of the page and the lists keep their
+     height instead of being a squat strip above it. */
+  .stglists{display:flex;flex-direction:column;gap:10px;min-height:0;height:100%}
+  .stgpane{border:1px solid var(--line);border-radius:10px;background:var(--panel2);
+           padding:8px;flex:1 1 0;min-height:0;display:flex;flex-direction:column}
+  .stglist{flex:1;min-height:120px;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+  /* canvas controls, in one row under the canvas */
+  .stgunder{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-top:8px}
+  .stgunder .field{flex:0 0 auto}
+  .stgunder select{width:150px}
+  .stgunder #stgScope{flex:0 0 auto}
   .stgrow{display:flex;align-items:center;gap:8px;padding:5px 7px;border-radius:7px;
           background:var(--panel);border:1px solid transparent;cursor:pointer}
   .stgrow:hover{border-color:var(--line)}
@@ -133,7 +141,8 @@
   .stgrow .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .stgrow .tag{font-size:11px;color:var(--dim);white-space:nowrap}
   .stgrow button{padding:2px 8px;font-size:13px;line-height:1.4}
-  @media(max-width:820px){ .stglists{grid-template-columns:1fr} }
+  @media(max-width:820px){ .stglists{display:grid;grid-template-columns:1fr;height:auto}
+                           .stgpane{flex:none} .stglist{max-height:184px} }
   /* Chat tab: log on the left, a stacked button panel on the right third */
   /* the virtual-cam controls: settings on one line, actions on the next, so
      nine controls stop fighting over a single row */
@@ -185,11 +194,12 @@
   /* the canvas keeps its own settings beside it, not stranded above the lists */
   .stgstage{display:flex;gap:14px;align-items:flex-start;margin-top:8px}
   .stgstage>#stgCanvas{flex:1 1 auto;min-width:0}
-  .stgstage .stgside{flex:0 0 165px;display:flex;flex-direction:column;gap:12px;
-                     padding-top:2px}
+  /* wide enough for the two lists and their group controls */
+  .stgstage .stgside{flex:0 0 380px;min-width:0;display:flex;flex-direction:column;
+                     gap:12px;padding-top:2px}
   @media(max-width:860px){
     .stgstage{flex-direction:column}
-    .stgstage .stgside{flex:none;width:100%;flex-direction:row;align-items:flex-end;gap:14px}
+    .stgstage .stgside{flex:none;width:100%;flex-direction:column;align-items:stretch;gap:10px}
   }
   /* layout grid: a line every 5%, brighter every 25%, brightest on the centre.
      Percentages (not pixels) so it means the same at any scene resolution. */
@@ -523,6 +533,10 @@
         <label class="ghost" style="padding:8px 12px;border:1px solid var(--line);border-radius:8px;cursor:pointer">⬆ Import Scene<input type="file" accept=".zip,.dfscene.zip" style="display:none" onchange="stgImport(this)"></label>
       </div>
       <div id="stgEditor" style="display:none;margin-top:10px">
+        <div class="hint" style="margin:8px 0 0">Drag on the canvas snaps to the <b>5% grid</b> — hold <b>Shift</b> to place freely, or untick <b>grid &amp; snap</b>. Add from the left. The right-hand list shows one <b>scene group</b> at a time — pick it in the dropdown, or <b>All overlays</b>; <b>➕✏️🗑</b> create, rename and delete groups (deleting a group keeps its overlays, just untagged). Anything you add while a group is selected <b>joins that group</b>, and a group fires as a batch from a <code>scene_group</code> action. The list on the right has a <b>Scoped / 🌐 Global</b> toggle: <b>Scoped</b> groups belong to this scene, <b>Global</b> groups are callable from every scene — same list, same canvas, same options, so a global overlay is designed exactly like any other. Globals are always <b>callable</b> (the camera only mounts the live scene's always-on overlays), and a global group fires alongside a scene group of the <b>same name</b>. Overlay kinds include <b>▬ Solid</b> — a flat colour block, full-frame by default, for a backdrop behind a scene group (no image file needed). Rows are the draw stack, front first: <b>👁</b> always-on vs callable (a callable one <b>ghosts</b> on the canvas rather than vanishing, so you can still place it), <b>▲▼</b> front/back, <b>⚙</b> options, <b>−</b> remove. On the canvas: drag to place, <b>◢</b> resize, <b>⟳</b> rotate.</div>
+        <div class="stgstage">
+          <div id="stgCanvas"></div>
+          <div class="stgside">
         <div class="stglists">
           <div class="stgpane">
             <div class="sidehead">Add an overlay</div>
@@ -548,19 +562,19 @@
             <div class="stglist" id="stgContents"></div>
           </div>
         </div>
-        <div class="hint" style="margin:8px 0 0">Drag on the canvas snaps to the <b>5% grid</b> — hold <b>Shift</b> to place freely, or untick <b>grid &amp; snap</b>. Add from the left. The right-hand list shows one <b>scene group</b> at a time — pick it in the dropdown, or <b>All overlays</b>; <b>➕✏️🗑</b> create, rename and delete groups (deleting a group keeps its overlays, just untagged). Anything you add while a group is selected <b>joins that group</b>, and a group fires as a batch from a <code>scene_group</code> action. The list on the right has a <b>Scoped / 🌐 Global</b> toggle: <b>Scoped</b> groups belong to this scene, <b>Global</b> groups are callable from every scene — same list, same canvas, same options, so a global overlay is designed exactly like any other. Globals are always <b>callable</b> (the camera only mounts the live scene's always-on overlays), and a global group fires alongside a scene group of the <b>same name</b>. Overlay kinds include <b>▬ Solid</b> — a flat colour block, full-frame by default, for a backdrop behind a scene group (no image file needed). Rows are the draw stack, front first: <b>👁</b> always-on vs callable (a callable one <b>ghosts</b> on the canvas rather than vanishing, so you can still place it), <b>▲▼</b> front/back, <b>⚙</b> options, <b>−</b> remove. On the canvas: drag to place, <b>◢</b> resize, <b>⟳</b> rotate.</div>
-        <div class="stgstage">
-          <div id="stgCanvas"></div>
-          <div class="stgside">
-            <label class="field">Resolution <select id="stgRes" style="width:100%" onchange="stgResPick()">
-              <option>1280x720</option><option>1920x1080</option><option>640x480</option>
-              <option>720x1280</option><option>1080x1920</option></select></label>
-            <label class="row" style="gap:6px" title="show a 5% grid and snap to it — hold Shift while dragging to place freely"><input type="checkbox" id="stgGridOn" checked style="width:auto" onchange="stgGridToggle()"> grid &amp; snap</label>
-            <!-- which devices the selected Device Timer List shows; empty
-                 until you select one, which is why it lives beside the canvas
-                 rather than in the properties row -->
-            <div id="stgScope" style="margin-top:4px"></div>
           </div>
+        </div>
+        <!-- canvas controls sit UNDER the canvas in one row; the side column
+             beside it is for the two lists now -->
+        <div class="stgunder">
+          <label class="field">Resolution <select id="stgRes" onchange="stgResPick()">
+            <option>1280x720</option><option>1920x1080</option><option>640x480</option>
+            <option>720x1280</option><option>1080x1920</option></select></label>
+          <label class="row" style="gap:6px" title="show a 5% grid and snap to it — hold Shift while dragging to place freely"><input type="checkbox" id="stgGridOn" checked style="width:auto" onchange="stgGridToggle()"> grid &amp; snap</label>
+          <div id="stgScope"></div>
+          <button class="ghost pmini" id="stgHushAll" style="display:none"
+                  title="show every overlay on the canvas again"
+                  onclick="stgHushClear()">🙈 show hidden</button>
         </div>
         <div id="stgProps" style="margin-top:8px"></div>
       </div>
@@ -2590,7 +2604,7 @@ function renderStgCanvas(){
       const live = lastState[CARD_KINDS[o.kind]];
       const mock = CARD_MOCK[o.kind] || CARD_MOCK.poll_viewer;
       const v = live || mock;
-      const rows = stgCardRows(v).slice(0,6), anyWin = rows.some(r=>r.win);
+      const rows = stgCardRows(v, o), anyWin = rows.some(r=>r.win);
       const acc = esc(o.color||CARD_ACCENT[o.kind]||'#f4a828');
       const foot = live
         ? (o.kind==='poll_viewer'
@@ -2598,23 +2612,28 @@ function renderStgCanvas(){
             : (live.note||''))
         : mock.foot;
       const secs = (live && live.remaining!=null) ? Math.round(live.remaining) : 12;
-      inner = `<div style="width:100%;height:100%;box-sizing:border-box;border:2px solid ${acc};`+
+      inner = `<div style="width:100%;min-height:100%;box-sizing:border-box;border:2px solid ${acc};`+
         `border-left:6px solid ${acc};border-radius:6px;background:${esc(o.bg||'#12121a')};`+
-        `padding:6px 8px;overflow:hidden;position:relative;`+
+        `padding:6px 8px;overflow:hidden;position:relative;display:flex;flex-direction:column;`+
         `font-size:${Math.max(8,fs*0.55)}px;color:#fff">`+
         `<div style="display:flex;justify-content:space-between;font-weight:800">`+
           `<span>${esc(v.title||'')}</span><span style="color:${acc}">${secs}s</span></div>`+
         (rows.length
-          ? rows.map(r=>`<div style="margin-top:3px;background:#2e2e36;border-radius:3px;position:relative;height:1.5em">`+
-              `<div style="width:${Math.round(100*Math.max(0,Math.min(1,+r.frac||0)))}%;height:100%;`+
-              `background:${(!anyWin||r.win)?acc:'#6e6e78'};border-radius:3px"></div>`+
-              `<span style="position:absolute;left:5px;top:0;line-height:1.5em">`+
-              `${r.win?'🏆 ':''}${esc(r.label)}${r.value?' · '+esc(r.value):''}</span></div>`).join('')
+          ? rows.map(r=>r.more
+              ? `<div style="margin-top:3px;padding:.2em .1em;opacity:.65">${esc(r.label)}</div>`
+              : `<div style="margin-top:3px;background:#2e2e36;border-radius:3px;position:relative;`+
+                `padding:.2em .45em;overflow:hidden">`+
+                `<div style="position:absolute;left:0;top:0;bottom:0;`+
+                `width:${Math.round(100*Math.max(0,Math.min(1,+r.frac||0)))}%;`+
+                `background:${(!anyWin||r.win)?acc:'#6e6e78'};border-radius:3px"></div>`+
+                `<span style="position:relative;display:block;line-height:1.25;overflow-wrap:anywhere">`+
+                `${r.win?'🏆 ':''}${esc(r.label)}${r.value?' · '+esc(r.value):''}</span></div>`).join('')
           : (v.body ? `<div style="margin-top:4px;line-height:1.3;opacity:.92">${esc(v.body)}</div>` : ''))+
-        (foot ? `<div style="position:absolute;left:0;right:0;bottom:4px;text-align:center;`+
+        (foot ? `<div style="margin-top:auto;padding-top:4px;text-align:center;`+
                 `font-size:.78em;font-weight:600;opacity:.7">${esc(foot)}</div>` : '')+
         `</div>`;
-      box = `width:${(o.w*100).toFixed(2)}%;height:${((o.h||0.3)*100).toFixed(2)}%`;
+      // h is a MINIMUM here too — the canvas has to grow the way the stream does
+      box = `width:${(o.w*100).toFixed(2)}%;min-height:${((o.h||0.3)*100).toFixed(2)}%`;
     } else if(o.kind==='timer'){
       const live = (lastState.timers||{})[o.id];
       const sec = live!=null ? live : (+o.seconds||0);
@@ -2670,6 +2689,9 @@ function renderStgCanvas(){
     // edit it. A CALLABLE overlay (🚫) ghosts back, because it isn't part of the
     // scene until something fires it; a HIDDEN GROUP ghosts further and greys
     // out. Both multiply the item's own opacity rather than replacing it.
+    // 🤫 hushed: not drawn on the canvas at all while you edit. Editor-only —
+    // the stream and the Stage page never see this list.
+    if(stgHushed.has(o.id)) return '';
     const dim = stgGroupHidden(o.group) ? 0.18 : (o.visible ? 1 : 0.45);
     const hid = stgGroupHidden(o.group) ? 'filter:grayscale(1);' : '';
     // dead centre ignores x/y and stays centred however the text resolves
@@ -2767,6 +2789,9 @@ function stgTimerRows(o, st, single){
 // Lives in the column beside the canvas (#stgScope), not in the properties
 // row — it's a list, and that column has the height for one.
 function renderStgScope(){
+  const b=$('#stgHushAll');
+  if(b){ b.style.display = stgHushed.size ? '' : 'none';
+         b.textContent = `🙈 show ${stgHushed.size} hidden`; }
   const box=$('#stgScope'); if(!box) return;
   const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id===scnSelId);
   box.innerHTML = (o && (o.kind||'')==='device_timers') ? stgScopeBox(o) : '';
@@ -2807,12 +2832,19 @@ function stgScopeToggle(id, on){
 }
 function stgScopeSet(v){ stgItemSet('devices', v||[]); }
 // a card view's body as {label,value,frac,win} rows — camera.py's _card_rows
-function stgCardRows(v){
-  if(v.rows) return v.rows;
-  const opts=(v.options||[]), tot=Math.max(1, v.total||0), win=v.winner;
-  return opts.map((o,i)=>({label:o.label||'', value:String(o.votes||0),
-                           frac: v.total ? (o.votes||0)/tot : 0,
-                           win: (win!=null && i===win)}));
+function stgCardRows(v, item){
+  let rows;
+  if(v.rows) rows = v.rows.slice();
+  else {
+    const opts=(v.options||[]), tot=Math.max(1, v.total||0), win=v.winner;
+    rows = opts.map((o,i)=>({label:o.label||'', value:String(o.votes||0),
+                             frac: v.total ? (o.votes||0)/tot : 0,
+                             win: (win!=null && i===win)}));
+  }
+  const cap = Math.max(1, +((item||{}).max_rows) || 8);
+  if(rows.length > cap)
+    rows = rows.slice(0, cap).concat([{label:`+${rows.length-cap} more`, value:'', frac:0, more:true}]);
+  return rows;
 }
 // split a row template at [name] so the value lands on a fixed tab stop
 function stgFmtCols(fmt, name, secs){
@@ -3206,9 +3238,29 @@ function stgGroupDelete(){
   stgGroupFilter=''; stgRemember();
   renderStgGroupPick(); renderStgContents(); goliveUi(); scheduleSave();
 }
+// 🤫 HUSH: hide an overlay from the CANVAS ONLY, so you can get at whatever is
+// underneath it. Purely an editing aid — it is not a scene setting, never goes
+// near the config, and cannot reach the stream or the Stage page. Kept per
+// scene in localStorage so it survives a refresh but travels nowhere.
+let stgHushed = new Set();
+function stgHushKey(){ return 'df_hush_' + (stgStage()?.name || ''); }
+function stgHushLoad(){
+  try{ stgHushed = new Set(JSON.parse(localStorage.getItem(stgHushKey()) || '[]')); }
+  catch(e){ stgHushed = new Set(); }
+}
+function stgHushSave(){
+  try{ localStorage.setItem(stgHushKey(), JSON.stringify([...stgHushed])); }catch(e){}
+}
+function stgHushToggle(id){
+  if(stgHushed.has(id)) stgHushed.delete(id); else stgHushed.add(id);
+  stgHushSave(); renderStgCanvas(); renderStgContents();
+}
+function stgHushClear(){ stgHushed.clear(); stgHushSave(); renderStgCanvas(); renderStgContents(); }
+
 function renderStgContents(){
   const box=$('#stgContents'); if(!box) return;
   renderStgGroupPick();
+  stgHushLoad();          // per-scene, so switching scenes switches the set
   const s=stgStage();
   const all=(s&&s.overlays)||[];
   const list = !stgGroupFilter ? all
@@ -3240,6 +3292,10 @@ function renderStgContents(){
         ((o.group||'').trim()?`<span class="tag">${stgGroupHidden(o.group)?'🚫':'🎬'} ${esc(o.group.trim())}</span>`:'')+
         (+o.delay?`<span class="tag" title="appears ${o.delay}s after the group fires">+${o.delay}s</span>`:'')+
 
+        `<button class="ghost" style="opacity:${stgHushed.has(o.id)?1:.45}" title="${
+            stgHushed.has(o.id) ? 'hidden on the canvas while you edit — click to show it again (this never affects the stream)'
+                                : 'hide from the CANVAS only, so you can reach what is under it — never affects the stream'
+          }" onclick="event.stopPropagation();stgHushToggle('${esc(o.id)}')">${stgHushed.has(o.id)?'🙈':'🤫'}</button>`+
         `<button class="ghost" title="move up (draws in front)" onclick="event.stopPropagation();stgReorder('${esc(o.id)}',1)">▲</button>`+
         `<button class="ghost" title="move down (draws behind)" onclick="event.stopPropagation();stgReorder('${esc(o.id)}',-1)">▼</button>`+
         `<button class="ghost" title="move to another scene group" onclick="event.stopPropagation();stgMoveTo('${esc(o.id)}')">➦</button>`+
@@ -3285,8 +3341,29 @@ function stgPickGroup(name){
   const hit=(s.overlays||[]).find(o=>(o.group||'').trim()===name);
   if(hit){ scnSelId=hit.id; renderStgCanvas(); renderStgProps(); }
 }
+// Every control here is rebuilt from scratch on each change, so the element you
+// were typing in or nudging is thrown away mid-interaction. Without this an
+// arrow key moved a slider exactly once and then focus was gone with the old
+// DOM — the same for a caret in a text field. Index-based because the panel's
+// shape only changes when the KIND does, never on a value.
+function stgKeepFocus(box){
+  const a = document.activeElement;
+  if(!box || !a || !box.contains(a)) return null;
+  const all = [...box.querySelectorAll('input,select,textarea,button')];
+  const k = {i: all.indexOf(a)};
+  try{ k.s = a.selectionStart; k.e = a.selectionEnd; }catch(e){}
+  return k.i < 0 ? null : k;
+}
+function stgRestoreFocus(box, k){
+  if(!box || !k) return;
+  const el = [...box.querySelectorAll('input,select,textarea,button')][k.i];
+  if(!el) return;
+  el.focus();
+  try{ if(k.s != null) el.setSelectionRange(k.s, k.e); }catch(e){}
+}
 function renderStgProps(){
   const s=stgStage(), box=$('#stgProps'); if(!box) return;
+  const _focus = stgKeepFocus(box);
   const o = s && (s.overlays||[]).find(x=>x.id===scnSelId);
   renderStgScope();   // the side column tracks the selection too
   if(!o){ box.innerHTML='<div class="muted">no overlay selected — pick one from the list or the canvas</div>'; return; }
@@ -3357,7 +3434,10 @@ function renderStgProps(){
         kind==='broadcast_viewer'?'seconds the announcement stays on screen'
                                  :'seconds the results stay up before fading')+
       F('Width %', num('w',Math.round((o.w??0.34)*100),8,100,1))+
-      F('Height %', num('h',Math.round((o.h??0.3)*100),8,100,1))+
+      F('Min height %', num('h',Math.round((o.h??0.3)*100),8,100,1),
+        'a FLOOR, not a cap — the card grows taller when it has more rows than this fits, and grows upward instead of off-frame when it is near the bottom')+
+      F('Max rows', num('max_rows',o.max_rows??8,1,20,1,76),
+        'beyond this the card shows “+N more” rather than silently dropping entrants')+
       F('Card bg', `<input type="range" min="0" max="255" step="5" value="${o.bg_opacity??220}" class="prange" oninput="this.nextElementSibling.textContent=Math.round(this.value/2.55)+'%'" onchange="stgItemSet('bg_opacity',+this.value)"><span class="pval">${Math.round((o.bg_opacity??220)/2.55)}%</span>`,
         'how solid the card background is')+
       `<span class="muted">A poll, a competition and a bonus round can never run at the same time, so all four cards can share one spot. A broadcast fired while one is running <b>waits</b> for it rather than being refused.</span>`;
@@ -3448,6 +3528,7 @@ function renderStgProps(){
   box.innerHTML = `<div class="pbox">`+head+
     sect('Content', content)+ sect('Style', style)+
     sect('Placement &amp; motion', place)+ sect('Firing', fire)+`</div>`;
+  stgRestoreFocus(box, _focus);
 }
 function stgGridToggle(){
   const cv=$('#stgCanvas'), on=($('#stgGridOn')||{checked:true}).checked;
@@ -3465,6 +3546,7 @@ function stgItemSet(k,v){ const s=stgStage(), o=s&&(s.overlays||[]).find(x=>x.id
   if(k==='fade_in'||k==='fade_out') v = Math.max(0, +v||0);  // plain seconds
   if(k==='slide_in_secs'||k==='slide_out_secs') v = Math.max(0.05, +v||0.4);
   if(k==='radius') v = Math.max(0, Math.min(50, +v||0));     // % of shorter side
+  if(k==='max_rows') v = Math.max(1, Math.min(20, +v||8));
   if(k==='opacity') v = Math.max(0, Math.min(100, +v||0));   // percent, as stored
   if(k==='h') v = (v===null||v==='') ? null : Math.max(0.02, (+v||0)/100);
   o[k]=v; renderStgCanvas(); renderStgContents(); renderStgProps();
