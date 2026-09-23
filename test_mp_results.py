@@ -222,7 +222,7 @@ ok(drv.index("_mp_end_check") < drv.index("round_cleared"),
 rps = ACTS["MultiRPS"]["actions"]
 stake = next(r for r in walk(rps) if r.get("type") == "var")
 fire = next(r for r in walk(rps) if r.get("type") == "fire")
-ok(stake["variable"] == "duel_pct" and str(fire["fill_pct"]) == "[var:duel_pct]",
+ok(stake["variable"] == "duel_pct" and "[var:duel_pct]" in str(fire["fill_pct"]),
    "the RPS fire reads the stake variable instead of repeating a literal")
 ok("[var:duel_pct]" in CARDS["bvDuel"]["text"],
    "…and the card reads the SAME variable, so the two cannot drift")
@@ -231,7 +231,7 @@ ok(fire.get("multi_who") == "loser", "…and it lands on the loser")
 roul = ACTS["MultiRoulette"]["actions"]
 rfire = next(r for r in walk(roul) if r.get("type") == "fire")
 rnote = next(r for r in walk(roul) if r.get("type") == "notify")
-ok(rfire["fill_pct"] == "[multi_roll]" and "[multi_roll]" in rnote["message"],
+ok("[multi_roll]" in str(rfire["fill_pct"]) and "[multi_roll]" in rnote["message"],
    "roulette's notification and its fire both read the roll")
 ok("[multi_roll]" in CARDS["bvResult"]["text"], "…and so does its card")
 
@@ -274,7 +274,10 @@ def rig():
         t = row.get("type")
         if t == "fire":
             fires.append({"who": row.get("multi_who"),
-                          "pct": e.render(str(row.get("fill_pct", "")), xc)})
+                          # _num_expr, exactly as the engine's fire row does:
+                          # a stake is an EXPRESSION, and rendering it without
+                          # evaluating would miss the ceiling scaling entirely
+                          "pct": e._num_expr(row.get("fill_pct"), xc)})
             return True
         return bool(t and t.startswith("mp_"))   # the rail claims its own rows
 
@@ -291,9 +294,55 @@ def run(rows, ctx):
     return shown, notes, fires
 
 
+# ---- stakes are authored per-100 and scale to the ceiling ------------------ #
+# One scene plays the same game at any ceiling. Set 200 and every stake
+# doubles; set 80 and they shrink. Same idea as pace compensation: express the
+# number relative to the thing that matters, not in units that don't travel.
+for nm, a in ACTS.items():
+    for r in walk(a["actions"]):
+        if r.get("type") == "fire":
+            ok("[multi_scale]" in str(r.get("fill_pct")),
+               f"{nm}'s stake is ceiling-relative, not a bare number")
+
+ok(config_store.DEFAULTS["mp_end"]["max_capacity"] == 0,
+   "the SCHEMA default is still off — a lose-at number is the author's call")
+shipped = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                      "default_config.json"), encoding="utf-8"))
+ok(shipped["mp_end"]["max_capacity"] == 100,
+   "…and the shipped kit is authored against 100, which is what makes the "
+   "numbers in it readable")
+
+
+def stake_at(rows, ctx):
+    """What a pump is actually ASKED for, through the real engine."""
+    e, _shown, _notes, fires = rig()
+    asyncio.run(e._run_action_block(rows, "x", "", "55", "C", extra_ctx=dict(ctx)))
+    return fires
+
+
+ROUL = ACTS["MultiRoulette"]["actions"]
+
+
+scales = {}
+for ceiling in (100, 200, 50):
+    ctx = {"multi_roll": "6", "multi_scale": f"{ceiling / 100:g}",
+           "multi_chosen_name": "Dave", "multi_roll_dice": "6"}
+    fires = stake_at(ROUL, ctx)
+    scales[ceiling] = float(fires[0]["pct"])
+ok(scales[100] == 6, "a 6 rolled at a 100% ceiling asks the pump for 6%")
+ok(scales[200] == 12, "…the same roll at 200% asks for 12%")
+ok(scales[50] == 3, "…and at 50% asks for 3%")
+
+# a match with no ceiling set must not silently fire ZERO
+ctx = {"multi_roll": "6", "multi_scale": "1", "multi_chosen_name": "D",
+       "multi_roll_dice": "6"}
+ok(float(stake_at(ROUL, ctx)[0]["pct"]) == 6,
+   "with no ceiling set the scale is 1, never 0 — an unset dial must not "
+   "quietly turn every stake into nothing")
+
 WON = {"multi_duel_loser_name": "Dave", "multi_duel_me": "rock",
        "multi_duel_peer": "scissors", "multi_me_name": "Curtis",
-       "multi_peer_name": "Dave"}
+       "multi_peer_name": "Dave", "multi_scale": "1"}
 DRAW = {**WON, "multi_duel_loser_name": "", "multi_duel_peer": "rock"}
 
 shown, notes, fires = run(rps, WON)
@@ -301,7 +350,7 @@ ok([s["id"] for s in shown] == ["bvDuel"], "a decided duel shows the duel card, 
 ok("Dave" in shown[0]["text"], "…and the card NAMES the loser")
 ok("+5%" in shown[0]["text"],
    "…and the stake variable renders into the card as a real number")
-ok(len(fires) == 1 and fires[0] == {"who": "loser", "pct": "5"},
+ok(len(fires) == 1 and fires[0] == {"who": "loser", "pct": 5.0},
    "…and the pump is asked for exactly what the card showed")
 ok(any("Dave" in n and "5" in n for n in notes), "the notify overlay says it too")
 
@@ -314,11 +363,11 @@ ok(any("Draw" in n and "nobody" in n for n in notes),
 
 # roulette's own run
 shown, notes, fires = run(roul, {"multi_chosen_name": "Dave", "multi_roll": "6",
-                                 "multi_roll_dice": "6"})
+                                 "multi_roll_dice": "6", "multi_scale": "1"})
 ok([s["id"] for s in shown] == ["bvResult"], "roulette shows its spin card")
 ok("Dave" in shown[0]["text"] and "+6%" in shown[0]["text"],
    "…naming who it landed on and for how much")
-ok(len(fires) == 1 and fires[0] == {"who": "chosen", "pct": "6"},
+ok(len(fires) == 1 and fires[0] == {"who": "chosen", "pct": 6.0},
    "…and the pump takes that same number")
 ok(any("Dave" in n and "6" in n for n in notes), "…and the notify overlay agrees")
 

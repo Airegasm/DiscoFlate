@@ -304,6 +304,21 @@ def placeholders(session, chosen="", extra=None) -> dict:
                                ("host" if (lost == me) == s.is_host else "guest"))
     out["multi_end_why"] = str(getattr(s, "conceded_why", "") or "")
 
+    # THE CEILING, AND THE SCALE IT IMPLIES.
+    #
+    # Stakes are authored against a 100% match and multiplied by this, so one
+    # scene plays the same game at any ceiling: set 200 and every stake
+    # doubles, set 80 and they shrink. It is the same idea as pace
+    # compensation — express the number relative to the thing that matters
+    # instead of in absolute units that don't travel.
+    #
+    # Snapshotted by construction: end_max is agreed at invite time and does
+    # not move again, so a dial turned mid-match cannot re-price a deal both
+    # players already agreed to. No ceiling set = ×1, never ×0.
+    top = float(_num(getattr(s, "end_max", 0)) or 0)
+    out["multi_max"] = f"{top:g}"
+    out["multi_scale"] = f"{(top / 100.0) if top > 0 else 1.0:g}"
+
     out["multi_guest_capacity"] = pct(gcap)
     out["multi_host_capacity"] = pct(hcap)
     out["multi_guest_pump_timer"] = f"{gpump:.0f}"

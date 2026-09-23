@@ -508,7 +508,7 @@
         {
           "type": "fire",
           "fire_mode": "add",
-          "fill_pct": "[multi_roll]",
+          "fill_pct": "([multi_roll]) * [multi_scale]",
           "multi_who": "chosen",
           "block_during": false
         },
@@ -591,7 +591,7 @@
             {
               "type": "fire",
               "fire_mode": "add",
-              "fill_pct": "[var:duel_pct]",
+              "fill_pct": "([var:duel_pct]) * [multi_scale]",
               "multi_who": "loser",
               "block_during": false
             }
@@ -7396,7 +7396,7 @@
   "resume_title": "▶ Resumed",
   "templates_removed": [],
   "mp_end": {
-    "max_capacity": 145,
+    "max_capacity": 100,
     "actions": [
       {
         "type": "stop_devices"

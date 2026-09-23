@@ -229,7 +229,11 @@ roll = rows[kinds.index("mp_roll")]
 fire = rows[kinds.index("fire")]
 ov = rows[kinds.index("overlay")]
 ok(roll["dice"] == 1 and roll["sides"] == 8, "the dice are 1d8")
-ok(fire["fill_pct"] == "[multi_roll]", "the fire spends what the roll produced")
+# Stakes are authored against a 100% match and scaled to the ceiling, so the
+# same scene plays the same game whatever the lose-at number is set to.
+ok("[multi_roll]" in str(fire["fill_pct"]), "the fire spends what the roll produced")
+ok("[multi_scale]" in str(fire["fill_pct"]),
+   "…scaled to the match's ceiling, not a bare number that only suits one")
 ok(fire["fire_mode"] == "add",
    "…as a PERCENT — seconds are a different amount of inflation on every rig, "
    "and are refused over the wire anyway")
@@ -279,9 +283,10 @@ ok(hit["multi_who"] == "loser", "the pump hits the LOSER")
 ok(hit["fire_mode"] == "add",
    "…as a percent: seconds are a different amount of inflation per rig, and "
    "are refused over the wire")
-ok(str(hit["fill_pct"]) == "[var:duel_pct]",
+ok("[var:duel_pct]" in str(hit["fill_pct"]),
    "…for whatever the stake variable says, so the card and the pump can never "
    "disagree about the number")
+ok("[multi_scale]" in str(hit["fill_pct"]), "…and it scales to the ceiling too")
 ok(hit.get("block_during") is False,
    "…and doesn't block, so the next round starts on its own clock")
 
