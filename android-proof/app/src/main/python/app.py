@@ -382,6 +382,7 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         # (which Discord mirrors anyway) looked correct.
         "vcam_mirror": bool(cfg.get("vcam_mirror", False)),
         "standby_text": cfg.get("standby_text", "STARTING SOON"),
+        "standby_image": cfg.get("standby_image", ""),
         # How long each scene group needs on screen before it cuts its own
         # content off, so a stage can't be set shorter than the clip it plays.
         "group_seconds": _group_lengths(raw),
@@ -572,8 +573,10 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             # keep the standby line in step while we're here — it is a global
             # camera setting, the same whichever scene happens to be selected
             want = cfg0.get("standby_text", "STARTING SOON")
-            if want != getattr(vcam, "_standby_text", None):
-                vcam.set_standby(want)
+            img = _resolve_img(cfg0.get("standby_image", "")) or ""
+            if (want != getattr(vcam, "_standby_text", None)
+                    or img != getattr(vcam, "_standby_image", None)):
+                vcam.set_standby(want, img)
             return "off"
         # 'pending' matters: LIVE flips on BEFORE start_intro runs, and the ON
         # message + its [!command]s post to Discord in between. Without this
@@ -1197,7 +1200,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                     # round-trips state back into config would otherwise flatten
                     # the live scene's show into the global fallback.
                     "chat_isolate", "chat_isolate_channel",
-                    "vcam_device", "vcam_size", "standby_text",
+                    "vcam_device", "vcam_size", "standby_text", "standby_image",
                     "capacity_ranges", "commands", "modes", "events",
                     "capacity_events", "polls", "competitions", "minigames",
                     "bonus_rounds",

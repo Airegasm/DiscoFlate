@@ -701,6 +701,9 @@ DEFAULTS = {
     # What anyone sees if they pick the virtual camera before you go live.
     # A property of the CAMERA, not of any one scene — blank = plain black.
     "standby_text": "STARTING SOON",
+    # A card shown instead of the line. Falls back to the text when it is
+    # unset or unreadable — never to a blank frame, which reads as a dead camera.
+    "standby_image": "",
     "vcam_device": 0,
     "vcam_size": "1280x720",
 

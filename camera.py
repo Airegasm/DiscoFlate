@@ -76,6 +76,8 @@ class VirtualCam:
         # What a viewer sees if they pick the virtual camera before you go
         # live. app.py keeps it in step with the live scene's Go Live block.
         self._standby_text = "STARTING SOON"
+        self._standby_image = ""        # a card to show instead of the line
+        self._standby_cache = None      # (path, mtime, decoded) — decode once
         # () -> 'live' | 'intro' | 'off'. app.py ties this to LIVE, and it's
         # asked every frame so it can never drift:
         #   'live'  — the camera picture, every overlay
@@ -129,10 +131,44 @@ class VirtualCam:
     def _gate_open(self) -> bool:
         return self._gate_mode() == "live" 
 
-    def set_standby(self, text: str) -> dict:
-        """The line shown on the pre-show black frame ("" = plain black)."""
+    def set_standby(self, text: str, image: str = "") -> dict:
+        """The pre-show frame: a CARD if one is set, else the line, else black.
+
+        The image wins when it loads, and falls back to the TEXT — not to
+        nothing — because a missing or unreadable file must never turn the
+        standby frame into a blank screen that reads as a broken camera.
+        """
         self._standby_text = str(text or "")
-        return {"ok": True, "standby": self._standby_text}
+        want = str(image or "")
+        if want != self._standby_image:
+            self._standby_image = want
+            self._standby_cache = None
+        return {"ok": True, "standby": self._standby_text,
+                "standby_image": self._standby_image}
+
+    def _standby_card(self):
+        """The decoded standby image, or None. Decoded once and re-read only
+        when the file changes — this runs on every frame of the pre-show."""
+        path = str(self._standby_image or "").strip()
+        if not path or not os.path.exists(path):
+            return None
+        try:
+            mtime = os.path.getmtime(path)
+        except OSError:
+            return None
+        c = self._standby_cache
+        if c and c[0] == path and c[1] == mtime:
+            return c[2]
+        img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+        if img is None:
+            self._standby_cache = (path, mtime, None)   # don't retry every frame
+            return None
+        if img.ndim == 2:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGRA)
+        elif img.shape[2] == 3:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
+        self._standby_cache = (path, mtime, img)
+        return img
 
     def set_blackout(self, on: bool) -> dict:
         """Black out the camera image while STILL compositing overlays over
@@ -1224,8 +1260,24 @@ class VirtualCam:
                     pass
 
     def _standby(self, frame) -> None:
-        """Centre the standby line on an otherwise black pre-show frame.
-        Empty text = a genuinely black screen, as before."""
+        """The pre-show frame: a card if one loads, else the line, else black.
+
+        Empty text AND no image = a genuinely black screen, as before.
+        """
+        card = self._standby_card()
+        if card is not None:
+            H, W = frame.shape[:2]
+            h, w = card.shape[:2]
+            # CONTAIN, not cover: a standby card is usually a whole design, and
+            # cropping its edges off is worse than a letterbox on black.
+            k = min(W / max(1, w), H / max(1, h))
+            if k != 1:
+                card = cv2.resize(card, (max(1, int(w * k)), max(1, int(h * k))),
+                                  interpolation=cv2.INTER_AREA if k < 1
+                                  else cv2.INTER_LINEAR)
+                h, w = card.shape[:2]
+            self._blend(frame, card, (W - w) // 2, (H - h) // 2)
+            return
         txt = str(self._standby_text or "").strip()
         if not txt:
             return

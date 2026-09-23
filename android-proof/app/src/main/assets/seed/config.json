@@ -2316,6 +2316,7 @@
   "chat_isolate_channel": "",
   "vcam_mirror": false,
   "standby_text": "STARTING SOON",
+  "standby_image": "",
   "vcam_device": 0,
   "vcam_size": "1280x720",
   "minigames": [

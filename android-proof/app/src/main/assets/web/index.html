@@ -474,8 +474,14 @@
             <option>1280x720</option><option>1920x1080</option><option>640x480</option>
             <option>720x1280</option><option>1080x1920</option></select></label>
           <label class="row" style="gap:5px" title="Flips the CAMERA IMAGE only — your overlays are drawn on top afterwards, so text always reads correctly to viewers either way. Use it if your camera hands you a reversed picture, or something in shot reads backwards. It will NOT fix your own Discord tile: Discord mirrors your self-view and offers no way to turn that off, so your overlays read backwards TO YOU there whatever this is set to. The preview above is the finished frame exactly as sent — judge your layout there."><input type="checkbox" id="vcamMirror" style="width:auto" onchange="vcamMirrorSet()"> 🪞 Mirror</label>
-          <label class="field grow" style="min-width:200px" title="Big centred text anyone sees if they pick your virtual camera BEFORE you go LIVE — so a black rectangle doesn't read as a broken camera. Blank = a plain black screen.">Standby card
+          <label class="field grow" style="min-width:180px" title="Big centred text anyone sees if they pick your virtual camera BEFORE you go LIVE — so a black rectangle doesn't read as a broken camera. Blank = a plain black screen. An image, if you pick one, is shown INSTEAD of this.">Standby card
             <input id="standbyText" placeholder="STARTING SOON" onchange="scheduleSave()"></label>
+          <label class="field" style="min-width:210px" title="An image shown instead of the line. Letterboxed onto black so nothing is cropped. If the file is missing or unreadable it falls back to the text rather than to a blank frame — a blank standby reads as a broken camera.">Standby image
+            <div class="row" style="gap:6px">
+              <input id="standbyImage" placeholder="— none, use the text —" readonly style="min-width:120px">
+              <button class="ghost" onclick="pickStandbyImage()" style="padding:6px 10px">Pick</button>
+              <button class="ghost" onclick="clearStandbyImage()" style="padding:6px 10px" title="back to the text">✕</button>
+            </div></label>
          </div>
          <div class="row vcamrow" style="gap:8px;align-items:center;margin-top:8px">
           <button onclick="vcamStart()">▶ Start virtual cam</button>
@@ -4363,6 +4369,16 @@ function stgAddWidget(kind){ const s=stgStage(); if(!s){ toastMsg('create a scen
   const o=stgNewItem(kind,''); stgApplyGroup(o); (s.overlays=s.overlays||[]).push(o);
   scnSelId=o.id; renderStgCanvas(); renderStgContents(); renderStgProps(); scheduleSave(); }
 // ---- universal media browser -------------------------------------------
+// The standby card's image. Picks from the same media library as everything
+// else; clearing it falls back to the text line, never to a blank frame.
+function pickStandbyImage(){
+  mediaBrowse(name=>{ const el=$('#standbyImage'); if(!el) return;
+    el.value = name || ''; scheduleSave(); }, 'visual');
+}
+function clearStandbyImage(){
+  const el=$('#standbyImage'); if(!el) return;
+  el.value=''; scheduleSave();
+}
 let mediaPickKind='';   // '', 'audio' or 'visual' — filters the browser
 function mediaBrowse(cb, kind){ mediaPickCb=cb||null; mediaPickKind=kind||'';
   openOverlay('mediaOverlay'); mediaLoad(); }
@@ -8759,7 +8775,9 @@ function applyState(st, full){
     }
     if($('#vcamMirror') && document.activeElement!==$('#vcamMirror')) $('#vcamMirror').checked = !!st.vcam_mirror;
     { const sb=$('#standbyText');
-      if(sb && document.activeElement!==sb && st.standby_text!=null) sb.value = st.standby_text; }
+      if(sb && document.activeElement!==sb && st.standby_text!=null) sb.value = st.standby_text;
+      const si=$('#standbyImage');
+      if(si && st.standby_image!=null) si.value = st.standby_image; }
     // the camera list is built asynchronously, so remember the wanted values
     // and let vcamDevPick apply them once the options exist
     if(st.vcam_device!=null) vcamWant.device = String(st.vcam_device);
@@ -8981,6 +8999,7 @@ function gatherConfig(){
     chat_isolate: $('#chatIso')?$('#chatIso').checked:false, chat_isolate_channel: chatIsoChan,
     // camera + output size: global, so switching scenes never re-points them
     standby_text: $('#standbyText') ? $('#standbyText').value : 'STARTING SOON',
+    standby_image: $('#standbyImage') ? $('#standbyImage').value : '',
     vcam_device: $('#vcamDev') ? (+$('#vcamDev').value||0) : 0,
     vcam_size: $('#vcamRes') ? ($('#vcamRes').value||'1280x720') : '1280x720',
     anon_user_label:$('#anonLabel').value,

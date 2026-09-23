@@ -93,6 +93,59 @@ fires, and more (full table in Help → Placeholders).
 
 ---
 
+## Multiplayer — two installs, one game
+
+Two DiscoFlate installs, two bot tokens, two pumps, one match played across
+Discord. Neither is a client of the other: each drives its own hardware and
+they agree over a channel.
+
+**Two channels.** `bot_network` carries the protocol — one-line JSON envelopes
+(`DF1 concede {…}`), no humans needed, nothing from the game ever appears
+there. `broadcast` is the venue: narration, the cards, the audience. The same
+`bot_network` can hold any number of bots; every envelope names who it is from,
+who it is for and which match it belongs to, so several pairs can play at once
+without hearing each other.
+
+**Percent, never seconds.** A second is a different amount of inflation on
+every rig, so only percentages cross the wire and each install computes its own
+seconds from its own calibration. Unequal pumps are handled twice over: pace
+compensation brings the *slower* rig's finish line down (never the faster one's
+up, so a quoted cost stays honest), and the host may offer to **split the
+difference** — both calibrations meet in the middle for the match and revert
+when it ends.
+
+**Safety is the hardware's.** There is no percentage gate in the panel. A
+ceiling nobody can see silently swallows a fire and leaves no-one anywhere to
+look; your pump's own limits and a plug you can reach are what actually keep
+you safe.
+
+**The shipped game** — *DiscoFlate Versus*, four rounds that escalate in kind:
+
+| | | |
+|---|---|---|
+| Round 1 | Roulette | luck — sets the gap |
+| Round 2 | Rock Paper Scissors | bluff, and throwable to hit your bet |
+| Round 3 | Blackjack | judgement — two seats, one dealer, open hands |
+| Round 4 | Simon | memory, lengthening on its own |
+| Sudden Death | Tic tac toe | a draw costs **both**, so someone has to crack |
+
+Every round carries a **spread bet**: predict the gap between you when it ends,
+closest without going over. The loser pays, the winner pays half — both meters
+climb, so the ceiling stays reachable. **Max volume** (the lose-at capacity) is
+a dial on the Chat page; stakes are authored against a 100% match and scale to
+whatever you set, so one scene plays the same game at any ceiling.
+
+Everything a game needs is an ordinary action row — `mp_spin` · `mp_roll` ·
+`mp_choice` · `mp_duel` · `mp_cards` · `mp_simon` · `mp_ttt` · `mp_action` ·
+`mp_tell`. None of them fires a pump: they decide *who lost* and publish it,
+and a separate `fire` row spends it.
+
+> Multiplayer requires **both players on camera**, which means a **voice**
+> channel for broadcast. It is new in v4.0.0 and has had far less real-world
+> use than the rest of the app — see Help → 🤝 Multiplayer.
+
+---
+
 ## Supported smart plugs
 
 | Brand | How | Status |
@@ -226,6 +279,8 @@ export your config first via **Help → Export config**.) APKs are published on
 | `vendors/` | per-brand drivers (kasa is `kasa_legacy.py`) |
 | `kasa_legacy.py` | legacy Kasa driver (UDP/TCP 9999, XOR autokey cipher) |
 | `config_store.py` | `data/config.json` (atomic + fsync, 0600 — holds your token; git-ignored; auto-backups in `data/backups/`) |
+| `multiplayer.py` | the multiplayer rail: envelope encode/decode, link state machine, pacing — pure, no I/O |
+| `mp_games.py` | the game pieces: spin, dice, duels, cards, simon, tic tac toe, the spread bet — pure |
 | `web/index.html` | the control-surface GUI (Chat · Scenes · Triggers · Devices · Discord · System · Help) |
 | `android-proof/` | the Chaquopy Android app |
 
