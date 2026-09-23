@@ -321,13 +321,21 @@ apps = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 ok('("media", "audio")' in apps and "has no media file yet" in apps,
    "a media overlay with no file is skipped the way a missing id already is")
 
-# ONE empty media slot ships: the intro backdrop, waiting for the operator's
-# own card art. That is exactly what the graceful skip is for — with no file in
-# it the intro still plays, names and countdown on black, and the match runs.
-blank = [o["id"] for o in SCENE["overlays"]
-         if o.get("kind") == "media" and not str(o.get("media") or "").strip()]
-ok(blank == ["bvIntroBg"],
-   "the only slot shipped empty is the intro backdrop, for your own art")
+# The intro backdrop NAMES a file, and that file lives in the operator's own
+# media library (data/ is git-ignored) rather than in the repo. So a fresh
+# install has the name but not the art — which is exactly what the graceful
+# media skip is for: the intro still plays, names and countdown on black, and
+# the match runs. It must never be a hard reference that stops a round.
+bg = next(o for o in SCENE["overlays"] if o["id"] == "bvIntroBg")
+ok(bg.get("kind") == "media" and str(bg.get("media") or "").strip(),
+   "the intro backdrop names a media file")
+ok(not os.path.isabs(str(bg["media"])) and "/" not in str(bg["media"]),
+   "…by bare NAME, resolved against the media library — never a path off this "
+   "one machine")
+ok(not [o for o in SCENE["overlays"]
+        if o.get("kind") == "media" and o["id"] != "bvIntroBg"
+        and not str(o.get("media") or "").strip()],
+   "…and no OTHER half-built media slot ships")
 called = {r.get("overlay") for a in list(ACTS.values()) + [{"actions": END["actions"]}]
           for r in walk(a["actions"]) if r.get("type") == "overlay"}
 for r in CFG.get("mp_rounds") or []:
