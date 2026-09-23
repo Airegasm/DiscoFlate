@@ -150,8 +150,10 @@
   .stgrow .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .stgrow .tag{font-size:11px;color:var(--dim);white-space:nowrap}
   .stgrow button{padding:2px 8px;font-size:13px;line-height:1.4}
+  /* Stacked under the canvas on a narrow screen. 184px was about six rows —
+     enough to prove the list exists, not enough to work in. */
   @media(max-width:820px){ .stglists{display:grid;grid-template-columns:1fr;height:auto}
-                           .stgpane{flex:none} .stglist{max-height:184px} }
+                           .stgpane{flex:none} .stglist{max-height:min(44vh, 420px)} }
   /* Chat tab: log on the left, a stacked button panel on the right third */
   /* the virtual-cam controls: settings on one line, actions on the next, so
      nine controls stop fighting over a single row */
@@ -169,6 +171,10 @@
            display:inline-block}
   .spoil{background:var(--dim);color:transparent;border-radius:3px;cursor:pointer}
   .spoil:hover{background:transparent;color:inherit}
+  /* Custom server emoji are CDN IMAGES, not glyphs — no bundled font can draw
+     them (and Discord's own gg sans is proprietary anyway). Sized to the line
+     so a message with one doesn't jump taller than its neighbours. */
+  .cemoji{height:1.35em;width:auto;vertical-align:-0.3em;object-fit:contain}
   /* an embed, drawn the way Discord draws it: coloured spine, title, body,
      then fields (inline ones share a row) */
   .embedmd{margin:4px 0 4px 2px;padding:7px 11px;background:#20222a;
@@ -210,8 +216,26 @@
   /* the lists run the FULL height of the section beside that column, and their
      right edge lands on the card's content edge — the same gutter the canvas
      has on the left */
-  .stgstage .stgside{flex:0 0 clamp(300px, 32%, 460px);min-width:0;display:flex;
-                     flex-direction:column;gap:12px}
+  /* Wider than it was: the row under the canvas used to hold Export/Import,
+     whose min-content width stopped the canvas column shrinking and so capped
+     this one. With those moved to the scene header, the lists can have the
+     room — overlay names were truncating to "C..." at three characters. */
+  .stgstage .stgside{flex:0 0 clamp(320px, 40%, 560px);min-width:0;display:flex;
+                     flex-direction:column;gap:12px;
+  /* The lists are the working surface, so give them a floor of their own.
+     `align-items:stretch` makes this column exactly as tall as the CANVAS
+     column — and the canvas is capped at 900px wide, so a small scene, a
+     portrait one, or simply nothing selected in the properties panel left the
+     lists a squat strip. They borrow height; this stops them borrowing too
+     little. */
+                     min-height:min(72vh, 780px)}
+  /* Both panes share the column evenly. The scene's own settings live under
+     the CANVAS, so nothing above the lists eats into their height — the two
+     of them get the whole column between them. */
+  /* flex-basis 0 so the two divide the column EXACTLY evenly, and no
+     min-height: a floor on each pane stops them shrinking together when the
+     column is short, which is how one ends up taller than the other. */
+  .stgstage .stgside .stgpane{flex:1 1 0;min-height:0}
   @media(max-width:860px){
     .stgstage{flex-direction:column}
     .stgmain{flex:none}
@@ -391,7 +415,15 @@
       <button class="ghost" id="saveAllBtn" onclick="saveAllNow()" style="padding:7px 14px" title="Everything autosaves as you edit — this is a manual, save-everything safety">💾 Save all</button>
       <span class="muted" id="saveBarStatus" style="min-width:0"></span>
       <button class="bad" id="ctrlStopBtn" onclick="controlStop()" style="padding:7px 14px" title="Pause the whole session: pumps off, events + games cancelled, commands latched until Resume">⏸ Pause</button>
-      <span class="tgl"><span class="muted">Mock</span><label class="switch"><input type="checkbox" id="mock"><span class="slider"></span></label></span>
+      <span class="tgl" id="modeTgl" title="Multiplayer: a match against a SECOND install — another machine, another bot token, another pump. Locked while the session is live."><span class="muted">Multi</span><label class="switch"><input type="checkbox" id="modeMulti" onchange="setMode(this.checked)"><span class="slider"></span></label></span>
+      <button id="mpInviteBtn" onclick="mpInviteModal()" style="display:none;padding:7px 14px" title="Find who you're playing and send the invite">✉ Invite</button>
+      <button class="ghost" id="mpReadyBtn" onclick="mpReady()" style="display:none;padding:7px 14px" title="posts Host Ready / Guest Ready into the broadcast channel — each button only its own player can press">📣 Ready check</button>
+      <button class="ghost" id="mpArmBtn" onclick="mpArm()" style="display:none;padding:7px 14px">I'm ready</button>
+      <button id="mpStartBtn" onclick="mpStart()" style="display:none;padding:7px 14px" title="runs the whole opening: the scene intro, then both curtains up, then the game">▶ Start</button>
+      <button class="bad" id="mpAbortBtn" onclick="mpAbort()" style="display:none;padding:7px 14px">Abort</button>
+      <span class="muted" id="mpMsg"></span>
+      <span class="tgl" id="seatTgl" style="display:none" title="Which seat you take. Pick it BEFORE you go LIVE — the host drives the match and narrates for both of you; the guest takes instructions and stays quiet. Frozen once you're live."><select id="mpSeat" onchange="setSeat(this.value)" style="width:auto;padding:4px 8px"><option value="host">Host</option><option value="guest">Guest</option></select></span>
+      <span class="tgl" id="mockTgl" title="Devices don't fire — for testing a game without a pump running."><span class="muted">Mock</span><label class="switch"><input type="checkbox" id="mock"><span class="slider"></span></label></span>
       <span class="tgl"><span style="font-weight:700;color:var(--text)">LIVE</span><label class="switch"><input type="checkbox" id="listener"><span class="slider"></span></label></span>
     </div>
   </header>
@@ -412,13 +444,18 @@
     <!-- chat (owner cockpit) -->
     <div class="card span" data-tab="chat">
       <h2>💬 Chat</h2>
+      <div class="hint" id="mpLockNote" style="display:none;border:1px solid var(--warn);border-radius:8px;padding:10px 12px;margin-bottom:8px"></div>
       <div class="row" style="gap:12px;align-items:flex-end">
         <label class="field">Your Discord name
           <input id="cooldownExemptNames" placeholder="AireGasm" style="width:190px"
                  title="Who the Controls post as, and [operator] in messages. Blank → the bot's own Discord name."></label>
-        <label class="field">Channel <select id="chatChan" style="width:280px" onchange="chatSwitch()"></select></label>
+        <label class="field" data-mode="solo">Channel <select id="chatChan" style="width:280px" onchange="chatSwitch()"></select></label>
+        <label class="field" data-mode="multi">Channel
+          <div id="chatChanFixed" style="padding:7px 0;font-weight:600">—</div></label>
         <button id="introNext" style="display:none;background:var(--accent);color:#04202a;font-weight:700" onclick="introNextStage()" title="finish this intro stage and play the next one">⏭ Next stage</button><button id="introNow" style="display:none;background:var(--warn);color:#3a2a00;font-weight:700" onclick="endIntroNow()" title="end the pre-show and start the session right now">🎬 Start now</button>
-        <label class="row" style="gap:6px" title="while checked, ALL broadcasts (events, announcements, timers) go ONLY to this channel — other live channels still get their direct command replies"><input type="checkbox" id="chatIso" style="width:auto" onchange="chatIsoChanged()"> <b>Isolate</b> <span class="muted">— Broadcast ONLY to this video channel</span></label>
+        <button class="bad" id="mpConcede" onclick="mpConcede()" style="display:none"
+                title="ends the match for both installs: the handshake drops, both pumps stop, and the guest's panel is released">🏳 Concede</button>
+        <label class="row" style="gap:6px" data-mode="solo" title="while checked, ALL broadcasts (events, announcements, timers) go ONLY to this channel — other live channels still get their direct command replies"><input type="checkbox" id="chatIso" style="width:auto" onchange="chatIsoChanged()"> <b>Isolate</b> <span class="muted">— Broadcast ONLY to this video channel</span></label>
       </div>
       <div id="overlaySec" style="display:none;border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
         <div id="vcamCtrls">
@@ -475,7 +512,7 @@
           </div>
           <div class="row" style="margin-top:4px;flex-wrap:nowrap"><span class="muted" id="chatPerm" style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span><div style="flex:1"></div><span class="muted" id="chatMsg"></span></div>
         </div>
-        <div class="chatside">
+        <div class="chatside" data-mode="solo">
           <div class="sidehead">Controls</div>
           <div class="ctrlstack" data-noautosave>
             <div class="ctrlline">
@@ -539,6 +576,12 @@
     <div class="card span" data-tab="stages">
       <details class="help" open><summary><b style="font-size:1.02rem">🎭 Scenes</b></summary>
 
+      <div class="stgstage">
+        <!-- The canvas column owns the intro line and the scene picker too, so
+             the lists beside it start at the TOP of the section. Left full
+             width, those two pushed the lists down and left dead space to the
+             right of them. -->
+        <div class="stgmain">
       <div class="hint">A <b>scene is the whole show</b> — overlays, groups, commands, triggers, wording and limits, all switching together. See <b>Help → 🎬 Scenes</b>.</div>
       <div class="row" style="gap:8px;align-items:flex-end;margin-top:8px">
         <label class="field">Scene <select id="scnSel" style="width:200px" onchange="stgPick(+this.value)"></select></label>
@@ -548,28 +591,32 @@
         <button class="ghost pmini" onclick="stgDelete()" title="delete this scene (its media stays in the library)">🗑</button>
         <button class="ghost pmini" onclick="mediaBrowse(null)" title="media browser">🗂</button>
         <button class="ghost pmini" onclick="pushGameplay()" title="copy this scene's rules — commands, triggers, wording — onto other scenes">⇪</button>
+        <button class="ghost pmini" onclick="stgExport()" title="export this scene, media and all">⬇</button>
+        <label class="ghost pmini" style="cursor:pointer" title="import a scene bundle">⬆<input type="file" accept=".zip,.dfscene.zip" style="display:none" onchange="stgImport(this)"></label>
       </div>
       <div id="stgEditor" style="display:none;margin-top:10px">
-        <div class="stgstage">
-          <!-- the canvas and everything that belongs to it in one column,
-               so the lists beside them span the WHOLE section -->
-          <div class="stgmain">
           <div id="stgCanvas"></div>
             <div class="stgunder">
           <label class="field">Resolution <select id="stgRes" onchange="stgResPick()">
             <option>1280x720</option><option>1920x1080</option><option>640x480</option>
             <option>720x1280</option><option>1080x1920</option></select></label>
+          <label class="field" id="stgModeWrap" style="display:none">Mode
+            <select id="stgMode" onchange="stgSetMode(this.value)"
+                    title="whose hands are on this scene's game. Same referee either way — the dial only changes who gets to push.">
+              <option value="operators">Versus</option>
+              <option value="audience">Gameshow</option>
+            </select></label>
           <label class="row" style="gap:6px" title="show a 5% grid and snap to it — hold Shift while dragging to place freely"><input type="checkbox" id="stgGridOn" checked style="width:auto" onchange="stgGridToggle()"> grid &amp; snap</label>
           <div id="stgScope"></div>
           <div style="flex:1"></div>
-          <button class="ghost pmini" onclick="stgExport()" title="export this scene, media and all">⬇ Export</button>
-          <label class="ghost pmini" style="cursor:pointer" title="import a scene bundle">⬆ Import<input type="file" accept=".zip,.dfscene.zip" style="display:none" onchange="stgImport(this)"></label>
           <button class="ghost pmini" id="stgHushAll" style="display:none"
                   title="show every overlay on the canvas again"
                   onclick="stgHushClear()">🙈 show hidden</button>
         </div>
+        <div class="hint" id="stgModeHint" style="display:none;margin-top:6px"></div>
         <div id="stgProps" style="margin-top:8px"></div>
-          </div>
+      </div><!-- /#stgEditor -->
+        </div><!-- /.stgmain -->
           <div class="stgside">
         <div class="stglists">
           <div class="stgpane">
@@ -594,11 +641,10 @@
               <button class="ghost pmini" title="delete this group (its overlays stay, untagged)" onclick="stgGroupDelete()">🗑</button>
             </div>
             <div class="stglist" id="stgContents"></div>
-          </div>
-        </div>
-          </div>
-        </div>
-      </div>
+          </div><!-- /.stgpane -->
+        </div><!-- /.stglists -->
+          </div><!-- /.stgside -->
+        </div><!-- /.stgstage -->
       </details>
     </div>
 
@@ -762,7 +808,7 @@
       </details>
     </div>
 
-    <div class="card span" data-tab="stages">
+    <div class="card span" data-tab="stages" data-mode="solo">
 <details class="help" style="margin-top:14px"><summary><b style="font-size:1.02rem">🏆 Leaderboards</b></summary>
         <div id="users"><div class="muted">No one has pumped yet.</div></div>
         <div class="row" style="margin-top:12px;gap:8px;align-items:center;flex-wrap:wrap">
@@ -779,7 +825,7 @@
 
     <!-- capacity ranges + always-on: both are triggers, fired by the -->
     <!-- capacity number rather than by a person typing -->
-    <div class="card span" data-tab="triggers">
+    <div class="card span" data-tab="triggers" data-mode="solo">
       <details class="help"><summary><h2>System commands</h2></summary>
       <!-- Same layout language as the rest of the panel: label above its
            control, checkboxes at a matching height, and every hint UNDER its
@@ -829,7 +875,7 @@
       </details>
 
     </div>
-    <div class="card span" data-tab="triggers">
+    <div class="card span" data-tab="triggers" data-mode="solo">
       <details class="help"><summary><h2>Custom commands</h2></summary>
       <div id="commands"></div>
       <div class="row" style="margin-top:10px">
@@ -841,7 +887,7 @@
         A command works once it's in a <b>range</b> (Game → Capacity ranges) or in <b>⚡ Always-On</b> — range values (cooldown, fire seconds/device, dice, luck) always override the command's own. See the <b>Help</b> tab for placeholders.</div>
       </details>
     </div>
-    <div class="card span" data-tab="triggers">
+    <div class="card span" data-tab="triggers" data-mode="solo">
       <details class="help"><summary><h2>Capacity ranges</h2></summary>
       <details class="help" style="margin-bottom:14px"><summary><b style="font-size:1.02rem">⚡ Always-On commands</b></summary>
         <label class="row" style="gap:8px;margin:4px 0 8px"><input type="checkbox" id="alwaysOnEnabled" style="width:auto" onchange="renderAlwaysOn();scheduleSave()"> Enable — commands added here work in <b>every</b> range (bypassing per-range membership)</label>
@@ -863,7 +909,7 @@
         <b>above 100%</b> up to the End threshold. Only one End / End Sequence is allowed, and nothing comes after it.</div>
       </details>
     </div>
-    <div class="card span" data-tab="triggers">
+    <div class="card span" data-tab="triggers" data-mode="solo">
       <details class="help"><summary><h2>📈 Capacity events</h2></summary>
       <div class="hint" style="margin-top:8px;max-width:860px">One-shot triggers that fire the moment capacity reaches a threshold (<b>1–999%</b>; above 100% only happens inside an End Sequence's buildup). They operate <b>independently of ranges</b> — while one runs, its restrictions <b>take precedence over normal ranges</b> — but the <b>End / End Sequence overrules them</b>: nothing triggers after the end fires, and the session end cancels any running capacity event. One-shot per session (re-armed by Session reset / Activation).</div>
       <div id="capEvents"></div>
@@ -874,7 +920,7 @@
       <div class="hint" style="max-width:860px"><b>During the event</b> = while its action block is running (actions execute in order; use <b>wait</b> to shape timing). Gate play with a <b>command_gate</b> row: a <b>Resume</b> row at the block's end lifts it when the event completes; leave it off and the gate persists for the session. Gates apply to <b>chat commands only</b> — dashboard controls still work; an <b>Allow</b> row wins over everything, including range membership.</div>
       </details>
     </div>
-    <div class="card span" data-tab="triggers">
+    <div class="card span" data-tab="triggers" data-mode="solo">
       <details class="help"><summary><h2>⏱ Timed events</h2></summary>
       <div id="events"></div>
       <div class="row" style="margin-top:10px">
@@ -895,7 +941,7 @@
         Runs only while <b>Activation</b> is on; turning Activation off cancels all events and clears cooldowns. Rounds never overlap — a slow block (wait/poll) just delays the next round.</div>
       </details>
     </div>
-    <div class="card span" data-tab="triggers">
+    <div class="card span" data-tab="triggers" data-mode="solo">
       <details class="help"><summary><h2>🗳 Polls</h2></summary>
       <div class="row" style="gap:10px;align-items:flex-end;margin-top:8px">
         <label class="field">Poll vote command <span class="muted">(only active while a poll runs)</span>
@@ -910,7 +956,7 @@
       </div>
       </details>
     </div>
-    <div class="card span" data-tab="triggers">
+    <div class="card span" data-tab="triggers" data-mode="solo">
       <details class="help"><summary><h2>Broadcasts</h2></summary>
       <div id="broadcasts"></div>
       <div class="row" style="margin-top:10px">
@@ -920,7 +966,7 @@
       <div class="hint">Preset messages you can fire from the <b>Chat tab → Controls</b> (“Broadcast Custom”). Placeholders work (<code>[capacity]</code>, <code>[operator]</code>, …). Posted to your channel as the owner.</div>
       </details>
     </div>
-    <div class="card span" data-tab="triggers">
+    <div class="card span" data-tab="triggers" data-mode="solo">
       <details class="help"><summary><h2>🎮 Minigames</h2></summary>
       <div id="minigames"></div>
       <div class="row" style="margin-top:10px">
@@ -930,7 +976,7 @@
       <div class="hint">A minigame is a <b>named profile</b>: a game, its settings, its luck, and the <b>outcome tiers</b> that run when the score lands. Play one from any command with a <b>minigame</b> action row — so a command can fire a pump and post a message <i>before</i> the game, and carry on <i>after</i> it. Two profiles of the same game can differ completely, and any number of commands can call either.</div>
       </details>
     </div>
-    <div class="card span" data-tab="triggers">
+    <div class="card span" data-tab="triggers" data-mode="solo">
       <details class="help"><summary><h2>🏁 Competitions</h2></summary>
       <div class="hint" style="max-width:880px;margin-top:8px">A competition is an <b>action</b> (start it from any action block). Fully <b>button-driven</b>: players press <b>Enter Challenge</b> on the embed and roll privately — the rolls you define below, in order (complete them all to qualify). Results post all at once; highest score wins by the <b>Win by</b> metric. Winner / no-winner outcomes are <b>action blocks</b> — e.g. an embed message row, <code>fire [winner_score]</code>, <b>award</b> a bonus command, or <b>command_gate</b> everyone else. <i>Race &amp; raffle are being redesigned and will return.</i> Placeholders: <code>[winner]</code> <code>[winner_score]</code> <code>[runnerup]</code> <code>[total_score]</code> <code>[results]</code>.</div>
       <div id="competitions" style="margin-top:10px"></div>
@@ -940,7 +986,7 @@
       </div>
       </details>
     </div>
-    <div class="card span" data-tab="triggers">
+    <div class="card span" data-tab="triggers" data-mode="solo">
       <details class="help"><summary><h2>🤝 Bonus Rounds</h2></summary>
       <div class="hint" style="max-width:880px">A Bonus Round is a <b>teamwork cash-in</b>, started by a <b>bonus_round</b> action. First bank amounts with an <b>award</b> action (volume secs/%) (pump <b>seconds</b> or <b>capacity %</b>, on <code>[winner]</code>/<code>[range_leader]</code>/<code>[session_leader]</code>/…). The round posts an embed with a <b>Confirm</b> button for bonus holders; once the needed holders confirm (<b>all</b>, or just the <b>top holder</b>) before the timer, your action block runs with the pooled <code>[total_bonus_secs]</code> / <code>[total_bonus_pct]</code> — then the banks are spent. Use <code>fire [total_bonus_secs]</code> or <code>add % [total_bonus_pct]</code> to apply them.</div>
       <div id="bonusRounds" style="margin-top:10px"></div>
@@ -950,7 +996,7 @@
       </div>
       </details>
     </div>
-    <div class="card span" data-tab="triggers">
+    <div class="card span" data-tab="triggers" data-mode="solo">
       <details class="help"><summary><b style="font-size:1.02rem">🏆 Rewards</b></summary>
 
           <div class="hint" style="margin-top:0">Achievement rewards: N <b>perfects</b> unlock an <b>action block</b> for the earner (an <b>award</b> row grants a bonus command — target <code>[user]</code>).
@@ -963,7 +1009,7 @@
           </div>
       </details>
     </div>
-    <div class="card span" data-tab="triggers">
+    <div class="card span" data-tab="triggers" data-mode="solo">
       <details class="help"><summary><h2>Modes</h2></summary>
       <div id="modes"></div>
       <div class="row" style="margin-top:10px">
@@ -977,7 +1023,7 @@
     </div>
 
     <!-- templates: reusable snapshots of any trigger -->
-    <div class="card span" data-tab="triggers">
+    <div class="card span" data-tab="triggers" data-mode="solo">
       <details class="help"><summary><b style="font-size:1.02rem">🧩 Templates</b></summary>
         <div class="hint" style="margin-top:8px">Reusable snapshots saved from the <b>Commands</b>, <b>Events</b>, <b>Ranges</b> (incl. <b>End</b> / <b>End Sequence</b>), <b>Polls</b>, <b>Competitions</b>, and <b>Capacity Events</b> editors — hit the <b>💾</b> on any row to save it here. <b>＋ Add to Config</b> ports one back into your live setup, renaming to dodge clashes. Templates are <b>global</b> — they belong to your config, not to a scene, so one saved here is available from any of them, and they travel with backup/restore.</div>
         <div class="row" style="gap:10px;align-items:center;margin-top:10px">
@@ -1026,7 +1072,7 @@
     </div>
 
     <!-- discord -->
-    <div class="card span" data-tab="discord">
+    <div class="card span" data-tab="discord" data-mode="solo">
       <h2>Discord</h2>
       <div class="cols2">
 
@@ -1114,6 +1160,80 @@
       </div>
     </div>
 
+    <div class="card span" data-tab="discord" data-mode="multi">
+      <h2>Discord · Multiplayer</h2>
+      <div class="hint" style="max-width:880px"><b>broadcast</b> is where the game listens and plays.
+        <b>bot_network</b> is where the two bots talk to each other. That's all — a match uses these two
+        channels and nothing else, so the solo listen list doesn't apply.<br>
+        bot_network can hold <b>as many bots as you like</b>: every message names who it is from, who it is
+        for, and which match it belongs to, so several pairs can play side by side in one channel without
+        hearing each other. You still <b>name</b> the one bot you mean to play.</div>
+      <div class="hint" style="margin-top:0;max-width:880px">They do <b>not</b> have to be in the same server — bot_network
+        in a private two-person server and broadcast in the public one is the nicer arrangement. But then
+        <b>both bots need inviting to both servers</b>, and somebody always forgets one.</div>
+
+      <label class="field">bot_network <span class="muted">— where the two bots talk. No humans, nothing from the game. Needs View Channel, Send Messages, Read Message History.</span></label>
+      <div class="row" style="align-items:flex-end;gap:8px;max-width:880px">
+        <label class="field" style="flex:1;min-width:140px">Server
+          <select id="mpNetGuild" onchange="mpChans('Net')"><option value="">— select a server —</option></select></label>
+        <label class="field" style="flex:1;min-width:140px">Channel
+          <select id="mpNetChan" onchange="mpSave()"><option value="">— select a channel —</option></select></label>
+      </div>
+
+      <label class="field" style="margin-top:8px">broadcast <span class="muted">— where the game listens and plays: narration, commands, the audience. Needs View Channel, Send Messages, Embed Links. A <b>voice</b> channel here is what makes cameras possible.</span></label>
+      <div class="row" style="align-items:flex-end;gap:8px;max-width:880px">
+        <label class="field" style="flex:1;min-width:140px">Server
+          <select id="mpCastGuild" onchange="mpChans('Cast')"><option value="">— select a server —</option></select></label>
+        <label class="field" style="flex:1;min-width:140px">Channel
+          <select id="mpCastChan" onchange="mpSave()"><option value="">— select a channel —</option></select></label>
+        <button class="ghost" onclick="loadGuilds().then(mpUi)" title="Refresh the server list from the bot">↻</button>
+      </div>
+
+      <div id="mpChanState" class="hint" style="margin-top:6px"></div>
+    </div>
+
+    <!-- Triggers · Multiplayer mode -->
+    <div class="card span" data-tab="triggers" data-mode="multi">
+      <details class="help"><summary><h2>🎬 Actions</h2></summary>
+      <div class="hint" style="max-width:880px;margin-top:8px">A <b>Multiplayer Action</b> is a reusable batch of action rows —
+        a spin, a message, an overlay, a dice roll, a device activation, a loop. It is <b>not bound to whatever
+        ran it</b>: a row says <i>who</i> it acts on rather than naming a player, and reads the match out of
+        <code>[multi_…]</code> placeholders. So the same "roulette round" drops into any multiplayer game.
+        These are <b>global</b> — not per-scene, and nothing to do with solo's Templates.</div>
+      <div id="mpActList"></div>
+      <div class="row" style="gap:8px;margin-top:8px">
+        <button onclick="mpActAdd()">+ New Action</button>
+
+        <span class="muted" id="mpActMsg"></span>
+      </div>
+      </details>
+    </div>
+
+    <div class="card span" data-tab="triggers" data-mode="multi">
+      <details class="help"><summary><h2>🔁 Rounds</h2></summary>
+      <div class="hint" style="max-width:880px;margin-top:8px">A <b>round is a band with an action block</b> — the same shape as a
+        capacity range. The difference is that a round <b>loops</b> its Action until the band is cleared, then hands
+        over to the next round. "Do a roulette process, wait 15s, repeat until somebody hits 25%" is one round;
+        the next band is the next round.</div>
+      <div id="mpRndList"></div>
+      <div id="mpEndBox" style="margin-top:10px"></div>
+      <div class="row" style="gap:8px;margin-top:8px">
+        <button onclick="mpRndAdd()">+ New Round</button>
+        <button class="ghost" onclick="mpRndRun()" title="run the bands on their own, without the intro or the curtains — for checking a sequence, not for starting a show">🧪 Test the sequence</button>
+        <button class="ghost" onclick="mpRndStop()">■ Stop</button>
+        <span class="muted" id="mpRndMsg"></span>
+      </div>
+      <div class="hint" style="margin-top:6px">A real match starts from the <b>Multiplayer</b> tab — <b>▶ Start the match</b> plays the
+        scene intro, raises both curtains and then runs these. This button skips straight to the bands.</div>
+      <div class="hint" style="margin-top:8px;max-width:880px">The round sets <code>[multi_round_target]</code> to its
+        band's top, and the Action reads it — which is what keeps an Action unbound from whatever ran it. Rounds run
+        <b>in order</b>, low band to high; one already cleared when its turn comes is skipped. A round that can't be
+        cleared stops the sequence and says why rather than repeating forever.</div>
+
+      </details>
+    </div>
+
+<!-- multiplayer -->
     <!-- devices -->
     <div class="card span" data-tab="devices">
       <h2>Devices</h2>
@@ -1223,6 +1343,41 @@
       </details>
     </div>
 
+    <!-- multiplayer setup + diagnostics (multiplayer only) -->
+    <div class="card span" data-tab="system" data-mode="multi">
+      <details class="help" open><summary><h2>🤝 Multiplayer</h2></summary>
+      <div class="hint" style="max-width:860px;margin-top:8px">Setup and diagnostics. The match itself is run from the
+        <b>header</b> — pick your seat, go LIVE, then <b>✉ Invite</b>. Who you're playing is chosen in that invite,
+        so there is nobody's name to type here.</div>
+
+      <div id="mpResume" style="display:none;border:1px solid var(--warn);border-radius:10px;padding:12px;margin-top:10px;max-width:860px">
+        <div style="font-weight:700;margin-bottom:6px" id="mpResumeText">Unfinished match found</div>
+        <div class="row" style="gap:8px">
+          <button onclick="mpResume(true)">Rejoin it</button>
+          <button class="ghost" onclick="mpResume(false)">Drop it</button>
+        </div>
+      </div>
+
+      <div id="mpMatch" style="max-width:860px;margin-top:10px"></div>
+
+      <h3 style="margin:14px 0 6px">Preflight</h3>
+      <div id="mpPreflight" style="max-width:860px"><div class="muted">Connect the bot and pick both channels on the Discord tab.</div></div>
+      <div id="mpPeerState" class="dev" style="margin-top:8px;max-width:860px"><div class="grow"><div class="name">◌ No peer seen yet</div><div class="tag">multiplayer mode is off</div></div></div>
+
+      <h3 style="margin:14px 0 6px">Link log</h3>
+      <div id="mpNotes" class="hint" style="margin-top:0;max-width:860px;max-height:180px;overflow:auto;font-family:ui-monospace,monospace;font-size:12px"></div>
+      </details>
+    </div>
+
+    <div class="card span" data-tab="system" data-mode="multi">
+      <details class="help"><summary><h2>🚫 Blocked bots</h2></summary>
+      <div class="hint" style="max-width:820px;margin-top:8px">A blocked bot can't pair with you, can't invite you,
+        and can't make your panel light up — the block is checked when they say <b>hello</b>, not just when they
+        ask for a match. Blocking someone you're mid-match with <b>ends the match</b> and stops both pumps.</div>
+      <div id="mpBlockList" style="margin-top:8px"></div>
+      </details>
+    </div>
+
     <!-- activity log -->
     <div class="card span" data-tab="system">
 
@@ -1261,7 +1416,157 @@
     </div>
 
 
-    <div class="card span" data-tab="help">
+    <div class="card span" data-tab="help" data-mode="multi">
+      <details class="help"><summary><h2>🤝 Multiplayer — two installs, one game</h2></summary>
+      <div class="hint" style="max-width:860px;margin-top:8px">Two DiscoFlate installs — <b>separate machines, separate bot tokens, separate pumps</b> — in the same Discord channel, playing one game. One side is <b>host</b>: it referees, narrates, and is the only side that resolves commands. The other is <b>guest</b>: devices, ceilings and a scene, nothing else. The host drives the guest by sending it <b>action rows</b>, which the guest runs locally through its own limits. Discord is the wire. <b>The guest's pump is never reachable except through the guest's own gate.</b></div>
+
+      <h3 style="margin:14px 0 6px">What you need</h3>
+      <ol style="line-height:1.7;padding-left:22px;margin:0;max-width:860px">
+        <li>Both <b>people</b> in the same broadcast channel.</li>
+        <li>Both <b>bots</b> pointed at that same broadcast channel.</li>
+        <li>Both <b>bots</b> pointed at the same bot_network channel.</li>
+        <li>That broadcast channel is the <b>only</b> place either bot speaks, for the duration.</li>
+      </ol>
+      <div class="hint" style="margin-top:8px;max-width:860px">⚠️ <b>The phone can't be the second player.</b> The Android app is a real second install, but it runs the <i>same bot token</i> — so everything it says is dropped as coming from yourself. You need a <b>second bot</b> (a second application in the Discord Developer Portal), invited to both channels.</div>
+
+      <h3 style="margin:14px 0 6px">The two channels</h3>
+      <ul style="line-height:1.7;padding-left:22px;margin:0;max-width:860px">
+        <li><b>bot_network</b> — protocol traffic only. No humans needed, nothing from the game ever appears there, and nothing typed there ever reaches the game. Needs <b>View Channel, Send Messages, Read Message History</b>.</li>
+        <li><b>broadcast</b> — the venue: narration, commands, the audience. Needs <b>View Channel, Send Messages, Embed Links</b>. Make it a <b>voice</b> channel if you want cameras; in a text channel nobody is on camera, by Discord's rules rather than ours.</li>
+      </ul>
+      <div class="hint" style="margin-top:8px;max-width:860px">They don't have to be in the same server — bot_network in a private two-person server and broadcast in the public one is the nicer arrangement. But then <b>both bots need inviting to both servers</b>, and somebody always forgets one. The <b>Preflight</b> list on the Multiplayer tab names exactly which check failed rather than leaving you at a silent dead end.</div>
+
+      <h3 style="margin:14px 0 6px">Your ceilings are the safety model</h3>
+      <div class="hint" style="margin-top:0;max-width:860px">Not trust, not authenticity — <b>your limits</b>. The host may ask for anything; what actually reaches your pump is whatever survives your gate, and the refusal travels back so the host narrates the truth instead of what they asked for. A hostile peer's best available move is <b>lying about who won</b>. Everything is in <b>percent</b>: a second is a different amount of inflation on every rig, 10% is 10% everywhere. <b>0 = no limit.</b> A <b>stop</b> is never gated, because blocking a stop to enforce a limit would be the gate causing the exact harm it exists to prevent. To end a match outright, use <b>Concede</b> on the Chat tab.</div>
+
+      <h3 style="margin:14px 0 6px">Fair races between unequal pumps</h3>
+      <div class="hint" style="margin-top:0;max-width:860px">Percent fixes <i>how much</i>. It says nothing about <i>how fast</i>: a pump that fills 100% in 60s reaches any finish line twice as quickly as one that takes 120s. So the handshake exchanges each side's <b>calibration</b> and the finish lines are scaled — base 150% with a 60s pump against a 120s pump becomes <b>150% vs 75%</b>, and both take 90 seconds of pumping. Compensation only ever brings a line <b>down</b>, never past the number the other person already agreed to. If either pump isn't calibrated the match says so out loud rather than pretending the race is even.</div>
+
+      <h3 style="margin:14px 0 6px">Race to N%</h3>
+      <div class="hint" style="margin-top:0;max-width:860px">First pump to its own finish line wins. The target can exceed 100% — capacity runs to 999%. <b>Who plays</b> is a dial on the same game, not a different game:</div>
+      <ul style="line-height:1.7;padding-left:22px;margin:6px 0 0;max-width:860px">
+        <li><b>Versus</b> — the two racers drive their own pumps with <code>!pump</code>. The guest's press is resolved by the host and sent across as an action row.</li>
+        <li><b>Gameshow</b> — the audience drives it: <code>!boost &lt;name&gt;</code> pushes a racer toward their line, <code>!stall &lt;name&gt;</code> freezes them for a few seconds. Sabotage <b>freezes</b> rather than draining anyone — nobody's physical state gets rewritten by a stranger in chat.</li>
+        <li><b>Both</b> — racers and audience together.</li>
+      </ul>
+      <div class="hint" style="margin-top:8px;max-width:860px">Each press is worth a fixed <b>%</b>, with a per-person <b>cooldown</b> so a race isn't a typing-speed contest. <code>!board</code> posts the scoreboard. If the <b>time limit</b> runs out with nobody across, whoever is the larger fraction of <b>their own</b> line wins. Two crossings within half a second are a <b>draw</b> — which is a constant, not a policy, and it's why there are no tie-break rules to argue about.</div>
+
+      <h3 style="margin:16px 0 6px">🧩 The rows multiplayer adds</h3>
+<div class="hint" style="margin-top:8px;max-width:880px"><b>Three of them:</b>
+        <code>mp_spin</code> picks a racer (even by default; a weight tilts it, and uneven odds get announced —
+        a wheel the audience can't see is indistinguishable from a rigged one) ·
+        <code>mp_roll</code> rolls dice and publishes <code>[multi_roll]</code> but <b>fires nothing</b>, so a
+        separate fire row spends it as a <b>percent</b> (seconds are refused over the wire — they're a different
+        amount of inflation on every rig) ·
+        <code>mp_choice</code> is a <b>Player Choice</b>: buttons only the named player may press, and it
+        <b>blocks</b> until they answer or the deadline passes.</div>
+            <h3 style="margin:16px 0 6px">Who does a row act on?</h3>
+      <div class="hint" style="max-width:860px;margin-top:0"><b>Who</b> appears only on rows that touch a
+        <b>pump or a picture</b>, because those belong to one machine and multiplayer has two. Blank means
+        <i>this</i> machine and nothing crosses the wire — which is what a video or a scene group wants.
+        It earns its keep inside an <b>Action</b>: that is where <i>the racer the spin picked</i> gets
+        inflated, or <i>the duel loser</i> takes the hit. A target that matches nobody — <i>chosen</i> before
+        any spin, <i>loser</i> after a draw — <b>drops the row</b> rather than guessing at a person.</div>
+      <h3 style="margin:14px 0 6px">Once it starts, leave the panel alone</h3>
+      <div class="hint" style="margin-top:0;max-width:860px">The match is <b>self-driving</b>. There is no "press here to continue" and no operator cockpit — it will run start to finish with both panels closed. Everything a human does happens in the broadcast channel, where both players and the audience already are. The panel's whole job is setup: pick the mode, the two channels and your opponent's bot name, set your ceilings, invite or accept, drop the flag. Then watch it in Discord.</div>
+
+      <h3 style="margin:14px 0 6px">Going LIVE is not starting a game</h3>
+      <div class="hint" style="margin-top:0;max-width:860px">In multiplayer the <b>LIVE</b> switch <i>arms</i> this install — it does not
+        start a session. No announcement, no intro, no commands, no events: nothing at all until an invite is accepted and gated, because both
+        shows have to begin on the same instant and that instant is the <b>handshake</b>, not the switch. Until then you are
+        <b>standing by</b>, and anyone who types a command is told so. Solo's go-live is untouched and unchanged — they are two separate flows
+        that share no code.<br>
+        When the match does begin, only the <b>host's</b> session starts for real: its activation message posts, its <code>[!command]</code>
+        tokens fire, its events release. The guest's never does — it has no game of its own to run, it takes instructions. It says so once in
+        the venue and is then quiet, because the host narrates for both of you.</div>
+
+      <h3 style="margin:14px 0 6px">Both players are on camera</h3>
+      <div class="hint" style="margin-top:0;max-width:860px">A requirement, not a setting: accepting an invite without a camera is refused.
+        That is what lets each machine carry only <b>its own</b> gauge and <b>its own</b> pump timer — the other player is a video tile, not a
+        widget to be drawn. Their meter still crosses the wire and drives the game's maths.<br>
+        It also means <b>the guest never needs your scene</b>. Both installs hold the same shipped scene, so an overlay id means the same thing
+        on either machine and you can play one on theirs by name. What can never cross is anything that would make the guest's bot <i>speak</i>
+        or run a game of its own: no messages, no commands, no rounds.<br>
+        <b>Mock is unavailable in a match.</b> Devices not firing while the other player's do is a silent cheat, not a test mode.</div>
+
+      <h3 style="margin:14px 0 6px">Splitting the difference</h3>
+      <div class="hint" style="margin-top:0;max-width:860px">Your two pumps almost certainly fill at different speeds, and every target in a
+        match is paced from that. The invite carries <b>both</b> numbers: the host's, and yours — and yours is <b>editable</b> in the popup,
+        because a stale figure is a handicap you never agreed to and that is the last moment to fix it.<br>
+        The host may tick <b>Offer to split the difference</b>. If you take it, both pumps run the <b>halfway</b> speed for this match and the
+        two finish lines become the same number, since equal pumps need no handicap. It is an offer both sides have to agree to — you cannot
+        re-tune someone else's rig on your own — and it is <b>match-scoped</b>: both rigs go back to their own calibration when the match ends,
+        however it ends, including after a crash.</div>
+
+      <h3 style="margin:14px 0 6px">How a match ends — the End Condition</h3>
+      <div class="hint" style="margin-top:0;max-width:860px">A match needs a way to be over that isn't "the rounds ran out". The
+        <b>End Condition</b> sits at the bottom of Rounds, always last, never one of them. Three things trigger it, and all three run the
+        <b>same</b> action block, because they are the same event — somebody lost:
+        <ul style="line-height:1.7;padding-left:22px;margin:6px 0 0">
+          <li><b>Conceding</b> — the 🏳 Concede button, or <code>!concede</code> in the venue. Only the two players can type it; the audience
+            does not get to end somebody else's match.</li>
+          <li><b>Max Capacity Volume</b> — a number from 1–999. Whoever reaches it <b>first loses</b>; getting there is conceding. It rides in
+            the invite, because it is what losing looks like and agreeing to a match without knowing it is agreeing to nothing.
+            <b>0</b> = no capacity trigger, so giving up is the only way out.</li>
+          <li><b>Coming off air</b> — either player unticking LIVE. Walking away is conceding by other means, and the match does not get a
+            different ending because somebody reached for the switch instead of the button.</li>
+        </ul>
+        Conceding is deliberately <b>not</b> an abort: the block still has to run — the outro, the result card, whatever you wrote — and a match
+        that tore itself down first would have nothing left to run it on.</div>
+
+      <h3 style="margin:14px 0 6px">Finding your opponent</h3>
+      <div class="hint" style="margin-top:0;max-width:860px">Bots are members like anyone else, so the bot you mean to play is in the member
+        list beside its owner. The search on the Multiplayer tab is scoped to your <b>broadcast</b> server and matches the <i>start</i> of a
+        name. Bots show 🤖; one marked <b>● seen</b> has said hello on bot_network, which is the difference between "this bot exists here" and
+        "this bot will answer an invite". You need <b>both</b> names — the bot is who the protocol addresses, the player is who you think you're
+        playing — and an invite is refused if that bot turns out to belong to somebody else.</div>
+
+      <h3 style="margin:14px 0 6px">The <code>[multi_…]</code> placeholders</h3>
+      <div class="hint" style="margin-top:0;max-width:860px">Repeated here from <b>Placeholders &amp; examples</b> so you don't have to leave
+        this page. Every one is prefixed <code>multi_</code>, so a block can never confuse the <i>other</i> player's capacity with this
+        install's own <code>[capacity]</code>.</div>
+      <table class="ph" style="margin-top:8px"><tbody>
+<tr><td colspan="2" style="padding-top:14px"><b>🤝 Multiplayer</b> — every one is prefixed <code>[multi_…]</code>, so a block can never confuse the <i>other</i> player's capacity with this install's own <code>[capacity]</code>. They fill in inside a <b>Multiplayer Action</b>; outside a match they render empty.</td></tr>
+            <tr><td><code>[multi_me_name]</code> / <code>[multi_peer_name]</code></td><td>the two <b>players'</b> names (never the bots' — "Dave-bot fired 10%" is plumbing leaking into the show)</td></tr>
+            <tr><td><code>[multi_me]</code> / <code>[multi_peer]</code></td><td>the two installs' ids — for a <b>condition</b>, rarely for a message</td></tr>
+            <tr><td><code>[multi_host_name]</code> / <code>[multi_guest_name]</code></td><td>who is in which seat, for a block that cares</td></tr>
+            <tr><td><code>[multi_loser]</code> / <code>[multi_winner]</code></td><td>who gave up, and who didn't — by player name. Set when the <b>End Condition</b> fires: a concession, reaching the lose-at capacity, or somebody going off air. Empty until then, so a block can test it.</td></tr>
+            <tr><td><code>[multi_loser_seat]</code></td><td>the loser's seat — <code>host</code> or <code>guest</code>.</td></tr>
+            <tr><td><code>[multi_end_why]</code></td><td>the reason the match ended, in words.</td></tr>
+            <tr><td><code>[multi_guest_capacity]</code> / <code>[multi_host_capacity]</code></td><td>each seat's meter, as a percent. The guest's arrives on its heartbeat, so a host-side overlay or report can show both rigs without asking for anything.</td></tr>
+            <tr><td><code>[multi_guest_pump_timer]</code> / <code>[multi_host_pump_timer]</code></td><td>seconds left on that seat's pump. A <b>duration</b>, never a finish time — a deadline computed on one machine is wrong on the other.</td></tr>
+            <tr><td><code>[multi_chosen]</code> / <code>[multi_chosen_name]</code></td><td>who the last <b>spin</b> picked. Empty before a spin, so a row aimed at <code>chosen</code> hits nobody rather than guessing.</td></tr>
+            <tr><td><code>[multi_other]</code> / <code>[multi_other_name]</code></td><td>the racer the spin <b>missed</b></td></tr>
+            <tr><td><code>[multi_my_pct]</code> / <code>[multi_peer_pct]</code></td><td>both capacity meters</td></tr>
+            <tr><td><code>[multi_my_target]</code> / <code>[multi_peer_target]</code></td><td>each racer's own <b>compensated</b> finish line — they differ on purpose (see Multiplayer → fair races)</td></tr>
+            <tr><td><code>[multi_my_frac]</code> / <code>[multi_peer_frac]</code></td><td>how far along <b>their own</b> line each racer is, as a %. This is the honest "who's winning" when the two lines differ.</td></tr>
+            <tr><td><code>[multi_leader]</code> <code>[multi_leader_name]</code> <code>[multi_leader_pct]</code></td><td>whoever is ahead on raw capacity. Dead level names <b>nobody</b> rather than picking arbitrarily.</td></tr>
+            <tr><td><code>[multi_trailer]</code> <code>[multi_trailer_name]</code> <code>[multi_trailer_pct]</code></td><td>…and whoever is behind</td></tr>
+            <tr><td><code>[multi_roll]</code></td><td>the last <b>mp_roll</b> total — spend it as a <b>percent</b> in a fire row (seconds are refused over the wire; they're a different amount of inflation on every rig)</td></tr>
+            <tr><td><code>[multi_roll_dice]</code> <code>[multi_roll_faces]</code> <code>[multi_roll_max]</code></td><td>what was rolled (<code>1d7</code>), the individual faces, and the best possible total — for narrating a roll properly</td></tr>
+            <tr><td><code>[multi_odds]</code></td><td>the last spin's odds, already worded. Uneven odds are announced automatically: a wheel the audience can't see is indistinguishable from a rigged one.</td></tr>
+            <tr><td><code>[multi_duel_me]</code> / <code>[multi_duel_peer]</code></td><td>what each racer played in an <b>mp_duel</b> — <code>—</code> if they never answered</td></tr>
+            <tr><td><code>[multi_duel_winner_name]</code> / <code>[multi_duel_loser_name]</code></td><td>who won and who lost it. <b>Both empty on a draw</b>, so <code>[if multi_duel_loser_name]</code> is how a line only appears when somebody actually lost.</td></tr>
+            <tr><td><code>[multi_duel_winner]</code> <code>[multi_duel_loser]</code> <code>[multi_duel_draw]</code></td><td>the same as install ids, and a flag set only when it drew — for a <b>condition</b> rather than a message</td></tr>
+            <tr><td><code>[multi_choice]</code> <code>[multi_choice_label]</code> <code>[multi_choice_by]</code> <code>[multi_choice_who]</code></td><td>what a <b>Player Choice</b> came back with — its value, the button's words, who pressed it, and which install they race for</td></tr>
+            <tr><td><code>[multi_round]</code> / <code>[multi_round_target]</code></td><td>the round number and the band it ends at — what a <b>repeat until</b> tests against</td></tr>
+            <tr><td><code>[multi_told_…]</code></td><td>values that arrived with a <b>mp_tell</b> from the other bot — <code>values</code> of <code>{who: "Dave"}</code> becomes <code>[multi_told_who]</code>. How their bot learns what just happened on your side.</td></tr>
+            <tr><td><code>[multi_round_name]</code> / <code>[multi_round_pass]</code></td><td>the round's name, and which pass of its loop this is (1, 2, 3…) — for a round that wants to say "last chance"</td></tr>
+            <tr><td><code>[multi_game]</code> <code>[multi_role]</code> <code>[multi_sid]</code></td><td>the game being played, whether this install is host or guest, and the match id</td></tr>
+      </tbody></table>
+
+      <h3 style="margin:14px 0 6px">When it goes wrong</h3>
+      <ul style="line-height:1.7;padding-left:22px;margin:0;max-width:860px">
+        <li><b>90 seconds of silence</b> from the other install ends the match and stops your pump. So does <b>Abort</b>, on either side, and every timeout.</li>
+        <li><b>Reconnecting is free.</b> The channel is a log, so an install that drops off reads back what it missed and catches up. A replayed instruction can't fire a pump twice.</li>
+        <li>An unfinished match found at startup <b>asks</b> before rejoining — never silently, because a match that picks itself back up can put a pump on in a room nobody is watching.</li>
+        <li>A host that restarts <b>can't</b> restore the scores and the clock, so it aborts loudly instead of carrying on wrong.</li>
+        <li>The <b>Multi</b> switch is locked while the session is LIVE: swapping modes mid-session would change the command handling, the broadcast target and the scene set out from under an audience.</li>
+      </ul>
+      </details>
+    </div>
+
+    <div class="card span" data-tab="help" data-mode="solo">
       <details class="help"><summary><h2>Custom commands — how to set them up</h2></summary>
       <div class="hint" style="max-width:820px;margin-top:8px">A custom command is a chat trigger you invent (e.g. <code>!spin</code>). It's simply its <b>gates</b> (ranges, cooldowns, owner-only, …) plus an <b>action block</b> — an ordered list of action rows that run when it's typed. The bot only speaks through <b>message</b> rows, so “the reply” is just the message row you put after the rows that do things (their results flow on as placeholders).</div>
       <h3 style="margin:14px 0 6px">The action rows</h3>
@@ -1300,7 +1605,7 @@
       </details>
     </div>
 
-    <div class="card span" data-tab="help">
+    <div class="card span" data-tab="help" data-mode="solo">
       <details class="help"><summary><h2>Capacity ranges — how to set them up</h2></summary>
       <div class="hint" style="max-width:820px;margin-top:8px">Ranges are capacity bands (<b>From %</b> → <b>To %</b>) that change the game as the meter climbs. They're evaluated top-down — the <b>first band that contains the current capacity wins</b>. Edit them in Game → <b>Capacity ranges</b>.</div>
       <div class="hint" style="max-width:820px"><b>⚡ Always-On commands</b> (the collapsible at the top of the ranges section) is the alternative to per-range membership: a command listed there works in <b>every</b> range while the toggle is on — handy for utility commands like <code>!cointoss</code>. Each entry has its own <b>cooldown</b> and <b>max/person</b> (blank = default / unlimited); minigame entries also get a <b>luck</b> modifier. <b>A command lives in ranges OR Always-On, never both</b> — adding it to a range removes it from Always-On, and range-bound commands don't appear in the Always-On picker.</div>
@@ -1318,7 +1623,7 @@
       </details>
     </div>
 
-    <div class="card span" data-tab="help">
+    <div class="card span" data-tab="help" data-mode="solo">
       <details class="help"><summary><h2>Timed events — how to set them up</h2></summary>
       <div class="hint" style="max-width:820px;margin-top:8px">Events are automatic actions on a timer — no one has to type anything. Build them on the <b>Events</b> tab. They only run while <b>Activation</b> is on; turning Activation off cancels every event and clears cooldowns.</div>
       <h3 style="margin:14px 0 6px">Two timing modes</h3>
@@ -1613,6 +1918,33 @@ esphome dashboard config/</code></pre>
             <tr><td><code>[session_leader]</code> / <code>[session_leader_score]</code></td><td>the top pumper this whole session and their capacity % — use <code>[session_leader]</code> as a target for an end-of-session special prize</td></tr>
             <tr><td><code>[on_message]</code> / <code>[off_message]</code></td><td>the configured Activation ON / OFF message text (rendered), for reuse in other messages</td></tr>
             <tr><td><code>[prefix]</code> <code>[capacity_cmd]</code> <code>[leaderboard_cmd]</code> <code>[pumptimer_cmd]</code></td><td>the system command names (e.g. <code>!capacity</code>)</td></tr>
+            <tr><td colspan="2" style="padding-top:14px"><b>🤝 Multiplayer</b> — every one is prefixed <code>[multi_…]</code>, so a block can never confuse the <i>other</i> player's capacity with this install's own <code>[capacity]</code>. They fill in inside a <b>Multiplayer Action</b>; outside a match they render empty.</td></tr>
+            <tr><td><code>[multi_me_name]</code> / <code>[multi_peer_name]</code></td><td>the two <b>players'</b> names (never the bots' — "Dave-bot fired 10%" is plumbing leaking into the show)</td></tr>
+            <tr><td><code>[multi_me]</code> / <code>[multi_peer]</code></td><td>the two installs' ids — for a <b>condition</b>, rarely for a message</td></tr>
+            <tr><td><code>[multi_host_name]</code> / <code>[multi_guest_name]</code></td><td>who is in which seat, for a block that cares</td></tr>
+            <tr><td><code>[multi_loser]</code> / <code>[multi_winner]</code></td><td>who gave up, and who didn't — by player name. Set when the <b>End Condition</b> fires: a concession, reaching the lose-at capacity, or somebody going off air. Empty until then, so a block can test it.</td></tr>
+            <tr><td><code>[multi_loser_seat]</code></td><td>the loser's seat — <code>host</code> or <code>guest</code>.</td></tr>
+            <tr><td><code>[multi_end_why]</code></td><td>the reason the match ended, in words.</td></tr>
+            <tr><td><code>[multi_guest_capacity]</code> / <code>[multi_host_capacity]</code></td><td>each seat's meter, as a percent. The guest's arrives on its heartbeat, so a host-side overlay or report can show both rigs without asking for anything.</td></tr>
+            <tr><td><code>[multi_guest_pump_timer]</code> / <code>[multi_host_pump_timer]</code></td><td>seconds left on that seat's pump. A <b>duration</b>, never a finish time — a deadline computed on one machine is wrong on the other.</td></tr>
+            <tr><td><code>[multi_chosen]</code> / <code>[multi_chosen_name]</code></td><td>who the last <b>spin</b> picked. Empty before a spin, so a row aimed at <code>chosen</code> hits nobody rather than guessing.</td></tr>
+            <tr><td><code>[multi_other]</code> / <code>[multi_other_name]</code></td><td>the racer the spin <b>missed</b></td></tr>
+            <tr><td><code>[multi_my_pct]</code> / <code>[multi_peer_pct]</code></td><td>both capacity meters</td></tr>
+            <tr><td><code>[multi_my_target]</code> / <code>[multi_peer_target]</code></td><td>each racer's own <b>compensated</b> finish line — they differ on purpose (see Multiplayer → fair races)</td></tr>
+            <tr><td><code>[multi_my_frac]</code> / <code>[multi_peer_frac]</code></td><td>how far along <b>their own</b> line each racer is, as a %. This is the honest "who's winning" when the two lines differ.</td></tr>
+            <tr><td><code>[multi_leader]</code> <code>[multi_leader_name]</code> <code>[multi_leader_pct]</code></td><td>whoever is ahead on raw capacity. Dead level names <b>nobody</b> rather than picking arbitrarily.</td></tr>
+            <tr><td><code>[multi_trailer]</code> <code>[multi_trailer_name]</code> <code>[multi_trailer_pct]</code></td><td>…and whoever is behind</td></tr>
+            <tr><td><code>[multi_roll]</code></td><td>the last <b>mp_roll</b> total — spend it as a <b>percent</b> in a fire row (seconds are refused over the wire; they're a different amount of inflation on every rig)</td></tr>
+            <tr><td><code>[multi_roll_dice]</code> <code>[multi_roll_faces]</code> <code>[multi_roll_max]</code></td><td>what was rolled (<code>1d7</code>), the individual faces, and the best possible total — for narrating a roll properly</td></tr>
+            <tr><td><code>[multi_odds]</code></td><td>the last spin's odds, already worded. Uneven odds are announced automatically: a wheel the audience can't see is indistinguishable from a rigged one.</td></tr>
+            <tr><td><code>[multi_duel_me]</code> / <code>[multi_duel_peer]</code></td><td>what each racer played in an <b>mp_duel</b> — <code>—</code> if they never answered</td></tr>
+            <tr><td><code>[multi_duel_winner_name]</code> / <code>[multi_duel_loser_name]</code></td><td>who won and who lost it. <b>Both empty on a draw</b>, so <code>[if multi_duel_loser_name]</code> is how a line only appears when somebody actually lost.</td></tr>
+            <tr><td><code>[multi_duel_winner]</code> <code>[multi_duel_loser]</code> <code>[multi_duel_draw]</code></td><td>the same as install ids, and a flag set only when it drew — for a <b>condition</b> rather than a message</td></tr>
+            <tr><td><code>[multi_choice]</code> <code>[multi_choice_label]</code> <code>[multi_choice_by]</code> <code>[multi_choice_who]</code></td><td>what a <b>Player Choice</b> came back with — its value, the button's words, who pressed it, and which install they race for</td></tr>
+            <tr><td><code>[multi_round]</code> / <code>[multi_round_target]</code></td><td>the round number and the band it ends at — what a <b>repeat until</b> tests against</td></tr>
+            <tr><td><code>[multi_told_…]</code></td><td>values that arrived with a <b>mp_tell</b> from the other bot — <code>values</code> of <code>{who: "Dave"}</code> becomes <code>[multi_told_who]</code>. How their bot learns what just happened on your side.</td></tr>
+            <tr><td><code>[multi_round_name]</code> / <code>[multi_round_pass]</code></td><td>the round's name, and which pass of its loop this is (1, 2, 3…) — for a round that wants to say "last chance"</td></tr>
+            <tr><td><code>[multi_game]</code> <code>[multi_role]</code> <code>[multi_sid]</code></td><td>the game being played, whether this install is host or guest, and the match id</td></tr>
             <tr><td><code>[syscom_capacity]</code> <code>[syscom_help]</code> <code>[syscom_leaderboard]</code> <code>[syscom_leaderboard_life]</code> <code>[syscom_pumptimer]</code> <code>[syscom_vote]</code></td><td>every system command, <b>prefix included</b> and following any rename — e.g. <code>[syscom_help]</code> → <code>!aghelp</code>. Works in overlay text too, so a Text overlay can say “<code>[syscom_help]</code> for commands”.</td></tr>
             <tr><td><code>[count]</code> <code>[goal]</code> <code>[remaining]</code> <code>[counter]</code> <code>[prize]</code></td><td>Perfect Prize progress (in prize messages/blocks)</td></tr>
           </tbody></table>
@@ -1651,7 +1983,7 @@ esphome dashboard config/</code></pre>
       </details>
     </div>
 
-    <div class="card span" data-tab="help">
+    <div class="card span" data-tab="help" data-mode="solo">
       <details class="help"><summary><h2>Minigames — how each one plays</h2></summary>
       <div class="hint" style="margin-top:8px;max-width:820px">Minigames are custom command types (Commands tab → Type → <code>game-*</code>). Running one posts a public <b>▶ Play</b> button locked to whoever typed it; the game itself is <b>ephemeral</b> (only the player sees it), and when it ends the tiered result broadcasts to the channel — with any pump fires credited to the player's leaderboard. <b>Slots is the exception:</b> it plays fully in-channel with no Play button. Every game maps its final <b>score</b> through your <b>Outcome tiers</b> (score → message + optional device fires), so YOU decide what a win pays. A per-range or Always-On <b>Luck</b> value is a flat ± added to the score before the tier is picked.</div>
 
@@ -1687,6 +2019,11 @@ esphome dashboard config/</code></pre>
 const $ = s => document.querySelector(s);
 let editingForms = false;   // becomes true once user-editable forms are populated
 let configRev = null;       // last config revision this tab saw (concurrency check)
+// Declared HERE, not beside applyState: the startup showTab() runs during
+// script evaluation, long before that point, and it asks applyModeVis() which
+// half of the app we're in. A `let` read before its declaration is a TDZ
+// ReferenceError, not undefined — so the whole panel died on load.
+let lastState = {};
 
 // ---- fluid tabs (no page navigation) ----
 function showTab(name){
@@ -1694,6 +2031,7 @@ function showTab(name){
   document.querySelectorAll('.card[data-tab]').forEach(c=>{
     c.classList.toggle('show', c.getAttribute('data-tab')===name);
   });
+  applyModeVis();
   document.querySelectorAll('.tab-btn').forEach(b=>{
     b.classList.toggle('active', b.getAttribute('data-go')===name);
   });
@@ -1719,6 +2057,63 @@ function renderSceneBar(){
 // The shipped baseline. The server restores it on every save, so the panel
 // just says so up front rather than letting edits vanish silently.
 function isBuiltinScene(sc){ return !!(sc && sc.builtin); }
+// Cards tagged data-mode only belong to that half of the app. Untagged cards
+// are GLOBAL and always show — which is what gives multiplayer its own Triggers
+// page and its own Help without duplicating either.
+// A guest in a match takes instructions: its commands are off and every editor
+// would be editing something that isn't driving anything. So the panel locks to
+// Chat — plus the header, which is how you stop. It releases itself when the
+// match ends, because it is driven by state rather than set once.
+let mpLockedNow = false;
+function applyMpLock(){
+  const locked = !!(lastState && lastState.mp_locked);
+  const inMatch = !!(lastState && lastState.mp_in_match);
+  const cb=document.querySelector('#mpConcede');
+  if(cb) cb.style.display = inMatch ? '' : 'none';
+
+  document.querySelectorAll('.tab-btn').forEach(b=>{
+    const keep = b.getAttribute('data-go')==='chat';
+    b.style.display = (locked && !keep) ? 'none' : '';
+  });
+  const note=document.querySelector('#mpLockNote');
+  if(note){
+    note.style.display = locked ? '' : 'none';
+    if(locked) note.innerHTML = `🔒 <b>You're the guest</b> in a match with `+
+      `<b>${esc((lastState&&lastState.mp_peer)||'your opponent')}</b>. Your commands are off and `+
+      `the host is running the show — that's the deal, not a fault. `+
+      `<b>Concede</b> ends it and gives you the panel back.`;
+  }
+  if(locked && !mpLockedNow) showTab('chat');   // only yank them once
+  mpLockedNow = locked;
+}
+async function mpConcede(){
+  const who=(lastState&&lastState.mp_peer)||'your opponent';
+  if(!confirm(`Concede the match with ${who}? Both pumps stop and the handshake drops.`)) return;
+  await api('/api/mp/concede', {why:'conceded'});
+  mpPoll(true);
+}
+function mpAvailable(){
+  // absent means an older server that predates the flag — treat as available
+  return !(lastState && lastState.multiplayer_enabled === false);
+}
+function applyModeVis(){
+  const on = mpAvailable();
+  const m = (on && lastState && lastState.mode==='multi') ? 'multi' : 'solo';
+  document.querySelectorAll('[data-mode]').forEach(el=>{
+    el.style.display = (el.getAttribute('data-mode')===m) ? '' : 'none';
+  });
+  // A build without multiplayer hides the whole surface: the header toggle and
+  // the tab itself. Leaving a dead toggle visible is worse than leaving it out.
+  const tgl=document.querySelector('#modeTgl');
+  if(tgl) tgl.style.display = on ? '' : 'none';
+  // There is no Multiplayer tab any more — the header RUNS the match, so the
+  // header is what has to go. These are shown by mpRender() on mode, and a
+  // build without multiplayer is forced to solo server-side; hiding them here
+  // as well means a dead control can't appear even if that ever slips.
+  ['#seatTgl','#mpInviteBtn','#mpReadyBtn','#mpArmBtn','#mpStartBtn','#mpAbortBtn']
+    .forEach(id=>{ const el=document.querySelector(id);
+                   if(el && !on) el.style.display='none'; });
+}
 function pushGameplay(){
   const me=stgStage(); if(!me) return toastMsg('no scene selected');
   const others=(scenesData||[]).filter(sc=>sc!==me);
@@ -1899,8 +2294,30 @@ async function controlPump(){
 // ---- Chat tab (owner cockpit) ----
 let chatLast = '';    // newest message id rendered for the current channel
 let chatBusy = false;
+// In multiplayer the channel is not a choice — it is the broadcast channel set
+// on the Discord tab. Show WHICH, in words, and pin the log to it.
+function chatFixedChannel(){
+  const el=$('#chatChanFixed'); if(!el) return '';
+  const b=((mpCfg||{}).broadcast)||{};
+  const cid=String(b.channel_id||''), gid=String(b.guild_id||'');
+  if(!cid){ el.textContent='— not set —'; el.style.color='var(--warn)'; return ''; }
+  const g=(guildsCache||[]).find(x=>x.id===gid);
+  const c=g&&(g.channels||[]).find(x=>x.id===cid);
+  el.style.color='';
+  el.textContent = c ? `#${c.name}${g?` · ${g.name}`:''}` : `channel ${cid}`;
+  el.title = 'set on the Discord tab';
+  return cid;
+}
 async function chatChannels(){
   const sel=$('#chatChan'); if(!sel) return;
+  if(appMode()==='multi'){
+    const cid=chatFixedChannel();
+    // the log still needs a channel id, it just isn't picked here
+    sel.innerHTML = cid ? `<option value="${esc(cid)}" selected></option>` : '';
+    chatChanKinds = {};
+    try{ chatVideoUi(); }catch(e){}
+    return;
+  }
   try{
     const r = await api('/api/chat/channels', {});
     const cur = sel.value;
@@ -1948,6 +2365,14 @@ function chatMd(t){
   const keep = c => { code.push(c); return '@@DFCODE' + (code.length-1) + '@@'; };
   t = t.replace(/```(?:[a-zA-Z]*\n)?([\s\S]*?)```/g, (m,c)=>keep('<pre class="codemd">'+c+'</pre>'));
   t = t.replace(/`([^`\n]+)`/g,                      (m,c)=>keep('<code class="codemd">'+c+'</code>'));
+  // Custom server emoji arrive as <:name:id> (animated: <a:name:id>), and esc()
+  // has already turned the brackets into entities — so they used to render as
+  // literal "<:pepe:123…>" text, which read as leaked code. Swap them for the
+  // CDN image Discord itself serves. Runs AFTER the code keeps above, so an
+  // emoji inside a code block is left alone.
+  t = t.replace(/&lt;(a)?:(\w{2,32}):(\d{15,25})&gt;/g, (m, anim, nm, id) =>
+    `<img class="cemoji" loading="lazy" src="https://cdn.discordapp.com/emojis/${id}.${anim?'gif':'png'}?size=44"`+
+    ` alt=":${nm}:" title=":${nm}:">`);
   t = t.replace(/\|\|([\s\S]+?)\|\|/g, '<span class="spoil" title="spoiler - click to reveal">$1</span>');
   t = t.replace(/\*\*\*([\s\S]+?)\*\*\*/g, '<b><i>$1</i></b>');
   t = t.replace(/\*\*([\s\S]+?)\*\*/g, '<b>$1</b>');
@@ -2494,6 +2919,57 @@ function globalScene(){
   };
 }
 function stgStage(){ return stgGlobalMode ? globalScene() : (scenesData[stgCur]||null); }
+// A scene with no tag is a SOLO scene — every scene written before multiplayer
+// existed is one, and none of them should vanish from the picker.
+function sceneMode(s){ return (s && s.mode==='multi') ? 'multi' : 'solo'; }
+function appMode(){ return (lastState && lastState.mode==='multi') ? 'multi' : 'solo'; }
+// Versus or Gameshow — WHOSE HANDS are on the game. Solo/multi is not a choice
+// here: the header toggle already says which half of the app you're in, and a
+// scene is created in the one you're standing in.
+function stgSetMode(m){
+  const s=stgStage(); if(!s) return toastMsg('no scene selected');
+  if(isBuiltinScene(s)) return toastMsg('this scene is read-only — copy it first');
+  s.input = (m==='audience') ? 'audience' : 'operators';
+  stgModeUi(); scheduleSave();
+}
+// Switching modes leaves the Scenes tab pointed at a scene the picker no
+// longer lists. Follow the mode rather than showing an editor for something
+// that isn't in the dropdown.
+function stgModeFollow(){
+  // The SERVER decides which scene a mode loads (it remembers per mode), so
+  // follow what it just loaded rather than picking the first of that mode and
+  // overwriting its choice on the way past.
+  const want=(lastState&&lastState.chat_scene||'').trim().toLowerCase();
+  const byName=scenesData.findIndex(s=>(s.name||'').trim().toLowerCase()===want
+                                       && sceneMode(s)===appMode());
+  if(byName>=0){ if(byName!==stgCur) stgPick(byName); else stgModeUi(); return; }
+  const cur=scenesData[stgCur];
+  if(cur && sceneMode(cur)===appMode()) return stgModeUi();
+  const i=scenesData.findIndex(s=>sceneMode(s)===appMode());
+  if(i>=0) stgPick(i); else { renderStages(); }
+}
+
+function stgModeUi(count){
+  const s=stgStage(), isMulti=(sceneMode(s)==='multi');
+  // Versus/Gameshow only means anything in multiplayer, so it only shows there.
+  const mw=$('#stgModeWrap');
+  if(mw) mw.style.display = (isMulti && !stgGlobalMode) ? '' : 'none';
+  const sel=$('#stgMode');
+  if(sel && s && document.activeElement!==sel)
+    sel.value = (s.input==='audience') ? 'audience' : 'operators';
+  const h=$('#stgModeHint'); if(!h) return;
+  if(count===0){
+    h.style.display='';
+    h.innerHTML = appMode()==='multi'
+      ? `No multiplayer scenes yet — add one. A text-only match still wants a scene as its container; its overlays simply aren't drawn.`
+      : `No solo scenes yet — add one, or flip <b>Multi</b> off in the header.`;
+  } else if(isMulti){
+    h.style.display='';
+    h.innerHTML = (s && s.input==='audience')
+      ? `<b>Gameshow</b> — the audience drives it. Same win condition and same referee as Versus; the dial only changes whose hands are on it.`
+      : `<b>Versus</b> — the two racers drive it. What gets played is the <b>Rounds</b> on the Triggers tab, not a setting here.`;
+  } else h.style.display='none';
+}
 function stgSetGlobal(on){
   stgGlobalMode = !!on;
   scnSelId = null; stgGroupFilter = '';
@@ -2583,10 +3059,21 @@ function stgRestore(){
 }
 function renderStages(){
   const sel=$('#scnSel'); if(!sel) return;
-  sel.innerHTML = scenesData.map((s,i)=>`<option value="${i}" ${i===stgCur?'selected':''}>${esc(s.name||('Stage '+(i+1)))}</option>`).join('')
-    || '<option value="-1">— none yet —</option>';
+  // Tag, don't fork the store: one `scenes` list, filtered by the mode you're
+  // in. Duplicating into scenes / mp_scenes would double every scene function
+  // already written here. The option VALUE stays the real index, so nothing
+  // downstream has to know the list was filtered.
+  const mine = scenesData.map((s,i)=>[s,i]).filter(([s])=>sceneMode(s)===appMode());
+  sel.innerHTML = mine.map(([s,i])=>`<option value="${i}" ${i===stgCur?'selected':''}>${esc(s.name||('Stage '+(i+1)))}</option>`).join('')
+    || `<option value="-1">— no ${appMode()==='multi'?'multiplayer ':''}scenes yet —</option>`;
+  stgModeUi(mine.length);
   const s = stgStage();
+  // The lists moved OUT of #stgEditor (so they can start at the top of the
+  // section), which means they no longer hide with it. An empty palette beside
+  // a missing canvas reads as broken, so hide them together.
   $('#stgEditor').style.display = s ? '' : 'none';
+  { const side=document.querySelector('.stgside');
+    if(side) side.style.display = s ? '' : 'none'; }
   stgScopeUi();
   // the scene picker and its icons aren't about the global pool
   for(const id of ['#scnSel','#stgSceneIcons']){
@@ -2656,7 +3143,7 @@ function renderStgCanvas(){
                                          : (o.group||'').trim()===stgGroupFilter);
   let shell=null;                      // geometry of the selected overlay
   cv.innerHTML = (s.overlays||[]).filter(inScope).map(o=>{
-    let inner='', box='';
+    let inner='', box='', shellBox='';   // shellBox: editing box, when != drawn box
     const fam = STG_FONTS[o.font||'bold']||STG_FONTS.bold;
     const fs = Math.max(7, (o.size||0.06)*CH);
     if(o.kind==='capacity_gauge'){
@@ -2689,17 +3176,35 @@ function renderStgCanvas(){
             : (live.note||''))
         : mock.foot;
       const secs = (live && live.remaining!=null) ? Math.round(live.remaining) : 12;
+      // The STREAM sizes this card's text from its HEIGHT (camera.py _card_sprite:
+      // fs = bh_min/300), NOT from o.size. The canvas used o.size, so a short card
+      // drew big readable text here and microscopic text on the feed — and the
+      // oversized canvas content then swallowed every vertical resize, which is why
+      // a corner drag went wider but never taller. Mirror the stream: scale with h.
+      const bhm   = Math.max(1, (o.h||0.3) * CH);
+      const csz   = Math.max(0.01, Math.min(0.9, +o.size || 0.06));
+      // CARD_TEXT mirrors camera.py's _CARD_TEXT — change both together. The
+      // stream's cv2 scale is size*H*CARD_TEXT/22; rows draw at 0.8 of it and
+      // the title at 1.05. A CSS font-size is the em box and a cap is ~0.7 of
+      // it, so divide to land on the same cap height the compositor draws.
+      const CARD_TEXT = 0.58;
+      const cfs   = csz*CH*CARD_TEXT/22;      // the stream's fs, in canvas px
+      const cardF = Math.max(5, cfs*0.8*22/0.7);
+      const cpad  = Math.max(2, bhm*0.07);    // stream: pad     = bh_min*0.07
+      const cgap  = Math.max(1, cfs*5);       // stream: gap     = fs*5
+      const crpad = Math.max(1, cfs*7);       // stream: row_pad = fs*7
       inner = `<div style="width:100%;min-height:100%;box-sizing:border-box;border:2px solid ${acc};`+
         `border-left:6px solid ${acc};border-radius:6px;background:${esc(o.bg||'#12121a')};`+
-        `padding:6px 8px;overflow:hidden;position:relative;display:flex;flex-direction:column;`+
-        `font-size:${Math.max(8,fs*0.55)}px;color:#fff">`+
-        `<div style="display:flex;justify-content:space-between;font-weight:800">`+
+        `padding:${cpad.toFixed(1)}px ${(cpad+2).toFixed(1)}px;overflow:hidden;position:relative;`+
+        `display:flex;flex-direction:column;`+
+        `font-size:${cardF.toFixed(1)}px;color:#fff">`+
+        `<div style="display:flex;justify-content:space-between;font-weight:800;font-size:1.3em">`+
           `<span>${esc(v.title||'')}</span><span style="color:${acc}">${secs}s</span></div>`+
         (rows.length
           ? rows.map(r=>r.more
-              ? `<div style="margin-top:3px;padding:.2em .1em;opacity:.65">${esc(r.label)}</div>`
-              : `<div style="margin-top:3px;background:#2e2e36;border-radius:3px;position:relative;`+
-                `padding:.2em .45em;overflow:hidden">`+
+              ? `<div style="margin-top:${cgap.toFixed(1)}px;padding:.2em .1em;opacity:.65">${esc(r.label)}</div>`
+              : `<div style="margin-top:${cgap.toFixed(1)}px;background:#2e2e36;border-radius:3px;position:relative;`+
+                `padding:${crpad.toFixed(1)}px .45em;overflow:hidden">`+
                 `<div style="position:absolute;left:0;top:0;bottom:0;`+
                 `width:${Math.round(100*Math.max(0,Math.min(1,+r.frac||0)))}%;`+
                 `background:${(!anyWin||r.win)?acc:'#6e6e78'};border-radius:3px"></div>`+
@@ -2711,6 +3216,12 @@ function renderStgCanvas(){
         `</div>`;
       // h is a MINIMUM here too — the canvas has to grow the way the stream does
       box = `width:${(o.w*100).toFixed(2)}%;min-height:${((o.h||0.3)*100).toFixed(2)}%`;
+      // …but the HANDLES have to sit on the box you're actually editing. Sizing
+      // the shell from the grown card made every vertical drag look dead: the
+      // first pixel jumped o.h up to the content height, and everything after
+      // was swallowed by min-height. The outline shows the minimum you're
+      // setting; the card behind it still previews how tall it really renders.
+      shellBox = `width:${(o.w*100).toFixed(2)}%;height:${((o.h||0.3)*100).toFixed(2)}%;overflow:hidden`;
     } else if(o.kind==='timer'){
       const live = (lastState.timers||{})[o.id];
       const sec = live!=null ? live : (+o.seconds||0);
@@ -2773,14 +3284,15 @@ function renderStgCanvas(){
     const hid = stgGroupHidden(o.group) ? 'filter:grayscale(1);' : '';
     // dead centre ignores x/y and stays centred however the text resolves
     const rotT = o.rot ? ` rotate(${+o.rot||0}deg)` : '';
-    const geom = o.center
-      ? `left:50%;top:50%;${box};transform:translate(-50%,-50%)${rotT};`+
+    const mkGeom = bx => o.center
+      ? `left:50%;top:50%;${bx};transform:translate(-50%,-50%)${rotT};`+
         `transform-origin:center center;${fl}`
-      : `left:${(o.x*100).toFixed(2)}%;top:${(o.y*100).toFixed(2)}%;${box};${rot}${fl}`;
+      : `left:${(o.x*100).toFixed(2)}%;top:${(o.y*100).toFixed(2)}%;${bx};${rot}${fl}`;
+    const geom = mkGeom(box);
     // The SELECTED overlay gets a transparent editing shell above everything
     // (below). It keeps its real z-index here so the canvas still previews the
     // true stacking — the shell is what you grab and see the outline on.
-    if(o.id===scnSelId) shell = {geom, inner};
+    if(o.id===scnSelId) shell = {geom: mkGeom(shellBox||box), inner};
     return `<div class="stgItem" data-id="${esc(o.id)}" `+
            `style="${geom}`+
            `z-index:${Math.round(+o.z||0)+10};opacity:${(Math.max(0,Math.min(100,o.opacity??100))/100)*dim};${hid}">`+
@@ -2951,7 +3463,12 @@ let stgDrag=null;
     const b=el?el.getBoundingClientRect():R;
     // offsetWidth/Height are the UNROTATED layout box — the right basis for resize
     const fw = el ? el.offsetWidth / R.width  : 0.1;
-    const fh = el ? el.offsetHeight / R.height : 0.1;
+    // …except for the cards, whose drawn height is max(h, content). Measuring the
+    // GROWN box made the first pixel of a vertical drag teleport o.h up to the
+    // content height, and every drag after that vanished into min-height — which
+    // is why these felt unresizable. Drag the configured minimum instead.
+    const fh = CARD_KINDS[o.kind||''] ? (+o.h || 0.3)
+             : (el ? el.offsetHeight / R.height : 0.1);
     stgSnap();          // one drag / resize / rotate = one undo step
     stgDrag={o, el, shellEl, R,
              handle: hEl ? hEl.dataset.h : null,
@@ -3688,6 +4205,7 @@ function stgItemDel(){ const s=stgStage(); if(!s) return;
 function stgPick(i){
   stgGlobalMode=false;                 // picking a scene leaves the global pool
   stgCur=i; scnSelId=null; stgGroupFilter=''; stgPending.clear();
+  stgModeUi();
   stgSyncLive();                       // one picker: this IS the live scene
   stgRemember(); renderStages(); showReload(); sceneSwitchSave();
 }
@@ -3711,7 +4229,7 @@ function stgAdd(){ const name=prompt('Scene name:','My Scene'); if(!name) return
   const seed=JSON.parse(JSON.stringify((stgStage()||{}).gameplay||{}));
   delete seed.preset_loaded;
   scenesData.push({name:name.trim(), preset:'', width:1280, height:720, overlays:[],
-                   gameplay:seed});
+                   mode:appMode(), input:'operators', gameplay:seed});
   stgCur=scenesData.length-1; scnSelId=null; stgSyncLive();
   renderStages(); showReload(); sceneSwitchSave(); }
 function stgRename(){ if(stgGlobalMode) return toastMsg('the global pool has no name');
@@ -3924,24 +4442,34 @@ function glStageMove(i,d){
   glStageRows(); scheduleSave();
 }
 // Every scene's groups as <optgroup>s, filtered to intro / non-intro.
+// THIS SCENE'S groups only, plus the globals.
+//
+// It used to offer every scene's, on the theory that a group you can see
+// should be pickable. But a scene group RESOLVES INSIDE THE LOADED SCENE —
+// the server deliberately does not hunt other scenes, because two scenes
+// reuse a name like "Intro" for completely different looks. So picking
+// another scene's group silently played nothing, and the picker was the only
+// thing claiming otherwise.
 function glGroupOptions(cur, wantIntro){
-  const isIntro=(sc,n)=>(Array.isArray(sc.intro_groups)?sc.intro_groups:[])
+  const sc = stgStage() || scenesData.find(x=>x.name===chatSceneName) || null;
+  const isIntro=n=>(Array.isArray(sc&&sc.intro_groups)?sc.intro_groups:[])
     .some(g=>String(g).trim().toLowerCase()===n.trim().toLowerCase());
   const seen=new Set();
   let html='<option value="">— none —</option>';
-  scenesData.forEach(sc=>{
-    const gs=[...new Set([...(Array.isArray(sc.groups)?sc.groups:[]),
+  const gs = !sc ? [] :
+    [...new Set([...(Array.isArray(sc.groups)?sc.groups:[]),
       ...(sc.overlays||[]).map(o=>(o.group||'').trim()).filter(Boolean)])]
-      .filter(n=>isIntro(sc,n)===wantIntro).sort();
-    if(!gs.length) return;
-    html+=`<optgroup label="${esc(sc.name||'scene')}">`+
-      gs.map(n=>{ seen.add(n); return `<option ${n===cur?'selected':''}>${esc(n)}</option>`; }).join('')+
-      `</optgroup>`;
-  });
+      .filter(n=>isIntro(n)===wantIntro).sort();
+  if(gs.length) html+=`<optgroup label="${esc((sc&&sc.name)||'this scene')}">`+
+    gs.map(n=>{ seen.add(n); return `<option ${n===cur?'selected':''}>${esc(n)}</option>`; }).join('')+
+    `</optgroup>`;
   const gg=[...new Set(sceneGlobals.map(o=>(o.group||'').trim()).filter(Boolean))].sort();
   if(gg.length && !wantIntro) html+=`<optgroup label="Global overlays">`+
     gg.map(n=>{ seen.add(n); return `<option ${n===cur?'selected':''}>${esc(n)}</option>`; }).join('')+`</optgroup>`;
-  if(cur && !seen.has(cur)) html+=`<option selected>${esc(cur)}</option>`;
+  // A value already saved that this scene has no group for: keep it visible and
+  // SAY it won't play, rather than dropping it and silently rewriting the config.
+  if(cur && !seen.has(cur))
+    html+=`<optgroup label="not in this scene — won't play"><option selected>${esc(cur)}</option></optgroup>`;
   return html;
 }
 // The two overlays the SESSION drives: the shared notify line, and the card
@@ -4000,36 +4528,13 @@ function goliveUi(){
   const b=$('#glBody'); if(b) b.style.display = on?'':'none';
   glStageRows();
   sessOvUi();
-  for(const which of ['#glAfter']){
-  const sel=$(which);
+  // "Then switch to" — the same scoped picker the stages use. Not intro
+  // groups: switching to another intro is never what you want.
+  const sel=$('#glAfter');
   if(sel){
-    // Offer EVERY scene's groups, labelled by scene — scoping this to one
-    // scene meant a group you could plainly see just wasn't in the list.
     const cur=sel.dataset.want ?? sel.value ?? '';
-    const seen=new Set();
-    let html='<option value="">— none —</option>';
-    // The INTRO picker offers only groups flagged 🎬 intro; "Then switch to"
-    // offers only the normal ones, because switching to another intro is
-    // never what you want.
-    const wantIntro = which==='#glGroup';
-    const isIntro=(sc,n)=>(Array.isArray(sc.intro_groups)?sc.intro_groups:[])
-      .some(g=>String(g).trim().toLowerCase()===n.trim().toLowerCase());
-    const groupsOf=sc=>[...new Set([...(Array.isArray(sc.groups)?sc.groups:[]),
-      ...(sc.overlays||[]).map(o=>(o.group||'').trim()).filter(Boolean)])]
-      .filter(n=>isIntro(sc,n)===wantIntro).sort();
-    scenesData.forEach(sc=>{
-      const gs=groupsOf(sc); if(!gs.length) return;
-      html+=`<optgroup label="${esc(sc.name||'scene')}">`+
-        gs.map(n=>{ seen.add(n);
-          return `<option ${n===cur?'selected':''}>${esc(n)}</option>`; }).join('')+`</optgroup>`;
-    });
-    const gg=[...new Set(sceneGlobals.map(o=>(o.group||'').trim()).filter(Boolean))].sort();
-    if(gg.length) html+=`<optgroup label="Global overlays">`+
-      gg.map(n=>{ seen.add(n); return `<option ${n===cur?'selected':''}>${esc(n)}</option>`; }).join('')+`</optgroup>`;
-    if(cur && !seen.has(cur)) html+=`<option selected>${esc(cur)}</option>`;
-    sel.innerHTML=html;
+    sel.innerHTML=glGroupOptions(cur, false);
     if(cur) sel.value=cur;
-  }
   }
 }
 async function introNextStage(){
@@ -4088,6 +4593,13 @@ function tabEnter(name){
   if(name==='chat'){ chatChannels().then(()=>{ chatPoll(true); chatVideoUi(); }); }
   else { vcamPreviewStop(); selfViewStop(); }   // leaving Chat: release the camera
   if(name==='stages') setTimeout(()=>{ stgEnsureDefault(); renderStgCanvas(); }, 0);
+  // The Discord tab picks the two match channels, System shows the preflight
+  // that checks them — both need the server list.
+  if(name==='discord' || name==='system'){
+    (guildsLoaded ? Promise.resolve() : loadGuilds()).then(()=>{
+      try{ mpApply(lastState||{}); }catch(e){}
+    });
+  }
 }
 function setCtrlMsg(t){
   const m=$('#ctrlMsg'); if(!m) return;
@@ -4528,6 +5040,10 @@ async function loadGuilds(){
       if(cc && t.channel_name!==cc.name){ t.channel_name=cc.name; changed=true; } }
   });
   renderListenTargets();
+  // The MULTIPLAYER pickers live on this tab too, and they are filled from the
+  // same cache. Refreshing only the solo ones is why they came up empty: the
+  // cache arrives AFTER the applyState that drew them.
+  try{ if(typeof mpApply==='function') mpApply(lastState||{}); }catch(e){}
   if(changed) saveDiscord();
 }
 function targetName(t){
@@ -4604,6 +5120,689 @@ function removeListenTarget(i){
   listenTargets.splice(i,1); renderListenTargets(); saveDiscord();
 }
 function idList(v){ return (v||'').split(',').map(x=>x.trim()).filter(Boolean); }
+
+// ---- Multiplayer Actions (Triggers, multiplayer mode) -----------------------
+// Reuses actionsSection()/actionRow() wholesale. A Multiplayer Action is an
+// ordinary action block, so it gets the ordinary editor — the only additions
+// are three row types and the `multi_who` target, both handled inside
+// actionRow() itself.
+let mpActions = [];
+let mpActOpen = new Set();
+
+function renderMpActions(){
+  const box=$('#mpActList'); if(!box) return;
+  if(!mpActions.length){
+    box.innerHTML = '<div class="muted">No Multiplayer Actions yet — add one, or start from the example roulette round.</div>';
+    return;
+  }
+  box.innerHTML = mpActions.map((a,i)=>{
+    const open = mpActOpen.has(i);
+    const n = (a.actions||[]).length;
+    const ro = false;               // nothing is read-only while it's a starter
+    return `<details class="help" ${open?'open':''} ontoggle="mpActTog(${i},this.open)">`+
+      `<summary><b>${esc(a.name||'(unnamed)')}</b> <span class="muted">(${n} row${n===1?'':'s'})`+
+      `${ro?' · shipped, read-only':''}</span></summary>`+
+      `<div style="margin-top:8px">`+
+        (ro
+          ? `<div class="hint" style="margin-top:0">${esc(a.description||'')}<br>`+
+            `<b>Shipped with the app</b>, because a scene depends on it — an immutable scene `+
+            `whose parts can be deleted isn't immutable. <b>Copy</b> it to make your own.</div>`+
+            `<div class="row" style="gap:8px;margin-top:8px">`+
+              `<button onclick="mpActCopy(${i})">📋 Copy to edit</button>`+
+              `<button class="ghost" onclick="mpActRun(${i})" title="run it now — needs a live match">▶ Test</button>`+
+            `</div>`
+          : `<div class="row" style="gap:8px;align-items:flex-end">`+
+            `<label class="field" style="flex:1;min-width:160px">Name `+
+              `<input value="${esc(a.name||'')}" onchange="mpActions[${i}].name=this.value;renderMpActions();saveMpActions()"></label>`+
+            `<label class="field" style="flex:2;min-width:200px">What it's for `+
+              `<input value="${esc(a.description||'')}" placeholder="one line, for you" onchange="mpActions[${i}].description=this.value;saveMpActions()"></label>`+
+            `<button class="ghost" onclick="mpActCopy(${i})" title="duplicate">📋</button>`+
+            `<button class="ghost" onclick="mpActDel(${i})" title="delete">🗑</button>`+
+            `<button class="ghost" onclick="mpActRun(${i})" title="run it now — needs a live match">▶ Test</button>`+
+          `</div>`)+
+        (ro ? '' : actionsSection('Rows', `mpActions[${i}].actions`, 'renderMpActions', a.actions||[],
+                       `{type:'mp_spin'}`,
+                       'Rows run in order. A row with a <b>Who</b> of <i>chosen</i> follows the last spin; '+
+                       'one that resolves to nobody is <b>dropped</b> rather than aimed at a guess.'))+
+      `</div></details>`;
+  }).join('');
+}
+function mpActTog(i, open){ open ? mpActOpen.add(i) : mpActOpen.delete(i); }
+function mpActMsg(t){ const m=$('#mpActMsg'); if(!m) return;
+  m.textContent=t; clearTimeout(m._t); m._t=setTimeout(()=>{ if(m) m.textContent=''; }, 4000); }
+// gatherConfig() carries mp_actions now, so this is the ordinary save path —
+// a second writer is what created the 409 in the first place.
+async function saveMpActions(){ scheduleSave(); }
+// The versus kit is a STARTER, not a fixture: everything here is yours and
+// everything saves. A filter that silently dropped rows would be a trap.
+function isBuiltinAction(a){ return !!(a && a.builtin); }
+function cleanMpActions(){
+  return (mpActions||[]).map(a=>({
+    name:(a.name||'').trim() || 'Untitled',
+    description:(a.description||'').trim(),
+    actions: cleanActionRows(a.actions),
+  })).filter(a=>a.name);
+}
+function mpActAdd(){
+  mpActions.push({name:`Action ${mpActions.length+1}`, description:'', actions:[]});
+  mpActOpen.add(mpActions.length-1); renderMpActions(); saveMpActions();
+}
+function mpActCopy(i){
+  const a=mpActions[i]; if(!a) return;
+  const copy = JSON.parse(JSON.stringify({...a, name:(a.name||'')+' copy'}));
+  delete copy.builtin; delete copy._tpl_id;   // a copy is YOURS, and storable
+  mpActions.splice(i+1, 0, copy);
+  mpActOpen.add(i+1); renderMpActions(); renderMpRounds(); saveMpActions();
+}
+function mpActDel(i){
+  const a=mpActions[i]||{};
+  if(isBuiltinAction(a)) return mpActMsg('shipped with the app — copy it instead');
+  if(!confirm(`Delete "${a.name||'(unnamed)'}"? This can't be undone.`)) return;
+  mpActions.splice(i,1); mpActOpen=shiftSet(mpActOpen,i); renderMpActions(); saveMpActions();
+}
+async function mpActRun(i){
+  const a=mpActions[i]; if(!a) return;
+  await saveMpActions();
+  const r = await api('/api/mp/action', {name:a.name});
+  mpActMsg(r.ok ? `▶ ran "${a.name}"` : '⚠ '+(r.error||'refused'));
+}
+// ---- Multiplayer Rounds -----------------------------------------------------
+let mpRounds = [];
+let mpRndOpen = new Set();
+let mpEnd = {max_capacity: 0, actions: []};
+let mpEndOpen = false;
+
+// THE END CONDITION — always last, never one of the rounds.
+//
+// A match needs a way to be over that isn't "the rounds ran out". Three things
+// trigger it and all three run THIS block, because they are the same event —
+// somebody lost: a concession (the button or !concede), reaching the lose-at
+// capacity, or either player coming off air.
+function renderMpEnd(){
+  const box=$('#mpEndBox'); if(!box) return;
+  const n=(mpEnd.actions||[]).length, top=+mpEnd.max_capacity||0;
+  box.innerHTML =
+    `<details class="dev" style="flex-direction:column;align-items:stretch;border-color:var(--warn)" `+
+      `${mpEndOpen?'open':''} ontoggle="mpEndOpen=this.open">`+
+    `<summary class="row" style="gap:8px;align-items:center;cursor:pointer">`+
+      `<span class="name">🏁 End Condition</span>`+
+      `<span class="tag">${top?`lose at ${top}%`:'concede only'}</span>`+
+      `<span class="tag">${n} action${n===1?'':'s'}</span>`+
+      `<span class="muted" style="margin-left:auto">always last</span>`+
+    `</summary>`+
+    `<div style="padding:8px 2px 2px">`+
+      `<div class="row" style="gap:8px;align-items:flex-end">`+
+        `<label class="field" style="min-width:190px">Max Capacity Volume`+
+          `<input type="number" min="0" max="999" step="1" value="${top||''}" placeholder="0 = off" `+
+          `onchange="mpEnd.max_capacity=Math.max(0,Math.min(999,+this.value||0));renderMpEnd();saveMpEnd()"></label>`+
+        `<span class="muted" style="flex:1;min-width:220px">1–999. Whoever reaches it <b>first loses</b> — getting `+
+        `there is conceding. <b>0</b> = no capacity trigger, so the only way out is giving up. `+
+        `This number rides in the <b>invite</b>: it is what losing looks like, and agreeing to a match `+
+        `without knowing it is agreeing to nothing.</span>`+
+      `</div>`+
+      actionsSection('Runs when the match ends', 'mpEnd.actions', 'renderMpEnd',
+                     mpEnd.actions||[], `{type:'message',message:''}`,
+                     'One block for every natural ending — a concession, the lose-at capacity, '+
+                     'or somebody going off air. They are the same event, so they get the same '+
+                     'outro.<br><code>[multi_loser]</code> and <code>[multi_winner]</code> name '+
+                     'the players, <code>[multi_loser_seat]</code> is host/guest and '+
+                     '<code>[multi_end_why]</code> is the reason in words.')+
+    `</div></details>`;
+}
+async function saveMpEnd(){ await saveCfg({mp_end: mpEnd}); }
+
+function renderMpRounds(){
+  renderMpEnd();
+  const box=$('#mpRndList'); if(!box) return;
+  if(!mpRounds.length){
+    box.innerHTML='<div class="muted">No rounds yet — add one to build the show. '+
+      'The <b>End Condition</b> below still ends the match.</div>';
+    return;
+  }
+  // Listed in the order they RUN, reordered with the arrows — the same shape a
+  // custom command's action block has.
+  box.innerHTML = mpRounds.map((r,i)=>{
+    const open=mpRndOpen.has(i), n=(r.actions||[]).length;
+    const until=(r.until==='leader'||r.until==='both')?r.until:'count';
+    const ends = until==='count' ? `\u00d7${+r.count||1}`
+      : `${until==='both'?'both reach':'first to'} ${+r.max||0}%`;
+    return `<details class="help" ${open?'open':''} ontoggle="mpRndTog(${i},this.open)">`+
+      `<summary><b>${i+1}. ${esc(r.name||'(unnamed)')}</b> `+
+      `<span class="muted">${ends} · ${n} action${n===1?'':'s'}</span></summary>`+
+      `<div style="margin-top:8px">`+
+        `<div class="row" style="gap:8px;align-items:flex-end">`+
+          `<label class="field" style="flex:1;min-width:150px">Name `+
+            `<input value="${esc(r.name||'')}" onchange="mpRounds[${i}].name=this.value;renderMpRounds();saveMpRounds()"></label>`+
+          `<label class="field" style="flex:1;min-width:170px">Runs `+
+            `<select onchange="mpRounds[${i}].until=this.value;renderMpRounds();saveMpRounds()">`+
+              [['count','Count'],['leader','First to %'],['both','Both Reach %']]
+                .map(([v,l])=>`<option value="${v}" ${until===v?'selected':''}>${l}</option>`).join('')+
+            `</select></label>`+
+          (until==='count'
+            ? `<label class="field" style="flex:0 0 110px">Times `+
+              `<input type="number" min="1" max="200" step="1" value="${r.count??1}" `+
+              `title="how many times this round's actions run, whatever the meters say" `+
+              `onchange="mpRounds[${i}].count=+this.value||1;renderMpRounds();saveMpRounds()"></label>`
+            : `<label class="field" style="flex:0 0 110px">Target % `+
+              `<input type="number" min="1" max="999" step="5" value="${r.max??25}" `+
+              `title="this is [multi_round_target] — the round repeats until it is reached" `+
+              `onchange="mpRounds[${i}].max=+this.value||0;renderMpRounds();saveMpRounds()"></label>`)+
+          `<div style="flex:1"></div>`+
+          `<button class="ghost pmini" onclick="mpRndMove(${i},-1)" title="run earlier" ${i?'':'disabled'}>\u25b2</button>`+
+          `<button class="ghost pmini" onclick="mpRndMove(${i},1)" title="run later" ${i<mpRounds.length-1?'':'disabled'}>\u25bc</button>`+
+          `<button class="ghost pmini" onclick="mpRndCopy(${i})" title="duplicate">\ud83d\udccb</button>`+
+          `<button class="ghost pmini" onclick="mpRndDel(${i})" title="delete">\ud83d\uddd1</button>`+
+        `</div>`+
+        (until==='count' ? '' :
+          `<div class="row" style="gap:8px;align-items:flex-end;margin-top:6px">`+
+          `<label class="field" style="flex:0 0 130px">Give up after `+
+            `<input type="number" min="1" max="200" step="1" value="${r.max_passes??40}" `+
+            `title="a backstop, not a rule — a target nobody can reach still has to end" `+
+            `onchange="mpRounds[${i}].max_passes=+this.value||40;saveMpRounds()"></label>`+
+          `<span class="muted" style="align-self:center">passes</span></div>`)+
+        `<label class="field" style="margin-top:6px">When it ends, say `+
+          `<input value="${esc(r.done_message||'')}" placeholder="\u2705 [multi_round_name] done." onchange="mpRounds[${i}].done_message=this.value;saveMpRounds()"></label>`+
+        actionsSection('What the round does',
+                       `mpRounds[${i}].actions`, 'renderMpRounds', r.actions||[],
+                       `{type:'mp_action',action:''}`,
+                       'Runs top to bottom, then again until the round ends. '+
+                       '<b>mp_action</b> calls an Action, <b>scene_group</b> plays a '+
+                       'multiscene group, plus <b>wait</b>, <b>message</b>, <b>overlay</b> '+
+                       '\u2014 as many as you like.<br>'+
+                       '<b>Who</b> only appears on rows that touch a pump or a picture, '+
+                       'because those belong to one machine. Leave it blank here: a video '+
+                       'or a scene group plays on <i>this</i> one. It is inside an '+
+                       '<b>Action</b> that it matters \u2014 that is where '+
+                       '<i>the racer the spin picked</i> gets inflated.')+
+        actionsSection('Round card \u2014 runs ONCE as the round opens',
+                       `mpRounds[${i}].intro`, 'renderMpRounds', r.intro||[],
+                       `{type:'scene_group',group:''}`,
+                       'Its own pre-show: a scene group, different words, a sound cue.')+
+      `</div></details>`;
+  }).join('');
+}
+function mpRndMove(i, d){
+  const j=i+d; if(j<0||j>=mpRounds.length) return;
+  [mpRounds[i], mpRounds[j]] = [mpRounds[j], mpRounds[i]];
+  mpRndOpen = new Set([...mpRndOpen].map(k=>k===i?j:(k===j?i:k)));
+  renderMpRounds(); saveMpRounds();
+}
+function mpRndTog(i, open){ open ? mpRndOpen.add(i) : mpRndOpen.delete(i); }
+function mpRndMsg(t){ const m=$('#mpRndMsg'); if(!m) return;
+  m.textContent=t; clearTimeout(m._t); m._t=setTimeout(()=>{ if(m) m.textContent=''; }, 4000); }
+function mpRndCopy(i){
+  const r=mpRounds[i]; if(!r) return;
+  const copy=JSON.parse(JSON.stringify({...r, name:(r.name||'')+' copy'}));
+  delete copy.builtin; delete copy._tpl_id;   // a copy is YOURS, and storable
+  mpRounds.splice(i+1,0,copy); mpRndOpen.add(i+1);
+  renderMpRounds(); saveMpRounds();
+}
+function cleanMpRounds(){
+  // Order is LIST order — what you see is what runs.
+  return (mpRounds||[]).map(r=>{
+    const until=(r.until==='leader'||r.until==='both')?r.until:'count';
+    const o={name:(r.name||'').trim()||'Round', until,
+             done_message:(r.done_message||'').trim(),
+             intro:cleanActionRows(r.intro), actions:cleanActionRows(r.actions)};
+    if(until==='count') o.count=Math.max(1,Math.min(200,+r.count||1));
+    else { o.max=+r.max||0;
+           o.max_passes=Math.max(1,Math.min(200,+r.max_passes||40)); }
+    return o;
+  // a round with nothing to run, or a % round with no target, could never end
+  }).filter(r=>(r.actions||[]).length && (r.until==='count' || r.max>0));
+}
+async function saveMpRounds(){ scheduleSave(); }
+function mpRndAdd(){
+  mpRounds.push({name:`Round ${mpRounds.length+1}`, until:'count', count:1,
+                 max:25, max_passes:40, done_message:'', intro:[],
+                 actions:[{type:'mp_action', action:(mpActions[0]||{}).name||''}]});
+  mpRndOpen.add(mpRounds.length-1); renderMpRounds(); saveMpRounds();
+}
+function mpRndDel(i){
+  const r=mpRounds[i]||{};
+  if(r.builtin) return mpRndMsg('shipped with the app — copy it instead');
+  if(!confirm(`Delete round "${r.name||'(unnamed)'}"?`)) return;
+  mpRounds.splice(i,1); mpRndOpen=shiftSet(mpRndOpen,i); renderMpRounds(); saveMpRounds();
+}
+async function mpRndRun(){
+  await saveMpRounds();
+  const r = await api('/api/mp/rounds', {start:true});
+  mpRndMsg(r.ok ? '▶ running — watch it in Discord' : '⚠ '+(r.error||'refused'));
+}
+async function mpRndStop(){ await api('/api/mp/rounds', {start:false}); mpRndMsg('■ stopped'); }
+
+// ---- multiplayer (the rail) -------------------------------------------------
+// Setup only. Once a match is running this tab's job is to stay out of the way:
+// the referee is self-driving and everything a human touches is in Discord.
+let mpCfg = null;          // the live multiplayer config block
+let mpState = {};          // last /api/mp/status
+let mpTimer = null;
+
+function mpChans(which){
+  const g = $('#mp'+which+'Guild').value;
+  const hit = guildsCache.find(x=>x.id===g);
+  const sel = $('#mp'+which+'Chan'), keep = sel.value;
+  sel.innerHTML = `<option value="">— select a channel —</option>` +
+    ((hit&&hit.channels)||[]).map(c=>`<option value="${esc(c.id)}">#${esc(c.name)}</option>`).join('');
+  sel.value = keep;                      // survives a server list refresh
+  mpSave();
+}
+function mpFillGuilds(){
+  ['Net','Cast'].forEach(w=>{
+    const sel=$('#mp'+w+'Guild'); if(!sel) return;
+    const keep=sel.value;
+    sel.innerHTML = `<option value="">— select a server —</option>` +
+      guildsCache.map(g=>`<option value="${esc(g.id)}">${esc(g.name)}</option>`).join('');
+    sel.value = keep;
+  });
+}
+// Everything multiplayer contributes to the ONE save payload — and nothing at
+// all until the panel has been hydrated, or a save fired from a solo tab before
+// the first /api/state would write empty lists over real ones.
+let mpLoaded = false;
+function mpPayload(){
+  if(!mpLoaded) return {};
+  const out = {mp_actions: cleanMpActions(), mp_rounds: cleanMpRounds(),
+               mp_end: {max_capacity: Math.max(0, Math.min(999, +mpEnd.max_capacity||0)),
+                        actions: cleanActionRows(mpEnd.actions)}};
+  if(mpCfg){
+    // `blocked` is the SERVER's — it can change without the panel (blocking
+    // ends a live match). Leaving it out lets the deep-merge keep theirs
+    // instead of writing back whatever this tab last happened to see.
+    const {blocked, ...mine} = mpCfg;
+    out.multiplayer = mine;
+  }
+  return out;
+}
+async function mpSave(){
+  if(!mpCfg) return;
+  const block = {
+    ...mpCfg,
+    bot_network: {guild_id: $('#mpNetGuild').value, channel_id: $('#mpNetChan').value},
+    broadcast:   {guild_id: $('#mpCastGuild').value, channel_id: $('#mpCastChan').value},
+    // Names are set in the invite modal, which is the only place they are
+    // ever chosen — so whatever mpCfg already holds is authoritative here.
+    video: {required: true},          // both players on camera; not a setting
+  };
+  mpCfg = block;
+  scheduleSave();          // one writer — see mpPayload()
+}
+async function setMode(on){
+  const want = on ? 'multi' : 'solo';
+  try{
+    // Let anything already pending land first, so this can't overtake it.
+    try{ await flushSave(); }catch(e){}
+    // No config_rev: the rev guard exists to stop a stale tab's FULL SNAPSHOT
+    // clobbering someone else's edits. This patch is one key and can't clobber
+    // anything, so guarding it only creates a way for the toggle to fail.
+    const s = await api('/api/config', {mode: want});
+    applyState(s, true);
+    stgModeFollow();
+    mpPoll(true);
+  }catch(e){
+    // The toggle is locked at go-live: switching mid-session swaps the command
+    // handling, the broadcast target and the scene set out from under a live
+    // audience. Put the switch back where it was and say why.
+    $('#modeMulti').checked = !on;
+    toastMsg('⚠ '+(e.message||e));
+  }
+}
+// WHICH SEAT YOU TAKE — picked before going live, frozen after.
+//
+// Not negotiated. Two installs quietly agreeing a role between themselves is
+// how you end up starting a match in a seat you didn't mean to be in; you say
+// which one you want, and the invite either fits or is refused.
+// ---- the two match modals --------------------------------------------------
+//
+// An invite is a CONVERSATION, not a form: the host says who and on what
+// terms, the guest sees the terms and answers. Both halves are modal because
+// both are a decision you make once and then live with for a whole match.
+function mpModal(html, wide){
+  const ov=document.createElement('div');
+  ov.className='mpModal';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10000;'+
+    'display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML=`<div style="background:var(--panel);border:1px solid var(--line);`+
+    `border-radius:12px;padding:20px;max-width:${wide?620:460}px;width:100%;`+
+    `max-height:88vh;overflow:auto">${html}</div>`;
+  document.body.appendChild(ov);
+  return ov;
+}
+
+// HOST: who are we playing, and on what terms.
+function mpInviteModal(){
+  const m = mpCfg||{};
+  const ov = mpModal(
+    `<h2 style="margin:0 0 6px">✉ Invite someone</h2>`+
+    `<div class="hint" style="margin:0 0 12px">Bots are members like anyone else, so the bot you mean `+
+      `to play is in here beside its owner. Search your <b>broadcast</b> server by the start of a name. `+
+      `🤖 is a bot; <b>● seen</b> means it has said hello on bot_network — the difference between `+
+      `"this bot exists here" and "this bot will answer".</div>`+
+    `<label class="field">Search<input id="mpiFind" placeholder="type at least two letters" autofocus></label>`+
+    `<div class="muted" id="mpiMsg" style="margin:4px 0"></div>`+
+    `<div id="mpiList" style="max-height:220px;overflow:auto"></div>`+
+    `<div class="row" style="gap:8px;margin-top:12px;align-items:flex-end">`+
+      `<label class="field" style="flex:1;min-width:130px">Their name <span class="muted">(the player)</span>`+
+        `<input id="mpiPlayer" value="${esc(m.peer_player_name||'')}" placeholder="Dave"></label>`+
+      `<label class="field" style="flex:1;min-width:130px">Their bot's name`+
+        `<input id="mpiBot" value="${esc(m.peer_bot_name||'')}" placeholder="Dave-bot"></label>`+
+    `</div>`+
+    `<div class="hint" style="margin:6px 0 0">You need <b>both</b>. The bot is who the protocol addresses; `+
+      `the player is who you think you're playing — an invite is refused if that bot turns out to belong `+
+      `to somebody else.</div>`+
+    `<label class="row" style="gap:8px;margin-top:10px"><input type="checkbox" id="mpiSplit" style="width:auto"> `+
+      `<b>Offer to split the difference</b> <span class="muted">— your two pumps fill at different speeds. `+
+      `If they take it, both run the halfway speed for this match and go back to their own when it ends.</span></label>`+
+    `<div class="row" style="gap:8px;margin-top:14px;justify-content:flex-end">`+
+      `<button class="ghost" id="mpiCancel">Cancel</button>`+
+      `<button id="mpiSend">Send the invite</button></div>`, true);
+
+  const $$ = id => ov.querySelector(id);
+  let t=null;
+  $$('#mpiFind').oninput = ()=>{ clearTimeout(t); t=setTimeout(run, 250); };
+  async function run(){
+    const q=($$('#mpiFind').value||'').trim();
+    if(q.length<2){ $$('#mpiList').innerHTML=''; $$('#mpiMsg').textContent=''; return; }
+    $$('#mpiMsg').textContent='searching…';
+    let r; try{ r = await api('/api/mp/members', {q}); }
+    catch(e){ $$('#mpiMsg').textContent='⚠ '+(e.message||e); return; }
+    if(!r || r.ok===false){ $$('#mpiMsg').textContent='⚠ '+((r&&r.error)||'search failed'); return; }
+    $$('#mpiMsg').textContent = r.guild ? `in ${r.guild}` : '';
+    const ms=r.members||[];
+    $$('#mpiList').innerHTML = ms.length ? ms.map((x,i)=>
+      `<div class="dev"><div class="grow"><div class="name">${x.bot?'🤖 ':''}${esc(x.display||x.name)}`+
+      `${x.seen?' <span class="tag" style="color:var(--accent2)">● seen</span>':''}</div>`+
+      `<div class="tag">${esc(x.name)}${x.bot?' · a bot':' · a person'}</div></div>`+
+      `<button class="ghost" data-pick="${i}" data-bot="${x.bot?1:0}" data-name="${esc(x.name)}">`+
+      `${x.bot?'their bot':'their name'}</button></div>`).join('')
+      : '<div class="muted">nobody by that name</div>';
+    ov.querySelectorAll('[data-pick]').forEach(b=>{
+      b.onclick=()=>{ $$(b.dataset.bot==='1' ? '#mpiBot' : '#mpiPlayer').value = b.dataset.name; };
+    });
+  }
+  $$('#mpiCancel').onclick = ()=>ov.remove();
+  $$('#mpiSend').onclick = async ()=>{
+    const player=($$('#mpiPlayer').value||'').trim(), bot=($$('#mpiBot').value||'').trim();
+    if(!player || !bot) return toastMsg('⚠ name both the player and their bot');
+    mpCfg = mpCfg||{};
+    mpCfg.peer_player_name = player; mpCfg.peer_bot_name = bot;
+    await mpSave();
+    const r = await api('/api/mp/offer', {split: $$('#mpiSplit').checked});
+    if(!r.ok){ toastMsg('⚠ '+(r.error||'refused')); return; }
+    ov.remove(); mpPoll(true); toastMsg('invite sent — waiting for '+player);
+  };
+}
+
+// GUEST: the terms, and an answer. Opened by state, not by a button — an
+// invite that sat unnoticed behind a tab is an invite that times out.
+let mpInvOpen = false;
+function mpInviteeModal(st){
+  if(mpInvOpen) return;
+  mpInvOpen = true;
+  const inv=st.invite||{}, ven=inv.venue||{}, lim=(mpCfg&&mpCfg.limits)||{};
+  const where = w => { const v=ven[w]||{};
+    return v.channel ? `#${esc(v.channel)}${v.guild?` in ${esc(v.guild)}`:''}${v.kind==='voice'?' 🔊':''}`
+                     : '<span style="color:var(--warn)">not set</span>'; };
+  const ov = mpModal(
+    `<h2 style="margin:0 0 6px">${esc(inv.host||'Someone')} wants to play</h2>`+
+    `<div class="hint" style="margin:0 0 12px">${inv.bot?esc(inv.bot):'their bot'} · `+
+      `<b>${esc(inv.game||'a match')}</b>`+
+      `${inv.input?` · ${inv.input==='operators'?'Versus':'Gameshow'}`:''}</div>`+
+    `<div class="dev"><div class="grow">`+
+      `<div class="tag">${esc(inv.cost||'no estimate given')}</div>`+
+      `<div class="tag">played in ${where('cast')} · protocol on ${where('net')}</div>`+
+      `<div class="tag">you lose at <b>${esc(String(inv.cap||100))}%</b></div>`+
+      (inv.paced===false?`<div class="tag" style="color:var(--warn)">⚠ unpaced — ${esc(inv.why||'a calibration is missing')}</div>`:'')+
+    `</div></div>`+
+    `<div class="row" style="gap:8px;margin-top:10px;align-items:flex-end">`+
+      `<label class="field" style="min-width:150px">Their pump<input value="${esc(String(inv.cal||'—'))}" disabled></label>`+
+      `<label class="field" style="min-width:150px">Your pump`+
+        `<input type="number" id="mpiMyCal" min="1" step="1" value="${esc(String(st.calibration||''))}"></label>`+
+      `<span class="muted">seconds to 100%</span>`+
+    `</div>`+
+    `<div class="hint" style="margin:4px 0 0">Every target is paced from <b>your</b> number — fix it here if it's `+
+      `out of date, because this is the last moment it can be corrected.</div>`+
+    (inv.split?`<label class="row" style="gap:8px;margin-top:10px"><input type="checkbox" id="mpiTakeSplit" style="width:auto"> `+
+      `<b>Split the difference</b> <span class="muted">— they've offered: both pumps run the halfway speed for `+
+      `this match, and go back to their own when it ends.</span></label>`:'')+
+    `<div class="tag" style="margin-top:10px">📷 Accepting puts you <b>on camera</b> — a match requires it of both players</div>`+
+    `<div class="row" style="gap:8px;margin-top:14px;justify-content:flex-end">`+
+      `<button class="bad" id="mpiBlock" title="they can't pair with you, invite you, or light up your panel again">🚫 Block</button>`+
+      `<button class="ghost" id="mpiNo">Decline</button>`+
+      `<button id="mpiYes">Accept</button></div>`, true);
+
+  const $$ = id => ov.querySelector(id);
+  const close = ()=>{ ov.remove(); mpInvOpen=false; };
+  $$('#mpiNo').onclick = async ()=>{
+    const why = prompt('Tell them why (they see this — "declined" tells them nothing):','not right now')||'declined';
+    await api('/api/mp/respond', {accept:false, why});
+    close(); mpPoll(true);
+  };
+  $$('#mpiBlock').onclick = async ()=>{ await mpBlock(); close(); };
+  $$('#mpiYes').onclick = async ()=>{
+    const cal=$$('#mpiMyCal'), sp=$$('#mpiTakeSplit');
+    const r = await api('/api/mp/respond', {accept:true, why:'', video:true,
+      cal:(cal && +cal.value)||null, split:!!(sp && sp.checked)});
+    if(r && r.ok===false){ toastMsg('⚠ '+(r.error||'not accepted')); return; }
+    close(); mpPoll(true);
+  };
+}
+
+async function setSeat(v){
+  const want = (v === 'guest') ? 'guest' : 'host';
+  mpCfg = mpCfg || {};
+  mpCfg.role_pref = want;
+  try{
+    await mpSave();
+    mpPoll(true);
+  }catch(e){ toastMsg('⚠ '+(e.message||e)); }
+}
+
+// Hydrate from /api/state. Never fights an input you're typing in.
+function mpApply(st){
+  mpCfg = st.multiplayer || mpCfg || {};
+  mpLoaded = true;
+  const m = mpCfg, live = !!st.listener_enabled;
+  const tg=$('#modeMulti');
+  if(tg && document.activeElement!==tg) tg.checked = (st.mode==='multi');
+  if(tg) tg.disabled = live;
+  const tw=$('#modeTgl');
+  if(tw) tw.title = live
+    ? "can't switch between solo and multiplayer while the session is live — end it first"
+    : 'Multiplayer: a match against a SECOND install — another machine, another bot token, another pump.';
+  // The seat only exists in multiplayer, and only before you go live. Once
+  // LIVE is on, mode AND seat are frozen together: both decide what the other
+  // install is agreeing to, and neither may move under a running match.
+  const sw=$('#seatTgl'), sel=$('#mpSeat');
+  if(sw) sw.style.display = (st.mode==='multi') ? '' : 'none';
+  if(sel){
+    const seat = (m.role_pref === 'guest') ? 'guest' : 'host';
+    if(document.activeElement!==sel) sel.value = seat;
+    sel.disabled = live;
+    if(sw) sw.title = live
+      ? `you are the ${seat} for this session — end it to change seats`
+      : 'Which seat you take. Pick it BEFORE you go LIVE — the host drives the '
+        + 'match and narrates for both of you; the guest takes instructions and '
+        + 'stays quiet. Frozen once you are live.';
+  }
+  mpFillGuilds();
+  const set=(id,v)=>{ const el=$(id); if(el && document.activeElement!==el) el.value = v; };
+  set('#mpNetGuild', (m.bot_network||{}).guild_id||'');
+  set('#mpCastGuild', (m.broadcast||{}).guild_id||'');
+  ['Net','Cast'].forEach(w=>{
+    const g=$('#mp'+w+'Guild').value, hit=guildsCache.find(x=>x.id===g), sel=$('#mp'+w+'Chan');
+    if(!sel || document.activeElement===sel) return;
+    sel.innerHTML = `<option value="">— select a channel —</option>` +
+      ((hit&&hit.channels)||[]).map(c=>`<option value="${esc(c.id)}">#${esc(c.name)}</option>`).join('');
+    sel.value = (w==='Net' ? (m.bot_network||{}) : (m.broadcast||{})).channel_id || '';
+  });
+}
+// The panel's three states, straight from the design doc:
+//   ⚠ Bot can't post here   ◌ No peer seen yet   ✓ Peer online: Dave · v3.90.2
+function mpRender(st){
+  mpState = st||{};
+  const faults = (st.preflight||[]).filter(c=>c.ok===false);
+
+  // ✉ Invite lives in the HEADER, and only when it could do anything: you're
+  // in multiplayer, you're live (so you're armed and advertising), you took
+  // the host seat, and there is no match yet.
+  {
+    const ib=$('#mpInviteBtn');
+    if(ib){
+      const seat = ((mpCfg||{}).role_pref === 'guest') ? 'guest' : 'host';
+      const idle = !st.state || st.state==='idle' || st.state==='advertised';
+      ib.style.display = (st.mode==='multi' && st.listener_enabled
+                          && seat==='host' && idle) ? '' : 'none';
+      ib.disabled = faults.length > 0;
+      ib.title = faults.length
+        ? `${faults[0].check} — ${faults[0].why}`
+        : "Find who you're playing and send the invite";
+    }
+  }
+  // An invite opens on the INVITEE by state, never by a button. One that sat
+  // unnoticed behind a tab is one that times out.
+  if(st.state === 'invited') mpInviteeModal(st);
+  else if(mpInvOpen){
+    document.querySelectorAll('.mpModal').forEach(x=>x.remove());
+    mpInvOpen = false;            // withdrawn, timed out, or answered elsewhere
+  }
+
+  const peer = $('#mpPeerState');
+  if(peer){
+    let head, tag;
+    if(faults.length){ head='⚠ '+faults[0].check+" — can't play yet"; tag=faults[0].why; }
+    else if(st.peer_online){ head='✓ Peer online: '+(st.peer_name||'?')+(st.peer_version?(' · v'+st.peer_version):''); tag=st.state||''; }
+    else if(st.mode!=='multi'){ head='◌ No peer seen yet'; tag='multiplayer mode is off'; }
+    else { head='◌ No peer seen yet'; tag = st.peer_name ? ('posting hello, '+st.peer_name+' not answering') : 'posting hello, nobody answering'; }
+    peer.innerHTML = `<div class="grow"><div class="name">${esc(head)}</div><div class="tag">${esc(tag)}</div></div>`;
+  }
+  const pf=$('#mpPreflight');
+  if(pf) pf.innerHTML = (st.preflight||[]).length
+    ? st.preflight.map(c=>{
+        const icon = c.ok===true ? '✓' : c.ok===false ? '⚠' : '◌';
+        const col  = c.ok===true ? 'var(--on)' : c.ok===false ? 'var(--warn)' : 'var(--dim)';
+        return `<div class="row" style="gap:8px;align-items:baseline"><span style="color:${col};font-weight:700">${icon}</span>`+
+               `<span>${esc(c.check)}</span><span class="muted">${esc(c.why||'')}</span></div>`;
+      }).join('')
+    : '<div class="muted">Connect the bot and pick both channels.</div>';
+
+  const rs=$('#mpResume'), snap=st.resume||{};
+  if(rs){
+    rs.style.display = snap.sid ? '' : 'none';
+    const t=$('#mpResumeText');
+    if(t && snap.sid) t.textContent = `Rejoin match with ${snap.peer_name||'your peer'}`+
+      (snap.round ? `, round ${snap.round}?` : '?');
+  }
+
+  // What the match box says depends entirely on where the link is.
+  const box=$('#mpMatch'), ab=$('#mpArmBtn'), xb=$('#mpAbortBtn');
+  const s = st.state||'idle', inMatch = (s==='match'||s==='settling');
+  if(box){
+    if(s==='invited'){
+      // The terms live in the Accept/Decline MODAL, which opens by itself.
+      // Repeating them here would be two places to keep honest.
+      box.innerHTML = `<div class="dev" style="border-color:var(--accent)"><div class="grow">`+
+        `<div class="name">${esc((st.invite||{}).host||'Someone')} has invited you</div>`+
+        `<div class="tag">answer it in the window that just opened</div></div></div>`;
+    } else if(s==='inviting'){
+      box.innerHTML = `<div class="muted">Invite sent — waiting for ${esc(st.peer_name||'your peer')}…</div>`;
+    } else if(s==='linked' || s==='ready'){
+      box.innerHTML = `<div class="dev"><div class="grow"><div class="name">${esc(st.game||'Match')} · ${esc(st.role||'')}</div>`+
+        `<div class="tag">${esc(st.cost||'')}</div></div></div>`;
+    } else if(inMatch){
+      const r = st.race||{}, tg = r.targets||{};
+      const mine = tg[st.me] ?? (st.targets||{})[st.me];
+      const theirs = tg[st.peer] ?? (st.targets||{})[st.peer];
+      box.innerHTML = `<div class="dev"><div class="grow">`+
+        `<div class="name">${esc(r.game||st.game||'Match')} · ${esc(st.role||'')}`+
+        `${r.done?' · finished':''}</div>`+
+        mpLane(st.player||'you', st.capacity, mine)+
+        mpLane(st.peer_player||st.peer_name||'your opponent', st.peer_capacity, theirs)+
+        (st.spent ? `<div class="tag">${Math.round(st.spent)}% of your match budget spent</div>` : '')+
+        (st.paced===false ? `<div class="tag" style="color:var(--warn)">⚠ this race is not pace-compensated — the lines are equal, the pumps aren't</div>` : '')+
+        (r.why ? `<div class="tag">${esc(r.why)}</div>` : '')+
+        `</div></div>`+
+        `<div class="hint" style="margin-top:6px">It runs itself from here — <b>watch it in Discord.</b></div>`;
+    } else {
+      box.innerHTML = st.why ? `<div class="muted">last match: ${esc(st.why)}</div>` : '';
+    }
+  }
+  if(ab) ab.style.display = (s==='linked'||s==='ready') ? '' : 'none';
+  const rb=$('#mpReadyBtn');
+  if(rb) rb.style.display = (st.role==='host' && (s==='linked'||s==='ready')) ? '' : 'none';
+  if(xb) xb.style.display = (s!=='idle'&&s!=='advertised') ? '' : 'none';
+  // Only the host drops the flag, and only once both sides have armed.
+  const sb=$('#mpStartBtn');
+  if(sb){ const can = st.role==='host' && s==='ready';
+    sb.style.display = can ? '' : 'none'; }
+  renderMpBlocked((mpCfg||{}).blocked);
+  const nb=$('#mpNotes');
+  if(nb) nb.innerHTML = (st.notes||[]).slice().reverse().map(n=>`<div>${esc(n)}</div>`).join('')
+    || '<div class="muted">nothing yet</div>';
+}
+async function mpPoll(once){
+  try{ mpRender(await api('/api/mp/status', {})); }catch(e){}
+  if(!once){
+    clearTimeout(mpTimer);
+    // While you are in MULTIPLAYER — not while some tab is open. The match is
+    // run from the header, and an invite opens a modal by itself; polling tied
+    // to a tab would mean an invite that arrived while you were elsewhere was
+    // never seen at all.
+    if((lastState||{}).mode === 'multi')
+      mpTimer = setTimeout(()=>mpPoll(), 2000);
+  }
+}
+function mpStopPoll(){ clearTimeout(mpTimer); mpTimer=null; }
+function mpMsg(t){ const m=$('#mpMsg'); if(!m) return;
+  m.textContent=t; clearTimeout(m._t); m._t=setTimeout(()=>{ if(m) m.textContent=''; }, 4000); }
+async function mpReady(){
+  const r = await api('/api/mp/ready', {});
+  mpMsg(r.ok ? '📣 posted — both players press in Discord' : '⚠ '+(r.error||'refused'));
+  mpPoll(true);
+}
+async function mpBlock(id){
+  const who = id ? '' : (mpState.peer_player || mpState.peer_name || 'them');
+  if(!id && !confirm(`Block ${who}? Any match with them ends now, and they can't pair with you again until you unblock.`)) return;
+  await api('/api/mp/block', {bot_id: id||''});
+  mpPoll(true);
+}
+async function mpUnblock(id){ await api('/api/mp/block', {bot_id:id, unblock:true}); mpPoll(true); }
+function renderMpBlocked(list){
+  const box=$('#mpBlockList'); if(!box) return;
+  const rows=(list||[]);
+  box.innerHTML = rows.length ? rows.map(b=>
+    `<div class="dev"><div class="grow"><div class="name">${esc(b.player||b.bot_name||b.bot_id||'?')}</div>`+
+    `<div class="tag">${esc(b.bot_name||'')}${b.bot_id?` · ${esc(b.bot_id)}`:''}</div></div>`+
+    `<button class="ghost" onclick="mpUnblock('${esc(b.bot_id||'')}')">Unblock</button></div>`).join('')
+    : '<div class="muted">Nobody is blocked.</div>';
+}
+async function mpArm(){ await api('/api/mp/arm', {}); mpPoll(true); }
+async function mpStart(){
+  const r = await api('/api/mp/start', {});
+  mpMsg(r.ok ? '▶ intro running — watch it in Discord' : '⚠ '+(r.error||'refused'));
+  mpPoll(true);
+}
+// One racer's lane: their meter against THEIR line, which is the only honest
+// comparison when the two lines differ by design.
+function mpLane(who, cap, target){
+  const c=+cap||0, t=+target||0;
+  const frac = t>0 ? Math.max(0, Math.min(1, c/t)) : 0;
+  const pct = Math.round(frac*100);
+  return `<div class="tag" style="display:flex;gap:8px;align-items:center;margin-top:3px">`+
+    `<span style="min-width:90px">${esc(who)}</span>`+
+    `<span style="flex:1;height:8px;background:var(--panel2);border-radius:4px;overflow:hidden;min-width:60px">`+
+      `<span style="display:block;height:100%;width:${pct}%;background:${frac>=1?'var(--on)':'var(--accent)'}"></span></span>`+
+    `<span style="min-width:96px;text-align:right">${c.toFixed(0)}% of ${t?t.toFixed(0):'?'}%</span></div>`;
+}
+async function mpAbort(){
+  if(!confirm('Abort the match? Both installs stop their pumps.')) return;
+  await api('/api/mp/abort', {why: 'stopped from the panel'}); mpPoll(true);
+}
+async function mpResume(yes){
+  if(yes && !confirm('Rejoin this match? Your pump can be fired by the host again.')) return;
+  await api('/api/mp/resume', {confirm: !!yes});
+  mpPoll(true);
+}
 
 async function saveAutomation(){
   await saveCfg({
@@ -5566,6 +6765,15 @@ function actGist(a){
   if(t==='goto') return `→ ${s(a.name)||'—'}`;
   if(t==='goto_if'){ const c=(a.conditions||[])[0];
     return `→ ${s(a.name)||'—'} if ${c?`${s(c.left)} ${s(c.op)||'=='} ${s(c.right)}`:'…'}`; }
+  if(t==='mp_spin') return 'spin the wheel' + (s(a.message)?` · "${s(a.message).slice(0,34)}"`:'');
+  if(t==='mp_roll') return `roll ${(a.dice||1)}d${(a.sides||7)} → [multi_roll]`;
+  if(t==='mp_action') return `run "${s(a.action)||'—'}"`;
+  if(t==='mp_tell') return `tell their bot: run "${s(a.action)||'—'}"`;
+  if(t==='mp_duel'){ const n=(a.options||[]).length;
+    return `${s(a.title)||'duel'} · ${n} move${n===1?'':'s'} · both pick · waits ${a.seconds??30}s`; }
+  if(t==='mp_choice'){ const n=(a.options||[]).length;
+    return `${s(a.title)||'player choice'} · ${n} button${n===1?'':'s'}`+
+           `${a.multi_who?` · ${s(a.multi_who)}`:''} · waits ${a.seconds??30}s`; }
   if(t==='cancel') return 'cancel other blocks';
   if(t==='random') return `random 1 of ${(a.options||[]).length}`;
   if(t==='var') return `${s(a.variable)||'?'} ${s(a.operation)||'set'} ${s(a.value)}`.trim();
@@ -5615,9 +6823,107 @@ function actionRow(base, rr, j, a, condLabels){
     }
     cond=`<label class="field">Run <select onchange="${T('if_option')}=+this.value;scheduleSave()">${opts}</select></label>`;
   }
+  // The three multiplayer rows are offered only in multiplayer mode — a solo
+  // block has nobody to spin between, and a type you can pick but never run is
+  // worse than one that isn't listed.
+  const MP_ROWS = ['mp_action','mp_tell','mp_spin','mp_roll','mp_choice','mp_duel'];
+  const inMulti = (typeof appMode==='function') && appMode()==='multi';
   const typeSel = `<select onchange="${T('type')}=this.value;${rr}();scheduleSave()">`+
-    ['message','notify','broadcast','command','fire','roll','chance','minigame','var','if','repeat','random','group','label','goto','goto_if','cancel','capacity','wait','poll','competition','bonus_round','award','command_gate','overlay','overlay_kill','scene_group','scene_group_kill','camera','snapshot','update_overlay_text','start_timer','stop_timer','stop_devices','end_session'].map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select>`;
-  let fields=cond;
+    (inMulti?MP_ROWS:[]).concat(
+    ['message','notify','broadcast','command','fire','roll','chance','minigame','var','if','repeat','random','group','label','goto','goto_if','cancel','capacity','wait','poll','competition','bonus_round','award','command_gate','overlay','overlay_kill','scene_group','scene_group_kill','camera','snapshot','update_overlay_text','start_timer','stop_timer','stop_devices','end_session'])
+    .map(t=>`<option value="${t}" ${typ===t?'selected':''}>${t}</option>`).join('')+`</select>`;
+  // WHO a row acts on. Only rows that reach a device or a person need it;
+  // a wait or a loop belongs to nobody.
+  const WHO_ROWS = ['fire','roll','capacity','stop_devices','overlay','overlay_kill','camera','mp_choice'];
+  // Twelve options, three of them duplicates. Only the HOST runs a block, so
+  // `host` was always this machine (= blank) and `guest` was always the other
+  // one (= peer); `me` was blank again. They still RESOLVE, for a config that
+  // already used them — they are just not offered. What is left is grouped,
+  // because "the duel loser" and "whoever is behind" answer different questions.
+  const WHO_GROUPS = [
+    ['what the round decided', [['chosen','the racer the spin picked'],
+                                ['other','the racer it missed'],
+                                ['winner','the duel winner'],
+                                ['loser','the duel loser']]],
+    ['by position',            [['leader','whoever is ahead'],
+                                ['trailer','whoever is behind']]],
+    ['always',                 [['both','both machines'],
+                                ['peer','the other machine']]],
+  ];
+  const whoOptions = cur => `<option value="" ${cur?'':'selected'}>— just this machine —</option>`+
+    WHO_GROUPS.map(([label, opts])=>`<optgroup label="${label}">`+
+      opts.map(([v,l])=>`<option value="${v}" ${cur===v?'selected':''}>${l}</option>`).join('')+
+      `</optgroup>`).join('');
+  let whoSel='';
+  if(inMulti && WHO_ROWS.includes(typ)){
+    whoSel = `<label class="field" title="Which MACHINE this row runs on. Multiplayer has two, and a pump or a picture belongs to one of them. Resolved when the row runs — a target that matches nobody DROPS the row rather than guessing at a person.">Who `+
+      `<select onchange="${T('multi_who')}=this.value||null;${rr}();scheduleSave()">`+
+      whoOptions(a.multi_who||'')+
+      `</select></label>`+
+      `<span class="muted" style="flex:1 1 130px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" `+
+      `title="Blank keeps it here and nothing crosses the wire. Name a racer and it is sent to whichever machine that turns out to be.">`+
+      `which machine it runs on</span>`;
+  }
+  let fields=cond+whoSel;
+  if(typ==='mp_spin'){
+    fields += `<label class="field" style="flex:2;min-width:200px">Say <input value="${esc(a.message||'')}" placeholder="🎡 The wheel picks **[multi_chosen_name]**!" onchange="${T('message')}=this.value;scheduleSave()"></label>`+
+      `<label class="row" style="gap:6px" title="uneven odds are stated in the channel — a wheel the audience can't see is indistinguishable from a rigged one"><input type="checkbox" ${a.announce_odds!==false?'checked':''} style="width:auto" onchange="${T('announce_odds')}=this.checked;scheduleSave()"> announce uneven odds</label>`+
+      `<span class="muted" style="flex:1 1 100%;min-width:0">Even by default. Fires nothing — what happens to the winner is the job of the rows after it. Publishes <code>[multi_chosen]</code> <code>[multi_chosen_name]</code> <code>[multi_other]</code> <code>[multi_odds]</code>.</span>`;
+  }
+  if(typ==='mp_roll'){
+    fields += `<label class="field">Dice <input type="number" min="1" max="20" step="1" value="${a.dice??1}" style="width:80px" onchange="${T('dice')}=+this.value||1;scheduleSave()"></label>`+
+      `<label class="field">Sides <input type="number" min="2" max="100" step="1" value="${a.sides??7}" style="width:80px" onchange="${T('sides')}=+this.value||7;scheduleSave()"></label>`+
+      `<label class="field">Luck % <input type="number" min="-100" max="100" step="1" value="${a.luck??''}" placeholder="0" style="width:80px" title="± chance to force the best / worst possible roll" onchange="${T('luck')}=(this.value===''?null:+this.value);scheduleSave()"></label>`+
+      `<label class="field" style="flex:2;min-width:180px">Say <input value="${esc(a.message||'')}" placeholder="🎲 [multi_roll_dice] → **[multi_roll]%**" onchange="${T('message')}=this.value;scheduleSave()"></label>`+
+      `<span class="muted" style="flex:1 1 100%;min-width:0">Rolls only — it fires nothing. Spend <code>[multi_roll]</code> in a <b>fire</b> row as <b>add %</b>: seconds are refused over the wire, because a second is a different amount of inflation on every rig.</span>`;
+  }
+  if(typ==='mp_tell'){
+    const bot=(mpState&&(mpState.peer_name||mpState.peer_player))||'';
+    fields += `<label class="field" style="min-width:190px">Tell ${bot?esc(bot):'their bot'} to run `+
+      `<input value="${esc(a.action||'')}" placeholder="Round Card" style="width:100%" `+
+      `title="the name of an Action on THEIR install — they run their own copy, with their own overlays" `+
+      `onchange="${T('action')}=this.value;scheduleSave()"></label>`+
+      `<span class="muted" style="flex:1 1 100%;min-width:0">Bot-to-bot, over <b>bot_network</b> — addressed to `+
+      `<b>${bot?esc(bot):'the bot you paired with'}</b> by id, so other bots in that channel never see it. `+
+      `Nothing appears in the venue. `+
+      `You send the NAME of an Action, not the thing to do, so they play <b>their</b> version on <b>their</b> scene. `+
+      `That is the way to put something on their stream: an overlay id from your scene means nothing on theirs.</span>`;
+  }
+  if(typ==='mp_action'){
+    const names=(typeof mpActions!=='undefined'?mpActions:[]).map(x=>(x.name||'').trim()).filter(Boolean);
+    const cur=(a.action||'').trim();
+    const missing = cur && !names.includes(cur);
+    fields += `<label class="field" style="min-width:200px">Run this Action `+
+      `<select style="width:100%" onchange="${T('action')}=this.value;${rr}();scheduleSave()">`+
+        `<option value="">— pick one —</option>`+
+        names.map(n=>`<option ${cur===n?'selected':''}>${esc(n)}</option>`).join('')+
+        (missing?`<option selected>${esc(cur)} (missing)</option>`:'')+
+      `</select></label>`+
+      `<span class="muted" style="align-self:center">runs another Multiplayer Action here. Wrap it in a <b>repeat</b> to do it N times — that is how a round becomes "four passes, a video, four more".</span>`;
+  }
+  if(typ==='mp_duel'){
+    fields += `<label class="field">Titlebar <input value="${esc(a.title||'')}" placeholder="Rock, Paper, Scissors" style="width:180px" onchange="${T('title')}=this.value;scheduleSave()"></label>`+
+      `<label class="field">Deadline <input type="number" min="5" max="180" step="5" value="${a.seconds??30}" style="width:90px" title="seconds. Whoever answered when it runs out WINS — a round must not stall on someone who walked away." onchange="${T('seconds')}=+this.value||30;scheduleSave()"></label>`+
+      `<span class="muted" style="flex:1 1 100%;min-width:0">Both racers pick from the SAME embed and nobody sees the other until both are in. Publishes <code>[multi_duel_winner]</code> <code>[multi_duel_loser]</code> and their moves; aim a fire at <b>the duel loser</b>. A draw resolves to nobody, so that row is simply dropped.</span>`;
+  }
+  if(typ==='mp_choice' && inMulti){
+    // Not "which machine": the HOST posts the embed either way, because a
+    // component interaction only ever reaches the app that owns the message.
+    // This is whose buttons they are.
+    fields += `<label class="field" title="Whose buttons these are. The host posts the embed whichever racer it belongs to.">Who presses `+
+      `<select onchange="${T('multi_who')}=this.value||null;${rr}();scheduleSave()">`+
+      WHO_GROUPS.flatMap(([, opts])=>opts).filter(([v])=>v!=='both')
+        .map(([v,l])=>`<option value="${v}" ${(a.multi_who||'chosen')===v?'selected':''}>${l}</option>`).join('')+
+      `</select></label>`;
+  }
+  if(typ==='mp_choice'){
+    const ops = Array.isArray(a.options)?a.options:[];
+    fields += `<label class="field">Titlebar <input value="${esc(a.title||'')}" placeholder="Double or Nothing?" style="width:170px" onchange="${T('title')}=this.value;scheduleSave()"></label>`+
+      `<label class="field">Deadline <input type="number" min="5" max="180" step="5" value="${a.seconds??30}" style="width:90px" title="seconds. A blocking row must always be able to end on its own, or a player who walked away hangs the match." onchange="${T('seconds')}=+this.value||30;scheduleSave()"></label>`+
+      `<label class="field">If nobody answers <select onchange="${T('default')}=this.value||null;scheduleSave()">`+
+        (ops.length?ops:[{label:'—',value:''}]).map(o=>`<option value="${esc(o.value||o.label||'')}" ${(a.default||'')===(o.value||o.label||'')?'selected':''}>${esc(o.label||o.value||'—')}</option>`).join('')+
+      `</select></label>`;
+  }
   if(typ==='wait')
     fields += `<label class="field">Seconds <input value="${esc(String(a.seconds??10))}" placeholder="10" title="a number or a [placeholder] like [winner_score]" style="width:110px" onchange="${T('seconds')}=this.value;scheduleSave()"></label>`;
   if(typ==='fire'){
@@ -5852,6 +7158,56 @@ function actionRow(base, rr, j, a, condLabels){
     nested = `<div class="colsec" style="margin-left:12px;border-left:2px solid var(--line);padding-left:10px;margin-top:6px;gap:6px">`+
       ((a.actions||[]).map((x,k)=>actionRow(gb,rr,k,x)).join('')||'<div class="muted">nothing in this group yet</div>')+
       `<button class="ghost" style="align-self:flex-start" onclick="${gb}=${gb}||[];${gb}.push({type:'message',message:''});actOpen.add('${gb}['+(${gb}.length-1)+']');${rr}();scheduleSave()">+ Add action</button>`+
+    `</div>`;
+  }
+  if(typ==='mp_duel'){
+    const ob=`${base}[${j}].options`;
+    const ops=(a.options||[]);
+    const vals=ops.map(o=>(o.value||o.label||'').trim().toLowerCase()).filter(Boolean);
+    nested = `<div class="colsec" style="margin-left:12px;border-left:2px solid var(--line);padding-left:10px;margin-top:6px;gap:6px">`+
+      ops.map((op,k)=>{
+        const mine=(op.value||op.label||'').trim().toLowerCase();
+        const beats=(op.beats||[]).map(b=>String(b).trim().toLowerCase());
+        return `<div class="row ovedit">`+
+          `<label class="field">Move <input value="${esc(op.label||'')}" placeholder="🪨 Rock" style="width:140px" onchange="${ob}[${k}].label=this.value;${rr}();scheduleSave()"></label>`+
+          `<label class="field">Beats <span class="muted">(tick what it wins against)</span><span class="row" style="gap:8px;flex-wrap:wrap">`+
+            vals.filter(v=>v!==mine).map(v=>
+              `<label class="row" style="gap:4px"><input type="checkbox" ${beats.includes(v)?'checked':''} style="width:auto" `+
+              `onchange="${ob}[${k}].beats=(this.checked?((${ob}[${k}].beats||[]).concat(['${esc(v)}'])):(${ob}[${k}].beats||[]).filter(x=>String(x).toLowerCase()!=='${esc(v)}'));scheduleSave()"> ${esc(v)}</label>`).join('')+
+          `</span></label>`+
+          `<div style="flex:1"></div>`+
+          `<button class="ghost" onclick="${ob}.splice(${k},1);${rr}();scheduleSave()">✕</button>`+
+        `</div>`;
+      }).join('')+
+      (ops.length<2?`<div class="muted" style="color:var(--warn)">⚠ a duel needs at least two moves</div>`:'')+
+      `<button class="ghost" style="align-self:flex-start" onclick="${ob}=${ob}||[];${ob}.push({label:'',beats:[],style:'primary'});${rr}();scheduleSave()">+ Add move</button>`+
+      `<span class="muted">Whatever a move doesn't beat and isn't beaten by is a <b>draw</b>. Leave every box unticked and every round draws — which is a legitimate game, just not this one.</span>`+
+    `</div>`;
+  }
+  if(typ==='mp_choice'){
+    const ob=`${base}[${j}].options`;
+    const ops=(a.options||[]);
+    nested = `<div class="colsec" style="margin-left:12px;border-left:2px solid var(--line);padding-left:10px;margin-top:6px;gap:6px">`+
+      `<label class="field">Prompt <textarea rows="2" placeholder="[multi_chosen_name], you rolled [multi_roll]%. Take it, or spin again?" onchange="${T('message')}=this.value;scheduleSave()">${esc(a.message||'')}</textarea></label>`+
+      ops.map((op,k)=>{
+        const ab=`${ob}[${k}].actions`;
+        return `<div class="colsec" style="gap:4px">`+
+          `<div class="row ovedit">`+
+            `<label class="field">Button <input value="${esc(op.label||'')}" placeholder="Double or Nothing" style="width:170px" onchange="${ob}[${k}].label=this.value;${rr}();scheduleSave()"></label>`+
+            `<label class="field">Look <select style="width:120px" onchange="${ob}[${k}].style=this.value;scheduleSave()">`+
+              [['secondary','grey'],['primary','blue'],['success','green'],['danger','red']]
+                .map(([v,l])=>`<option value="${v}" ${(op.style||'secondary')===v?'selected':''}>${l}</option>`).join('')+
+            `</select></label>`+
+            `<div style="flex:1"></div>`+
+            `<button class="ghost" onclick="${ob}.splice(${k},1);${rr}();scheduleSave()">✕</button>`+
+          `</div>`+
+          ((op.actions||[]).map((x,q)=>actionRow(ab,rr,q,x)).join('')||'<div class="muted" style="margin-left:10px">nothing yet</div>')+
+          `<button class="ghost" style="align-self:flex-start;margin-left:10px" onclick="${ab}=${ab}||[];${ab}.push({type:'message',message:''});actOpen.add('${ab}['+(${ab}.length-1)+']');${rr}();scheduleSave()">+ Add action</button>`+
+        `</div>`;
+      }).join('')+
+      (ops.length<2?`<div class="muted" style="color:var(--warn)">⚠ a choice needs at least two buttons — one button is not a decision, and it will be skipped</div>`:'')+
+      `<button class="ghost" style="align-self:flex-start" onclick="${ob}=${ob}||[];${ob}.push({label:'',style:'secondary',actions:[]});${rr}();scheduleSave()">+ Add button</button>`+
+      `<span class="muted">Only the racer picked by <b>Who</b> may press. The block <b>waits here</b> until they answer or the deadline passes — then it takes <b>If nobody answers</b> and says so in the channel.</span>`+
     `</div>`;
   }
   if(typ==='random'){
@@ -6279,6 +7635,34 @@ function cleanActionRows(arr){
       target:(a.target||'').trim()||null, command:(a.command||'').trim()||null,
       if_option:(a.if_option>0)?+a.if_option:null};
     if(t==='message'){ o.message=a.message||''; if((a.as||'')==='owner') o.as='owner'; }   // only message rows speak
+    // multiplayer: who a row acts on, kept on EVERY row type that can carry it
+    if((a.multi_who||'').trim()) o.multi_who=(a.multi_who||'').trim();
+    if(t==='mp_spin'){ o.message=a.message||''; o.announce_odds=a.announce_odds!==false;
+      if(a.weights && typeof a.weights==='object') o.weights=a.weights;
+      return o; }
+    if(t==='mp_roll'){ o.message=a.message||'';
+      o.dice=(a.dice>0)?+a.dice:1; o.sides=(a.sides>1)?+a.sides:7;
+      o.luck=(a.luck==null||a.luck==='')?null:+a.luck; return o; }
+    if(t==='mp_action'){ o.action=s(a.action); return o; }
+    if(t==='mp_tell'){ o.action=s(a.action);
+      if(a.values && typeof a.values==='object') o.values=a.values;
+      return o; }
+    if(t==='mp_duel'){ o.message=a.message||''; o.title=s(a.title);
+      o.seconds=Math.max(5,Math.min(180,+a.seconds||30));
+      o.options=(Array.isArray(a.options)?a.options:[]).map(op=>({
+        label:s(op&&op.label), value:s(op&&op.value)||s(op&&op.label).toLowerCase(),
+        style:['secondary','primary','success','danger'].includes(op&&op.style)?op.style:'primary',
+        beats:(Array.isArray(op&&op.beats)?op.beats:[]).map(b=>s(b).toLowerCase()).filter(Boolean)}));
+      return o; }
+    if(t==='mp_choice'){ o.message=a.message||''; o.title=s(a.title);
+      o.seconds=Math.max(5,Math.min(180,+a.seconds||30));
+      o.default=s(a.default)||null;
+      o.timeout_message=a.timeout_message||'';
+      o.options=(Array.isArray(a.options)?a.options:[]).map(op=>({
+        label:s(op&&op.label), value:s(op&&op.value)||s(op&&op.label).toLowerCase(),
+        style:['secondary','primary','success','danger'].includes(op&&op.style)?op.style:'secondary',
+        actions:cleanActionRows(op&&op.actions)}));
+      return o; }
     if(t==='roll') o.luck=(a.luck==null||a.luck==='')?null:+a.luck;
     if(t==='label'||t==='group'){ o.name=s(a.name);
       if(t==='group') o.actions=cleanActionRows(a.actions); return o; }
@@ -6961,7 +8345,6 @@ async function addDisc(btn){
 }
 
 // ---- state application ----
-let lastState = {};
 function applyState(st, full){
   lastState = st || {};
   if(!st) return;
@@ -7007,7 +8390,23 @@ function applyState(st, full){
   if(st.version){ const vl=$('#verLabel'); if(vl && !vl.textContent) vl.textContent='v'+st.version;
     const um=$('#updMsg'); if(um && !um.textContent) um.textContent=`You're on v${st.version}.`; }
   $('#listener').checked = !!st.listener_enabled;
+  try{ applyMpLock(); }catch(e){}
+  // The solo/multi toggle is LOCKED at go-live — grey it every poll, not only
+  // on a full config load, or it stays clickable through a whole session.
+  const mt=$('#modeMulti');
+  if(mt){ mt.disabled = !!st.listener_enabled;
+          if(document.activeElement!==mt) mt.checked = (st.mode==='multi'); }
+  applyModeVis();
   if(document.activeElement!==$('#mock')) $('#mock').checked = !!st.mock_mode;
+  // MOCK IS NOT AVAILABLE IN A MATCH. Devices not firing while the other
+  // player's do is a silent cheat, not a test mode — and nothing on their
+  // machine could ever tell. The server refuses it too; this just stops it
+  // being offered.
+  {
+    const mt=$('#mockTgl'), mc=$('#mock'), multi = (st.mode==='multi');
+    if(mt) mt.style.display = multi ? 'none' : '';
+    if(mc) mc.disabled = multi;
+  }
   $('#mockPill').style.display = st.mock_mode ? 'inline-flex' : 'none';
   renderUsers(st.users||[]);
   renderLog(st.log||[]);
@@ -7073,6 +8472,15 @@ function applyState(st, full){
     if($('#activationOffNotice')) $('#activationOffNotice').checked = !!st.activation_off_notice;
     if($('#outputHeaders')) $('#outputHeaders').checked = !!st.output_headers;
     if($('#richOutput')) $('#richOutput').checked = !!st.rich_output;
+    try{ mpApply(st); }catch(e){}
+    mpActions = Array.isArray(st.mp_actions) ? JSON.parse(JSON.stringify(st.mp_actions)) : [];
+    mpRounds = Array.isArray(st.mp_rounds) ? JSON.parse(JSON.stringify(st.mp_rounds)) : [];
+    {
+      const e = st.mp_end || {};
+      mpEnd = {max_capacity: +e.max_capacity||0,
+               actions: Array.isArray(e.actions) ? JSON.parse(JSON.stringify(e.actions)) : []};
+    }
+    renderMpActions(); renderMpRounds();
     $('#tokenState').textContent = st.has_token ? '✓ token saved' : 'no token yet';
     allDevices = st.devices||[];
     pumpDevUi();       // the Pump picker follows renames + added/removed devices
@@ -7324,6 +8732,12 @@ function gatherConfig(){
     pump_embed:$('#pumpEmbed')?$('#pumpEmbed').checked:false, pump_title:$('#pumpTitle')?$('#pumpTitle').value:'',
     pump_message: $('#pumpMsg') ? $('#pumpMsg').value : '',
     listen_targets:listenTargets,
+    // Multiplayer rides in the SAME payload. Its editors reuse actionRow(),
+    // which calls scheduleSave() on every field — so leaving these out meant a
+    // row edit saved solo config, lost the edit, and bumped the rev underneath
+    // the multiplayer save that was already in flight ("config changed
+    // elsewhere"). One saver, one payload.
+    ...mpPayload(),
     scenes: _scenesWithShow(), scene_globals: sceneGlobals, chat_scene: chatSceneName,
     scene_globals_meta: globalsMeta,
     chat_isolate: $('#chatIso')?$('#chatIso').checked:false, chat_isolate_channel: chatIsoChan,
@@ -7499,7 +8913,11 @@ async function doSave(){
 // any edit to a config field schedules a debounced save. Controls that save
 // through their OWN endpoint (or are pure runtime state) are excluded — a full
 // config save for them is pointless and used to race their endpoint's rev bump.
-const NO_AUTOSAVE_IDS = new Set(['mock','listener','silenceOnOff','token',
+// The header toggles drive their own endpoints — the generic autosave must not
+// also fire for them. A checkbox raises BOTH `input` and `change`, so without
+// this the Multi toggle schedules a full-config save that races its own POST
+// and 409s it ("config changed elsewhere"), flipping the switch back.
+const NO_AUTOSAVE_IDS = new Set(['mock','listener','modeMulti','silenceOnOff','token',
   'raEnabled','raNewIp','capSlider','capInput','ctrlDice','ctrlSides','ctrlPump',
   'ctrlBroadcast','ctrlPoll','ctrlCleanup','importFile']);
 function maybeSave(e){

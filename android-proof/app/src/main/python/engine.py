@@ -212,6 +212,12 @@ class Engine:
         # the ON message (+ its [!command]s) has posted — finish_activation()
         # releases them (safety-released after 8s if nothing calls it).
         self._activation_hold: float | None = None
+        # MULTIPLAYER STANDBY: LIVE is on, but in a match nothing starts until
+        # the two installs are linked and gated. Unlike _activation_hold this
+        # has NO safety timeout — "starting soon" lasts as long as it lasts,
+        # and a bot that started announcing itself 8 seconds in would be
+        # exactly the leak this exists to prevent.
+        self._mp_standby = False
         self._pump_time: dict[str, dict] = {}    # uid -> {name, seconds, capacity} (session leaderboard)
         # Per-range leaderboards: (min,max) -> {uid: {name, seconds, capacity}}.
         # Same shape as _pump_time but scoped to the range the pump landed in, for
@@ -250,6 +256,22 @@ class Engine:
         self.owner_say_cb = None               # async (text) -> None : owner-voiced broadcast (webhook skin)
         self.overlay_cb = None                 # (spec dict) -> {ok,..} : virtual-camera overlay (quiet-fail)
         self.embed_cb = None                   # async (title, text) -> None : rich embed post (polls)
+        # Multiplayer row router: async (row, ctx) -> bool. Set only while a
+        # multiplayer block is running. Returning True means the row was dealt
+        # with elsewhere — sent across the wire to the other install, or handled
+        # as a multiplayer-only row — and must NOT also run locally.
+        #
+        # One hook rather than a second block runner: `repeat`, `if`, `goto` and
+        # the rest of the control flow are already here and correct, and a
+        # multiplayer copy of them would be a second implementation to keep in
+        # step. Multiplayer owns its own transport, not its own action system.
+        self.mp_row_cb = None
+        # Sync () -> {placeholder: value}. Conditions are tested BETWEEN rows —
+        # a repeat-until is re-asked after each pass, which may be on the far
+        # side of a 15s wait. Without a live read the loop tests capacity as it
+        # was before the wait and runs one pass too many, which at a round
+        # boundary means over-inflating somebody.
+        self.mp_ctx_cb = None
         self.broadcast_embed_cb = None         # async (text) -> None : broadcast-preset embed
         self.comp_embed_cb = None              # async (title, text, meta) -> None : competition embed + Enter button
         self.winner_button_cb = None           # async (title, text, meta) -> None : one-press Winner Button embed
@@ -343,6 +365,7 @@ class Engine:
             self._runtime_events_on.clear()
             self._activation_hold = None
             self._intro_pending = False
+            self._mp_standby = False
             self._log("bot", "deactivated — everything running cancelled, cooldowns cleared")
             try:
                 asyncio.create_task(self._deactivate_kill())
@@ -640,6 +663,15 @@ class Engine:
         ctx["total_bonus_pct"] = f"{tb_pct:g}"
         ctx.setdefault("user_bonus_secs", "")
         ctx.setdefault("user_bonus_pct", "")
+        # Multiplayer values are global while a match is live, not only inside
+        # a multiplayer block — an overlay LABEL has to keep resolving them on
+        # screen, and the compositor re-renders text through here ~4x/sec.
+        if self.mp_ctx_cb is not None:
+            try:
+                ctx.update(self.mp_ctx_cb() or {})
+            except Exception:  # noqa: BLE001 — a bad token never blanks a scene
+                pass
+
         if extra:
             ctx.update(extra)
         # Embeddable blocks: [toppump] / [toppump-all] = the leaderboard command
@@ -1242,6 +1274,8 @@ class Engine:
         has triggered, and the session end cancels them)."""
         if not self.cfg.get("listener_enabled") or self._end_triggered:
             return
+        if self.mp_standby():
+            return
         if self._activation_hold is not None:
             if time.monotonic() - self._activation_hold < 8.0:
                 return
@@ -1526,6 +1560,24 @@ class Engine:
     def intro_active(self) -> bool:
         return bool(self._intro_open)
 
+    def mp_standby(self) -> bool:
+        """Armed and silent: LIVE, but waiting for a match to begin.
+
+        Solo can never be standing by. The flag is cleared on every config
+        read that isn't multiplayer, so a stale one cannot outlive the mode
+        that set it and leave a solo session silently held.
+        """
+        if str(self.cfg.get("mode") or "solo") != "multi":
+            self._mp_standby = False
+        return bool(self._mp_standby)
+
+    def set_mp_standby(self, on: bool) -> None:
+        was, self._mp_standby = bool(self._mp_standby), bool(on)
+        if was != self._mp_standby:
+            self._log("bot", "multiplayer: standing by — nothing runs until the "
+                             "match starts" if self._mp_standby
+                      else "multiplayer: standby lifted")
+
     def intro_pending(self) -> bool:
         """LIVE has been flipped and an intro is configured, but the pre-show
         hasn't opened yet — the ON message is still posting. Black, not live."""
@@ -1548,6 +1600,11 @@ class Engine:
         an exception is a command_gate there: real dropdowns, and it reads
         beside everything else the stage does."""
         return not self.golive().get("hold_commands", True)
+
+    def _standby_result(self, who: str, uid) -> dict:
+        return {"ok": False, "reply": self.render(
+            "⏳ [mention], the match hasn't started yet — standing by.",
+            {"user": who, "mention": who, "uid": uid})}
 
     def _intro_result(self, who: str, uid) -> dict:
         tmpl = self.golive().get("holding_message") or \
@@ -1596,6 +1653,12 @@ class Engine:
         conds = [c for c in (spec.get("conditions") or []) if c]
         if not conds:
             return True
+        if self.mp_ctx_cb is not None:
+            # live match state, not whatever the context held a wait ago
+            try:
+                xc = {**xc, **(self.mp_ctx_cb() or {})}
+            except Exception:  # noqa: BLE001 — a bad read must not wedge a loop
+                pass
         results = []
         for c in conds:
             left = self.render(str(c.get("left") or ""), xc)
@@ -1771,6 +1834,16 @@ class Engine:
                     continue
             typ = ((a or {}).get("type") or "message").lower()
             try:
+                if self.mp_row_cb is not None:
+                    # Ask multiplayer first: this row may belong to the OTHER
+                    # install, or be a row only multiplayer knows (mp_spin).
+                    # Anything it claims must not also happen here.
+                    try:
+                        if await self.mp_row_cb(a, xc):
+                            continue
+                    except Exception as ex:  # noqa: BLE001 — never kill a block
+                        self._log("error", f"{name}: multiplayer row failed: {ex}")
+                        continue
                 if typ == "minigame":
                     prof = self.find_minigame(a.get("minigame") or a.get("game"))
                     if prof is None:
@@ -2477,7 +2550,8 @@ class Engine:
                         # use until_capacity (exempt from the single-fire cap).
                         mode = (a.get("fire_mode") or "seconds").lower()
                         if mode in ("add", "fill", "add_pct"):
-                            until = self.capacity + self._num_expr(a.get("fill_pct"), xc)
+                            until = (self._pending_capacity(target)
+                                     + self._num_expr(a.get("fill_pct"), xc))
                         elif mode in ("to", "to_pct", "until"):
                             until = self._num_expr(a.get("fill_pct"), xc)
                         secs_v = a.get("seconds")
@@ -3206,10 +3280,15 @@ class Engine:
         ru_name, ru_score = self._comp_runnerup(winner_uid)   # 2nd place, before clearing
         total_score = self._comp_total_score()   # combined total, before clearing
         # the Competition Viewer's final board, held past the end like a poll's
+        # `winner` is the PLAYER DICT from the (uid, player) pairs above, not a
+        # name. Storing it whole put the entire record through competition_view's
+        # f"🏆 {winner}" and printed {'name': …, 'score': …, 'rolls': […]} across
+        # the bottom of the Competition overlay for the length of the results
+        # hold. The card only ever wants the name.
         self._comp_card = {"title": self._comp.get("title") or name,
                            "at": time.monotonic(),
                            "rows": self._comp_rows(winner_uid),
-                           "winner": (winner or "")}
+                           "winner": ((winner or {}).get("name") or "")}
         self._comp = None
         await self._drain_broadcasts()        # the card slot is free again
         self._last_results = results_text
@@ -3568,6 +3647,8 @@ class Engine:
         """Fire each enabled event when its interval elapses. Events only run
         while the listener is enabled (so they don't fire on a paused/off bot)."""
         if not self.cfg.get("listener_enabled"):
+            return
+        if self.mp_standby():
             return
         if self._activation_hold is not None:
             # activation in flight: the ON message + its [!command]s go first
@@ -4276,6 +4357,9 @@ class Engine:
 
         if self._paused:
             return self._paused_result(who, uid)
+        # Standing by for a match: LIVE, but there is no game yet to command.
+        if uid is not None and self.mp_standby():
+            return self._standby_result(who, uid)
         # Pre-show: the session is LIVE but the game hasn't begun.
         if self._intro_open and uid is not None and not self.intro_allows(name):
             return self._intro_result(who, uid)
@@ -4864,6 +4948,29 @@ class Engine:
     def _remaining(self, device_id: str | None) -> float:
         f = self._fires.get(device_id)
         return max(0.0, f["deadline"] - time.monotonic()) if f else 0.0
+
+    def _pending_capacity(self, device_id: str | None) -> float:
+        """Where this pump is ALREADY heading, or the live meter if it's idle.
+
+        An "add N%" has to stack on what is queued, not on what the meter reads
+        right now. A second award arriving mid-fire would otherwise be measured
+        from a number the pump has already been told to leave behind, and the
+        two awards would quietly collapse into less than their sum — two 10%
+        awards landing 15s apart on a 60s pump produce 17%, not 20%.
+
+        It is not a rounding error either: the shortfall grows the faster the
+        awards come relative to the pump, so the SLOWER rig loses more of them.
+        That silently rigs a match against the pump that pace compensation
+        exists to protect, which is why this is the base for every add.
+        """
+        f = self._fires.get(str(device_id))
+        if f:
+            pend = f.get("until_capacity")
+            if pend is not None:
+                # never below the live meter: a fire that has already overshot
+                # its target must not drag the next award backwards
+                return max(float(pend), self.capacity)
+        return self.capacity
 
     def _begin_or_extend(self, device_id: str, duration: float, reason: str,
                          bypass_lock: bool = False, until_capacity: float | None = None) -> dict:

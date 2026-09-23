@@ -243,6 +243,29 @@ def _group_lengths(raw: dict) -> dict:
     return {g: media_len.group_seconds(raw, scene, g, IMAGES_DIR) for g in sorted(names)}
 
 
+# ── Multiplayer is not finished. A public build ships with it OFF so nobody
+#    wanders into a half-built mode; this working copy leaves it ON.
+#
+#    Flip the constant for a release, or set DISCOFLATE_MULTIPLAYER=0 without
+#    touching the file. When it is off the toggle and the whole multiplayer
+#    surface are hidden, `mode` cannot be set to "multi", and a config that is
+#    ALREADY in multi is pulled back to solo — otherwise a released build would
+#    boot straight into a mode with no way out of it.
+MULTIPLAYER_ENABLED = True
+if os.environ.get("DISCOFLATE_MULTIPLAYER", "").strip() in ("0", "off", "false"):
+    MULTIPLAYER_ENABLED = False
+
+
+def _mp_session_flags(botmgr) -> dict:
+    """`mp_in_match` — a match is live, so Concede means something.
+    `mp_locked`  — this install is the GUEST in one, so the panel locks down."""
+    lk = getattr(botmgr, "link", None)
+    live = bool(lk is not None and lk.state in ("linked", "ready", "match", "settling"))
+    return {"mp_in_match": live,
+            "mp_locked": bool(live and not lk.is_host),
+            "mp_peer": (lk.peer_player or lk.link.peer_name) if lk is not None else ""}
+
+
 def _public_state(engine: Engine, botmgr: BotManager) -> dict:
     # RESOLVED: the panel must show the rules the live scene is actually
     # playing by, not the stale top-level copy they were migrated from.
@@ -284,6 +307,17 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "broadcasts": cfg.get("broadcasts", []),
         "devices": cfg.get("devices", []),
         "active_device_id": cfg.get("active_device_id"),
+        "multiplayer_enabled": MULTIPLAYER_ENABLED,
+        # In a match the GUEST has no game to run: it takes instructions, its
+        # commands are off, and every editor would be editing something that
+        # isn't driving anything. Lock the panel to Chat until it's over.
+        **_mp_session_flags(botmgr),
+        "mode": (cfg.get("mode", "solo") if MULTIPLAYER_ENABLED else "solo"),
+        "multiplayer": cfg.get("multiplayer", {}),
+        "mp_actions": cfg.get("mp_actions", []),
+        "mp_rounds": cfg.get("mp_rounds", []),
+        "mp_end": cfg.get("mp_end", {}),
+        "scene_by_mode": cfg.get("scene_by_mode", {}),
         "vendors_set": _mask_vendors(cfg.get("vendors", {})),
         "allow": cfg.get("allow", {}),
         "listen_guild_id": cfg.get("listen_guild_id", ""),
@@ -542,6 +576,10 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         if ((engine.intro_active() or engine.intro_pending())
                 and engine.golive().get("blackout", True)):
             return "intro"
+        # Standing by for a match: the camera is up so the standby card can
+        # show, but the room isn't on air yet.
+        if engine.mp_standby() and engine.golive().get("blackout", True):
+            return "intro"
         return "live"
     vcam.gate_cb = _picture_gate
     net["vcam"] = vcam
@@ -563,6 +601,17 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         # hand-picked dict silently never carried its state.
         for k in ("poll", "competition", "bonus_round", "broadcast"):
             out[k] = s.get(k)
+        # The OTHER install's meter. It is already arriving on `tele`/`ack` and
+        # sitting on the session — this just hands it to the compositor, so a
+        # gauge can be pointed at the peer. Nothing new crosses the wire.
+        lk0 = getattr(botmgr, "link", None)
+        if lk0 is not None:
+            out["peer_capacity"] = round(float(lk0.peer_cap or 0), 1)
+            out["multi"] = {"me": lk0.player or "You",
+                            "peer": lk0.peer_player or lk0.link.peer_name or "Opponent",
+                            "my_target": (lk0.targets or {}).get(lk0.link.me),
+                            "peer_target": (lk0.targets or {}).get(lk0.link.peer),
+                            "live": lk0.state in ("match", "settling")}
         return out
     vcam.state_cb = _vcam_state
     stg = stage.Stage(IMAGES_DIR)   # /stage overlay registry (phone screen-share path)
@@ -699,8 +748,11 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         if spec.get("group"):
             cfg0 = config_store.load()
             scene_name = (spec.get("stage") or "").strip() or cfg0.get("chat_scene", "")
-            if not scene_name:      # nothing linked to Chat: search every scene
-                for s_ in (cfg0.get("scenes") or []):
+            if not scene_name:
+                # Nothing loaded. Search — but only within the mode we're in.
+                # "Intro" exists in a solo scene AND a multiplayer one, and
+                # playing the wrong half's overlays is worse than playing none.
+                for s_ in config_store.scenes_in_mode(cfg0):
                     if _scene_group(cfg0, s_.get("name"), spec.get("group")):
                         scene_name = s_.get("name")
                         break
@@ -735,10 +787,12 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             cfg0 = config_store.load()
             scene_name = (spec.get("stage") or "").strip() or cfg0.get("chat_scene", "")
             found = _scene_item(cfg0, scene_name, oid)
-            if found is None and not scene_name:   # not linked? search every stage
-                for s_ in (cfg0.get("scenes") or []):
+            if found is None and not scene_name:
+                # Same rule for a bare overlay id: stay inside this mode.
+                for s_ in config_store.scenes_in_mode(cfg0):
                     found = _scene_item(cfg0, s_.get("name"), oid)
                     if found is not None:
+                        scene_name = s_.get("name")
                         break
             if found is None:
                 return {"ok": True, "skipped": f"overlay {oid} not in any scene"}
@@ -1097,7 +1151,9 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                    "cooldown_exempt_names": list, "command_names": dict, "roll": dict,
                    "auto_report": dict, "templates": dict,
                    "templates_removed": list,
-                   "vendors": dict, "allow": dict, "server_channels": dict}
+                   "vendors": dict, "allow": dict, "server_channels": dict,
+                   "multiplayer": dict, "mp_actions": list, "mp_rounds": list,
+                   "mp_end": dict}
 
     async def set_config(request):
         await guard(request)
@@ -1137,6 +1193,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                     "listen_targets", "anon_user_label", "output_headers", "rich_output",
                     "templates", "templates_removed",
                     "allow_dms", "server_channels", "silence_onoff_log",
+                    "multiplayer", "mp_actions", "mp_rounds", "mp_end", "scene_by_mode",
                     "mock_calibration_seconds_to_100",
                     "always_on_enabled", "always_on_commands",
                     "event_in_process_message", "event_cooldown_message", "broadcasts",
@@ -1149,6 +1206,33 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                 if want and not isinstance(body[key], want):
                     raise web.HTTPBadRequest(text=f"{key} must be a {want.__name__}")
                 patch[key] = body[key]
+        # The solo/multi toggle is LOCKED at go-live. Switching mid-session
+        # swaps the command handling, the broadcast target and the scene set
+        # out from under a live audience, so it is refused with a reason rather
+        # than half-applied.
+        if "mode" in body:
+            want = "multi" if str(body.get("mode")) == "multi" else "solo"
+            if want == "multi" and not MULTIPLAYER_ENABLED:
+                raise web.HTTPConflict(text="multiplayer isn't available in this build")
+            live = config_store.load()
+            cur = str(live.get("mode") or "solo")
+            if want != cur and live.get("listener_enabled"):
+                raise web.HTTPConflict(
+                    text="can't switch between solo and multiplayer while the session "
+                         "is live — end the session first")
+            patch["mode"] = want
+            if want != cur:
+                # Swap the loaded scene with the mode. Remember what this mode
+                # had so coming back restores it, and load the other mode's own
+                # — a solo scene left loaded in multi means solo's rules and
+                # none of the multiplayer overlays, since the live scene is
+                # what resolved() lays over the config.
+                seen = dict(live.get("scene_by_mode") or {})
+                seen[cur] = str(live.get("chat_scene") or "")
+                patch["scene_by_mode"] = seen
+                patch["chat_scene"] = config_store.scene_for_mode(
+                    {**live, "scene_by_mode": seen}, want)
+
         # Gameplay belongs to the SCENE. Route those keys into the live scene's
         # block instead of the top level, so editing Commands or Game while
         # "Tuesday Show" is selected changes Tuesday Show and nothing else.
@@ -1171,6 +1255,16 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                 # no scene to own it (none selected yet) — keep the old behaviour
                 # rather than dropping the edit on the floor
                 patch.update(gp)
+        # A scene never changes which half of the app it belongs to. The panel
+        # sends every scene on every save, so this is the only place that can
+        # actually hold the line.
+        if isinstance(patch.get("scenes"), list):
+            moved = config_store.lock_scene_modes(
+                patch["scenes"], config_store.load().get("scenes") or [])
+            if moved:
+                engine._log("error",
+                            f"refused to move {moved} scene(s) between solo and "
+                            f"multiplayer — a scene belongs to the mode it was made in")
         cfg = config_store.update(patch)
         engine.set_config(cfg)
         return web.json_response(_public_state(engine, botmgr))
@@ -1232,9 +1326,62 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
     async def set_mock(request):
         await guard(request)
         body = await _json(request)
-        cfg = config_store.update({"mock_mode": bool(body.get("enabled"))})
+        want = bool(body.get("enabled"))
+        # NOT IN A MATCH. Mock means devices don't fire — against a real
+        # opponent whose pump does, that is a silent cheat rather than a test
+        # mode, and nothing on the other machine could ever tell.
+        if want and str(config_store.load().get("mode") or "solo") == "multi":
+            engine._log("bot", "MOCK refused — a match fires real devices")
+            return web.json_response(_public_state(engine, botmgr))
+        cfg = config_store.update({"mock_mode": want})
         engine.set_config(cfg)
         engine._log("bot", f"MOCK MODE {'ON — devices will NOT fire' if cfg['mock_mode'] else 'off'}")
+        return web.json_response(_public_state(engine, botmgr))
+
+    async def _mp_activate():
+        """Round 1 has started: the HOST's session begins for real, here.
+
+        Deliberately its own copy of the activation flow rather than a call
+        into solo's. They run at completely different moments — solo's at the
+        flip of the switch, this one at the handshake — and the one thing that
+        must never happen is a change to solo's go-live silently altering when
+        a match announces itself.
+        """
+        cfg0 = config_store.load()
+        msg0 = (cfg0.get("listener_message_on") or "").strip()
+        if msg0:
+            text = engine.render(engine.strip_inline(msg0))
+            if text.strip():
+                if cfg0.get("listener_on_embed"):
+                    ttl = engine.render(
+                        (cfg0.get("listener_on_title") or "").strip()) or "🟢 Match ON"
+                    await botmgr.post_embed(
+                        ttl, text, footer=f"DiscoFlate v{VERSION} by AireGasm")
+                else:
+                    await botmgr.announce(
+                        f"{text}\n-# DiscoFlate v{VERSION} by AireGasm", None)
+            await engine.fire_inline(msg0)
+        engine.finish_activation()
+    botmgr.mp_activate_cb = _mp_activate
+
+    async def _listener_multi(cfg, enabled: bool):
+        """GO LIVE, multiplayer — a DIFFERENT go-live, not solo's with a flag.
+
+        Solo's go-live starts a session: it announces, fires the ON message's
+        commands, plays the intro and releases events. In a match none of that
+        may happen on either install, because both shows have to begin on the
+        same instant and that instant is the handshake, not this switch. So
+        this arms and advertises, and stops.
+
+        Kept as its own function on purpose. The two flows share no lines, so
+        a change to one can never quietly alter the other.
+        """
+        if enabled:
+            engine.set_mp_standby(True)
+            await botmgr.link_standby()
+        else:
+            engine.set_mp_standby(False)
+            await botmgr.link_offair("went off air")
         return web.json_response(_public_state(engine, botmgr))
 
     async def set_listener(request):
@@ -1244,6 +1391,9 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         engine.set_config(cfg)
         engine._log("bot", f"listener {'ENABLED' if cfg['listener_enabled'] else 'muted'}")
         enabled = cfg["listener_enabled"]
+        # The fork is HERE, before any of solo's flow is touched.
+        if str(cfg.get("mode") or "solo") == "multi":
+            return await _listener_multi(cfg, enabled)
         msg = ((cfg.get("listener_message_on") if enabled
                else cfg.get("listener_message_off")) or "").strip()
         footer = f"-# DiscoFlate v{VERSION} by AireGasm"
@@ -2054,6 +2204,96 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         b = await _json(request)
         return web.json_response(await botmgr.owner_chat(b.get("channel_id"), b.get("text")))
 
+    # ---- multiplayer (the rail) -------------------------------------------
+    # Setup only. During a match the panel's entire job is to get out of the
+    # way: rounds advance on the host's own clock, and anything a human does
+    # happens in the broadcast channel, as a command or a button on an embed.
+
+    async def mp_status(request):
+        await guard(request)
+        st = botmgr.link_status()
+        st["preflight"] = await botmgr.link_preflight()
+        return web.json_response(st)
+
+    async def mp_offer(request):
+        await guard(request)
+        b = await _json(request)
+        return web.json_response(await botmgr.link_offer(
+            game=b.get("game"), target=b.get("target"), rounds=b.get("rounds"),
+            max_pct=b.get("max_pct"), input=b.get("input"),
+            split=bool(b.get("split"))))
+
+    async def mp_respond(request):
+        await guard(request)
+        b = await _json(request)
+        return web.json_response(await botmgr.link_respond(
+            bool(b.get("accept")), str(b.get("why") or ""),
+            video=bool(b.get("video")),
+            cal=b.get("cal"), split=bool(b.get("split"))))
+
+    async def mp_block(request):
+        await guard(request)
+        b = await _json(request)
+        if b.get("unblock"):
+            return web.json_response(await botmgr.link_unblock(str(b.get("bot_id") or "")))
+        return web.json_response(await botmgr.link_block(str(b.get("bot_id") or "")))
+
+    async def mp_ready(request):
+        await guard(request)
+        return web.json_response(await botmgr.post_ready())
+
+    async def mp_start(request):
+        await guard(request)
+        return web.json_response(await botmgr.start_match())
+
+    async def mp_action(request):
+        await guard(request)
+        b = await _json(request)
+        return web.json_response(await botmgr.mp_run_action(str(b.get("name") or "")))
+
+    async def mp_rounds(request):
+        await guard(request)
+        b = await _json(request)
+        if not b.get("start"):
+            await botmgr.rounds_stop()
+            return web.json_response({"ok": True, "status": botmgr.link_status()})
+        return web.json_response(await botmgr.rounds_start())
+
+    async def mp_arm(request):
+        await guard(request)
+        return web.json_response(await botmgr.link_arm())
+
+    async def mp_members(request):
+        """Search the broadcast server by name. Bots are members too, so the
+        bot you mean to play is in here beside everyone else."""
+        await guard(request)
+        b = await _json(request)
+        return web.json_response(await botmgr.mp_search_members(
+            str(b.get("q") or ""), int(b.get("limit") or 25)))
+
+    async def mp_concede(request):
+        """Give up. NOT an abort — the End Condition's block runs first."""
+        await guard(request)
+        b = await _json(request)
+        return web.json_response(await botmgr.link_concede(
+            str(b.get("why") or "conceded")))
+
+    async def mp_abort(request):
+        await guard(request)
+        b = await _json(request)
+        return web.json_response(await botmgr.link_abort(
+            str(b.get("why") or "stopped from the panel")))
+
+    async def mp_kill(request):
+        await guard(request)
+        b = await _json(request)
+        return web.json_response(botmgr.link_kill(bool(b.get("armed"))))
+
+    async def mp_resume(request):
+        await guard(request)
+        b = await _json(request)
+        return web.json_response(await botmgr.link_resume(bool(b.get("confirm"))))
+
     # ---- virtual camera + overlays (Chat tab, video channels) -------------
     # Android can't host a virtual camera: registering a camera device needs a
     # system driver (root), and Discord mobile only lists the real cameras.
@@ -2709,6 +2949,20 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
         web.post("/api/chat/channels", chat_channels),
         web.post("/api/chat/log", chat_log),
         web.post("/api/chat/send", chat_send),
+        web.post("/api/mp/status", mp_status),
+        web.post("/api/mp/offer", mp_offer),
+        web.post("/api/mp/respond", mp_respond),
+        web.post("/api/mp/arm", mp_arm),
+        web.post("/api/mp/block", mp_block),
+        web.post("/api/mp/ready", mp_ready),
+        web.post("/api/mp/start", mp_start),
+        web.post("/api/mp/action", mp_action),
+        web.post("/api/mp/rounds", mp_rounds),
+        web.post("/api/mp/abort", mp_abort),
+        web.post("/api/mp/kill", mp_kill),
+        web.post("/api/mp/concede", mp_concede),
+        web.post("/api/mp/members", mp_members),
+        web.post("/api/mp/resume", mp_resume),
         web.post("/api/camera/status", camera_status),
         web.post("/api/camera/start", camera_start),
         web.post("/api/camera/stop", camera_stop),

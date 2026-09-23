@@ -8,7 +8,8 @@ PY=./.venv/bin/python
 
 echo "→ compiling Python modules …"
 $PY -m py_compile app.py camera.py config_store.py discord_bot.py engine.py \
-    device_control.py kasa_legacy.py minigames.py pumpdirect_import.py stage.py vendors/*.py
+    device_control.py kasa_legacy.py minigames.py mp_games.py multiplayer.py \
+    pumpdirect_import.py stage.py vendors/*.py
 
 echo "→ default_config.json covers every DEFAULTS key …"
 $PY - <<'EOF'
@@ -18,6 +19,34 @@ py = set(config_store.DEFAULTS) - {"config_rev"}
 missing = sorted(py - d)
 assert not missing, f"default_config.json is missing: {missing}"
 print("   ok")
+EOF
+
+echo "→ multiplayer rail (protocol + transport) + game modes …"
+$PY test_multiplayer.py
+$PY test_fire_stacking.py
+$PY test_mp_actions.py
+$PY test_multiplayer_bot.py
+$PY test_mp_scene.py
+$PY test_mp_gate.py
+$PY test_mp_results.py
+$PY test_mp_golive.py
+
+# Every new [placeholder] has to reach the Help table, or it exists only for
+# whoever wrote it. Multiplayer publishes a lot of them, so this is checked
+# rather than remembered.
+echo "→ every [multi_*] placeholder is documented in Help …"
+$PY - <<'EOF'
+import re, sys
+html = open("web/index.html", encoding="utf-8").read()
+# row/scene FIELDS, not placeholders — they never appear in a message
+NOT_PLACEHOLDERS = {"multi_who", "multi_game_mode"}
+published = set()
+for f in ("mp_games.py", "discord_bot.py"):
+    published |= set(re.findall(r'"(multi_[a-z_]+)"', open(f, encoding="utf-8").read()))
+published -= NOT_PLACEHOLDERS
+missing = sorted(published - set(re.findall(r"[\[](multi_[a-z_]+)[\]]", html)))
+assert not missing, f"undocumented placeholders: {missing}"
+print(f"   ok — {len(published)} documented")
 EOF
 
 echo "→ version.json parses and matches app version …"
@@ -33,6 +62,16 @@ if command -v node >/dev/null; then
   sed -n '/<script>/,/<\/script>/p' web/index.html | sed '1d;$d' > /tmp/discoflate-ui-check.js
   node --check /tmp/discoflate-ui-check.js && echo "   ok"
   rm -f /tmp/discoflate-ui-check.js
+  # node --check is valid-syntax only: it accepts markup spliced into the wrong
+  # function and every undefined runtime name (that is how adding an overlay
+  # stayed broken 3.51.0 -> 3.55.1). This EXERCISES the panel against stubs.
+  # node --check cannot see a TDZ read or any other load-time death, and one
+  # of those blanks the whole panel. This actually runs the file.
+  echo "→ the panel script loads at all …"
+  node test_panel_boot.js
+  echo "→ multiplayer panel behaviour …"
+node test_golive_scope.js
+  node test_multiplayer_ui.js
 fi
 
 # The APK ships a hand-listed set of modules. A module the app imports but

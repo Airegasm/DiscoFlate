@@ -17,6 +17,7 @@ the connection. Optional guild/channel/user allowlists scope where it responds.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import time
 from collections import deque
@@ -24,6 +25,8 @@ import discord
 
 import config_store
 import minigames
+import mp_games
+import multiplayer as mp
 
 
 def _install_id() -> str:
@@ -343,6 +346,207 @@ def _does(t: dict, job: str) -> bool:
     return bool(t.get("active", True))
 
 
+class MpChoiceView(discord.ui.View):
+    """A Player Choice: buttons only one named player may press.
+
+    The HOST posts this, always — including the choices the guest's player
+    makes — because a component interaction only ever reaches the app that owns
+    the message. There is no way to delegate it and no reason to want to: the
+    whole decision stays host-side and nothing about it touches the wire.
+    """
+
+    def __init__(self, bot, options, allow_uid: str, who: str, timeout: float):
+        super().__init__(timeout=timeout)
+        self.bot = bot
+        self.who = who
+        self.allow_uid = str(allow_uid or "")
+        self.picked: str | None = None
+        self.done = asyncio.Event()
+        self.message = None
+        styles = {"danger": discord.ButtonStyle.danger,
+                  "primary": discord.ButtonStyle.primary,
+                  "success": discord.ButtonStyle.success,
+                  "secondary": discord.ButtonStyle.secondary}
+        for opt in options:
+            b = discord.ui.Button(label=opt["label"],
+                                  style=styles.get(opt["style"], discord.ButtonStyle.secondary))
+            b.callback = self._press(opt["value"], opt["label"])
+            self.add_item(b)
+
+    def _press(self, value: str, label: str):
+        async def cb(interaction: discord.Interaction):
+            # Gated to ONE person. Anyone else gets an ephemeral no rather than
+            # silence — a dead button is indistinguishable from a broken bot.
+            if self.allow_uid and str(interaction.user.id) != self.allow_uid:
+                try:
+                    await interaction.response.send_message(
+                        f"This one's {self.who}'s call.", ephemeral=True)
+                except Exception:  # noqa: BLE001
+                    pass
+                return
+            if self.picked is not None:
+                return
+            self.picked = value
+            for c in self.children:
+                c.disabled = True
+            try:
+                await interaction.response.edit_message(view=self)
+            except Exception:  # noqa: BLE001
+                pass
+            self.done.set()
+            self.stop()
+        return cb
+
+    async def on_timeout(self) -> None:
+        for c in self.children:
+            c.disabled = True
+        try:
+            if self.message is not None:
+                await self.message.edit(view=self)
+        except Exception:  # noqa: BLE001
+            pass
+        self.done.set()
+
+
+class MpReadyView(discord.ui.View):
+    """Host Ready / Guest Ready on ONE embed, each button scoped to one person.
+
+    The host posts it — a component interaction only ever reaches the app that
+    owns the message, so the guest's player presses a button the HOST owns.
+    That is not a limitation to work around: it means the whole ready exchange
+    costs the wire nothing.
+    """
+
+    def __init__(self, bot, *, host_uid: str, guest_uid: str,
+                 host_name: str, guest_name: str, timeout: float = 600.0):
+        super().__init__(timeout=timeout)
+        self.bot = bot
+        self.uids = {"host": str(host_uid or ""), "guest": str(guest_uid or "")}
+        self.names = {"host": host_name or "the host", "guest": guest_name or "the guest"}
+        self.ready = {"host": False, "guest": False}
+        self.done = asyncio.Event()
+        self.message = None
+        for seat in ("host", "guest"):
+            b = discord.ui.Button(label=f"{self.names[seat]} Ready",
+                                  style=discord.ButtonStyle.success)
+            b.callback = self._press(seat)
+            self.add_item(b)
+
+    def _press(self, seat: str):
+        async def cb(interaction: discord.Interaction):
+            want = self.uids.get(seat) or ""
+            if want and str(interaction.user.id) != want:
+                try:
+                    await interaction.response.send_message(
+                        f"That's {self.names[seat]}'s button.", ephemeral=True)
+                except Exception:  # noqa: BLE001
+                    pass
+                return
+            self.ready[seat] = True
+            for i, s2 in enumerate(("host", "guest")):
+                if self.ready[s2] and i < len(self.children):
+                    self.children[i].disabled = True
+                    self.children[i].style = discord.ButtonStyle.secondary
+            try:
+                await interaction.response.edit_message(view=self)
+            except Exception:  # noqa: BLE001
+                pass
+            if all(self.ready.values()):
+                self.done.set()
+                self.stop()
+        return cb
+
+    async def on_timeout(self) -> None:
+        for c in self.children:
+            c.disabled = True
+        try:
+            if self.message is not None:
+                await self.message.edit(view=self)
+        except Exception:  # noqa: BLE001
+            pass
+        self.done.set()
+
+
+class MpDuelView(discord.ui.View):
+    """One embed, both players, simultaneous pick.
+
+    Every button is pressable by EITHER racer, once each, and what they chose
+    stays hidden until both are in — an RPS where the second player can see the
+    first one's move is not RPS. The host owns the message, as it owns every
+    component, so nothing about this touches the wire.
+    """
+
+    def __init__(self, bot, options, uids: dict, names: dict, timeout: float):
+        super().__init__(timeout=timeout)
+        self.bot = bot
+        self.uids = {k: str(v or "") for k, v in uids.items()}   # side -> user id
+        self.names = names
+        self.picks: dict = {}                                    # side -> value
+        self.done = asyncio.Event()
+        self.message = None
+        styles = {"danger": discord.ButtonStyle.danger,
+                  "primary": discord.ButtonStyle.primary,
+                  "success": discord.ButtonStyle.success,
+                  "secondary": discord.ButtonStyle.secondary}
+        for opt in options:
+            b = discord.ui.Button(label=opt["label"],
+                                  style=styles.get(opt["style"], discord.ButtonStyle.primary))
+            b.callback = self._press(opt["value"], opt["label"])
+            self.add_item(b)
+
+    def _side(self, uid: str) -> str:
+        for side, want in self.uids.items():
+            if want and str(uid) == want:
+                return side
+        return ""
+
+    def _press(self, value: str, label: str):
+        async def cb(interaction: discord.Interaction):
+            side = self._side(interaction.user.id)
+            if not side:
+                try:
+                    await interaction.response.send_message(
+                        "This one's between the two racers.", ephemeral=True)
+                except Exception:  # noqa: BLE001
+                    pass
+                return
+            if side in self.picks:
+                try:
+                    await interaction.response.send_message(
+                        f"You've already locked in **{self.picks[side]}**.", ephemeral=True)
+                except Exception:  # noqa: BLE001
+                    pass
+                return
+            self.picks[side] = value
+            try:
+                # ephemeral, so the other racer learns nothing from it
+                await interaction.response.send_message(
+                    f"🔒 Locked in **{label}**.", ephemeral=True)
+            except Exception:  # noqa: BLE001
+                pass
+            if len(self.picks) >= 2:
+                for c in self.children:
+                    c.disabled = True
+                try:
+                    if self.message is not None:
+                        await self.message.edit(view=self)
+                except Exception:  # noqa: BLE001
+                    pass
+                self.done.set()
+                self.stop()
+        return cb
+
+    async def on_timeout(self) -> None:
+        for c in self.children:
+            c.disabled = True
+        try:
+            if self.message is not None:
+                await self.message.edit(view=self)
+        except Exception:  # noqa: BLE001
+            pass
+        self.done.set()
+
+
 class BotManager:
     def __init__(self, engine, get_config) -> None:
         self.engine = engine
@@ -373,6 +577,21 @@ class BotManager:
         # avatar) and the cached owner (avatar url, display name).
         self._webhooks: dict = {}
         self._owner_ident: dict = {}
+        # Multiplayer: the live mp.Session (None until the bot knows its own
+        # id — every address in the protocol is a bot user id), the clock task,
+        # a rolling log for the panel, and a match found on disk at boot that is
+        # waiting for the operator to confirm the rejoin. Resume is NEVER silent.
+        self.link: "mp.Session | None" = None
+        self._rounds_task: asyncio.Task | None = None
+        self._start_task: asyncio.Task | None = None
+        self._mp_curtain_sid = ""        # the match this curtain was dropped for
+        self._mp_begun_sid = ""          # match whose start has been handled
+        self._mp_ended_sid = ""          # match whose End Condition has run
+        self.mp_activate_cb = None       # the HOST's session start, parked here
+        self._ready_view = None        # the live Host/Guest Ready embed
+        self._link_task: asyncio.Task | None = None
+        self._link_notes: deque = deque(maxlen=60)
+        self._link_resume: dict | None = None
 
     # -- minigame view registry ---------------------------------------------- #
     def _register_view(self, view) -> None:
@@ -425,12 +644,14 @@ class BotManager:
         self._client = self._build_client()
         self._task = asyncio.create_task(self._runner(token))
         self._auto_task = asyncio.create_task(self._auto_loop())
+        self._link_task = asyncio.create_task(self._link_loop())
+        self._link_find_resume()
 
     async def reconnect(self) -> None:
         await self.ensure(self._token, force=True)
 
     async def stop(self) -> None:
-        for task in (self._auto_task, self._task):
+        for task in (self._auto_task, self._link_task, self._task):
             if task is not None:
                 task.cancel()
         if self._client is not None:
@@ -441,6 +662,16 @@ class BotManager:
         self._client = None
         self._task = None
         self._auto_task = None
+        self._link_task = None
+        # The Session is keyed to the bot user id; a token change makes a new
+        # install, so drop it rather than carry a stale identity across.
+        self.link = None
+        self.engine.mp_ctx_cb = None
+        for t in ("_rounds_task", "_start_task"):
+            task = getattr(self, t, None)
+            if task is not None:
+                task.cancel()
+                setattr(self, t, None)
         self.engine.bot_connected = False
 
     async def _runner(self, token: str) -> None:
@@ -616,7 +847,7 @@ class BotManager:
             f"?client_id={app_id}&permissions={perms}&scope=bot%20applications.commands"
         )
 
-    def _targets(self, cfg: dict) -> list[dict]:
+    def _targets_raw(self, cfg: dict) -> list[dict]:
         """Every channel the bot listens in. Uses listen_targets if set, else
         falls back to the single legacy listen_guild/channel. NEVER narrowed by
         Isolate — the bot must keep hearing commands everywhere (and the Chat
@@ -637,6 +868,14 @@ class BotManager:
         if gid and cid:
             return [{"guild_id": gid, "channel_id": cid}]
         return []
+
+    def _targets(self, cfg: dict) -> list[dict]:
+        """As above, minus bot_network. That channel is plumbing, not a venue:
+        if it ever leaked into the target list the protocol's own envelopes
+        would show up in the Chat tab and be offered as command sources."""
+        net = self._mp_chan(cfg, "bot_network")
+        rows = self._targets_raw(cfg)
+        return [t for t in rows if str(t.get("channel_id") or "") != net] if net else rows
 
     @staticmethod
     def _muted(cfg: dict) -> set:
@@ -1448,11 +1687,1600 @@ class BotManager:
         await self.broadcast(rendered, None, embed=self._status_embed("broadcast", rendered))
         return {"ok": True}
 
+    # ══ Multiplayer ═════════════════════════════════════════════════════════ #
+    #
+    # Multiplayer does NOT reuse single player's channel plumbing, and does not
+    # branch it either. There is exactly one broadcast channel for a whole match
+    # — named in config, agreed by the handshake — so there is no target list,
+    # no pinning, no fail-open/fail-closed question and no Isolate. It gets its
+    # own send path, its own target resolution and its own listener gate. What
+    # IS shared with solo is engine primitives: devices, calibration, the
+    # capacity meter, the fire path, the action-block runner. Any sentence of
+    # the form "multiplayer is solo's X with a flag" is a design smell.
+
+    @staticmethod
+    def _mp(cfg: dict) -> dict:
+        return cfg.get("multiplayer") or {}
+
+    def _mp_cfg(self) -> dict:
+        """The live config with NO disk read. `get_config` is
+        `config_store.load` — a full read, migrate, deep-merge and template
+        seed — while the envelope path runs on every message in every channel
+        and the match clock runs every second. `mode` and `multiplayer` are
+        top-level and never scene-scoped, so the engine's in-memory copy is the
+        right answer and costs nothing to ask."""
+        return self.engine.cfg or {}
+
+    def _mp_live(self, cfg=None) -> bool:
+        """Multiplayer mode is selected. Everything below is inert otherwise,
+        so a solo install pays nothing for any of it."""
+        cfg = self._mp_cfg() if cfg is None else cfg
+        return str(cfg.get("mode") or "solo") == "multi"
+
+    def _mp_chan(self, cfg: dict, which: str) -> str:
+        return str((self._mp(cfg).get(which) or {}).get("channel_id") or "").strip()
+
+    def _mp_player(self, cfg: dict) -> str:
+        """What this person is called in messages. One of the four things that
+        carries over from single player — "Dave-bot fired 10%" is plumbing
+        leaking into the show."""
+        names = cfg.get("cooldown_exempt_names") or []
+        return (str(names[0]).strip() if names and str(names[0]).strip()
+                else str(cfg.get("operator_name") or "").strip())
+
+    def _mp_venue(self, cfg: dict) -> dict:
+        """Human labels for the two channels. Ids travel for routing; NAMES
+        travel so the guest's popup can be answered — "is 901 right?" is not a
+        question anyone can settle, "#gameshow in The Den" is."""
+        out = {}
+        for key, which in (("net", "bot_network"), ("cast", "broadcast")):
+            cid = self._mp_chan(cfg, which)
+            if not cid:
+                continue
+            try:
+                ch = self._client.get_channel(int(cid)) if self._client else None
+            except (TypeError, ValueError):
+                ch = None
+            g = getattr(ch, "guild", None)
+            out[key] = {"channel": str(getattr(ch, "name", "") or cid),
+                        "guild": str(getattr(g, "name", "") or ""),
+                        "kind": self._chan_kind(cid)}
+        return out
+
+    def _mp_cap(self) -> float:
+        """How far this match can take anyone — the host's capacity ceiling.
+
+        A number, not "is past 100% allowed": the guest is agreeing to an
+        amount of inflation, and it is the cap that tells them what losing
+        looks like. "Up to 100" and "up to 300" are not the same offer.
+
+        The End Condition's lose-at capacity wins when it is set, because that
+        is literally the losing line — quoting the rig's ceiling instead would
+        describe a limit nobody is playing to.
+        """
+        top = mp_games.end_capacity(self._mp_cfg().get("mp_end") or {})
+        if top > 0:
+            return float(top)
+        try:
+            return float(self.engine._capacity_cap())
+        except Exception:  # noqa: BLE001
+            return 100.0
+
+    def _mp_calibration(self):
+        """The PRIMARY pump's seconds-to-100%. This is what makes a race between
+        two different rigs fair: % says how much, calibration says how fast."""
+        return (self.engine._device(self.engine._active_id()) or {}).get(
+            "calibration_seconds_to_100")
+
+    async def mp_search_members(self, query: str, limit: int = 25) -> dict:
+        """Members of the BROADCAST server whose name starts with `query`.
+
+        A name search, not a member list. That distinction is what makes this
+        work with no privileged intent: `fetch_members` (the bulk list) needs
+        Intents.members, `query_members` does not — it is an explicit
+        gateway lookup by name prefix.
+
+        Bots are members like anyone else, so the bot you want to play is in
+        here beside its owner. Discord never says which human owns which bot;
+        it doesn't have to, because you know the name you're looking for and
+        the handshake confirms the rest.
+        """
+        q = str(query or "").strip()
+        if len(q) < 2:
+            return {"ok": False, "error": "type at least two characters"}
+        cid = self._mp_chan(self._mp_cfg(), "broadcast")
+        try:
+            ch = self._client.get_channel(int(cid)) if (self._client and cid) else None
+        except (TypeError, ValueError):
+            ch = None
+        guild = getattr(ch, "guild", None)
+        if guild is None:
+            return {"ok": False, "error": "pick a broadcast channel first — "
+                                          "the search is scoped to its server"}
+        try:
+            found = await guild.query_members(query=q, limit=max(5, min(100, int(limit))))
+        except asyncio.TimeoutError:
+            return {"ok": False, "error": "the server didn't answer in time"}
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "error": f"search failed: {e}"}
+        # A bot that has said hello on bot_network is RUNNING DiscoFlate. That
+        # is the difference between "this bot exists here" and "this bot will
+        # answer an invite", and it is otherwise indistinguishable.
+        seen = {str(b) for b in self._mp_seen_bots()}
+        me = str(getattr(getattr(self._client, "user", None), "id", "") or "")
+        out = []
+        for m in found:
+            if str(m.id) == me:
+                continue                       # you cannot play yourself
+            out.append({"id": str(m.id),
+                        "name": str(getattr(m, "name", "") or ""),
+                        "display": str(getattr(m, "display_name", "") or ""),
+                        "bot": bool(getattr(m, "bot", False)),
+                        "seen": str(m.id) in seen})
+        out.sort(key=lambda r: (not r["seen"], not r["bot"], r["name"].lower()))
+        return {"ok": True, "guild": str(getattr(guild, "name", "")), "members": out}
+
+    def _mp_seen_bots(self) -> list:
+        """Bot ids that have advertised on bot_network this run."""
+        return list(getattr(self, "_mp_hellos", {}) or {})
+
+    def _mp_set_calibration(self, secs) -> None:
+        """Write an agreed seconds-to-100% to the PRIMARY pump.
+
+        Only ever from a split-the-difference both sides took, and only for the
+        length of the match — `_settle()` sends the old number back through
+        here however the match ends.
+        """
+        try:
+            secs = round(float(secs), 2)
+        except (TypeError, ValueError):
+            return
+        if secs <= 0:
+            return
+        did = self.engine._active_id()
+        cfg = config_store.load()
+        for d in (cfg.get("devices") or []):
+            if str(d.get("id")) == str(did):
+                if float(d.get("calibration_seconds_to_100") or 0) == secs:
+                    return                      # already there — no churn
+                d["calibration_seconds_to_100"] = secs
+                config_store.save(cfg)
+                self.engine.set_config(cfg)
+                self.engine._log("bot", f"multiplayer: {d.get('label') or did} "
+                                        f"calibrated to {secs:g}s to 100%")
+                return
+        self.engine._log("error", "multiplayer: no primary pump to calibrate")
+
+    def link_session(self, cfg=None):
+        """The live Session, built once the bot knows who it is. Config-derived
+        terms are refreshed only while idle — once a match starts, the terms in
+        force are the ones both sides agreed to, not whatever the panel says
+        now."""
+        cfg = self._mp_cfg() if cfg is None else cfg
+        user = getattr(self._client, "user", None) if self._client else None
+        if user is None:
+            return None
+        m = self._mp(cfg)
+        if self.link is None or self.link.link.me != str(user.id):
+            owner_ids = cfg.get("cooldown_exempt_user_ids") or []
+            link = mp.Link(str(user.id),
+                           owner=str(owner_ids[0]).strip() if owner_ids else "",
+                           version=_install_id().split(" on ")[0].lstrip("v"),
+                           install=_install_id(),
+                           name=str(getattr(user, "name", "") or ""))
+            self.link = mp.Session(link, peer_name=str(m.get("peer_bot_name") or ""))
+        s = self.link
+        # The PLAYER's name and the command surface are live even mid-match:
+        # they change what messages say, never what the match agreed to.
+        s.player = self._mp_player(cfg)
+        if s.state in (mp.S_IDLE, mp.S_ADVERTISED):
+            lim = m.get("limits") or {}
+            s.peer_name = str(m.get("peer_bot_name") or "")
+            s.role_pref = str(m.get("role_pref") or "host")
+            s.blocked = [b for b in (m.get("blocked") or []) if isinstance(b, dict)]
+            s.channels = {"net": self._mp_chan(cfg, "bot_network"),
+                          "cast": self._mp_chan(cfg, "broadcast")}
+            s.calibration = self._mp_calibration()
+            armed = s.ceiling.armed
+            s.ceiling = mp.Ceiling(lim.get("max_pct_per_fire"), lim.get("max_session_pct"),
+                                   lim.get("max_pct"), lim.get("on_exceed"))
+            s.ceiling.armed = armed          # the kill switch is not a config knob
+        # Read-only match values, always available to render(): an overlay
+        # label tracking [multi_peer_pct] has to keep resolving on screen, and
+        # the compositor re-renders text through engine.render ~4x/sec.
+        self.engine.mp_ctx_cb = self._mp_ctx
+        return s
+
+    # -- multiplayer's own send paths ---------------------------------------- #
+    async def _link_send(self, line: str) -> bool:
+        """The protocol's send. Deliberately NOT _send(): that one swallows
+        every exception and returns None, and a silently dropped envelope is a
+        stalled match. Envelopes are idempotent by seq, so a sender can safely
+        retry the same one — but only if it's told the send failed."""
+        cfg = self._mp_cfg()
+        cid = self._mp_chan(cfg, "bot_network")
+        kind = line.split(" ", 2)[1] if line.count(" ") >= 2 else "?"
+        if not cid:
+            self.engine._log("error", f"multiplayer: no bot_network channel — {kind} not sent")
+            return False
+        ch = await self._channel(cid)
+        if ch is None:
+            self.engine._log("error",
+                             f"multiplayer: bot_network #{cid} unreachable — {kind} not sent")
+            return False
+        try:
+            await ch.send(line)
+            return True
+        except Exception as e:  # noqa: BLE001 — surfaced, never swallowed
+            self.engine._log("error", f"multiplayer: {kind} not sent: {e}")
+            return False
+
+    async def _link_say(self, text: str, *, embed=None, view=None, image=None):
+        """The venue. Resolved straight from config — never _broadcast_targets:
+        there is exactly one channel, so there is nothing to fan out to and
+        nothing to narrow."""
+        cid = self._mp_chan(self._mp_cfg(), "broadcast")
+        if not cid:
+            self.engine._log("error", "multiplayer: no broadcast channel set")
+            return None
+        ch = await self._channel(cid)
+        if ch is None:
+            self.engine._log("error", f"multiplayer: broadcast #{cid} unreachable")
+            return None
+        return await self._send(ch, text, image, embed=embed, view=view)
+
+    async def _link_board(self, text: str, embed=None) -> None:
+        """The scoreboard: ONE message, owned by the host, edited in place.
+
+        An edit is one API call where delete-and-repost is two, and the
+        broadcast channel is the scarce bucket — it's where the show is. Falls
+        back to a fresh post if the tracked message has been deleted."""
+        cid = self._mp_chan(self._mp_cfg(), "broadcast")
+        prev = self._loop_msgs.get("mp:board", {}).get(cid)
+        if prev is not None:
+            try:
+                await prev.edit(content=None if embed is not None else text, embed=embed)
+                return
+            except Exception:  # noqa: BLE001 — message gone / no perms → repost
+                self._loop_msgs.get("mp:board", {}).pop(cid, None)
+        msg = await self._link_say(text, embed=embed)
+        if msg is not None:
+            self._track_msg("mp:board", cid, msg)
+
+    # -- the envelope path ---------------------------------------------------- #
+    def _link_envelope(self, message: discord.Message) -> bool:
+        """True when this message belongs to the protocol — handled here and
+        invisible to everything downstream.
+
+        Runs FIRST, ahead of the Chat capture and the bot filter: bot_network is
+        plumbing, not a venue. Nothing posted there may reach the Chat tab, the
+        command resolver, or the activity log.
+        """
+        cfg = self._mp_cfg()
+        if not self._mp_live(cfg):
+            return False
+        cid = self._mp_chan(cfg, "bot_network")
+        if not cid or str(getattr(message.channel, "id", "")) != cid:
+            return False
+        env = mp.decode(message.content or "")
+        # Remember WHO has said hello here. Any number of bots can share this
+        # channel, and a bot that advertises is running DiscoFlate — which is
+        # the difference between "exists in this server" and "will answer an
+        # invite", and is otherwise invisible in a member search.
+        if env is not None and env.get("t") == mp.T_HELLO and env.get("from"):
+            if not hasattr(self, "_mp_hellos"):
+                self._mp_hellos = {}
+            self._mp_hellos[str(env["from"])] = {
+                "name": str(env.get("bot") or env.get("name") or ""),
+                "player": str(env.get("player") or "")}
+        s = self.link_session(cfg)
+        if env is not None and s is not None:
+            out = s.feed(env, time.time(), capacity=self.engine.capacity)
+            asyncio.create_task(self._link_apply(out))
+        return True     # even a human chatting in bot_network stays out of the game
+
+    async def _mp_curtain(self, black: bool) -> None:
+        """Drop or raise the curtain on THIS install's picture.
+
+        `set_blackout` keeps compositing overlays over the black, so the gauges
+        and labels stay up while the room itself is hidden — which is what makes
+        a pre-show possible at all. Quiet when no virtual camera is running:
+        an Android guest simply has no picture to hide.
+        """
+        if self.engine.camera_cb is None:
+            return
+        try:
+            await self.engine.camera_cb("black" if black else "reveal")
+        except Exception as e:  # noqa: BLE001 — never lose a match to a camera
+            self.engine._log("error", f"multiplayer: camera {'black' if black else 'reveal'} failed: {e}")
+
+    async def _link_curtain_check(self) -> None:
+        """The curtain falls the moment a match is agreed, on BOTH installs, and
+        rises only when the host says so.
+
+        Keyed on the MATCH, not on whether the picture is currently black. The
+        difference matters: this runs after every envelope, so a flag meaning
+        "is it down" would see the host's deliberate mid-match reveal and
+        helpfully put it straight back — the curtain would slam shut the moment
+        the intro finished. Once per match is the whole contract.
+        """
+        s = self.link
+        live = s is not None and s.state in (mp.S_LINKED, mp.S_READY,
+                                             mp.S_MATCH, mp.S_SETTLING)
+        sid = (s.link.sid if (s is not None and live) else "")
+        if live and sid and self._mp_curtain_sid != sid:
+            self._mp_curtain_sid = sid
+            await self._mp_curtain(True)
+            self._link_notes.append("picture hidden until the host reveals it")
+        elif not live and self._mp_curtain_sid:
+            # The match is over. Give the operator their picture back rather
+            # than leaving them black with nothing running to un-black them.
+            self._mp_curtain_sid = ""
+            await self._mp_curtain(False)
+
+    async def _link_begin_check(self) -> None:
+        """The match has begun — standby ends on BOTH installs, once.
+
+        Keyed on the match id for the same reason the curtain is: this runs
+        after every envelope, so "are we standing by" would re-fire the guest's
+        acknowledgement all match long.
+
+        What happens next is the whole host/guest split. The HOST's session
+        starts for real — its activation message posts, its [!command] tokens
+        fire, its events release. The GUEST's never does: it has no game of its
+        own to run, it takes instructions. It says so once, on broadcast, so
+        the room knows who it is watching, and then it is quiet.
+        """
+        s = self.link
+        began = s is not None and s.state in (mp.S_MATCH, mp.S_SETTLING)
+        sid = (s.link.sid if (s is not None and began) else "")
+        if not (began and sid and self._mp_begun_sid != sid):
+            if not began and self._mp_begun_sid:
+                self._mp_begun_sid = ""
+            return
+        self._mp_begun_sid = sid
+        self.engine.set_mp_standby(False)
+        if s.is_host:
+            if self.mp_activate_cb is not None:
+                try:
+                    await self.mp_activate_cb()
+                except Exception as e:  # noqa: BLE001 — a match outlives this
+                    self.engine._log("error", f"multiplayer: activation failed: {e}")
+            return
+        who = s.player or "the guest"
+        await self._link_say(f"🎮 **{who}** is in — playing as guest. "
+                             f"The host's bot is running this match.")
+
+    async def _link_apply(self, out) -> None:
+        """Perform one Out. The protocol decides; this performs — and in this
+        order: envelopes first (an ack or abort must not wait behind a pump),
+        then the safe stop, then rows, then the resume file."""
+        try:
+            for line in out.send:
+                await self._link_send(line)
+            for note in out.notes:
+                self._link_notes.append(note)
+                self.engine._log("bot", f"multiplayer: {note}")
+            for line in out.say:
+                await self._link_say(line)
+            if out.board is not None:
+                await self._link_board(out.board)
+            if out.stop:
+                await self.engine.abort(reason="multiplayer: safe stop")
+                await self.rounds_stop()   # the match is over; nothing left to run
+                if self._start_task is not None:
+                    self._start_task.cancel()
+                    self._start_task = None
+            for item in out.rows:
+                await self._link_row(item)
+            if out.cal is not None:
+                self._mp_set_calibration(out.cal)
+            if out.dirty:
+                self._link_persist()
+            await self._link_curtain_check()
+            await self._link_begin_check()
+        except Exception as e:  # noqa: BLE001 — a match must never die silently
+            self.engine._log("error", f"multiplayer: applying an envelope failed: {e}")
+
+    async def _mp_notify_local(self, row: dict, ctx) -> None:
+        """An overlay line on THIS install, for a fire that arrived over the
+        wire. Overlay only, never chat."""
+        if self.engine.notify_cb is None:
+            return
+        pct = self.engine.render(str(row.get("fill_pct", "")), dict(ctx or {}))
+        try:
+            pct = f"{float(pct):g}"
+        except (TypeError, ValueError):
+            pass
+        s = self.link
+        who = (s.peer_player or s.link.peer_name or "the host") if s else "the host"
+        mode = str(row.get("fire_mode") or "add")
+        line = (f"💨 +{pct}% from {who}" if mode == "add"
+                else f"💨 {who} set you to {pct}%")
+        try:
+            await self.engine.notify_cb(line, self._mp_ctx())
+        except Exception as e:  # noqa: BLE001 — a missed line can't kill a match
+            self.engine._log("error", f"multiplayer: local notify failed: {e}")
+
+    async def _link_row(self, item: dict) -> None:
+        """Run one gated `do` row locally, then report what ACTUALLY happened.
+
+        A `message` row posts in THIS bot's voice through multiplayer's own
+        send; everything else goes to the engine's action-block runner, which is
+        why anything added to the action system later travels the wire for free.
+        """
+        s = self.link
+        row = dict(item.get("row") or {})
+        typ = str(row.get("type") or "")
+        did, ok, why = "", True, ""
+        try:
+            if typ == "message":
+                text = self.engine.render(str(row.get("message") or row.get("text") or ""))
+                style = str(row.get("style") or "")
+                msg = await self._link_say(
+                    text, embed=self._status_embed("broadcast", text) if style == "embed" else None)
+                ok = msg is not None
+                did, why = ("posted ✓", "") if ok else ("", "refused: post failed")
+            else:
+                # The router has to be live for an ARRIVING row as well: an
+                # `mp_action` from the other bot is meaningless to the engine
+                # on its own, and that is exactly what a `tell` sends.
+                self.engine.mp_row_cb = self._mp_row_router
+                try:
+                    ctx = await self.engine._run_action_block([row], name="multiplayer")
+                finally:
+                    self.engine.mp_row_cb = None
+                did = str((ctx or {}).get("fired_desc") or "") or f"{typ} ✓"
+                # Time landing on THIS pump with no local command behind it.
+                # Say so on this machine's own overlay — and only there: the
+                # host owns every chat notification for both of us, so a post
+                # from here would be the same news twice in the same channel.
+                if typ == "fire" and int(item.get("re") or 0):
+                    await self._mp_notify_local(row, ctx)
+        except Exception as e:  # noqa: BLE001
+            ok, why = False, f"refused: {e}"
+            self.engine._log("error", f"multiplayer: {typ} row failed: {e}")
+        re_seq = int(item.get("re") or 0)
+        if s is not None and re_seq:
+            # re 0 = a row WE originated (the referee pushing our own pump).
+            # There is nobody waiting on an ack for it.
+            await self._link_apply(s.ack(time.time(), re=re_seq, did=did,
+                                         ok=ok, why=why,
+                                         capacity=self.engine.capacity))
+
+    # -- preflights (all local — no API calls) -------------------------------- #
+    async def link_preflight(self, cfg=None) -> list:
+        """The five checks. Every failure NAMES which check failed: "Dave's bot
+        is pointed at #general, you're pointed at #gameshow" is a fixable
+        problem; a silent dead end is not."""
+        cfg = self._mp_cfg() if cfg is None else cfg
+        s, checks = self.link, []
+        net, cast = self._mp_chan(cfg, "bot_network"), self._mp_chan(cfg, "broadcast")
+
+        def chan_check(cid, label, needs):
+            if not cid:
+                return {"ok": False, "check": label, "why": f"no {label} channel picked"}
+            p = self.chat_perms(cid)
+            if not p.get("known"):
+                return {"ok": None, "check": label,
+                        "why": f"the bot can't see {label} yet — is it invited to that server?"}
+            lack = [n for n in needs if n in (p.get("missing") or [])]
+            if lack:
+                return {"ok": False, "check": label,
+                        "why": f"missing in {label}: {', '.join(lack)}"}
+            return {"ok": True, "check": label, "why": ""}
+
+        checks.append(chan_check(net, "bot_network",
+                                 ["View Channel", "Send Messages", "Read Message History"]))
+        checks.append(chan_check(cast, "broadcast",
+                                 ["View Channel", "Send Messages", "Embed Links"]))
+
+        # 3 + 4: do the two bots agree on both channels? Answerable as soon as
+        # the peer says hello, which is when it is still cheap to fix.
+        peer_ch = dict(getattr(s, "peer_channels", None) or {}) if s else {}
+        faults = mp.check_channels({"net": net, "cast": cast}, peer_ch) if peer_ch else []
+        for label in ("bot_network", "broadcast"):
+            name = f"peer's {label}"
+            if not peer_ch:
+                checks.append({"ok": None, "check": name, "why": "no peer seen yet"})
+                continue
+            hit = next((f for f in faults if label in f), "")
+            checks.append({"ok": not hit, "check": name, "why": hit})
+
+        # 5. Who YOU are. Blank is a silent failure, not a loud one: the Ready
+        #    buttons get scoped to nobody (so anyone can press them) and the
+        #    referee can't tell a racer from the audience, so a row aimed at
+        #    one of them lands on nobody.
+        ids = cfg.get("cooldown_exempt_user_ids") or []
+        names = cfg.get("cooldown_exempt_names") or []
+        me_id = str(ids[0]).strip() if ids else ""
+        me_nm = (str(names[0]).strip() if names and str(names[0]).strip()
+                 else str(cfg.get("operator_name") or "").strip())
+        where = " — set it on the Scenes tab under Limits & announcements"
+        if not me_id.isdigit():
+            # Fatal: without it the Ready buttons scope to nobody and `!pump`
+            # can't tell either racer apart from the audience.
+            checks.append({"ok": False, "check": "your identity",
+                           "why": "your Discord user ID isn't set" + where})
+        elif not me_nm:
+            # Not fatal — the match just talks about "you" and "your opponent"
+            # instead of naming anyone. Worth saying, not worth refusing over.
+            checks.append({"ok": None, "check": "your identity",
+                           "why": "no player name, so messages won't name you" + where})
+        else:
+            checks.append({"ok": True, "check": "your identity", "why": ""})
+
+        # 6. A voice broadcast channel is the only place video can happen, and
+        #    it needs both owners actually in the guild (and, for cameras, in
+        #    the channel). A text channel means nobody is on camera by Discord's
+        #    rules rather than ours — not an error, so not a failure here.
+        if cast and self._chan_kind(cast) == "voice":
+            try:
+                ch = self._client.get_channel(int(cast)) if self._client else None
+            except (TypeError, ValueError):
+                ch = None
+            guild = getattr(ch, "guild", None)
+            ids = cfg.get("cooldown_exempt_user_ids") or []
+            mine = str(ids[0]).strip() if ids else ""
+            theirs = str(getattr(s.link, "peer_owner", "") or "") if s else ""
+            missing = []
+            if guild is not None:
+                for uid, who in ((mine, "you"),
+                                 (theirs, (s.link.peer_name if s else "") or "the peer")):
+                    if not uid.isdigit():
+                        continue          # nobody named yet — not a failure
+                    if not await self._is_member(guild, int(uid)):
+                        missing.append(f"{who} isn't in that server")
+            checks.append({"ok": not missing, "check": "voice channel",
+                           "why": "; ".join(missing)})
+        return checks
+
+    # -- the referee ---------------------------------------------------------- #
+    def _mp_game(self) -> str:
+        """What the guest is being invited to, in words.
+
+        The loaded multiplayer scene IS the game — its Rounds are what gets
+        played — so the scene's name is the honest answer. There is no separate
+        "game mode" to pick: that was a leftover from when Race was the only
+        thing there was.
+        """
+        sc = config_store.live_scene(self._mp_cfg())
+        named = str(sc.get("name") or "").strip()
+        if str(sc.get("mode") or "") == "multi" and named:
+            return named
+        return "a multiplayer match"
+
+    def _mp_input(self) -> str:
+        """Versus or Gameshow — whose hands are on it. A property of the SCENE,
+        because it is the scene's own production; the config value is the
+        fallback for a match running without one."""
+        sc = config_store.live_scene(self._mp_cfg())
+        if str(sc.get("mode") or "") == "multi" and sc.get("input"):
+            return "audience" if str(sc["input"]) == "audience" else "operators"
+        return ""
+
+    async def _mp_production(self) -> None:
+        """Bring up the HOST's in-match layout, on the host.
+
+        The guest brings up nothing of its own. It holds the same shipped
+        scene, so the host can call any overlay or group in it by id and have
+        it play over there — but WHEN that happens is the host's call, not a
+        layout the guest decides for itself.
+
+        Both players are on camera, so each carries only its own gauge and its
+        own pump timer. The peer's numbers arrive on the heartbeat and drive
+        the game's maths, not a second widget.
+        """
+        s = self.link
+        if s is None or self.engine.overlay_cb is None:
+            return
+        want = str((self.engine.golive() or {}).get("after_group") or "").strip()
+        if not want:
+            self._link_notes.append(
+                "no in-match scene group set for this scene — text only")
+            return
+        try:
+            await self.engine._run_action_block(
+                [{"type": "scene_group", "group": want}], name="multiplayer:production")
+        except Exception as e:  # noqa: BLE001
+            self.engine._log("error", f"multiplayer: laying out {want} failed: {e}")
+
+    async def _mp_play_intro(self) -> None:
+        """Play the host's scene intro, stage by stage.
+
+        Reuses `intro_stages()` — the SAME pre-show data Go Live uses, so a
+        scene has one intro rather than a solo one and a multiplayer one — but
+        plays it through multiplayer's own runner rather than solo's go-live
+        state machine, which gates the camera and holds commands on rules that
+        don't apply here.
+        """
+        stages = self.engine.intro_stages()
+        if not stages:
+            return
+        self.engine.mp_row_cb = self._mp_row_router
+        try:
+            for st in stages:
+                if self.link is None or self.link.state != mp.S_MATCH:
+                    return                      # aborted mid pre-show
+                rows = []
+                if st.get("group"):
+                    rows.append({"type": "scene_group", "group": st["group"],
+                                 "fade_in": 0.3})
+                rows.extend(st.get("actions") or [])
+                if rows:
+                    await self.engine._run_action_block(
+                        rows, name="multiplayer:intro", extra_ctx=self._mp_ctx())
+                if st.get("seconds"):
+                    await asyncio.sleep(float(st["seconds"]))
+                if st.get("group"):
+                    await self.engine._run_action_block(
+                        [{"type": "scene_group_kill", "group": st["group"],
+                          "fade_out": 0.3}], name="multiplayer:intro")
+        finally:
+            self.engine.mp_row_cb = None
+
+    async def start_match(self) -> dict:
+        """The whole opening, in order, on the host's clock:
+
+            intro(s)  →  raise both curtains  →  the game
+
+        ONE entry point. Two of them is how an operator ends up mid-pre-show
+        with the picture already live, or with two things running at once.
+        """
+        s = self.link
+        if s is None or not s.is_host:
+            return {"ok": False, "error": "only the host starts the match"}
+        if s.state not in (mp.S_LINKED, mp.S_READY):
+            return {"ok": False, "error": f"can't start while {s.state}"}
+        if self._start_task is not None and not self._start_task.done():
+            return {"ok": False, "error": "the match is already starting"}
+        self._start_task = asyncio.create_task(self._run_start())
+        return {"ok": True, "status": self.link_status()}
+
+    async def _run_start(self) -> None:
+        s = self.link
+        try:
+            # MATCH first: the pre-show's own rows have to be able to cross the
+            # wire, and nothing may cross outside a match.
+            await self._link_apply(s.begin(time.time(), phase="intro", rnd=0))
+            await self._mp_play_intro()
+            if s.state != mp.S_MATCH:
+                return                          # aborted during the pre-show
+            # Lay the production out for the guest's camera answer, THEN reveal.
+            await self._mp_production()
+            await self._link_apply(s.send_do(time.time(),
+                                             {"type": "camera", "op": "reveal"}))
+            await self._mp_curtain(False)
+            self._link_notes.append("curtains up")
+
+            # A game IS its Rounds. With none defined there is nothing to play,
+            # and saying so beats sitting revealed and silent.
+            await self._rounds_run()
+        except asyncio.CancelledError:
+            return
+        except Exception as e:  # noqa: BLE001
+            self.engine._log("error", f"multiplayer: start failed: {e}")
+            self._link_notes.append(f"start failed: {e}")
+        finally:
+            self._start_task = None
+
+    def mp_action(self, name: str) -> dict:
+        """One saved Multiplayer Action by name. Global — never per-scene, and
+        nothing to do with solo's templates."""
+        want = str(name or "").strip().lower()
+        for a in (self._mp_cfg().get("mp_actions") or []):
+            if str(a.get("name") or "").strip().lower() == want:
+                return a
+        return {}
+
+    def _mp_ctx(self, chosen: str = "", extra=None) -> dict:
+        """The match, as render values. Every one is `[multi_*]`-prefixed so a
+        block can never confuse the other player's capacity with this install's
+        own `[capacity]`.
+
+        Read by three callers: a multiplayer block's context, a loop's
+        until-condition, and — because an overlay LABEL has to keep resolving
+        on screen — `engine.render` itself, ~4x/sec. So it stays cheap and
+        returns nothing at all outside a match, rather than seeding solo
+        renders with two dozen empty tokens.
+        """
+        s = self.link
+        if s is None or s.state in (mp.S_IDLE, mp.S_ADVERTISED):
+            return dict(extra or {})
+        s.capacity = float(self.engine.capacity)
+        return mp_games.placeholders(s, chosen=chosen, extra=extra)
+
+    def _mp_render_row(self, row: dict, xc: dict) -> dict:
+        """Resolve a row's placeholders BEFORE it crosses the wire.
+
+        The guest has no idea who `[multi_chosen]` is or what the host's dice
+        rolled — its context is its own. An unresolved placeholder would arrive
+        as literal text and the row would do nothing, silently. Nested blocks
+        are left alone: those run in whatever context the receiver has.
+        """
+        out = {}
+        for k, v in (row or {}).items():
+            if isinstance(v, str) and "[" in v:
+                out[k] = self.engine.render(v, xc)
+            else:
+                out[k] = v
+        return out
+
+    async def _mp_spin_row(self, a: dict, xc: dict) -> bool:
+        """The roulette. Picks a racer and publishes who — it fires nothing
+        itself, because what happens to the chosen racer is the job of the rows
+        after it, and that is what makes the block reusable."""
+        s = self.link
+        weights = a.get("weights") if isinstance(a.get("weights"), dict) else {}
+        chosen, odds = mp_games.spin([s.link.me, s.link.peer], weights)
+        ctx = self._mp_ctx(chosen=chosen)
+        xc.update(ctx)
+        names = {s.link.me: ctx.get("multi_me_name") or "you",
+                 s.link.peer: ctx.get("multi_peer_name") or "them"}
+        xc["multi_odds"] = " · ".join(f"{names.get(k, k)} {v * 100:.0f}%"
+                                      for k, v in odds.items())
+        even = len({round(v, 4) for v in odds.values()}) <= 1
+        say = str(a.get("message") or "").strip()
+        if say:
+            await self._link_say(self.engine.render(say, xc))
+        if not even and a.get("announce_odds", True):
+            # A wheel the audience can't see is indistinguishable from a rigged
+            # one, so uneven odds are stated rather than merely applied.
+            await self._link_say(f"🎡 Odds this spin — {xc['multi_odds']}")
+        self._link_notes.append(f"spin → {xc.get('multi_chosen_name') or chosen}")
+        return True
+
+    async def _mp_roll_row(self, a: dict, xc: dict) -> bool:
+        """Roll, publish, fire nothing. A separate fire row spends the number as
+        a PERCENT — seconds are refused over the wire, and splitting the two
+        lets the same roll drive a message or an overlay instead."""
+        total, faces = mp_games.roll_dice(a.get("dice"), a.get("sides"), a.get("luck"))
+        d = max(1, int(mp._num(a.get("dice")) or mp_games.ROLL_DICE))
+        sd = max(2, int(mp._num(a.get("sides")) or mp_games.ROLL_SIDES))
+        xc.update({"multi_roll": str(total), "multi_roll_dice": f"{d}d{sd}",
+                   "multi_roll_faces": "+".join(str(f) for f in faces),
+                   "multi_roll_max": str(d * sd)})
+        say = str(a.get("message") or "").strip()
+        if say:
+            await self._link_say(self.engine.render(say, xc))
+        self._link_notes.append(f"rolled {d}d{sd} → {total}")
+        return True
+
+    def _mp_card(self, title: str, body: str):
+        """An embed for a multiplayer prompt, independent of `rich_output`."""
+        try:
+            e = discord.Embed(description=(body or "")[:4096],
+                              color=self._EMBED_COLORS.get("command", 0x5865F2))
+            if title:
+                e.title = title[:256]
+            return e
+        except Exception:  # noqa: BLE001 — never lose a prompt to a bad embed
+            return None
+
+    async def _mp_choice_row(self, a: dict, xc: dict) -> bool:
+        """A Player Choice. BLOCKS the block until the player answers or the
+        deadline passes — which is the entire point of "Double or Nothing":
+        nothing may fire until they've decided.
+
+        It blocks simply by being awaited. The engine awaits the multiplayer
+        row hook, so a slow row is a slow block with no parking, no resume
+        token and no second code path.
+        """
+        s = self.link
+        opts = mp_games.choice_options(a)
+        if len(opts) < 2:
+            self._link_notes.append("choice needs at least two options — skipped")
+            return True
+        ids = mp_games.resolve_who(
+            str(a.get("multi_who") or "chosen"), me=s.link.me, peer=s.link.peer,
+            chosen=str(xc.get("multi_chosen") or ""),
+            caps={s.link.me: float(self.engine.capacity),
+                  s.link.peer: float(s.peer_cap or 0)},
+            role=s.link.role)
+        if not ids:
+            self._link_notes.append("choice targeted nobody — skipped")
+            return True
+        who_id = ids[0]
+        ctx = self._mp_ctx(chosen=str(xc.get("multi_chosen") or ""))
+        who_name = (ctx.get("multi_me_name") if who_id == s.link.me
+                    else ctx.get("multi_peer_name")) or "the racer"
+        uid = s.link.owner if who_id == s.link.me else s.link.peer_owner
+
+        secs = mp_games.choice_deadline(a.get("seconds"))
+        view = MpChoiceView(self, opts, uid, who_name, secs)
+        self._register_view(view)
+        title = self.engine.render(str(a.get("title") or "").strip(), xc)
+        body = self.engine.render(str(a.get("message") or "").strip(), xc)             or f"**{who_name}** — your call."
+        # ALWAYS a card, whatever `rich_output` says. That toggle is about
+        # status and report posts; a timed decision with buttons is the one
+        # thing the doc insists on presenting as an embed, and a player who
+        # misses it because the prompt looked like chatter loses their turn.
+        view.message = await self._link_say(body, embed=self._mp_card(title, body),
+                                            view=view)
+
+        try:
+            await asyncio.wait_for(view.done.wait(), timeout=secs + 5)
+        except asyncio.TimeoutError:
+            pass
+        picked = view.picked
+        if picked is None:
+            # Nobody answered. A named default is what keeps a walked-away
+            # player from stalling the match; without one the safe answer is
+            # the LAST option, which is the un-brave one by convention.
+            picked = str(a.get("default") or opts[-1]["value"]).strip().lower()
+            tmo = str(a.get("timeout_message") or "").strip()
+            await self._link_say(self.engine.render(tmo, {**xc, "multi_choice": picked})
+                                 if tmo else
+                                 f"⏳ No answer from {who_name} — taking **{picked}**.")
+        hit = next((o for o in opts if o["value"] == picked), opts[-1])
+        xc.update({"multi_choice": hit["value"], "multi_choice_label": hit["label"],
+                   "multi_choice_by": who_name, "multi_choice_who": who_id})
+        self._link_notes.append(f"{who_name} chose {hit['label']}")
+        if hit["actions"]:
+            sub = await self.engine._run_action_block(
+                hit["actions"], name=f"multiplayer:choice:{hit['value']}",
+                extra_ctx=xc)
+            if isinstance(sub, dict):
+                xc.update(sub)
+        return True
+
+    async def _mp_duel_row(self, a: dict, xc: dict) -> bool:
+        """Both racers pick at once, hidden, then it reveals. BLOCKS until both
+        have answered or the deadline passes."""
+        s = self.link
+        opts = mp_games.duel_options(a)
+        if len(opts) < 2:
+            self._link_notes.append("a duel needs at least two moves — skipped")
+            return True
+        ctx = self._mp_ctx()
+        me_nm = ctx.get("multi_me_name") or "You"
+        peer_nm = ctx.get("multi_peer_name") or "Opponent"
+        secs = mp_games.choice_deadline(a.get("seconds"))
+        view = MpDuelView(self, opts,
+                          {"me": s.link.owner, "peer": s.link.peer_owner},
+                          {"me": me_nm, "peer": peer_nm}, secs)
+        self._register_view(view)
+        title = self.engine.render(str(a.get("title") or "").strip(), xc) or "Pick one"
+        body = self.engine.render(str(a.get("message") or "").strip(), xc) \
+            or f"**{me_nm}** vs **{peer_nm}** — both pick. Nobody sees the other until both are in."
+        view.message = await self._link_say(body, embed=self._mp_card(title, body),
+                                            view=view)
+        try:
+            await asyncio.wait_for(view.done.wait(), timeout=secs + 5)
+        except asyncio.TimeoutError:
+            pass
+
+        mine, theirs = view.picks.get("me", ""), view.picks.get("peer", "")
+        side = mp_games.duel_winner(mine, theirs, a.get("options"))
+        lbl = {o["value"]: o["label"] for o in opts}
+        win = s.link.me if side == "me" else (s.link.peer if side == "peer" else "")
+        lose = "" if not win else (s.link.peer if win == s.link.me else s.link.me)
+        names = {s.link.me: me_nm, s.link.peer: peer_nm}
+        xc.update({
+            "multi_duel_me": lbl.get(mine, "") or "—",
+            "multi_duel_peer": lbl.get(theirs, "") or "—",
+            "multi_duel_winner": win, "multi_duel_loser": lose,
+            "multi_duel_winner_name": names.get(win, "") if win else "",
+            "multi_duel_loser_name": names.get(lose, "") if lose else "",
+            "multi_duel_draw": "1" if not win else "",
+            # `chosen` is whoever this round singled out, however it did the
+            # singling — so a row written for the wheel works here unchanged.
+            "multi_chosen": lose or "",
+            "multi_chosen_name": names.get(lose, "") if lose else "",
+        })
+        self._link_notes.append(
+            f"duel: {xc['multi_duel_me']} vs {xc['multi_duel_peer']} → "
+            + (f"{names.get(win)} wins" if win else "draw"))
+        return True
+
+    async def _mp_run_row(self, a: dict, xc: dict) -> bool:
+        """Run another Multiplayer Action from inside this one.
+
+        This is what lets a Round be composed rather than being one loop: four
+        passes of the roulette, a video, four more, another video. Depth-guarded
+        — an Action that runs itself would otherwise spiral, and the block
+        runner has no way to notice.
+        """
+        name = self.engine.render(str(a.get("action") or "").strip(), xc)
+        if not name:
+            return True
+        depth = int(xc.get("_mp_depth") or 0)
+        if depth >= mp_games.RUN_DEPTH:
+            self._link_notes.append(f"'{name}' nested too deep — stopped")
+            return True
+        blk = self.mp_action(name)
+        rows = blk.get("actions") or []
+        if not rows:
+            self._link_notes.append(f"no Multiplayer Action called {name!r}")
+            return True
+        told = {f"multi_told_{k}": v for k, v in (a.get("told") or {}).items()
+                if isinstance(k, str)}
+        sub = await self.engine._run_action_block(
+            rows, name=f"multiplayer:{name}",
+            extra_ctx={**xc, **told, "_mp_depth": depth + 1})
+        if isinstance(sub, dict):
+            # results flow back out, so a later row can read what it produced
+            xc.update({k: v for k, v in sub.items() if k != "_mp_depth"})
+        return True
+
+    async def _mp_tell_row(self, a: dict, xc: dict) -> bool:
+        """Say something to the other BOT, over bot_network.
+
+        It carries the NAME of an Action for them to run — not the thing to do.
+        They play their OWN copy, with their own overlays and their own scene,
+        which is why this exists: an overlay id from your scene means something
+        different over there, or nothing. You don't reach into their picture,
+        you tell them what just happened and let them show it their way.
+
+        Values ride along and land in their block as `[multi_told_*]`, so "the
+        wheel picked Dave" can be said in their words on their stream.
+        """
+        s = self.link
+        name = self.engine.render(str(a.get("action") or "").strip(), xc)
+        if not name:
+            self._link_notes.append("nothing to tell them — no Action named")
+            return True
+        vals = {}
+        for k, v in (a.get("values") or {}).items():
+            key = str(k).strip().lower().replace(" ", "_")
+            if key:
+                vals[key] = self.engine.render(str(v), xc)
+        await self._link_apply(s.send_do(time.time(),
+                                         {"type": mp_games.T_RUN, "action": name,
+                                          "told": vals}))
+        # Name the BOT, not just the player: several pairs can share one
+        # bot_network channel, so "told them" stops being unambiguous.
+        who = s.link.peer_name or s.peer_player or s.link.peer or "the other bot"
+        self._link_notes.append(f"told {who} to run {name!r}")
+        return True
+
+    async def _mp_row_router(self, a: dict, xc: dict) -> bool:
+        """The engine's multiplayer hook. True = handled here, don't run locally.
+
+        Two jobs: run the rows only multiplayer knows, and send a row that
+        belongs to the OTHER install across the wire instead of firing this
+        one's pump.
+        """
+        s = self.link
+        if s is None or s.state not in (mp.S_MATCH, mp.S_SETTLING):
+            return False
+        typ = str((a or {}).get("type") or "").lower()
+        if typ == mp_games.T_SPIN:
+            return await self._mp_spin_row(a, xc)
+        if typ == mp_games.T_ROLL:
+            return await self._mp_roll_row(a, xc)
+        if typ == mp_games.T_CHOICE:
+            return await self._mp_choice_row(a, xc)
+        if typ == mp_games.T_DUEL:
+            return await self._mp_duel_row(a, xc)
+        if typ == mp_games.T_RUN:
+            return await self._mp_run_row(a, xc)
+        if typ == mp_games.T_TELL:
+            return await self._mp_tell_row(a, xc)
+
+        who = str((a or {}).get("multi_who") or "").strip().lower()
+        if typ == "message" and who not in ("peer", "both"):
+            # A match speaks in ONE channel — its own, named in config. Left to
+            # the engine this would go out through solo's `_announce` and its
+            # broadcast targets, which is precisely the plumbing multiplayer
+            # does not reuse.
+            text = self.engine.render(str(a.get("message") or a.get("text") or ""), xc)
+            if text.strip():
+                title = self.engine.render(str(a.get("title") or ""), xc)
+                embed = (self._mp_card(title, text)
+                         if str(a.get("style") or "") == "embed" else None)
+                await self._link_say(text, embed=embed)
+            return True
+        if not who:
+            return False              # nobody in particular — the engine runs it
+        ids = mp_games.resolve_who(
+            who, me=s.link.me, peer=s.link.peer,
+            chosen=str(xc.get("multi_chosen") or ""),
+            winner=str(xc.get("multi_duel_winner") or ""),
+            loser=str(xc.get("multi_duel_loser") or ""),
+            caps={s.link.me: float(self.engine.capacity),
+                  s.link.peer: float(s.peer_cap or 0)},
+            role=s.link.role)
+        if not ids:
+            # Refuse rather than guess. Inflating the wrong person because a
+            # target didn't resolve is the one outcome worth a dropped row.
+            self._link_notes.append(f"row targeted '{who}' — nobody matched, skipped")
+            return True
+        if s.link.peer in ids:
+            if typ not in mp_games.CROSSABLE:
+                # Hiding the control is not enforcement: an older config, or a
+                # hand-edited one, can still carry a target on a row that has
+                # no business crossing.
+                self._link_notes.append(
+                    f"a {typ} row can't act on the other machine — kept here")
+            else:
+                row = {k: v for k, v in (a or {}).items() if k != "multi_who"}
+                await self._link_apply(s.send_do(time.time(),
+                                                 self._mp_render_row(row, xc)))
+                if s.link.me not in ids:
+                    return True
+        return s.link.me not in ids   # ours too? let the engine run it as well
+
+    async def mp_run_action(self, name: str, extra=None) -> dict:  # noqa: D401
+        """Run one Multiplayer Action. The HOST runs the block; rows aimed at
+        the guest leave as `do` envelopes. The block itself is ordinary action
+        rows, so `repeat`, `if` and `wait` are the ones already written and
+        already correct — multiplayer owns its transport, not its own runner."""
+        s = self.link
+        if s is None or not s.is_host:
+            return {"ok": False, "error": "only the host runs multiplayer actions"}
+        if s.state not in (mp.S_MATCH, mp.S_SETTLING):
+            return {"ok": False, "error": f"no match running ({s.state})"}
+        blk = self.mp_action(name)
+        rows = blk.get("actions") or []
+        if not rows:
+            return {"ok": False, "error": f"no Multiplayer Action called {name!r}"}
+        self.engine.mp_row_cb = self._mp_row_router
+        try:
+            await self.engine._run_action_block(
+                rows, name=f"multiplayer:{blk.get('name') or name}",
+                extra_ctx=self._mp_ctx(extra=extra))
+        finally:
+            # ROUTING is only ever live for the duration of a multiplayer
+            # block — solo's own blocks must never be routed anywhere. The
+            # read-only CONTEXT stays on (see link_session): an overlay label
+            # has to keep resolving between blocks, not just inside one.
+            self.engine.mp_row_cb = None
+        return {"ok": True, "status": self.link_status()}
+
+    # -- Rounds: bands that loop their action --------------------------------- #
+    def _mp_caps(self) -> dict:
+        s = self.link
+        return {s.link.me: float(self.engine.capacity),
+                s.link.peer: float(s.peer_cap or 0)}
+
+    async def rounds_start(self) -> dict:
+        """Host: run the round sequence. Each round opens with its own intro,
+        then loops its Action until the band is cleared, then hands over."""
+        s = self.link
+        if s is None or not s.is_host:
+            return {"ok": False, "error": "only the host runs rounds"}
+        if s.state not in (mp.S_MATCH, mp.S_SETTLING):
+            return {"ok": False, "error": f"no match running ({s.state})"}
+        rounds = mp_games.rounds_in_order(self._mp_cfg().get("mp_rounds") or [])
+        if not rounds:
+            return {"ok": False, "error": "no rounds defined"}
+        if self._rounds_task is not None and not self._rounds_task.done():
+            return {"ok": False, "error": "rounds are already running"}
+        self._rounds_task = asyncio.create_task(self._rounds_run())
+        return {"ok": True, "status": self.link_status()}
+
+    async def rounds_stop(self) -> None:
+        if self._rounds_task is not None:
+            self._rounds_task.cancel()
+            self._rounds_task = None
+
+    async def _rounds_run(self) -> None:
+        s = self.link
+        try:
+            # Walk the rounds in the order they are listed. Never by looking
+            # up "which band is capacity in": that read one install's meter
+            # while the clear-test reads both, so a round the OTHER racer
+            # cleared left the driver pointed at the same one forever.
+            rounds = mp_games.rounds_in_order(self._mp_cfg().get("mp_rounds") or [])
+            if not rounds:
+                self._link_notes.append("no rounds defined — nothing to play")
+                await self._link_say("⚠ **No rounds are set up**, so there's "
+                                     "nothing to play. Build them on the "
+                                     "Triggers tab.")
+                return
+            for rnd in rounds:
+                if s is None or s.state != mp.S_MATCH:
+                    return
+                if await self._mp_end_check():
+                    return
+                name = str(rnd.get("name") or "")
+                until = str(rnd.get("until") or "leader")
+                if (until != "count"
+                        and mp_games.round_cleared(rnd, self._mp_caps(), until)):
+                    # Somebody is already past this target — running it would be
+                    # asking for something that has already happened. A COUNT
+                    # round is never "already past": N passes is N passes.
+                    self._link_notes.append(f"{name}: already past, skipped")
+                    continue
+                if not await self._run_round(rnd):
+                    return           # the reason is already logged and said
+            self._link_notes.append("every round is done")
+            await self._link_say("🏁 **That's every round.**")
+            return
+        except asyncio.CancelledError:
+            return
+        except Exception as e:  # noqa: BLE001
+            self.engine._log("error", f"rounds stopped: {e}")
+            self._link_notes.append(f"rounds stopped: {e}")
+        finally:
+            self._rounds_task = None
+
+    async def _run_round(self, rnd: dict) -> bool:
+        """One band: open it, then loop its Action until it clears.
+
+        Returns False when the band could NOT be cleared — a missing Action, a
+        run that errored, or the pass limit. The caller must stop rather than
+        re-enter: the same round would otherwise repeat forever.
+
+        The round supplies `[multi_round_target]`; the Action reads it. That is
+        what keeps an Action unbound from whatever ran it — the same roulette
+        round works under any band, and under no band at all.
+        """
+        s = self.link
+        name = str(rnd.get("name") or f"Round {rnd.get('_i', 0) + 1}")
+        until = str(rnd.get("until") or "leader")
+        s.round = int(rnd.get("_i", 0)) + 1
+        s.round_target = float(rnd.get("max") or 0)
+        self._link_notes.append(f"{name}: up to {s.round_target:g}%")
+
+        # The round's own pre-show — different words, a sound cue, a scene
+        # group. Same shape as a Go Live intro stage, and it runs ONCE.
+        intro = rnd.get("intro") or []
+        if intro:
+            self.engine.mp_row_cb = self._mp_row_router
+            self.engine.mp_ctx_cb = self._mp_ctx
+            try:
+                await self.engine._run_action_block(
+                    intro, name=f"multiplayer:round:{name}:intro",
+                    extra_ctx=self._mp_ctx(extra={"multi_round_name": name}))
+            finally:
+                self.engine.mp_row_cb = None
+                self.engine.mp_ctx_cb = None
+
+        body = rnd.get("actions") if isinstance(rnd.get("actions"), list) else []
+        if not body:
+            self._link_notes.append(f"{name} has nothing to run")
+            await self._link_say(f"⚠ **{name}** has nothing to run.")
+            return False
+
+        # The round's BLOCK is what repeats. One mechanism: with a count of 1
+        # it is a plain sequence, with 4 it runs four times, and with a target
+        # it runs until somebody reaches it. A second "loop this one Action"
+        # path was just a worse way of saying the same thing.
+        cap = mp_games.round_passes(rnd)
+        cleared = False
+        for i in range(cap):
+            if s.state != mp.S_MATCH:
+                return False
+            if mp_games.round_cleared(rnd, self._mp_caps(), until, passes=i):
+                cleared = True
+                break
+            self.engine.mp_row_cb = self._mp_row_router
+            try:
+                await self.engine._run_action_block(
+                    body, name=f"multiplayer:round:{name}",
+                    extra_ctx=self._mp_ctx(extra={"multi_round_name": name,
+                                                  "multi_round_pass": str(i + 1)}))
+            except Exception as e:  # noqa: BLE001
+                self._link_notes.append(f"{name} stopped: {e}")
+                await self._link_say(f"⚠ **{name}** stopped — {e}")
+                return False
+            finally:
+                self.engine.mp_row_cb = None
+        if not cleared:
+            # The cap is a backstop, not a rule. Say so out loud rather than
+            # moving on as though the band was cleared fairly.
+            self._link_notes.append(f"{name} hit its pass limit ({cap})")
+            await self._link_say(f"⏭ **{name}** ran out of passes.")
+            return False
+        done = str(rnd.get("done_message") or "").strip()
+        if done:
+            await self._link_say(self.engine.render(done, self._mp_ctx(
+                extra={"multi_round_name": name})))
+        return True
+
+    # -- panel actions -------------------------------------------------------- #
+    def link_status(self) -> dict:
+        """One shape for the panel: ⚠ / ◌ / ✓ and everything behind them."""
+        cfg = self._mp_cfg()
+        s = self.link
+        st = s.status(time.time()) if s is not None else {}
+        return {"mode": str(cfg.get("mode") or "solo"),
+                "connected": bool(self._client and self._client.user),
+                "bot_network": self._mp_chan(cfg, "bot_network"),
+                "broadcast": self._mp_chan(cfg, "broadcast"),
+                "resume": dict(self._link_resume or {}),
+                "notes": list(self._link_notes)[-12:],
+                # This rig's own seconds-to-100%. The invite popup shows it
+                # beside the host's and lets the guest correct it before
+                # accepting — every target in the match is paced from it.
+                "calibration": self._mp_calibration(),
+                **st}
+
+    async def link_offer(self, **kw) -> dict:
+        """Host: invite the peer. Refuses with a reason rather than sending an
+        invite that can only end in a decline."""
+        s = self.link_session()
+        if s is None:
+            return {"ok": False, "error": "bot isn't connected"}
+        faults = [c for c in await self.link_preflight() if c.get("ok") is False]
+        if faults:
+            return {"ok": False, "error": faults[0]["why"]}
+        # The race's terms live in config, so the panel and the referee can
+        # never disagree about what was offered. Explicit arguments still win,
+        # which is what makes a one-off invite possible.
+        cfg = self._mp_cfg()
+        m = self._mp(cfg)
+        # You need BOTH names to invite. Naming only the bot makes it possible
+        # to start a match against the wrong person's install.
+        if not str(m.get("peer_bot_name") or "").strip():
+            return {"ok": False, "error": "name your opponent's bot first"}
+        if not str(m.get("peer_player_name") or "").strip():
+            return {"ok": False, "error": "name your opponent (the player) first"}
+        want = str(m.get("peer_player_name") or "").strip().lower()
+        seen = str(s.peer_player or "").strip().lower()
+        if seen and want and seen != want:
+            return {"ok": False,
+                    "error": f"that bot belongs to {s.peer_player!r}, not "
+                             f"{m.get('peer_player_name')!r} — check who you're inviting"}
+        # The finish line is the TOP OF THE LAST BAND — that is where the game
+        # actually ends, and it is what pace compensation and the guest's cost
+        # estimate both need. There is no separate "target" to set.
+        bands = mp_games.rounds_in_order(cfg.get("mp_rounds") or [])
+        finish = max((b["max"] for b in bands), default=0)
+        out = s.offer(time.time(), game=str(kw.get("game") or self._mp_game()),
+                      base_target=kw.get("target") or finish,
+                      rounds=len(bands) or None,
+                      input=str(kw.get("input") or self._mp_input() or "operators"),
+                      scene=str(cfg.get("chat_scene") or ""),
+                      cap=self._mp_cap(),
+                      split=bool(kw.get("split")),
+                      venue=self._mp_venue(cfg))
+        await self._link_apply(out)
+        return {"ok": bool(out.send), "error": "" if out.send else "; ".join(out.notes),
+                "status": self.link_status()}
+
+    async def link_respond(self, accept: bool, why: str = "", video=None,
+                           cal=None, split=False) -> dict:
+        s = self.link
+        if s is None:
+            return {"ok": False, "error": "bot isn't connected"}
+        out = s.respond(time.time(), bool(accept), why, video=video,
+                        cal=cal, split=bool(split))
+        await self._link_apply(out)
+        # An accept that never linked was REFUSED (no camera, and soon others).
+        # Saying ok:True there leaves the panel showing a match that isn't one.
+        if accept and s.link.state == mp.S_INVITED:
+            return {"ok": False, "error": "; ".join(out.notes) or "not accepted",
+                    "status": self.link_status()}
+        return {"ok": True, "status": self.link_status()}
+
+    async def post_ready(self, seconds: float = 600.0) -> dict:
+        """Host: put the Ready embed in the venue and wait for both presses.
+
+        Anything a human does during a match happens in the broadcast channel —
+        this is the first of those, and the panel's last act before the show
+        drives itself.
+        """
+        s = self.link
+        if s is None or not s.is_host:
+            return {"ok": False, "error": "only the host posts the ready check"}
+        if s.state not in (mp.S_LINKED, mp.S_READY):
+            return {"ok": False, "error": f"not linked yet ({s.state})"}
+        if self._ready_view is not None and not self._ready_view.done.is_set():
+            return {"ok": False, "error": "a ready check is already up"}
+        ctx = self._mp_ctx()
+        view = MpReadyView(self, host_uid=s.link.owner, guest_uid=s.link.peer_owner,
+                           host_name=ctx.get("multi_me_name") or "Host",
+                           guest_name=ctx.get("multi_peer_name") or "Guest",
+                           timeout=seconds)
+        self._ready_view = view
+        self._register_view(view)
+        body = (f"**{s.game or 'The match'}** is set up. Both players press your "
+                f"own button when you're ready.\n_Cameras stay dark until then._")
+        view.message = await self._link_say(body, embed=self._mp_card("Ready?", body),
+                                            view=view)
+        asyncio.create_task(self._ready_wait(view, seconds))
+        return {"ok": True, "status": self.link_status()}
+
+    async def _ready_wait(self, view, seconds: float) -> None:
+        """Both pressed → arm and let the host's intro run. Nobody pressed →
+        say so rather than leaving an embed up that does nothing."""
+        try:
+            await asyncio.wait_for(view.done.wait(), timeout=seconds + 5)
+        except asyncio.TimeoutError:
+            pass
+        s = self.link
+        if s is None or s.state not in (mp.S_LINKED, mp.S_READY):
+            return
+        if not all(view.ready.values()):
+            missing = [view.names[k] for k, v in view.ready.items() if not v]
+            self._link_notes.append(f"ready check timed out — {', '.join(missing)}")
+            await self._link_say(f"⏳ Never heard from {', '.join(missing)}.")
+            return
+        self._link_notes.append("both players ready")
+        await self._link_apply(s.arm(time.time()))
+        await self._link_say("✅ **Both ready.**")
+        # From here the show drives itself — that was the hard constraint from
+        # the start: a match runs beginning to end with both panels closed.
+        await self.start_match()
+
+    async def link_standby(self) -> dict:
+        """Going LIVE in multiplayer: say hello on bot_network and WAIT.
+
+        This is the whole separation — the install is discoverable and gated,
+        but no session has started. It advertises so a host's invite picker can
+        find it; it does nothing else until an invite is accepted.
+        """
+        s = self.link
+        if s is None:
+            return {"ok": False, "error": "bot isn't connected"}
+        await self._link_apply(s.start_advertising(time.time()))
+        self._link_notes.append("standing by — waiting for a match")
+        return {"ok": True, "status": self.link_status()}
+
+    async def link_offair(self, why: str = "went off air") -> dict:
+        """LIVE off. Tell the peer rather than letting them time out."""
+        s = self.link
+        if s is None:
+            return {"ok": True}
+        if s.link.state in mp.LIVE:
+            # Walking away is conceding by other means. Same End Condition,
+            # same block — the match does not get a different ending because
+            # somebody reached for the switch instead of the button.
+            await self._link_apply(s.concede(time.time(), why))
+            await self._mp_run_end()
+        else:
+            s.stop_advertising()
+        return {"ok": True, "status": self.link_status()}
+
+    async def link_arm(self) -> dict:
+        s = self.link
+        if s is None:
+            return {"ok": False, "error": "bot isn't connected"}
+        await self._link_apply(s.arm(time.time()))
+        return {"ok": True, "status": self.link_status()}
+
+    async def link_concede(self, why: str = "conceded", who: str = "") -> dict:
+        """Give up — from the panel button, from !concede, or by hitting the
+        lose-at capacity. All three land here, and all three run the SAME End
+        Condition block, because they are the same event: somebody lost.
+        """
+        s = self.link
+        if s is None or s.state not in mp.LIVE:
+            return {"ok": False, "error": "no match to concede"}
+        await self._link_apply(s.concede(time.time(), why, who=who))
+        await self._mp_run_end()
+        return {"ok": True, "status": self.link_status()}
+
+    async def _mp_end_check(self) -> bool:
+        """Has anyone hit the lose-at capacity? Getting there first IS
+        conceding, so it ends the match the same way and runs the same block.
+        """
+        s = self.link
+        if s is None or s.state != mp.S_MATCH:
+            return False
+        if s.conceded:
+            await self._mp_run_end()
+            return True
+        top = mp_games.end_capacity(self._mp_cfg().get("mp_end") or {})
+        if top <= 0:
+            return False
+        who = mp_games.end_loser(self._mp_caps(), top)
+        if not who:
+            return False
+        await self._link_apply(s.concede(time.time(), f"reached {top:g}%",
+                                         who=who))
+        await self._mp_run_end()
+        return True
+
+    async def _mp_run_end(self) -> None:
+        """The End Condition: its action block, then the match is over.
+
+        Always last, never one of the rounds — a round is a band you clear,
+        this is how the whole thing stops. It runs on the install that is
+        driving; the block's own rows cross to the other machine the same way
+        any round's do.
+        """
+        s = self.link
+        if s is None or self._mp_ended_sid == s.link.sid:
+            return
+        self._mp_ended_sid = s.link.sid
+        await self.rounds_stop()          # nothing else may run over the outro
+        end = self._mp_cfg().get("mp_end") or {}
+        rows = end.get("actions") if isinstance(end.get("actions"), list) else []
+        if rows:
+            self.engine.mp_row_cb = self._mp_row_router
+            self.engine.mp_ctx_cb = self._mp_ctx
+            try:
+                await self.engine._run_action_block(
+                    rows, name="multiplayer:end", extra_ctx=self._mp_ctx())
+            except Exception as e:  # noqa: BLE001 — the match still has to end
+                self.engine._log("error", f"multiplayer: end condition failed: {e}")
+            finally:
+                self.engine.mp_row_cb = None
+                self.engine.mp_ctx_cb = None
+        else:
+            await self._link_say(f"🏳 **{self._mp_loser_name()}** conceded — "
+                                 f"that's the match.")
+        await self._link_apply(s.abort(time.time(), s.conceded_why or "conceded"))
+
+    def _mp_loser_name(self) -> str:
+        s = self.link
+        if s is None or not s.conceded:
+            return "nobody"
+        return (s.player if s.conceded == s.link.me
+                else (s.peer_player or s.link.peer_name or "the other player"))
+
+    async def link_abort(self, why: str = "stopped from the panel") -> dict:
+        s = self.link
+        if s is None:
+            return {"ok": False, "error": "no session"}
+        await self._link_apply(s.abort(time.time(), why))
+        return {"ok": True, "status": self.link_status()}
+
+    def _mp_save_blocked(self) -> None:
+        """A block that only lives in memory is not a block — it would be gone
+        the next time the bot reconnects."""
+        s = self.link
+        if s is None:
+            return
+        blk = {"blocked": list(s.blocked)}
+        self.engine.set_config(config_store.update({"multiplayer": blk}))
+
+    async def link_block(self, bot_id: str = "") -> dict:
+        s = self.link
+        if s is None:
+            return {"ok": False, "error": "bot isn't connected"}
+        out = s.block(time.time(), bot_id=bot_id)
+        # Persist BEFORE the envelopes go out. Applying first posts an abort,
+        # the bot sees its own message, the envelope path rebuilds the session
+        # from config — and the block, which is only in memory at that moment,
+        # is read straight back out again.
+        self._mp_save_blocked()
+        await self._link_apply(out)
+        return {"ok": True, "status": self.link_status()}
+
+    async def link_unblock(self, bot_id: str) -> dict:
+        s = self.link
+        if s is None:
+            return {"ok": False, "error": "bot isn't connected"}
+        out = s.unblock(bot_id)
+        self._mp_save_blocked()
+        await self._link_apply(out)
+        return {"ok": True, "status": self.link_status()}
+
+    def link_kill(self, armed: bool) -> dict:
+        """The kill switch. Not a config knob — it takes effect this instant and
+        a stop is never gated by it."""
+        s = self.link
+        if s is not None:
+            s.ceiling.armed = bool(armed)
+            self._link_notes.append("ceiling armed" if armed else "KILL SWITCH — fires refused")
+        return {"ok": True, "status": self.link_status()}
+
+    # -- resume ---------------------------------------------------------------- #
+    def _match_path(self) -> str:
+        return os.path.join(config_store.DATA_DIR, "match.json")
+
+    def _link_persist(self) -> None:
+        """data/match.json. Guest resume is nearly free — persist the cursor,
+        read the tail on boot, replay by seq, and dedup does the rest."""
+        s, path = self.link, self._match_path()
+        try:
+            if s is None or s.state in (mp.S_IDLE, mp.S_ADVERTISED):
+                if os.path.exists(path):
+                    os.remove(path)
+                return
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump(s.snapshot(), fh)
+        except OSError as e:
+            self.engine._log("error", f"multiplayer: couldn't save match state: {e}")
+
+    def _link_find_resume(self) -> None:
+        """Called once the bot is up. Never resumes on its own — it only offers,
+        because rejoining a match silently is how a pump comes back on in a room
+        nobody is watching."""
+        try:
+            with open(self._match_path(), "r", encoding="utf-8") as fh:
+                snap = json.load(fh)
+            if isinstance(snap, dict) and snap.get("sid"):
+                self._link_resume = snap
+                self._link_notes.append(
+                    f"found an unfinished match with {snap.get('peer_name') or 'a peer'}"
+                    + (f", round {snap.get('round')}" if snap.get("round") else ""))
+        except (OSError, ValueError):
+            self._link_resume = None
+
+    async def link_resume(self, confirm: bool) -> dict:
+        """Operator's answer to "Rejoin match with Dave, round 4 of 7?"."""
+        snap, self._link_resume = self._link_resume, None
+        s = self.link_session()
+        if not confirm or not snap or s is None:
+            try:
+                os.remove(self._match_path())
+            except OSError:
+                pass
+            return {"ok": True, "status": self.link_status()}
+        await self._link_apply(s.restore(snap, time.time()))
+        await self._link_catchup()
+        return {"ok": True, "status": self.link_status()}
+
+    async def _link_catchup(self) -> None:
+        """Read the tail of bot_network and replay it. This is the single best
+        property of using a channel as the wire: the log is still there, so
+        reconnection costs nothing — no acks, no retry queue, no liveness
+        dance. Dedup on (from, sid, seq) makes every replayed envelope inert."""
+        s = self.link
+        cid = self._mp_chan(self._mp_cfg(), "bot_network")
+        ch = await self._channel(cid) if cid else None
+        if s is None or ch is None:
+            return
+        try:
+            tail = [m async for m in ch.history(limit=100)]
+        except Exception as e:  # noqa: BLE001
+            self.engine._log("error", f"multiplayer: couldn't read the tail: {e}")
+            return
+        for m in sorted(tail, key=lambda x: int(x.id)):
+            env = mp.decode(m.content or "")
+            if env is None or env["t"] in mp.NO_DEDUP:
+                # hello and beat are the two types dedup deliberately doesn't
+                # cover, which makes them the two a replay must skip: an old
+                # hello in the history is not the peer coming back right now,
+                # and reading it as one would abort the match we just rejoined.
+                continue
+            await self._link_apply(s.feed(env, time.time(),
+                                          capacity=self.engine.capacity))
+
+    # -- the match clock ------------------------------------------------------- #
+    async def _link_loop(self) -> None:
+        """Re-advertises, heartbeats, pushes telemetry, and enforces every
+        timeout. One iteration failing must never end the loop — a clock that
+        dies quietly is exactly the hung match this design is built to avoid."""
+        # A quarter-second beat. Every timeout in tick_clock is absolute and
+        # every push rate-limits itself, so a faster loop costs nothing — but a
+        # 1-second one would make the 500ms dead-heat window meaningless, and
+        # that window is what deletes every tie-break rule.
+        while True:
+            try:
+                await asyncio.sleep(0.25)
+                cfg = self._mp_cfg()
+                if not self._mp_live(cfg):
+                    continue
+                s = self.link_session(cfg)
+                if s is None:
+                    continue
+                now = time.time()
+                # The panel's own meter reads off the session, so keep it live:
+                # the host never pushes `tele`, so nothing else would update it.
+                s.capacity = float(self.engine.capacity)
+                if not s.advertising and self._mp_chan(cfg, "bot_network") \
+                        and s.state == mp.S_IDLE and not self._link_resume:
+                    await self._link_apply(s.start_advertising(now))
+                    continue
+                await self._link_apply(s.tick_clock(now))
+                if s.state == mp.S_MATCH and not s.is_host:
+                    # Interval telemetry is for METERS. Idle costs nothing:
+                    # capacity doesn't move when no pump is running.
+                    await self._link_apply(s.push_tele(
+                        now, self.engine.capacity, firing=bool(self.engine._fires)))
+            except asyncio.CancelledError:
+                return
+            except Exception as e:  # noqa: BLE001
+                self.engine._log("error", f"multiplayer clock: {e}")
+
+    def _mp_guest_muted(self, cfg) -> bool:
+        """During a match the GUEST resolves nothing — the host is the only side
+        that adjudicates. Two referees is worse than none."""
+        s = self.link
+        return bool(self._mp_live(cfg) and s is not None
+                    and s.state in mp.LIVE and not s.is_host)
+
+    # ══ end Multiplayer ═════════════════════════════════════════════════════ #
+
     async def _handle(self, client: discord.Client, message: discord.Message) -> None:
+        # The protocol path runs FIRST and returns early — ahead of the Chat
+        # capture and ahead of the bot filter below, which would otherwise drop
+        # every envelope on the floor (they all come from a bot).
+        if self._link_envelope(message):
+            return
         self._chat_capture(message)   # Chat tab log — before ANY filtering
         if message.author.bot or (client.user and message.author.id == client.user.id):
             return
         cfg = self.get_config()
+        if self._mp_guest_muted(cfg):
+            return
         prefix = cfg.get("command_prefix", "!")
         content = (message.content or "").strip()
         # Owner Commands: the OWNER typing "#name" posts that macro attributed
@@ -1474,6 +3302,21 @@ class BotManager:
         if not content.startswith(prefix):
             return
         cmd = content[len(prefix):].split(" ", 1)[0].lower()
+        # !concede — the other way to give up, for a player whose hands are on
+        # a pump rather than on the panel. Scoped to the TWO PLAYERS: the
+        # audience does not get to end somebody else's match.
+        if cmd == "concede":
+            s_ = self.link
+            if s_ is None or s_.state not in mp.LIVE:
+                return
+            who_id = str(message.author.id)
+            players = {str(s_.link.owner or ""), str(s_.link.peer_owner or "")}
+            if who_id not in players or not who_id:
+                return
+            mine = who_id == str(s_.link.owner or "")
+            await self.link_concede("conceded in chat",
+                                    who=s_.link.me if mine else s_.link.peer)
+            return
         bn = self.engine.builtin_names()               # {capacity,help,…} → names
         action = next((k for k, v in bn.items() if v == cmd), None)
         custom = self.engine.find_command(cmd)

@@ -13,7 +13,8 @@ ASSETS=android-proof/app/src/main/assets
 # spins on "booting local server". scripts/check.sh now audits this list
 # against the actual imports so it can't drift again.
 PY_FILES=(app.py camera.py config_store.py device_control.py discord_bot.py engine.py
-          kasa_legacy.py media_len.py minigames.py pumpdirect_import.py stage.py
+          kasa_legacy.py media_len.py minigames.py mp_games.py multiplayer.py
+          pumpdirect_import.py stage.py
           wordlist.py
           version.json default_preset.json)
 

@@ -98,6 +98,89 @@ def scene_gameplay(cfg: dict, name: str | None = None) -> dict:
     return {}
 
 
+def scene_mode(sc: dict) -> str:
+    """A scene with no tag is a SOLO scene — every one written before
+    multiplayer existed is one, and none of them should disappear."""
+    return "multi" if str((sc or {}).get("mode") or "") == "multi" else "solo"
+
+
+def lock_scene_modes(incoming: list, stored: list) -> int:
+    """A scene's half of the app is fixed when it is created. **Solo is solo,
+    multi is multi** — one is never moved to the other.
+
+    Enforced here rather than only in the panel, because the panel sends the
+    whole `scenes` list on every save: a stale tab, an older build or a
+    hand-written patch would otherwise carry a changed `mode` straight through.
+    And the cost is not cosmetic — the LIVE scene drives gameplay, so a scene
+    that crossed over takes its overlays and rules into a game with no use for
+    them.
+
+    Matched by name (scenes have no id). Returns how many were corrected.
+    """
+    was = {}
+    for sc in (stored or []):
+        if isinstance(sc, dict) and str(sc.get("name") or "").strip():
+            was[str(sc["name"]).strip().lower()] = scene_mode(sc)
+    fixed = 0
+    for sc in (incoming or []):
+        if not isinstance(sc, dict):
+            continue
+        key = str(sc.get("name") or "").strip().lower()
+        if key in was and scene_mode(sc) != was[key]:
+            sc["mode"] = was[key]
+            fixed += 1
+    return fixed
+
+
+def scenes_in_mode(cfg: dict, mode=None) -> list:
+    """The scenes belonging to one half of the app (the live mode by default).
+
+    Group names are scoped to the loaded SCENE, which is right — two scenes may
+    both call a group "Intro" and mean completely different looks. The hole is
+    the fallback when no scene is loaded: searching every scene can land on a
+    SOLO "Intro" while a multiplayer match is running. Playing the wrong half's
+    overlays is worse than playing none, so the search is confined to one mode.
+    """
+    want = str(mode if mode is not None else (cfg.get("mode") or "solo"))
+    want = "multi" if want == "multi" else "solo"
+    return [sc for sc in (cfg.get("scenes") or [])
+            if isinstance(sc, dict) and scene_mode(sc) == want]
+
+
+def scene_for_mode(cfg: dict, mode: str) -> str:
+    """Which scene that mode should load: the one it had, else the shipped
+    default for it, else that mode's first scene, else nothing.
+
+    Never returns a scene belonging to the OTHER mode — that is the whole bug
+    this exists to prevent.
+    """
+    mode = "multi" if str(mode) == "multi" else "solo"
+    mine = [sc for sc in (cfg.get("scenes") or [])
+            if isinstance(sc, dict) and scene_mode(sc) == mode]
+    by_name = {str(sc.get("name") or "").strip().lower(): str(sc.get("name") or "")
+               for sc in mine}
+    want = str((cfg.get("scene_by_mode") or {}).get(mode) or "").strip()
+    if want.lower() in by_name:
+        return by_name[want.lower()]
+    fallback = VERSUS_SCENE_NAME if mode == "multi" else DEFAULT_SCENE_NAME
+    if fallback.strip().lower() in by_name:
+        return by_name[fallback.strip().lower()]
+    return str(mine[0].get("name") or "") if mine else ""
+
+
+def live_scene(cfg: dict) -> dict:
+    """The whole loaded scene, not just its gameplay block. Multiplayer needs
+    the scene itself: its `mode` tag and, for a multi scene, the
+    `multi_game_mode` that decides which game the host is refereeing."""
+    want = str(cfg.get("chat_scene") or "").strip().lower()
+    if not want:
+        return {}
+    for sc in (cfg.get("scenes") or []):
+        if str(sc.get("name") or "").strip().lower() == want:
+            return sc if isinstance(sc, dict) else {}
+    return {}
+
+
 def live_gameplay(cfg: dict) -> dict:
     """The live scene's gameplay dict, MUTABLE and created in place if absent.
 
@@ -264,6 +347,99 @@ DEFAULTS = {
     # Remembered channel picks per server: {guild_id: {listen, announce}}.
     # UI convenience so switching servers restores the last selection.
     "server_channels": {},
+
+    # Multiplayer ACTIONS — reusable action blocks, global (never per-scene) and
+    # entirely separate from solo's `templates`. A block is only rows, so it is
+    # never bound to whatever invoked it: the same "roulette round" drops into
+    # any multiplayer game. Each: {name, _tpl_id, description, actions: [rows]}.
+    # Multiplayer-only rows: `mp_spin` (pick a racer). Every other row is the
+    # ordinary action system, with `multi_who` saying which racer it acts on.
+    "mp_actions": [],
+
+    # Multiplayer ROUNDS — bands with an action block, the way a capacity range
+    # is a band with one. The difference is that a round LOOPS its action until
+    # the band is cleared, then hands over to the next round. Each:
+    #   {name, min, max, action (an mp_actions name), until, max_passes,
+    #    intro: [rows run ONCE as the round opens]}
+    # `intro` is the per-round pre-show — different words, a sound cue, a scene
+    # group — the same shape as a Go Live intro stage.
+    # `until`: leader = the first racer to reach `max` ends the round (what you
+    # usually want), both = everyone must reach it, trailer = same as both but
+    # reads more clearly in a co-op round.
+    "mp_rounds": [],
+    # THE END CONDITION — always last, never one of the rounds.
+    #
+    # A match needs a way to be over that isn't "the rounds ran out". Two
+    # things trigger it: somebody CONCEDES (a button, or !concede in chat), or
+    # somebody reaches `max_capacity` — and reaching it LOSES, which is why it
+    # is a lose condition and not a finish line. 0 = no capacity trigger, so
+    # the only way out is conceding.
+    #
+    # `max_capacity` rides in the invite: it is what losing looks like, and
+    # agreeing to a match without knowing it is agreeing to nothing.
+    "mp_end": {"max_capacity": 0, "actions": []},
+
+    # ── Multiplayer ──────────────────────────────────────────────────────────
+    # "solo" is everything this app has ever been. "multi" is a match against a
+    # SECOND install — another machine, another bot token, another pump. The
+    # toggle is LOCKED at go-live: switching modes mid-session swaps out the
+    # command handling, the broadcast target and the scene set underneath a live
+    # audience, so it is refused with a reason instead.
+    "mode": "solo",
+    # Which scene each mode had loaded. Switching modes UNLOADS the current
+    # scene and loads that mode's own — a solo scene left loaded in multi means
+    # solo's rules and none of the multiplayer overlays, because the live scene
+    # is what `resolved()` lays over the config.
+    "scene_by_mode": {"solo": "", "multi": ""},
+    "multiplayer": {
+        # bot_network: protocol envelopes only, both bots post, no humans needed.
+        # broadcast: the venue — narration, commands, audience. They do NOT have
+        # to be in the same server, which means both bots need inviting to both.
+        "bot_network": {"guild_id": "", "channel_id": ""},
+        "broadcast": {"guild_id": "", "channel_id": ""},
+        # You NAME the bot you intend to play against; `hello` then resolves that
+        # name to an id and caches it below. Naming rather than pairing with
+        # whoever answers is what stops a third install in the channel grabbing
+        # the pairing.
+        "peer_bot_name": "",
+        # You need BOTH to invite: the bot is who the protocol addresses, the
+        # player is who you think you're playing. Naming only the bot makes it
+        # possible to start a match against the wrong person's install.
+        "peer_player_name": "",
+        "peer": {"bot_id": "", "owner_id": "", "name": ""},
+        # Bots this operator has blocked: [{bot_id, bot_name, player, owner_id}].
+        # Checked at HELLO, so a blocked install can't even light up the panel.
+        "blocked": [],
+        # Which scene group carries the production, decided by the GUEST's
+        # camera answer at accept. With their camera on, the host's stream only
+        # needs their own gauge; without it, the host carries both gauges
+        # labelled on opposite sides.
+        # Point at the shipped "Basic Versus" layouts out of the box.
+        # Both players are ON CAMERA in a match. That is what lets each
+        # install carry only its own gauge and its own pump timer: the other
+        # player is a video tile, not a widget to be drawn. Their numbers still
+        # cross the wire — they drive the game's maths, not a second gauge.
+        "video": {"required": True},
+        # THE safety guarantee. The host may ask for anything; what actually
+        # reaches this pump is whatever survives this gate, and the refusal goes
+        # back as an ack so the host narrates truth instead of intent. All in
+        # PERCENT — a second is not a portable unit across two rigs. 0 = no limit.
+        # DEFAULT TO NO LIMIT. The gate itself stays — it is still the only
+        # thing standing between you and whatever the other install asks for,
+        # and it still refuses over the wire with a reason. But there is no
+        # longer a panel for it, and a ceiling nobody can see or change is
+        # worse than none: a match would quietly refuse fires with nothing to
+        # tell you why or where to fix it. Set these in the config to arm it.
+        "limits": {"max_pct_per_fire": 0, "max_session_pct": 0,
+                   "max_pct": 0, "on_exceed": "refuse"},
+        # HOST or GUEST — picked in the header before going live, frozen
+        # after. Never "either": a negotiated seat is a seat you can end up in
+        # by accident.
+        "role_pref": "host",
+        # Skip the accept prompt. Off by default: the invite carries a cost
+        # estimate precisely so somebody reads it before agreeing.
+        "auto_accept": False,
+    },
 
     # Default cooldown (seconds) — used by the roll command and by custom
     # commands that don't set their own. Cooldowns are per-user AND per-command.
@@ -742,7 +918,12 @@ def load() -> dict:
     cfg = _coerce_numbers(_deep_merge(DEFAULTS, _migrate(stored)))
     _inject_shipped(cfg)
     seed_templates(cfg)      # generate any shipped Template that isn't here
+    seed_versus(cfg)         # the versus starter kit — once, then it's yours
     cfg["discord_token"] = _dec_token(cfg.get("discord_token") or "")
+    if os.environ.get("DISCOFLATE_MULTIPLAYER", "").strip() in ("0", "off", "false"):
+        # A build with multiplayer off must never come up IN multiplayer: the
+        # toggle that would get you out of it is hidden.
+        cfg["mode"] = "solo"
     return cfg
 
 
@@ -1644,6 +1825,15 @@ def _fsync_dir(path: str) -> None:
         pass
 
 
+# The first multiplayer scene. Shipped like the others — generated on load,
+# never written to disk, so it can't be half-migrated or left stale. Rename it
+# to claim it, exactly as with the solo ones.
+VERSUS_SCENE_NAME = "DiscoFlate Versus"
+# NOT shipped-immutable (yet). The versus kit — scene, Actions, Rounds — is
+# handed over ONCE and is then yours to take apart. It is a starter, not a
+# fixture, and it is all three or none: an editable scene whose Actions were
+# frozen would be the worst of both.
+VERSUS_SEED_ID = "mp_versus_kit"
 SHIPPED_SCENE_NAMES = (DEFAULT_SCENE_NAME, STARTER_SCENE_NAME)
 
 
@@ -1696,6 +1886,61 @@ def seed_templates(cfg: dict) -> int:
             added += 1
         tpls[kind] = cur
     cfg["templates"] = tpls
+    return added
+
+
+# The Multiplayer Actions a shipped scene depends on. These are generated the
+# same way the shipped SCENES are — never stored, so never editable, renamed
+# away or deleted.
+#
+# Making the scene immutable while its components stay deletable would be
+# theatre: a Round pointing at a deleted Action is a scene that ships broken.
+# Whatever a code-housed scene relies on has to be as durable as the scene.
+
+
+def _seeded(x: dict) -> str:
+    return str((x or {}).get("_tpl_id") or "")
+
+
+def seed_versus(cfg: dict) -> int:
+    """Hand over the versus starter kit, once: the scene, the Actions it runs
+    and the Rounds that sequence them.
+
+    Generate-when-missing, keyed by name (scene) and `_tpl_id` (the rest), and
+    anything DELETED never grows back — same contract as Templates. All three
+    together, because a scene you can edit whose Actions you cannot is the
+    worst of both.
+    """
+    gone = {str(x) for x in (cfg.get("templates_removed") or [])}
+    seed = _factory_seed()
+    added = 0
+
+    scenes = [sc for sc in (cfg.get("scenes") or []) if isinstance(sc, dict)]
+    have = {str(sc.get("name") or "").strip().lower() for sc in scenes}
+    if (VERSUS_SCENE_NAME.strip().lower() not in have
+            and VERSUS_SEED_ID not in gone):
+        for sc in (seed.get("scenes") or []):
+            if str(sc.get("name") or "").strip() == VERSUS_SCENE_NAME:
+                fresh = copy.deepcopy(sc)
+                fresh.pop("builtin", None)      # yours, so editable
+                fresh["_tpl_id"] = VERSUS_SEED_ID
+                scenes.append(fresh)
+                added += 1
+                break
+        cfg["scenes"] = scenes
+
+    for key in ("mp_actions", "mp_rounds"):
+        cur = [x for x in (cfg.get(key) or []) if isinstance(x, dict)]
+        ids = {_seeded(x) for x in cur if _seeded(x)}
+        for x in (seed.get(key) or []):
+            tid = _seeded(x)
+            if not tid or tid in ids or tid in gone:
+                continue
+            fresh = copy.deepcopy(x)
+            fresh.pop("builtin", None)
+            cur.append(fresh)
+            added += 1
+        cfg[key] = cur
     return added
 
 

@@ -39,6 +39,14 @@ except Exception as e:  # noqa: BLE001
     _VC_ERR = f"pyvirtualcam not available ({e.__class__.__name__})"
 
 
+# How big a CARD's row text is relative to a plain text overlay of the same
+# `size`. Cards carry a title, rows and a footer inside a box, so their body
+# text is deliberately smaller than a standalone caption — but only by this
+# much, not by the 3.4x the old height-derived basis produced. The canvas
+# mirrors this constant in web/index.html; change both together.
+_CARD_TEXT = 0.58
+
+
 class VirtualCam:
     """One camera pipeline: real webcam → overlay compositor → virtual cam.
     Runs in a daemon thread; all overlay state is lock-guarded."""
@@ -811,8 +819,20 @@ class VirtualCam:
             bh_min = max(80, int(H * float(item.get("h") or 0.30)))
         except (TypeError, ValueError):
             bw, bh_min = int(W * 0.34), int(H * 0.30)
+        try:
+            size = max(0.01, min(0.9, float(item.get("size") or 0.06)))
+        except (TypeError, ValueError):
+            size = 0.06
         pad = max(8, int(bh_min * 0.07))
-        fs = max(0.4, bh_min / 300.0)
+        # `size` drives the text, exactly like every other overlay kind. This
+        # used to be bh_min/300 — the box's own height — which made a card row
+        # 1.5% of frame height against 5% for a plain text overlay: 3.4x smaller
+        # than everything else, 10px at 720p, unreadable. Worse, it meant the
+        # only way to make a card legible was to make the box enormous, so the
+        # two knobs fought each other. h is the minimum BOX, size is the TEXT.
+        # Still the CONFIGURED size, never the grown height, so adding a row
+        # can't change the font and make the card breathe.
+        fs = max(0.4, (size * H * _CARD_TEXT) / 22.0)
         th = max(1, int(fs * 2))
         head_h = pad + int(fs * 26)
         foot_h = int(fs * 22) if footer else 0
@@ -983,8 +1003,16 @@ class VirtualCam:
             return self._solid_sprite(item, W, H)
         st = self._get_state()
         if kind == "capacity_gauge":
+            # `source: peer` points a gauge at the OTHER install's meter, which
+            # is what lets one screen carry both racers when the guest has no
+            # camera of their own. Outside a match the peer reads 0 rather than
+            # borrowing this install's number — a gauge showing your capacity
+            # under their name would be worse than a gauge showing nothing.
+            key = ("peer_capacity"
+                   if str(item.get("source") or "me").lower() == "peer"
+                   else "capacity")
             try:
-                pct = float(st.get("capacity") or 0)
+                pct = float(st.get(key) or 0)
             except (TypeError, ValueError):
                 pct = 0.0
             return self._gauge_sprite(item, W, H, pct)

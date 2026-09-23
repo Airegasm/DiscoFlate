@@ -16,9 +16,9 @@
     "pumptimer": "agtime",
     "vote": "agvote"
   },
-  "pumptimer_message": "\u23f1\ufe0f [timer] seconds left on the pump timer.",
+  "pumptimer_message": "⏱️ [timer] seconds left on the pump timer.",
   "capacity_embed": true,
-  "capacity_title": "\ud83d\udcca Capacity",
+  "capacity_title": "📊 Capacity",
   "pumptimer_embed": false,
   "pumptimer_title": "",
   "cooldown_embed": false,
@@ -30,17 +30,17 @@
   "listener_message_on": "[Bot Status] **[operator]'s DiscoFlate Inflation Bot is now LIVE!**\n[commands]\n",
   "listener_message_off": "[Bot Status] **[operator]'s DiscoFlate Inflation Bot is now OFFLINE after running for [uptime]**\n[toppump]\n**Thanks for pumping!**",
   "listener_on_embed": true,
-  "listener_on_title": "\ud83d\udfe2 Session LIVE",
+  "listener_on_title": "🟢 Session LIVE",
   "listener_off_embed": true,
-  "listener_off_title": "\ud83d\udd34 Session ended",
+  "listener_off_title": "🔴 Session ended",
   "session_paused": false,
   "session_paused_by": "",
-  "pause_message": "\u23f8\ufe0f **Session paused** by [user] \u2014 pumps are off and commands are disabled until the operator resumes.",
-  "resume_message": "\u25b6\ufe0f **Session resumed** by [user] \u2014 pump away!",
-  "paused_notice_message": "\u23f8\ufe0f [mention], the session is paused \u2014 hang tight until the operator resumes.",
+  "pause_message": "⏸️ **Session paused** by [user] — pumps are off and commands are disabled until the operator resumes.",
+  "resume_message": "▶️ **Session resumed** by [user] — pump away!",
+  "paused_notice_message": "⏸️ [mention], the session is paused — hang tight until the operator resumes.",
   "activation_off_notice": false,
   "pause_embed": true,
-  "pause_title": "\u23f8 Paused",
+  "pause_title": "⏸ Paused",
   "listen_guild_id": "",
   "listen_channel_id": "",
   "listen_targets": [],
@@ -83,7 +83,7 @@
           },
           {
             "type": "message",
-            "message": "\ud83d\udca8 [mention] used [prefix]fill[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+            "message": "💨 [mention] used [prefix]fill[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
           }
         ],
         "notify_enabled": true,
@@ -105,7 +105,7 @@
         "post_actions": [
           {
             "type": "message",
-            "message": "\ud83c\udfb0 **PumpRoulette** complete!"
+            "message": "🎰 **PumpRoulette** complete!"
           }
         ],
         "actions": [
@@ -122,7 +122,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udd34 **BIG HIT!** +20s pump! (Capacity now [capacity]%)\n[next_round]"
+                "message": "🎰 **Round [current_loop]/[total_loops]** — 🔴 **BIG HIT!** +20s pump! (Capacity now [capacity]%)\n[next_round]"
               }
             ],
             "miss_actions": [
@@ -134,13 +134,13 @@
               },
               {
                 "type": "message",
-                "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udfe2 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]"
+                "message": "🎰 **Round [current_loop]/[total_loops]** — 🟢 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]"
               }
             ]
           },
           {
             "type": "notify",
-            "message": "\ud83c\udfb0 [user] added [secs]s to [device] \u00b7 Roulette [current_loop]/[total_loops]"
+            "message": "🎰 [user] added [secs]s to [device] · Roulette [current_loop]/[total_loops]"
           }
         ],
         "_tpl_id": "df-events-pumproulette"
@@ -152,7 +152,7 @@
         "max": 20,
         "dice": 6,
         "sides": 6,
-        "announce": "\ud83c\udf88 [operator] is barely inflated \u2014 you can do better than that!",
+        "announce": "🎈 [operator] is barely inflated — you can do better than that!",
         "milestone": "",
         "image": "",
         "cooldowns": {
@@ -181,26 +181,26 @@
       {
         "name": "Mercy",
         "title": "Mercy or More?",
-        "body": "[owner] is at [capacity]% \u2014 the room decides.",
+        "body": "[owner] is at [capacity]% — the room decides.",
         "duration": 60,
         "repeat_every": 0,
         "options": [
           {
-            "label": "Mercy \u2014 let them breathe",
+            "label": "Mercy — let them breathe",
             "fallback": true,
             "actions": [
               {
                 "type": "message",
-                "message": "\ud83d\udd4a The room shows mercy. No pump this round."
+                "message": "🕊 The room shows mercy. No pump this round."
               },
               {
                 "type": "notify",
-                "message": "\ud83d\udd4a Mercy \u2014 [capacity]%"
+                "message": "🕊 Mercy — [capacity]%"
               }
             ]
           },
           {
-            "label": "More \u2014 keep going",
+            "label": "More — keep going",
             "fallback": false,
             "actions": [
               {
@@ -211,11 +211,11 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\ude08 The room votes MORE \u2014 [secs]s! (now [capacity]%)"
+                "message": "😈 The room votes MORE — [secs]s! (now [capacity]%)"
               },
               {
                 "type": "notify",
-                "message": "\ud83d\ude08 The room voted MORE \u00b7 [command_overlay_desc]"
+                "message": "😈 The room voted MORE · [command_overlay_desc]"
               }
             ]
           }
@@ -232,7 +232,7 @@
         "metric": "total",
         "max_entries": 3,
         "required_entries": 1,
-        "title": "\ud83c\udfc1 Roll-off!",
+        "title": "🏁 Roll-off!",
         "body": "Press **Enter Challenge**, roll, and the highest total takes it.",
         "allow_reroll": false,
         "reroll_count": 1,
@@ -246,7 +246,7 @@
         "win_actions": [
           {
             "type": "message",
-            "message": "\ud83c\udfc1 **[winner]** takes it with **[winner_score]**!"
+            "message": "🏁 **[winner]** takes it with **[winner_score]**!"
           },
           {
             "type": "fire",
@@ -256,13 +256,13 @@
           },
           {
             "type": "notify",
-            "message": "\ud83c\udfc1 [winner] won the roll-off"
+            "message": "🏁 [winner] won the roll-off"
           }
         ],
         "no_winner_actions": [
           {
             "type": "message",
-            "message": "\ud83c\udfc1 Nobody entered \u2014 the wheel spins on."
+            "message": "🏁 Nobody entered — the wheel spins on."
           }
         ],
         "_tpl_id": "df-competitions-rolloff"
@@ -277,8 +277,8 @@
         "metric": "total",
         "max_entries": 0,
         "required_entries": 1,
-        "title": "\ud83d\udfe9 Word Race!",
-        "body": "Press **Enter Challenge** for your own private grid. Everyone races the **same** hidden word \u2014 fewer guesses wins, and a tie goes to whoever got there first. \ud83d\udfe9 right letter, right place \u00b7 \ud83d\udfe8 right letter, wrong place.",
+        "title": "🟩 Word Race!",
+        "body": "Press **Enter Challenge** for your own private grid. Everyone races the **same** hidden word — fewer guesses wins, and a tie goes to whoever got there first. 🟩 right letter, right place · 🟨 right letter, wrong place.",
         "allow_reroll": false,
         "reroll_count": 1,
         "roll_specs": [],
@@ -287,7 +287,7 @@
         "win_actions": [
           {
             "type": "message",
-            "message": "\ud83d\udfe9 **[winner]** took the Word Race with **[winner_score]** to spare!"
+            "message": "🟩 **[winner]** took the Word Race with **[winner_score]** to spare!"
           },
           {
             "type": "fire",
@@ -297,13 +297,13 @@
           },
           {
             "type": "notify",
-            "message": "\ud83d\udfe9 [winner] won the Word Race"
+            "message": "🟩 [winner] won the Word Race"
           }
         ],
         "no_winner_actions": [
           {
             "type": "message",
-            "message": "\ud83d\udfe9 Nobody cracked it \u2014 the word lives to fight another day."
+            "message": "🟩 Nobody cracked it — the word lives to fight another day."
           }
         ],
         "_tpl_id": "df-competitions-wordrace"
@@ -317,11 +317,11 @@
         "actions": [
           {
             "type": "message",
-            "message": "\ud83d\udcc8 **20%** \u2014 [owner] is starting to fill out."
+            "message": "📈 **20%** — [owner] is starting to fill out."
           },
           {
             "type": "notify",
-            "message": "\ud83d\udcc8 20% reached"
+            "message": "📈 20% reached"
           }
         ],
         "post_actions": [],
@@ -332,7 +332,7 @@
       {
         "name": "TeamPush",
         "type": "teamwork",
-        "title": "\ud83e\udd1d Team Push",
+        "title": "🤝 Team Push",
         "body": "Everyone holding banked volume can cash it in together.",
         "duration": 60,
         "confirm": "all",
@@ -347,11 +347,11 @@
           },
           {
             "type": "message",
-            "message": "\ud83e\udd1d The team cashed in **[total_bonus_secs]s**!"
+            "message": "🤝 The team cashed in **[total_bonus_secs]s**!"
           },
           {
             "type": "notify",
-            "message": "\ud83e\udd1d Team push \u00b7 [command_overlay_desc]"
+            "message": "🤝 Team push · [command_overlay_desc]"
           }
         ],
         "_tpl_id": "df-bonus_rounds-teampush"
@@ -360,7 +360,7 @@
     "broadcasts": [
       {
         "name": "Welcome",
-        "message": "\ud83d\udc4b Welcome in. [owner] is at [capacity]%. [syscom_help] for commands.",
+        "message": "👋 Welcome in. [owner] is at [capacity]%. [syscom_help] for commands.",
         "enabled": true,
         "_tpl_id": "df-broadcasts-welcome"
       }
@@ -389,7 +389,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca5 **[user]** busted out with **[score]**. Womp womp.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                "message": "💥 **[user]** busted out with **[score]**. Womp womp.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
               }
             ]
           },
@@ -405,7 +405,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\ude05 **[user]** banked **[score]** \u2014 a little reward!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                "message": "😅 **[user]** banked **[score]** — a little reward!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
               }
             ]
           },
@@ -421,13 +421,13 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udd25 **[user]** cashed out a huge **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                "message": "🔥 **[user]** cashed out a huge **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
               }
             ]
           }
         ],
         "luck": null,
-        "intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it![cmd_remain_note]",
+        "intro": "🎰 **[user]** steps up to **Push Your Luck** — 💨 Pump for points or 🏦 Bank it![cmd_remain_note]",
         "intro_embed": false,
         "intro_title": "",
         "start_events": [],
@@ -441,7 +441,7 @@
         "counter": "roll",
         "goal": 3,
         "range_gate": "all",
-        "progress_message": "[mention] rolled a perfect score [[count]/[goal]] \u2014 [remaining] more will unlock a bonus command!",
+        "progress_message": "[mention] rolled a perfect score [[count]/[goal]] — [remaining] more will unlock a bonus command!",
         "actions": [
           {
             "type": "award",
@@ -453,7 +453,7 @@
           },
           {
             "type": "message",
-            "message": "[mention] has unlocked: [bonus_cmd] \u2014 SUPERPUMP - !superpump triggers a 40s burst of air\\nYou can use this command a total of [charges] times."
+            "message": "[mention] has unlocked: [bonus_cmd] — SUPERPUMP - !superpump triggers a 40s burst of air\\nYou can use this command a total of [charges] times."
           }
         ],
         "_tpl_id": "df-prizes-superpump-superpump-triggers-a-40s-burst-of-air"
@@ -468,25 +468,295 @@
         ],
         "events": [],
         "enabled": false,
-        "message_on": "\ud83d\udd4a **Gentle mode** \u2014 only the softer commands are live.",
-        "message_off": "Gentle mode off \u2014 everything is back.",
+        "message_on": "🕊 **Gentle mode** — only the softer commands are live.",
+        "message_off": "Gentle mode off — everything is back.",
         "_tpl_id": "df-modes-gentle"
       }
     ]
   },
   "allow_dms": false,
   "server_channels": {},
+  "mp_actions": [
+    {
+      "_tpl_id": "mp_multiroulette",
+      "name": "MultiRoulette",
+      "description": "Spin for who, roll 1d7 for how much, inflate them. One pass — a Round loops it.",
+      "actions": [
+        {
+          "type": "mp_spin",
+          "announce_odds": true,
+          "message": "🎡 The wheel picks… **[multi_chosen_name]**!"
+        },
+        {
+          "type": "mp_roll",
+          "dice": 1,
+          "sides": 8,
+          "message": "🎲 [multi_roll_dice] → **[multi_roll]%** for [multi_chosen_name]."
+        },
+        {
+          "type": "overlay",
+          "overlay": "bvResult",
+          "mode": "timed",
+          "seconds": 4,
+          "fade_in": 0.2,
+          "fade_out": 0.3
+        },
+        {
+          "type": "notify",
+          "message": "🎡 [multi_chosen_name] takes **+[multi_roll]%**"
+        },
+        {
+          "type": "fire",
+          "fire_mode": "add",
+          "fill_pct": "[multi_roll]",
+          "multi_who": "chosen",
+          "block_during": false
+        },
+        {
+          "type": "wait",
+          "seconds": 15
+        }
+      ]
+    },
+    {
+      "_tpl_id": "mp_multirps",
+      "name": "MultiRPS",
+      "description": "Both racers pick at once, hidden. The loser takes the hit. One pass — a Round loops it.",
+      "actions": [
+        {
+          "type": "var",
+          "variable": "duel_pct",
+          "operation": "set",
+          "value": "5"
+        },
+        {
+          "type": "mp_duel",
+          "seconds": 30,
+          "title": "Rock, Paper, Scissors",
+          "message": "**[multi_me_name]** vs **[multi_peer_name]** — both pick. Nobody sees the other until both are in.",
+          "options": [
+            {
+              "label": "🪨 Rock",
+              "value": "rock",
+              "beats": [
+                "scissors"
+              ],
+              "style": "primary"
+            },
+            {
+              "label": "📄 Paper",
+              "value": "paper",
+              "beats": [
+                "rock"
+              ],
+              "style": "primary"
+            },
+            {
+              "label": "✂️ Scissors",
+              "value": "scissors",
+              "beats": [
+                "paper"
+              ],
+              "style": "primary"
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "message": "🪨📄✂️ [multi_me_name] **[multi_duel_me]** · [multi_peer_name] **[multi_duel_peer]**\n[if multi_duel_loser_name]💨 **[multi_duel_loser_name]** takes it.\n[if not multi_duel_loser_name]🤝 A draw — nobody takes anything."
+        },
+        {
+          "type": "if",
+          "match": "all",
+          "conditions": [
+            {
+              "left": "[multi_duel_loser_name]",
+              "op": "!=",
+              "right": ""
+            }
+          ],
+          "actions": [
+            {
+              "type": "overlay",
+              "overlay": "bvDuel",
+              "mode": "timed",
+              "seconds": 4,
+              "fade_in": 0.2,
+              "fade_out": 0.3
+            },
+            {
+              "type": "notify",
+              "message": "🪊📄✂️ [multi_duel_loser_name] takes **+[var:duel_pct]%**"
+            },
+            {
+              "type": "fire",
+              "fire_mode": "add",
+              "fill_pct": "[var:duel_pct]",
+              "multi_who": "loser",
+              "block_during": false
+            }
+          ],
+          "else_actions": [
+            {
+              "type": "overlay",
+              "overlay": "bvDraw",
+              "mode": "timed",
+              "seconds": 3,
+              "fade_in": 0.2,
+              "fade_out": 0.3
+            },
+            {
+              "type": "notify",
+              "message": "🤝 Draw — nobody pays."
+            }
+          ]
+        },
+        {
+          "type": "wait",
+          "seconds": 15
+        }
+      ]
+    }
+  ],
+  "mp_rounds": [
+    {
+      "_tpl_id": "mp_vs_r1",
+      "name": "Round 1",
+      "until": "count",
+      "count": 1,
+      "intro": [
+        {
+          "type": "scene_group",
+          "group": "Round Intro",
+          "fade_in": 0.35
+        },
+        {
+          "type": "wait",
+          "seconds": 2
+        },
+        {
+          "type": "scene_group_kill",
+          "group": "Round Intro",
+          "fade_out": 0.6
+        }
+      ],
+      "actions": [
+        {
+          "type": "repeat",
+          "mode": "fixed",
+          "iterations": "4",
+          "max_iterations": "100",
+          "actions": [
+            {
+              "type": "mp_action",
+              "action": "MultiRoulette"
+            }
+          ]
+        },
+        {
+          "type": "overlay",
+          "overlay": "bvVidR1a",
+          "mode": "once",
+          "fade_in": 0.2,
+          "fade_out": 0.3
+        },
+        {
+          "type": "repeat",
+          "mode": "fixed",
+          "iterations": "4",
+          "max_iterations": "100",
+          "actions": [
+            {
+              "type": "mp_action",
+              "action": "MultiRoulette"
+            }
+          ]
+        },
+        {
+          "type": "overlay",
+          "overlay": "bvVidR1b",
+          "mode": "once",
+          "fade_in": 0.2,
+          "fade_out": 0.3
+        }
+      ],
+      "done_message": "✅ **[multi_round_name]** done."
+    },
+    {
+      "_tpl_id": "mp_vs_r2",
+      "name": "Round 2",
+      "until": "count",
+      "count": 6,
+      "intro": [
+        {
+          "type": "scene_group",
+          "group": "Round Intro",
+          "fade_in": 0.35
+        },
+        {
+          "type": "wait",
+          "seconds": 2
+        },
+        {
+          "type": "scene_group_kill",
+          "group": "Round Intro",
+          "fade_out": 0.6
+        }
+      ],
+      "actions": [
+        {
+          "type": "mp_action",
+          "action": "MultiRPS"
+        }
+      ],
+      "done_message": "✅ **[multi_round_name]** done."
+    }
+  ],
+  "mode": "solo",
+  "scene_by_mode": {
+    "solo": "",
+    "multi": ""
+  },
+  "multiplayer": {
+    "bot_network": {
+      "guild_id": "",
+      "channel_id": ""
+    },
+    "broadcast": {
+      "guild_id": "",
+      "channel_id": ""
+    },
+    "peer_bot_name": "",
+    "peer_player_name": "",
+    "peer": {
+      "bot_id": "",
+      "owner_id": "",
+      "name": ""
+    },
+    "blocked": [],
+    "video": {
+      "required": true
+    },
+    "limits": {
+      "max_pct_per_fire": 0,
+      "max_session_pct": 0,
+      "max_pct": 0,
+      "on_exceed": "refuse"
+    },
+    "role_pref": "host",
+    "auto_accept": false
+  },
   "cooldown_seconds": 120,
   "cooldown_exempt_user_ids": [],
   "cooldown_exempt_names": [],
   "operator_name": "",
-  "cooldown_message": "\u23f3 [mention], [cmd] is on cooldown \u2014 [cooldown]s left until you can use it again.",
+  "cooldown_message": "⏳ [mention], [cmd] is on cooldown — [cooldown]s left until you can use it again.",
   "auto_report": {
     "enabled": true,
     "seconds": 300,
-    "message": "\ud83d\udccb **Bot Report** \u2014 **[operator]'s DiscoFlate Inflation Bot is now LIVE! ([uptime])**\n\n[announce] - Current Capacity: **[capacity]%**\n[capacity_bar]\n\n**[syscom_help]** for a list of commands.",
+    "message": "📋 **Bot Report** — **[operator]'s DiscoFlate Inflation Bot is now LIVE! ([uptime])**\n\n[announce] - Current Capacity: **[capacity]%**\n[capacity_bar]\n\n**[syscom_help]** for a list of commands.",
     "embed": true,
-    "title": "\ud83d\udccb Bot Report"
+    "title": "📋 Bot Report"
   },
   "announce_channel_id": "",
   "roll": {
@@ -502,7 +772,7 @@
       "max": 20,
       "dice": 6,
       "sides": 6,
-      "announce": "\ud83c\udf88 [operator] is barely inflated \u2014 you can do better than that!",
+      "announce": "🎈 [operator] is barely inflated — you can do better than that!",
       "milestone": "",
       "image": "",
       "cooldowns": {
@@ -530,8 +800,8 @@
       "max": 40,
       "dice": 4,
       "sides": 6,
-      "announce": "\ud83d\udca8 [operator] is filling out nicely, the first signs of bloating begin to appear.",
-      "milestone": "**MILESTONE:** \ud83d\udca8 [operator]'s belly starts to round out and press outward slightly. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+      "announce": "💨 [operator] is filling out nicely, the first signs of bloating begin to appear.",
+      "milestone": "**MILESTONE:** 💨 [operator]'s belly starts to round out and press outward slightly. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
       "image": "",
       "cooldowns": {
         "inflate": {
@@ -559,8 +829,8 @@
       "max": 60,
       "dice": 4,
       "sides": 6,
-      "announce": "\ud83c\udf88 [operator]'s belly is taut and pressurised, curves stretching tighter.",
-      "milestone": "**MILESTONE:** \ud83c\udf88 Halfway there \u2014 [operator]'s middle is firm and noticeably swollen. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+      "announce": "🎈 [operator]'s belly is taut and pressurised, curves stretching tighter.",
+      "milestone": "**MILESTONE:** 🎈 Halfway there — [operator]'s middle is firm and noticeably swollen. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
       "image": "",
       "cooldowns": {
         "pump": {
@@ -588,8 +858,8 @@
       "max": 80,
       "dice": 2,
       "sides": 4,
-      "announce": "\ud83c\udf88 [operator]'s belly is round, tight, and visibly swollen.",
-      "milestone": "**MILESTONE:** \ud83c\udf88 [operator] is seriously swollen now \u2014 the pressure is constant and building. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+      "announce": "🎈 [operator]'s belly is round, tight, and visibly swollen.",
+      "milestone": "**MILESTONE:** 🎈 [operator] is seriously swollen now — the pressure is constant and building. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
       "image": "",
       "cooldowns": {
         "squeeze": {
@@ -619,8 +889,8 @@
       "max": 90,
       "dice": 2,
       "sides": 4,
-      "announce": "\u26a0\ufe0f [operator] 's belly is stretched dangerously tight, groaning under the strain.",
-      "milestone": "**MILESTONE:** \u26a0\ufe0f [operator]'s gut is straining hard \u2014 one bold roll could tip them over! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+      "announce": "⚠️ [operator] 's belly is stretched dangerously tight, groaning under the strain.",
+      "milestone": "**MILESTONE:** ⚠️ [operator]'s gut is straining hard — one bold roll could tip them over! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
       "image": "",
       "cooldowns": {
         "tease": {
@@ -649,8 +919,8 @@
       "max": 100,
       "dice": 2,
       "sides": 4,
-      "announce": "\ud83d\udea8 [operator]'s belly is at the absolute brink, creaking and ready to pop''.",
-      "milestone": "**MILESTONE:** \ud83d\udea8 The edge! [operator] has reached maximum capacity and can't take much more! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]\n",
+      "announce": "🚨 [operator]'s belly is at the absolute brink, creaking and ready to pop''.",
+      "milestone": "**MILESTONE:** 🚨 The edge! [operator] has reached maximum capacity and can't take much more! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]\n",
       "image": "",
       "cooldowns": {
         "topup": {
@@ -679,8 +949,8 @@
       "max": 110,
       "dice": 2,
       "sides": 4,
-      "announce": "\ud83d\udea8 [operator] is at the absolute brink, creaking and ready to pop. Any minute now!",
-      "milestone": "**MILESTONE:** \ud83d\udea8 [operator] is going to pop at any second! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+      "announce": "🚨 [operator] is at the absolute brink, creaking and ready to pop. Any minute now!",
+      "milestone": "**MILESTONE:** 🚨 [operator] is going to pop at any second! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
       "image": "",
       "cooldowns": {
         "topup": {
@@ -705,7 +975,7 @@
       "is_end": true,
       "enabled": true,
       "end_only": false,
-      "final_message": "\ud83d\udca5 **BOOOOM!!**\nCongratulations! [operator] has popped!\n\n[off_message]"
+      "final_message": "💥 **BOOOOM!!**\nCongratulations! [operator] has popped!\n\n[off_message]"
     }
   ],
   "commands": [
@@ -743,7 +1013,7 @@
         },
         {
           "type": "message",
-          "message": "\ud83d\udca8 [mention] used [prefix]fill[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+          "message": "💨 [mention] used [prefix]fill[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
         }
       ],
       "notify_enabled": true,
@@ -784,7 +1054,7 @@
         },
         {
           "type": "message",
-          "message": "\ud83d\udca8 [mention] used [prefix]inflate[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+          "message": "💨 [mention] used [prefix]inflate[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
         }
       ],
       "notify_enabled": true,
@@ -825,7 +1095,7 @@
         },
         {
           "type": "message",
-          "message": "\ud83d\udca8 [mention] used [prefix]pump[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+          "message": "💨 [mention] used [prefix]pump[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
         }
       ],
       "notify_enabled": true,
@@ -866,7 +1136,7 @@
         },
         {
           "type": "message",
-          "message": "\ud83d\udca8 [mention] used [prefix]squeeze[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+          "message": "💨 [mention] used [prefix]squeeze[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
         }
       ],
       "notify_enabled": true,
@@ -907,7 +1177,7 @@
         },
         {
           "type": "message",
-          "message": "\ud83d\udca8 [mention] used [prefix]tease[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+          "message": "💨 [mention] used [prefix]tease[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
         }
       ],
       "notify_enabled": true,
@@ -948,7 +1218,7 @@
         },
         {
           "type": "message",
-          "message": "\ud83d\udca8 [mention] used [prefix]topup[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+          "message": "💨 [mention] used [prefix]topup[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
         }
       ],
       "notify_enabled": true,
@@ -1017,7 +1287,7 @@
         "PumpRoulette"
       ],
       "range_gate": "all",
-      "description": "spin the pump roulette \u2014 3 rounds of 50/50 +5s or +20s",
+      "description": "spin the pump roulette — 3 rounds of 50/50 +5s or +20s",
       "hide_in_list": false,
       "react_only": false,
       "react_emoji": "",
@@ -1038,10 +1308,10 @@
       "actions": [
         {
           "type": "message",
-          "message": "**[user]** spins the roulette wheel\u2026[cmd_remain_note]"
+          "message": "**[user]** spins the roulette wheel…[cmd_remain_note]"
         }
       ],
-      "notify_enabled": false,
+      "notify_enabled": true,
       "notify": "[user] just triggered [command]"
     },
     {
@@ -1055,7 +1325,7 @@
       "device_id": null,
       "start_events": [],
       "range_gate": "all",
-      "description": "push-your-luck minigame \u2014 pump for points, bank before you bust",
+      "description": "push-your-luck minigame — pump for points, bank before you bust",
       "hide_in_list": false,
       "mention": false,
       "react_only": false,
@@ -1088,7 +1358,7 @@
       "device_id": null,
       "start_events": [],
       "range_gate": "all",
-      "description": "memory minigame \u2014 repeat the growing emoji sequence",
+      "description": "memory minigame — repeat the growing emoji sequence",
       "hide_in_list": false,
       "mention": false,
       "react_only": false,
@@ -1121,7 +1391,7 @@
       "device_id": null,
       "start_events": [],
       "range_gate": "all",
-      "description": "don't-pop-it minigame \u2014 reveal safe cells, avoid the balloons",
+      "description": "don't-pop-it minigame — reveal safe cells, avoid the balloons",
       "hide_in_list": false,
       "mention": false,
       "react_only": false,
@@ -1187,7 +1457,7 @@
       "device_id": null,
       "start_events": [],
       "range_gate": "all",
-      "description": "public slot machine \u2014 one pull, tiered payout",
+      "description": "public slot machine — one pull, tiered payout",
       "hide_in_list": false,
       "mention": false,
       "react_only": false,
@@ -1220,7 +1490,7 @@
       "device_id": null,
       "start_events": [],
       "range_gate": "all",
-      "description": "blackjack (21) vs the bot \u2014 hit or stand",
+      "description": "blackjack (21) vs the bot — hit or stand",
       "hide_in_list": false,
       "mention": false,
       "react_only": false,
@@ -1246,14 +1516,14 @@
       "name": "agroll",
       "type": "actions",
       "enabled": true,
-      "description": "Roll the dice \u2014 the result becomes pump seconds",
+      "description": "Roll the dice — the result becomes pump seconds",
       "actions": [
         {
           "type": "roll"
         },
         {
           "type": "message",
-          "message": "\ud83c\udfb2 [mention] rolled **[dice]** and they landed on **[result]**\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+          "message": "🎲 [mention] rolled **[dice]** and they landed on **[result]**\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
         }
       ],
       "notify_enabled": true,
@@ -1276,7 +1546,7 @@
         },
         {
           "type": "message",
-          "message": "\u2728 [mention] used the prize!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+          "message": "✨ [mention] used the prize!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
         }
       ],
       "notify_enabled": true,
@@ -1378,8 +1648,8 @@
       ],
       "events": [],
       "enabled": false,
-      "message_on": "\ud83d\udd4a **Gentle mode** \u2014 only the softer commands are live.",
-      "message_off": "Gentle mode off \u2014 everything is back."
+      "message_on": "🕊 **Gentle mode** — only the softer commands are live.",
+      "message_off": "Gentle mode off — everything is back."
     }
   ],
   "events": [
@@ -1395,7 +1665,7 @@
       "post_actions": [
         {
           "type": "message",
-          "message": "\ud83c\udfb0 **PumpRoulette** complete!"
+          "message": "🎰 **PumpRoulette** complete!"
         }
       ],
       "actions": [
@@ -1412,7 +1682,7 @@
             },
             {
               "type": "message",
-              "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udd34 **BIG HIT!** +20s pump! (Capacity now [capacity]%)\n[next_round]"
+              "message": "🎰 **Round [current_loop]/[total_loops]** — 🔴 **BIG HIT!** +20s pump! (Capacity now [capacity]%)\n[next_round]"
             }
           ],
           "miss_actions": [
@@ -1424,13 +1694,13 @@
             },
             {
               "type": "message",
-              "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udfe2 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]"
+              "message": "🎰 **Round [current_loop]/[total_loops]** — 🟢 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]"
             }
           ]
         },
         {
           "type": "notify",
-          "message": "\ud83c\udfb0 [user] added [secs]s to [device] \u00b7 Roulette [current_loop]/[total_loops]"
+          "message": "🎰 [user] added [secs]s to [device] · Roulette [current_loop]/[total_loops]"
         }
       ]
     },
@@ -1459,8 +1729,8 @@
       "actions": []
     }
   ],
-  "event_in_process_message": "\u23f3 [event] is already running.",
-  "event_cooldown_message": "\u23f3 [event] is on cooldown \u2014 [cooldown]s left.",
+  "event_in_process_message": "⏳ [event] is already running.",
+  "event_cooldown_message": "⏳ [event] is on cooldown — [cooldown]s left.",
   "capacity_events": [
     {
       "name": "Quarter",
@@ -1469,11 +1739,11 @@
       "actions": [
         {
           "type": "message",
-          "message": "\ud83d\udcc8 **20%** \u2014 [owner] is starting to fill out."
+          "message": "📈 **20%** — [owner] is starting to fill out."
         },
         {
           "type": "notify",
-          "message": "\ud83d\udcc8 20% reached"
+          "message": "📈 20% reached"
         }
       ],
       "post_actions": []
@@ -1485,11 +1755,11 @@
       "actions": [
         {
           "type": "message",
-          "message": "\ud83d\udcc8 **Halfway.** [owner] is at [capacity]% \u2014 no going back now."
+          "message": "📈 **Halfway.** [owner] is at [capacity]% — no going back now."
         },
         {
           "type": "notify",
-          "message": "\ud83d\udcc8 Halfway \u2014 [capacity]%"
+          "message": "📈 Halfway — [capacity]%"
         },
         {
           "type": "fire",
@@ -1507,11 +1777,11 @@
       "actions": [
         {
           "type": "message",
-          "message": "\ud83d\ude33 **70%** \u2014 things are getting tight."
+          "message": "😳 **70%** — things are getting tight."
         },
         {
           "type": "notify",
-          "message": "\ud83d\ude33 70% \u2014 getting tight"
+          "message": "😳 70% — getting tight"
         }
       ],
       "post_actions": []
@@ -1523,11 +1793,11 @@
       "actions": [
         {
           "type": "message",
-          "message": "\ud83d\udea8 **90%!** [owner] is nearly at capacity."
+          "message": "🚨 **90%!** [owner] is nearly at capacity."
         },
         {
           "type": "notify",
-          "message": "\ud83d\udea8 90% \u2014 nearly there"
+          "message": "🚨 90% — nearly there"
         }
       ],
       "post_actions": []
@@ -1542,7 +1812,7 @@
       "metric": "total",
       "max_entries": 3,
       "required_entries": 1,
-      "title": "\ud83c\udfc1 Roll-off!",
+      "title": "🏁 Roll-off!",
       "body": "Press **Enter Challenge**, roll, and the highest total takes it.",
       "allow_reroll": false,
       "reroll_count": 1,
@@ -1556,7 +1826,7 @@
       "win_actions": [
         {
           "type": "message",
-          "message": "\ud83c\udfc1 **[winner]** takes it with **[winner_score]**!"
+          "message": "🏁 **[winner]** takes it with **[winner_score]**!"
         },
         {
           "type": "fire",
@@ -1566,13 +1836,13 @@
         },
         {
           "type": "notify",
-          "message": "\ud83c\udfc1 [winner] won the roll-off"
+          "message": "🏁 [winner] won the roll-off"
         }
       ],
       "no_winner_actions": [
         {
           "type": "message",
-          "message": "\ud83c\udfc1 Nobody entered \u2014 the wheel spins on."
+          "message": "🏁 Nobody entered — the wheel spins on."
         }
       ]
     }
@@ -1581,7 +1851,7 @@
     {
       "name": "TeamPush",
       "type": "teamwork",
-      "title": "\ud83e\udd1d Team Push",
+      "title": "🤝 Team Push",
       "body": "Everyone holding banked volume can cash it in together.",
       "duration": 60,
       "confirm": "all",
@@ -1596,11 +1866,11 @@
         },
         {
           "type": "message",
-          "message": "\ud83e\udd1d The team cashed in **[total_bonus_secs]s**!"
+          "message": "🤝 The team cashed in **[total_bonus_secs]s**!"
         },
         {
           "type": "notify",
-          "message": "\ud83e\udd1d Team push \u00b7 [command_overlay_desc]"
+          "message": "🤝 Team push · [command_overlay_desc]"
         }
       ]
     }
@@ -1609,26 +1879,26 @@
     {
       "name": "Mercy",
       "title": "Mercy or More?",
-      "body": "[owner] is at [capacity]% \u2014 the room decides.",
+      "body": "[owner] is at [capacity]% — the room decides.",
       "duration": 60,
       "repeat_every": 0,
       "options": [
         {
-          "label": "Mercy \u2014 let them breathe",
+          "label": "Mercy — let them breathe",
           "fallback": true,
           "actions": [
             {
               "type": "message",
-              "message": "\ud83d\udd4a The room shows mercy. No pump this round."
+              "message": "🕊 The room shows mercy. No pump this round."
             },
             {
               "type": "notify",
-              "message": "\ud83d\udd4a Mercy \u2014 [capacity]%"
+              "message": "🕊 Mercy — [capacity]%"
             }
           ]
         },
         {
-          "label": "More \u2014 keep going",
+          "label": "More — keep going",
           "fallback": false,
           "actions": [
             {
@@ -1639,11 +1909,11 @@
             },
             {
               "type": "message",
-              "message": "\ud83d\ude08 The room votes MORE \u2014 [secs]s! (now [capacity]%)"
+              "message": "😈 The room votes MORE — [secs]s! (now [capacity]%)"
             },
             {
               "type": "notify",
-              "message": "\ud83d\ude08 The room voted MORE \u00b7 [command_overlay_desc]"
+              "message": "😈 The room voted MORE · [command_overlay_desc]"
             }
           ]
         }
@@ -1668,11 +1938,11 @@
             },
             {
               "type": "message",
-              "message": "\ud83d\udc22 Slow and steady \u2014 [secs]s."
+              "message": "🐢 Slow and steady — [secs]s."
             },
             {
               "type": "notify",
-              "message": "\ud83d\udc22 Slow and steady \u00b7 [command_overlay_desc]"
+              "message": "🐢 Slow and steady · [command_overlay_desc]"
             }
           ]
         },
@@ -1688,11 +1958,11 @@
             },
             {
               "type": "message",
-              "message": "\u26a1 Short and sharp \u2014 [secs]s."
+              "message": "⚡ Short and sharp — [secs]s."
             },
             {
               "type": "notify",
-              "message": "\u26a1 Short and sharp \u00b7 [command_overlay_desc]"
+              "message": "⚡ Short and sharp · [command_overlay_desc]"
             }
           ]
         }
@@ -1702,12 +1972,12 @@
   "broadcasts": [
     {
       "name": "Welcome",
-      "message": "\ud83d\udc4b Welcome in. [owner] is at [capacity]%. [syscom_help] for commands.",
+      "message": "👋 Welcome in. [owner] is at [capacity]%. [syscom_help] for commands.",
       "enabled": true
     },
     {
       "name": "LastCall",
-      "message": "\u23f3 Last call \u2014 [owner] is at [capacity]%.",
+      "message": "⏳ Last call — [owner] is at [capacity]%.",
       "enabled": true
     }
   ],
@@ -1718,7 +1988,7 @@
       "counter": "roll",
       "goal": 3,
       "range_gate": "all",
-      "progress_message": "[mention] rolled a perfect score [[count]/[goal]] \u2014 [remaining] more will unlock a bonus command!",
+      "progress_message": "[mention] rolled a perfect score [[count]/[goal]] — [remaining] more will unlock a bonus command!",
       "actions": [
         {
           "type": "award",
@@ -1730,7 +2000,7 @@
         },
         {
           "type": "message",
-          "message": "[mention] has unlocked: [bonus_cmd] \u2014 SUPERPUMP - !superpump triggers a 40s burst of air\\nYou can use this command a total of [charges] times."
+          "message": "[mention] has unlocked: [bonus_cmd] — SUPERPUMP - !superpump triggers a 40s burst of air\\nYou can use this command a total of [charges] times."
         }
       ]
     }
@@ -1778,15 +2048,15 @@
   "owner_commands": [],
   "chat_buttons": [
     {
-      "label": "\ud83d\udd4a Mercy or More?",
+      "label": "🕊 Mercy or More?",
       "name": "mercypoll"
     },
     {
-      "label": "\ud83c\udf9b Which pump?",
+      "label": "🎛 Which pump?",
       "name": "pickpump"
     },
     {
-      "label": "\ud83d\udfe9 Word Race",
+      "label": "🟩 Word Race",
       "name": "wordrace"
     }
   ],
@@ -1820,7 +2090,7 @@
             },
             {
               "type": "message",
-              "message": "\ud83d\udca5 **[user]** busted out with **[score]**. Womp womp.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+              "message": "💥 **[user]** busted out with **[score]**. Womp womp.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
@@ -1836,7 +2106,7 @@
             },
             {
               "type": "message",
-              "message": "\ud83d\ude05 **[user]** banked **[score]** \u2014 a little reward!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+              "message": "😅 **[user]** banked **[score]** — a little reward!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
@@ -1852,13 +2122,13 @@
             },
             {
               "type": "message",
-              "message": "\ud83d\udd25 **[user]** cashed out a huge **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+              "message": "🔥 **[user]** cashed out a huge **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         }
       ],
       "luck": null,
-      "intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it![cmd_remain_note]",
+      "intro": "🎰 **[user]** steps up to **Push Your Luck** — 💨 Pump for points or 🏦 Bank it![cmd_remain_note]",
       "intro_embed": false,
       "intro_title": "",
       "start_events": []
@@ -1885,7 +2155,7 @@
             },
             {
               "type": "message",
-              "message": "\u274c **[user]** fumbled at round **[score]**.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+              "message": "❌ **[user]** fumbled at round **[score]**.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
@@ -1901,7 +2171,7 @@
             },
             {
               "type": "message",
-              "message": "\ud83d\udc4f **[user]** reached round **[score]** \u2014 nice!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+              "message": "👏 **[user]** reached round **[score]** — nice!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
@@ -1917,7 +2187,7 @@
             },
             {
               "type": "message",
-              "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+              "message": "🏆 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
@@ -1933,7 +2203,7 @@
             },
             {
               "type": "message",
-              "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+              "message": "🏆 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
@@ -1949,13 +2219,13 @@
             },
             {
               "type": "message",
-              "message": "\ud83c\udfc6 **[user]** got a PERFECT SCORE **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+              "message": "🏆 **[user]** got a PERFECT SCORE **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         }
       ],
       "luck": null,
-      "intro": "\ud83e\udde0 **[user]** takes on **Simon** \u2014 memorize the sequence, then repeat it![cmd_remain_note] ",
+      "intro": "🧠 **[user]** takes on **Simon** — memorize the sequence, then repeat it![cmd_remain_note] ",
       "intro_embed": false,
       "intro_title": "",
       "start_events": []
@@ -1982,7 +2252,7 @@
             },
             {
               "type": "message",
-              "message": "\ud83d\udca5 **[user]** popped a balloon and walked away with the bare minimum.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+              "message": "💥 **[user]** popped a balloon and walked away with the bare minimum.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
@@ -1998,7 +2268,7 @@
             },
             {
               "type": "message",
-              "message": "\ud83c\udf88 **[user]** cashed out **[score]** \u2014 nice haul!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+              "message": "🎈 **[user]** cashed out **[score]** — nice haul!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
@@ -2014,7 +2284,7 @@
             },
             {
               "type": "message",
-              "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+              "message": "🎉 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
@@ -2030,13 +2300,13 @@
             },
             {
               "type": "message",
-              "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+              "message": "🎉 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         }
       ],
       "luck": null,
-      "intro": "\ud83c\udf88 **[user]** plays **Don't Pop It** \u2014 reveal safe cells for points, or cash out before you hit a balloon![cmd_remain_note]",
+      "intro": "🎈 **[user]** plays **Don't Pop It** — reveal safe cells for points, or cash out before you hit a balloon![cmd_remain_note]",
       "intro_embed": false,
       "intro_title": "",
       "start_events": []
@@ -2061,7 +2331,7 @@
             },
             {
               "type": "message",
-              "message": "\ud83d\udc80 **[user]** got swept by the bot in rock, paper, scissors.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+              "message": "💀 **[user]** got swept by the bot in rock, paper, scissors.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
@@ -2077,7 +2347,7 @@
             },
             {
               "type": "message",
-              "message": "\ud83d\ude05 **[user]** fought to **[score]** round(s) but lost the match.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+              "message": "😅 **[user]** fought to **[score]** round(s) but lost the match.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         },
@@ -2093,13 +2363,13 @@
             },
             {
               "type": "message",
-              "message": "\ud83c\udfc6 **[user]** BEAT the bot! **+[secs]s** added to the pump timer!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+              "message": "🏆 **[user]** BEAT the bot! **+[secs]s** added to the pump timer!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
             }
           ]
         }
       ],
       "luck": null,
-      "intro": "\u270a\u270b\u270c\ufe0f **[user]** challenges the bot to **Rock-Paper-Scissors** \u2014 first to 3![cmd_remain_note]",
+      "intro": "✊✋✌️ **[user]** challenges the bot to **Rock-Paper-Scissors** — first to 3![cmd_remain_note]",
       "intro_embed": false,
       "intro_title": "",
       "start_events": []
@@ -2124,7 +2394,7 @@
             },
             {
               "type": "message",
-              "message": "\ud83c\udfb0 no match \u2014 better luck next pull, **[user]** - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+              "message": "🎰 no match — better luck next pull, **[user]** - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
             }
           ]
         },
@@ -2140,7 +2410,7 @@
             },
             {
               "type": "message",
-              "message": "\ud83c\udfb0 **[user]** hit a pair \u2014 small win! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+              "message": "🎰 **[user]** hit a pair — small win! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
             }
           ]
         },
@@ -2156,13 +2426,13 @@
             },
             {
               "type": "message",
-              "message": "\ud83c\udfb0\ud83c\udf89 **JACKPOT!** **[user]** hit three of a kind! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+              "message": "🎰🎉 **JACKPOT!** **[user]** hit three of a kind! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
             }
           ]
         }
       ],
       "luck": null,
-      "intro": "\ud83c\udfb0 **[user]** pulls the lever\u2026[cmd_remain_note]",
+      "intro": "🎰 **[user]** pulls the lever…[cmd_remain_note]",
       "intro_embed": false,
       "intro_title": "",
       "start_events": []
@@ -2185,7 +2455,7 @@
             },
             {
               "type": "message",
-              "message": "\ud83c\udccf **[user]** lost the hand. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+              "message": "🃏 **[user]** lost the hand. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
             }
           ]
         },
@@ -2201,7 +2471,7 @@
             },
             {
               "type": "message",
-              "message": "\ud83c\udccf **[user]** pushed \u2014 a wash. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+              "message": "🃏 **[user]** pushed — a wash. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
             }
           ]
         },
@@ -2217,7 +2487,7 @@
             },
             {
               "type": "message",
-              "message": "\ud83c\udccf **[user]** beat the dealer! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+              "message": "🃏 **[user]** beat the dealer! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
             }
           ]
         },
@@ -2233,13 +2503,13 @@
             },
             {
               "type": "message",
-              "message": "\ud83c\udccf\ud83c\udca1 **BLACKJACK!** **[user] dominated the dealer!** \u2014 [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+              "message": "🃏🂡 **BLACKJACK!** **[user] dominated the dealer!** — [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
             }
           ]
         }
       ],
       "luck": null,
-      "intro": "\ud83c\udccf **[user]** sits down at the blackjack table\u2026[cmd_remain_note]",
+      "intro": "🃏 **[user]** sits down at the blackjack table…[cmd_remain_note]",
       "intro_embed": false,
       "intro_title": "",
       "start_events": []
@@ -2349,7 +2619,7 @@
           "visible": true,
           "group": "Main",
           "z": 0,
-          "opacity": 77,
+          "opacity": 100,
           "delay": 0,
           "h": 0.24888888888888894,
           "size": 0.06,
@@ -2380,7 +2650,7 @@
           "visible": true,
           "group": "Main",
           "z": 0,
-          "opacity": 75,
+          "opacity": 100,
           "delay": 0,
           "h": 0.22864197530864194,
           "size": 0.06,
@@ -2411,7 +2681,7 @@
           "visible": true,
           "group": "Main",
           "z": 0,
-          "opacity": 75,
+          "opacity": 100,
           "delay": 0,
           "h": 0.25,
           "size": 0.06,
@@ -2442,7 +2712,7 @@
           "visible": true,
           "group": "Main",
           "z": 0,
-          "opacity": 75,
+          "opacity": 100,
           "delay": 0,
           "h": 0.18358024691358021,
           "size": 0.06,
@@ -2520,7 +2790,7 @@
           "visible": false,
           "group": "Main",
           "z": 20,
-          "opacity": 67,
+          "opacity": 100,
           "delay": 0,
           "size": 0.04072463768115948,
           "color": "#ffffff",
@@ -2614,11 +2884,11 @@
         },
         "system_buffer_seconds": 8,
         "capacity_message": "[announce] - Current Capacity: **[capacity]%**\n[capacity_bar]",
-        "pumptimer_message": "\u23f1\ufe0f [timer] seconds left on the pump timer.",
+        "pumptimer_message": "⏱️ [timer] seconds left on the pump timer.",
         "pump_message": "**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
-        "cooldown_message": "\u23f3 [mention], [cmd] is on cooldown \u2014 [cooldown]s left until you can use it again.",
+        "cooldown_message": "⏳ [mention], [cmd] is on cooldown — [cooldown]s left until you can use it again.",
         "capacity_embed": true,
-        "capacity_title": "\ud83d\udcca Capacity",
+        "capacity_title": "📊 Capacity",
         "pumptimer_embed": false,
         "pumptimer_title": "",
         "cooldown_embed": false,
@@ -2660,7 +2930,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]fill[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "💨 [mention] used [prefix]fill[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -2701,7 +2971,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]inflate[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "💨 [mention] used [prefix]inflate[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -2742,7 +3012,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]pump[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "💨 [mention] used [prefix]pump[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -2783,7 +3053,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]squeeze[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "💨 [mention] used [prefix]squeeze[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -2824,7 +3094,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]tease[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "💨 [mention] used [prefix]tease[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -2865,7 +3135,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]topup[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "💨 [mention] used [prefix]topup[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -2934,7 +3204,7 @@
               "PumpRoulette"
             ],
             "range_gate": "all",
-            "description": "spin the pump roulette \u2014 3 rounds of 50/50 +5s or +20s",
+            "description": "spin the pump roulette — 3 rounds of 50/50 +5s or +20s",
             "hide_in_list": false,
             "react_only": false,
             "react_emoji": "",
@@ -2955,10 +3225,10 @@
             "actions": [
               {
                 "type": "message",
-                "message": "**[user]** spins the roulette wheel\u2026[cmd_remain_note]"
+                "message": "**[user]** spins the roulette wheel…[cmd_remain_note]"
               }
             ],
-            "notify_enabled": false,
+            "notify_enabled": true,
             "notify": "[user] just triggered [command]"
           },
           {
@@ -2972,7 +3242,7 @@
             "device_id": null,
             "start_events": [],
             "range_gate": "all",
-            "description": "push-your-luck minigame \u2014 pump for points, bank before you bust",
+            "description": "push-your-luck minigame — pump for points, bank before you bust",
             "hide_in_list": false,
             "mention": false,
             "react_only": false,
@@ -3005,7 +3275,7 @@
             "device_id": null,
             "start_events": [],
             "range_gate": "all",
-            "description": "memory minigame \u2014 repeat the growing emoji sequence",
+            "description": "memory minigame — repeat the growing emoji sequence",
             "hide_in_list": false,
             "mention": false,
             "react_only": false,
@@ -3038,7 +3308,7 @@
             "device_id": null,
             "start_events": [],
             "range_gate": "all",
-            "description": "don't-pop-it minigame \u2014 reveal safe cells, avoid the balloons",
+            "description": "don't-pop-it minigame — reveal safe cells, avoid the balloons",
             "hide_in_list": false,
             "mention": false,
             "react_only": false,
@@ -3104,7 +3374,7 @@
             "device_id": null,
             "start_events": [],
             "range_gate": "all",
-            "description": "public slot machine \u2014 one pull, tiered payout",
+            "description": "public slot machine — one pull, tiered payout",
             "hide_in_list": false,
             "mention": false,
             "react_only": false,
@@ -3137,7 +3407,7 @@
             "device_id": null,
             "start_events": [],
             "range_gate": "all",
-            "description": "blackjack (21) vs the bot \u2014 hit or stand",
+            "description": "blackjack (21) vs the bot — hit or stand",
             "hide_in_list": false,
             "mention": false,
             "react_only": false,
@@ -3163,14 +3433,14 @@
             "name": "agroll",
             "type": "actions",
             "enabled": true,
-            "description": "Roll the dice \u2014 the result becomes pump seconds",
+            "description": "Roll the dice — the result becomes pump seconds",
             "actions": [
               {
                 "type": "roll"
               },
               {
                 "type": "message",
-                "message": "\ud83c\udfb2 [mention] rolled **[dice]** and they landed on **[result]**\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "🎲 [mention] rolled **[dice]** and they landed on **[result]**\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -3193,7 +3463,7 @@
               },
               {
                 "type": "message",
-                "message": "\u2728 [mention] used the prize!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "✨ [mention] used the prize!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -3252,12 +3522,12 @@
         "broadcasts": [
           {
             "name": "Welcome",
-            "message": "\ud83d\udc4b Welcome in. [owner] is at [capacity]%. [syscom_help] for commands.",
+            "message": "👋 Welcome in. [owner] is at [capacity]%. [syscom_help] for commands.",
             "enabled": true
           },
           {
             "name": "LastCall",
-            "message": "\u23f3 Last call \u2014 [owner] is at [capacity]%.",
+            "message": "⏳ Last call — [owner] is at [capacity]%.",
             "enabled": true
           }
         ],
@@ -3270,8 +3540,8 @@
             ],
             "events": [],
             "enabled": false,
-            "message_on": "\ud83d\udd4a **Gentle mode** \u2014 only the softer commands are live.",
-            "message_off": "Gentle mode off \u2014 everything is back."
+            "message_on": "🕊 **Gentle mode** — only the softer commands are live.",
+            "message_off": "Gentle mode off — everything is back."
           }
         ],
         "prizes": [
@@ -3281,7 +3551,7 @@
             "counter": "roll",
             "goal": 3,
             "range_gate": "all",
-            "progress_message": "[mention] rolled a perfect score [[count]/[goal]] \u2014 [remaining] more will unlock a bonus command!",
+            "progress_message": "[mention] rolled a perfect score [[count]/[goal]] — [remaining] more will unlock a bonus command!",
             "actions": [
               {
                 "type": "award",
@@ -3293,7 +3563,7 @@
               },
               {
                 "type": "message",
-                "message": "[mention] has unlocked: [bonus_cmd] \u2014 SUPERPUMP - !superpump triggers a 40s burst of air\\nYou can use this command a total of [charges] times."
+                "message": "[mention] has unlocked: [bonus_cmd] — SUPERPUMP - !superpump triggers a 40s burst of air\\nYou can use this command a total of [charges] times."
               }
             ]
           }
@@ -3301,15 +3571,15 @@
         "owner_commands": [],
         "chat_buttons": [
           {
-            "label": "\ud83d\udd4a Mercy or More?",
+            "label": "🕊 Mercy or More?",
             "name": "mercypoll"
           },
           {
-            "label": "\ud83c\udf9b Which pump?",
+            "label": "🎛 Which pump?",
             "name": "pickpump"
           },
           {
-            "label": "\ud83d\udfe9 Word Race",
+            "label": "🟩 Word Race",
             "name": "wordrace"
           }
         ],
@@ -3327,11 +3597,11 @@
         "listener_on_title": "",
         "listener_off_embed": true,
         "listener_off_title": "",
-        "pause_message": "\u23f8\ufe0f **Session paused** by [user] \u2014 pumps are off and commands are disabled until the operator resumes.",
-        "resume_message": "\u25b6\ufe0f **Session resumed** by [user] \u2014 pump away!",
-        "paused_notice_message": "\u23f8\ufe0f [mention], the session is paused \u2014 hang tight until the operator resumes.",
+        "pause_message": "⏸️ **Session paused** by [user] — pumps are off and commands are disabled until the operator resumes.",
+        "resume_message": "▶️ **Session resumed** by [user] — pump away!",
+        "paused_notice_message": "⏸️ [mention], the session is paused — hang tight until the operator resumes.",
         "pause_embed": true,
-        "pause_title": "\u23f8 Paused",
+        "pause_title": "⏸ Paused",
         "output_headers": true,
         "rich_output": true,
         "capacity_ranges": [
@@ -3340,7 +3610,7 @@
             "max": 20,
             "dice": 6,
             "sides": 6,
-            "announce": "\ud83c\udf88 [operator] is barely inflated \u2014 you can do better than that!",
+            "announce": "🎈 [operator] is barely inflated — you can do better than that!",
             "milestone": "",
             "image": "",
             "cooldowns": {
@@ -3368,8 +3638,8 @@
             "max": 40,
             "dice": 4,
             "sides": 6,
-            "announce": "\ud83d\udca8 [operator] is filling out nicely, the first signs of bloating begin to appear.",
-            "milestone": "**MILESTONE:** \ud83d\udca8 [operator]'s belly starts to round out and press outward slightly. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+            "announce": "💨 [operator] is filling out nicely, the first signs of bloating begin to appear.",
+            "milestone": "**MILESTONE:** 💨 [operator]'s belly starts to round out and press outward slightly. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
             "image": "",
             "cooldowns": {
               "inflate": {
@@ -3397,8 +3667,8 @@
             "max": 60,
             "dice": 4,
             "sides": 6,
-            "announce": "\ud83c\udf88 [operator]'s belly is taut and pressurised, curves stretching tighter.",
-            "milestone": "**MILESTONE:** \ud83c\udf88 Halfway there \u2014 [operator]'s middle is firm and noticeably swollen. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+            "announce": "🎈 [operator]'s belly is taut and pressurised, curves stretching tighter.",
+            "milestone": "**MILESTONE:** 🎈 Halfway there — [operator]'s middle is firm and noticeably swollen. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
             "image": "",
             "cooldowns": {
               "pump": {
@@ -3426,8 +3696,8 @@
             "max": 80,
             "dice": 2,
             "sides": 4,
-            "announce": "\ud83c\udf88 [operator]'s belly is round, tight, and visibly swollen.",
-            "milestone": "**MILESTONE:** \ud83c\udf88 [operator] is seriously swollen now \u2014 the pressure is constant and building. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+            "announce": "🎈 [operator]'s belly is round, tight, and visibly swollen.",
+            "milestone": "**MILESTONE:** 🎈 [operator] is seriously swollen now — the pressure is constant and building. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
             "image": "",
             "cooldowns": {
               "squeeze": {
@@ -3457,8 +3727,8 @@
             "max": 90,
             "dice": 2,
             "sides": 4,
-            "announce": "\u26a0\ufe0f [operator] 's belly is stretched dangerously tight, groaning under the strain.",
-            "milestone": "**MILESTONE:** \u26a0\ufe0f [operator]'s gut is straining hard \u2014 one bold roll could tip them over! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+            "announce": "⚠️ [operator] 's belly is stretched dangerously tight, groaning under the strain.",
+            "milestone": "**MILESTONE:** ⚠️ [operator]'s gut is straining hard — one bold roll could tip them over! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
             "image": "",
             "cooldowns": {
               "tease": {
@@ -3487,8 +3757,8 @@
             "max": 100,
             "dice": 2,
             "sides": 4,
-            "announce": "\ud83d\udea8 [operator]'s belly is at the absolute brink, creaking and ready to pop''.",
-            "milestone": "**MILESTONE:** \ud83d\udea8 The edge! [operator] has reached maximum capacity and can't take much more! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]\n",
+            "announce": "🚨 [operator]'s belly is at the absolute brink, creaking and ready to pop''.",
+            "milestone": "**MILESTONE:** 🚨 The edge! [operator] has reached maximum capacity and can't take much more! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]\n",
             "image": "",
             "cooldowns": {
               "topup": {
@@ -3517,8 +3787,8 @@
             "max": 110,
             "dice": 2,
             "sides": 4,
-            "announce": "\ud83d\udea8 [operator] is at the absolute brink, creaking and ready to pop. Any minute now!",
-            "milestone": "**MILESTONE:** \ud83d\udea8 [operator] is going to pop at any second! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+            "announce": "🚨 [operator] is at the absolute brink, creaking and ready to pop. Any minute now!",
+            "milestone": "**MILESTONE:** 🚨 [operator] is going to pop at any second! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
             "image": "",
             "cooldowns": {
               "topup": {
@@ -3543,7 +3813,7 @@
             "is_end": true,
             "enabled": true,
             "end_only": false,
-            "final_message": "\ud83d\udca5 **BOOOOM!!**\nCongratulations! [operator] has popped!\n\n[off_message]"
+            "final_message": "💥 **BOOOOM!!**\nCongratulations! [operator] has popped!\n\n[off_message]"
           }
         ],
         "always_on_enabled": true,
@@ -3628,7 +3898,7 @@
             "post_actions": [
               {
                 "type": "message",
-                "message": "\ud83c\udfb0 **PumpRoulette** complete!"
+                "message": "🎰 **PumpRoulette** complete!"
               }
             ],
             "actions": [
@@ -3645,7 +3915,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udd34 **BIG HIT!** +20s pump! (Capacity now [capacity]%)\n[next_round]"
+                    "message": "🎰 **Round [current_loop]/[total_loops]** — 🔴 **BIG HIT!** +20s pump! (Capacity now [capacity]%)\n[next_round]"
                   }
                 ],
                 "miss_actions": [
@@ -3657,13 +3927,13 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udfe2 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]"
+                    "message": "🎰 **Round [current_loop]/[total_loops]** — 🟢 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]"
                   }
                 ]
               },
               {
                 "type": "notify",
-                "message": "\ud83c\udfb0 [user] added [secs]s to [device] \u00b7 Roulette [current_loop]/[total_loops]"
+                "message": "🎰 [user] added [secs]s to [device] · Roulette [current_loop]/[total_loops]"
               }
             ]
           },
@@ -3700,11 +3970,11 @@
             "actions": [
               {
                 "type": "message",
-                "message": "\ud83d\udcc8 **20%** \u2014 [owner] is starting to fill out."
+                "message": "📈 **20%** — [owner] is starting to fill out."
               },
               {
                 "type": "notify",
-                "message": "\ud83d\udcc8 20% reached"
+                "message": "📈 20% reached"
               }
             ],
             "post_actions": []
@@ -3716,11 +3986,11 @@
             "actions": [
               {
                 "type": "message",
-                "message": "\ud83d\udcc8 **Halfway.** [owner] is at [capacity]% \u2014 no going back now."
+                "message": "📈 **Halfway.** [owner] is at [capacity]% — no going back now."
               },
               {
                 "type": "notify",
-                "message": "\ud83d\udcc8 Halfway \u2014 [capacity]%"
+                "message": "📈 Halfway — [capacity]%"
               },
               {
                 "type": "fire",
@@ -3738,11 +4008,11 @@
             "actions": [
               {
                 "type": "message",
-                "message": "\ud83d\ude33 **70%** \u2014 things are getting tight."
+                "message": "😳 **70%** — things are getting tight."
               },
               {
                 "type": "notify",
-                "message": "\ud83d\ude33 70% \u2014 getting tight"
+                "message": "😳 70% — getting tight"
               }
             ],
             "post_actions": []
@@ -3754,11 +4024,11 @@
             "actions": [
               {
                 "type": "message",
-                "message": "\ud83d\udea8 **90%!** [owner] is nearly at capacity."
+                "message": "🚨 **90%!** [owner] is nearly at capacity."
               },
               {
                 "type": "notify",
-                "message": "\ud83d\udea8 90% \u2014 nearly there"
+                "message": "🚨 90% — nearly there"
               }
             ],
             "post_actions": []
@@ -3768,26 +4038,26 @@
           {
             "name": "Mercy",
             "title": "Mercy or More?",
-            "body": "[owner] is at [capacity]% \u2014 the room decides.",
+            "body": "[owner] is at [capacity]% — the room decides.",
             "duration": 60,
             "repeat_every": 0,
             "options": [
               {
-                "label": "Mercy \u2014 let them breathe",
+                "label": "Mercy — let them breathe",
                 "fallback": true,
                 "actions": [
                   {
                     "type": "message",
-                    "message": "\ud83d\udd4a The room shows mercy. No pump this round."
+                    "message": "🕊 The room shows mercy. No pump this round."
                   },
                   {
                     "type": "notify",
-                    "message": "\ud83d\udd4a Mercy \u2014 [capacity]%"
+                    "message": "🕊 Mercy — [capacity]%"
                   }
                 ]
               },
               {
-                "label": "More \u2014 keep going",
+                "label": "More — keep going",
                 "fallback": false,
                 "actions": [
                   {
@@ -3798,11 +4068,11 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83d\ude08 The room votes MORE \u2014 [secs]s! (now [capacity]%)"
+                    "message": "😈 The room votes MORE — [secs]s! (now [capacity]%)"
                   },
                   {
                     "type": "notify",
-                    "message": "\ud83d\ude08 The room voted MORE \u00b7 [command_overlay_desc]"
+                    "message": "😈 The room voted MORE · [command_overlay_desc]"
                   }
                 ]
               }
@@ -3827,11 +4097,11 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83d\udc22 Slow and steady \u2014 [secs]s."
+                    "message": "🐢 Slow and steady — [secs]s."
                   },
                   {
                     "type": "notify",
-                    "message": "\ud83d\udc22 Slow and steady \u00b7 [command_overlay_desc]"
+                    "message": "🐢 Slow and steady · [command_overlay_desc]"
                   }
                 ]
               },
@@ -3847,11 +4117,11 @@
                   },
                   {
                     "type": "message",
-                    "message": "\u26a1 Short and sharp \u2014 [secs]s."
+                    "message": "⚡ Short and sharp — [secs]s."
                   },
                   {
                     "type": "notify",
-                    "message": "\u26a1 Short and sharp \u00b7 [command_overlay_desc]"
+                    "message": "⚡ Short and sharp · [command_overlay_desc]"
                   }
                 ]
               }
@@ -3867,7 +4137,7 @@
             "metric": "total",
             "max_entries": 3,
             "required_entries": 1,
-            "title": "\ud83c\udfc1 Roll-off!",
+            "title": "🏁 Roll-off!",
             "body": "Press **Enter Challenge**, roll, and the highest total takes it.",
             "allow_reroll": false,
             "reroll_count": 1,
@@ -3881,7 +4151,7 @@
             "win_actions": [
               {
                 "type": "message",
-                "message": "\ud83c\udfc1 **[winner]** takes it with **[winner_score]**!"
+                "message": "🏁 **[winner]** takes it with **[winner_score]**!"
               },
               {
                 "type": "fire",
@@ -3891,13 +4161,13 @@
               },
               {
                 "type": "notify",
-                "message": "\ud83c\udfc1 [winner] won the roll-off"
+                "message": "🏁 [winner] won the roll-off"
               }
             ],
             "no_winner_actions": [
               {
                 "type": "message",
-                "message": "\ud83c\udfc1 Nobody entered \u2014 the wheel spins on."
+                "message": "🏁 Nobody entered — the wheel spins on."
               }
             ]
           },
@@ -3911,8 +4181,8 @@
             "metric": "total",
             "max_entries": 0,
             "required_entries": 1,
-            "title": "\ud83d\udfe9 Word Race!",
-            "body": "Press **Enter Challenge** for your own private grid. Everyone races the **same** hidden word \u2014 fewer guesses wins, and a tie goes to whoever got there first. \ud83d\udfe9 right letter, right place \u00b7 \ud83d\udfe8 right letter, wrong place.",
+            "title": "🟩 Word Race!",
+            "body": "Press **Enter Challenge** for your own private grid. Everyone races the **same** hidden word — fewer guesses wins, and a tie goes to whoever got there first. 🟩 right letter, right place · 🟨 right letter, wrong place.",
             "allow_reroll": false,
             "reroll_count": 1,
             "roll_specs": [],
@@ -3921,7 +4191,7 @@
             "win_actions": [
               {
                 "type": "message",
-                "message": "\ud83d\udfe9 **[winner]** took the Word Race with **[winner_score]** to spare!"
+                "message": "🟩 **[winner]** took the Word Race with **[winner_score]** to spare!"
               },
               {
                 "type": "fire",
@@ -3931,13 +4201,13 @@
               },
               {
                 "type": "notify",
-                "message": "\ud83d\udfe9 [winner] won the Word Race"
+                "message": "🟩 [winner] won the Word Race"
               }
             ],
             "no_winner_actions": [
               {
                 "type": "message",
-                "message": "\ud83d\udfe9 Nobody cracked it \u2014 the word lives to fight another day."
+                "message": "🟩 Nobody cracked it — the word lives to fight another day."
               }
             ]
           }
@@ -3946,7 +4216,7 @@
           {
             "name": "TeamPush",
             "type": "teamwork",
-            "title": "\ud83e\udd1d Team Push",
+            "title": "🤝 Team Push",
             "body": "Everyone holding banked volume can cash it in together.",
             "duration": 60,
             "confirm": "all",
@@ -3961,17 +4231,17 @@
               },
               {
                 "type": "message",
-                "message": "\ud83e\udd1d The team cashed in **[total_bonus_secs]s**!"
+                "message": "🤝 The team cashed in **[total_bonus_secs]s**!"
               },
               {
                 "type": "notify",
-                "message": "\ud83e\udd1d Team push \u00b7 [command_overlay_desc]"
+                "message": "🤝 Team push · [command_overlay_desc]"
               }
             ]
           }
         ],
-        "event_in_process_message": "\u23f3 [event] is already running.",
-        "event_cooldown_message": "\u23f3 [event] is on cooldown \u2014 [cooldown]s left.",
+        "event_in_process_message": "⏳ [event] is already running.",
+        "event_cooldown_message": "⏳ [event] is on cooldown — [cooldown]s left.",
         "minigames": [
           {
             "id": "mg:38259041",
@@ -3996,7 +4266,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83d\udca5 **[user]** busted out with **[score]**. Womp womp.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "💥 **[user]** busted out with **[score]**. Womp womp.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               },
@@ -4012,7 +4282,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83d\ude05 **[user]** banked **[score]** \u2014 a little reward!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "😅 **[user]** banked **[score]** — a little reward!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               },
@@ -4028,13 +4298,13 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83d\udd25 **[user]** cashed out a huge **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "🔥 **[user]** cashed out a huge **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               }
             ],
             "luck": null,
-            "intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it![cmd_remain_note]",
+            "intro": "🎰 **[user]** steps up to **Push Your Luck** — 💨 Pump for points or 🏦 Bank it![cmd_remain_note]",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []
@@ -4061,7 +4331,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\u274c **[user]** fumbled at round **[score]**.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "❌ **[user]** fumbled at round **[score]**.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               },
@@ -4077,7 +4347,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83d\udc4f **[user]** reached round **[score]** \u2014 nice!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "👏 **[user]** reached round **[score]** — nice!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               },
@@ -4093,7 +4363,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "🏆 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               },
@@ -4109,7 +4379,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "🏆 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               },
@@ -4125,13 +4395,13 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udfc6 **[user]** got a PERFECT SCORE **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "🏆 **[user]** got a PERFECT SCORE **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               }
             ],
             "luck": null,
-            "intro": "\ud83e\udde0 **[user]** takes on **Simon** \u2014 memorize the sequence, then repeat it![cmd_remain_note] ",
+            "intro": "🧠 **[user]** takes on **Simon** — memorize the sequence, then repeat it![cmd_remain_note] ",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []
@@ -4158,7 +4428,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83d\udca5 **[user]** popped a balloon and walked away with the bare minimum.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "💥 **[user]** popped a balloon and walked away with the bare minimum.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               },
@@ -4174,7 +4444,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udf88 **[user]** cashed out **[score]** \u2014 nice haul!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "🎈 **[user]** cashed out **[score]** — nice haul!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               },
@@ -4190,7 +4460,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "🎉 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               },
@@ -4206,13 +4476,13 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "🎉 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               }
             ],
             "luck": null,
-            "intro": "\ud83c\udf88 **[user]** plays **Don't Pop It** \u2014 reveal safe cells for points, or cash out before you hit a balloon![cmd_remain_note]",
+            "intro": "🎈 **[user]** plays **Don't Pop It** — reveal safe cells for points, or cash out before you hit a balloon![cmd_remain_note]",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []
@@ -4237,7 +4507,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83d\udc80 **[user]** got swept by the bot in rock, paper, scissors.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "💀 **[user]** got swept by the bot in rock, paper, scissors.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               },
@@ -4253,7 +4523,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83d\ude05 **[user]** fought to **[score]** round(s) but lost the match.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "😅 **[user]** fought to **[score]** round(s) but lost the match.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               },
@@ -4269,13 +4539,13 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udfc6 **[user]** BEAT the bot! **+[secs]s** added to the pump timer!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "🏆 **[user]** BEAT the bot! **+[secs]s** added to the pump timer!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               }
             ],
             "luck": null,
-            "intro": "\u270a\u270b\u270c\ufe0f **[user]** challenges the bot to **Rock-Paper-Scissors** \u2014 first to 3![cmd_remain_note]",
+            "intro": "✊✋✌️ **[user]** challenges the bot to **Rock-Paper-Scissors** — first to 3![cmd_remain_note]",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []
@@ -4300,7 +4570,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udfb0 no match \u2014 better luck next pull, **[user]** - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+                    "message": "🎰 no match — better luck next pull, **[user]** - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
                   }
                 ]
               },
@@ -4316,7 +4586,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udfb0 **[user]** hit a pair \u2014 small win! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+                    "message": "🎰 **[user]** hit a pair — small win! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
                   }
                 ]
               },
@@ -4332,13 +4602,13 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udfb0\ud83c\udf89 **JACKPOT!** **[user]** hit three of a kind! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+                    "message": "🎰🎉 **JACKPOT!** **[user]** hit three of a kind! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
                   }
                 ]
               }
             ],
             "luck": null,
-            "intro": "\ud83c\udfb0 **[user]** pulls the lever\u2026[cmd_remain_note]",
+            "intro": "🎰 **[user]** pulls the lever…[cmd_remain_note]",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []
@@ -4361,7 +4631,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udccf **[user]** lost the hand. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+                    "message": "🃏 **[user]** lost the hand. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
                   }
                 ]
               },
@@ -4377,7 +4647,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udccf **[user]** pushed \u2014 a wash. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+                    "message": "🃏 **[user]** pushed — a wash. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
                   }
                 ]
               },
@@ -4393,7 +4663,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udccf **[user]** beat the dealer! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+                    "message": "🃏 **[user]** beat the dealer! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
                   }
                 ]
               },
@@ -4409,20 +4679,20 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udccf\ud83c\udca1 **BLACKJACK!** **[user] dominated the dealer!** \u2014 [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+                    "message": "🃏🂡 **BLACKJACK!** **[user] dominated the dealer!** — [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
                   }
                 ]
               }
             ],
             "luck": null,
-            "intro": "\ud83c\udccf **[user]** sits down at the blackjack table\u2026[cmd_remain_note]",
+            "intro": "🃏 **[user]** sits down at the blackjack table…[cmd_remain_note]",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []
           }
         ],
         "resume_embed": true,
-        "resume_title": "\u25b6 Resumed"
+        "resume_title": "▶ Resumed"
       },
       "golive": {
         "intro_enabled": true,
@@ -4547,7 +4817,7 @@
           "visible": true,
           "group": "Main",
           "z": 0,
-          "opacity": 77,
+          "opacity": 100,
           "delay": 0,
           "h": 0.24888888888888894,
           "size": 0.06,
@@ -4578,7 +4848,7 @@
           "visible": true,
           "group": "Main",
           "z": 0,
-          "opacity": 75,
+          "opacity": 100,
           "delay": 0,
           "h": 0.22864197530864194,
           "size": 0.06,
@@ -4609,7 +4879,7 @@
           "visible": true,
           "group": "Main",
           "z": 0,
-          "opacity": 75,
+          "opacity": 100,
           "delay": 0,
           "h": 0.25,
           "size": 0.06,
@@ -4640,7 +4910,7 @@
           "visible": true,
           "group": "Main",
           "z": 0,
-          "opacity": 75,
+          "opacity": 100,
           "delay": 0,
           "h": 0.18358024691358021,
           "size": 0.06,
@@ -4718,7 +4988,7 @@
           "visible": false,
           "group": "Main",
           "z": 20,
-          "opacity": 67,
+          "opacity": 100,
           "delay": 0,
           "size": 0.04072463768115948,
           "color": "#ffffff",
@@ -4811,11 +5081,11 @@
         },
         "system_buffer_seconds": 8,
         "capacity_message": "[announce] - Current Capacity: **[capacity]%**\n[capacity_bar]",
-        "pumptimer_message": "\u23f1\ufe0f [timer] seconds left on the pump timer.",
+        "pumptimer_message": "⏱️ [timer] seconds left on the pump timer.",
         "pump_message": "**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s",
-        "cooldown_message": "\u23f3 [mention], [cmd] is on cooldown \u2014 [cooldown]s left until you can use it again.",
+        "cooldown_message": "⏳ [mention], [cmd] is on cooldown — [cooldown]s left until you can use it again.",
         "capacity_embed": true,
-        "capacity_title": "\ud83d\udcca Capacity",
+        "capacity_title": "📊 Capacity",
         "pumptimer_embed": false,
         "pumptimer_title": "",
         "cooldown_embed": false,
@@ -4857,7 +5127,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]fill[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "💨 [mention] used [prefix]fill[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -4898,7 +5168,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]inflate[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "💨 [mention] used [prefix]inflate[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -4939,7 +5209,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]pump[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "💨 [mention] used [prefix]pump[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -4980,7 +5250,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]squeeze[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "💨 [mention] used [prefix]squeeze[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -5021,7 +5291,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]tease[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "💨 [mention] used [prefix]tease[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -5062,7 +5332,7 @@
               },
               {
                 "type": "message",
-                "message": "\ud83d\udca8 [mention] used [prefix]topup[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "💨 [mention] used [prefix]topup[cmd_remain_note]\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -5131,7 +5401,7 @@
               "PumpRoulette"
             ],
             "range_gate": "all",
-            "description": "spin the pump roulette \u2014 3 rounds of 50/50 +5s or +20s",
+            "description": "spin the pump roulette — 3 rounds of 50/50 +5s or +20s",
             "hide_in_list": false,
             "react_only": false,
             "react_emoji": "",
@@ -5152,10 +5422,10 @@
             "actions": [
               {
                 "type": "message",
-                "message": "**[user]** spins the roulette wheel\u2026[cmd_remain_note]"
+                "message": "**[user]** spins the roulette wheel…[cmd_remain_note]"
               }
             ],
-            "notify_enabled": false,
+            "notify_enabled": true,
             "notify": "[user] just triggered [command]"
           },
           {
@@ -5169,7 +5439,7 @@
             "device_id": null,
             "start_events": [],
             "range_gate": "all",
-            "description": "push-your-luck minigame \u2014 pump for points, bank before you bust",
+            "description": "push-your-luck minigame — pump for points, bank before you bust",
             "hide_in_list": false,
             "mention": false,
             "react_only": false,
@@ -5202,7 +5472,7 @@
             "device_id": null,
             "start_events": [],
             "range_gate": "all",
-            "description": "memory minigame \u2014 repeat the growing emoji sequence",
+            "description": "memory minigame — repeat the growing emoji sequence",
             "hide_in_list": false,
             "mention": false,
             "react_only": false,
@@ -5235,7 +5505,7 @@
             "device_id": null,
             "start_events": [],
             "range_gate": "all",
-            "description": "don't-pop-it minigame \u2014 reveal safe cells, avoid the balloons",
+            "description": "don't-pop-it minigame — reveal safe cells, avoid the balloons",
             "hide_in_list": false,
             "mention": false,
             "react_only": false,
@@ -5301,7 +5571,7 @@
             "device_id": null,
             "start_events": [],
             "range_gate": "all",
-            "description": "public slot machine \u2014 one pull, tiered payout",
+            "description": "public slot machine — one pull, tiered payout",
             "hide_in_list": false,
             "mention": false,
             "react_only": false,
@@ -5334,7 +5604,7 @@
             "device_id": null,
             "start_events": [],
             "range_gate": "all",
-            "description": "blackjack (21) vs the bot \u2014 hit or stand",
+            "description": "blackjack (21) vs the bot — hit or stand",
             "hide_in_list": false,
             "mention": false,
             "react_only": false,
@@ -5360,14 +5630,14 @@
             "name": "agroll",
             "type": "actions",
             "enabled": true,
-            "description": "Roll the dice \u2014 the result becomes pump seconds",
+            "description": "Roll the dice — the result becomes pump seconds",
             "actions": [
               {
                 "type": "roll"
               },
               {
                 "type": "message",
-                "message": "\ud83c\udfb2 [mention] rolled **[dice]** and they landed on **[result]**\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "🎲 [mention] rolled **[dice]** and they landed on **[result]**\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -5390,7 +5660,7 @@
               },
               {
                 "type": "message",
-                "message": "\u2728 [mention] used the prize!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
+                "message": "✨ [mention] used the prize!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s capacity by **+[secs2capacity]%**\nCurrent Capacity: **[capacity]%** Remaining Pump Timer: **[timer]**s"
               }
             ],
             "notify_enabled": true,
@@ -5449,12 +5719,12 @@
         "broadcasts": [
           {
             "name": "Welcome",
-            "message": "\ud83d\udc4b Welcome in. [owner] is at [capacity]%. [syscom_help] for commands.",
+            "message": "👋 Welcome in. [owner] is at [capacity]%. [syscom_help] for commands.",
             "enabled": true
           },
           {
             "name": "LastCall",
-            "message": "\u23f3 Last call \u2014 [owner] is at [capacity]%.",
+            "message": "⏳ Last call — [owner] is at [capacity]%.",
             "enabled": true
           }
         ],
@@ -5467,8 +5737,8 @@
             ],
             "events": [],
             "enabled": false,
-            "message_on": "\ud83d\udd4a **Gentle mode** \u2014 only the softer commands are live.",
-            "message_off": "Gentle mode off \u2014 everything is back."
+            "message_on": "🕊 **Gentle mode** — only the softer commands are live.",
+            "message_off": "Gentle mode off — everything is back."
           }
         ],
         "prizes": [
@@ -5478,7 +5748,7 @@
             "counter": "roll",
             "goal": 3,
             "range_gate": "all",
-            "progress_message": "[mention] rolled a perfect score [[count]/[goal]] \u2014 [remaining] more will unlock a bonus command!",
+            "progress_message": "[mention] rolled a perfect score [[count]/[goal]] — [remaining] more will unlock a bonus command!",
             "actions": [
               {
                 "type": "award",
@@ -5490,7 +5760,7 @@
               },
               {
                 "type": "message",
-                "message": "[mention] has unlocked: [bonus_cmd] \u2014 SUPERPUMP - !superpump triggers a 40s burst of air\\nYou can use this command a total of [charges] times."
+                "message": "[mention] has unlocked: [bonus_cmd] — SUPERPUMP - !superpump triggers a 40s burst of air\\nYou can use this command a total of [charges] times."
               }
             ]
           }
@@ -5498,15 +5768,15 @@
         "owner_commands": [],
         "chat_buttons": [
           {
-            "label": "\ud83d\udd4a Mercy or More?",
+            "label": "🕊 Mercy or More?",
             "name": "mercypoll"
           },
           {
-            "label": "\ud83c\udf9b Which pump?",
+            "label": "🎛 Which pump?",
             "name": "pickpump"
           },
           {
-            "label": "\ud83d\udfe9 Word Race",
+            "label": "🟩 Word Race",
             "name": "wordrace"
           }
         ],
@@ -5524,11 +5794,11 @@
         "listener_on_title": "",
         "listener_off_embed": true,
         "listener_off_title": "",
-        "pause_message": "\u23f8\ufe0f **Session paused** by [user] \u2014 pumps are off and commands are disabled until the operator resumes.",
-        "resume_message": "\u25b6\ufe0f **Session resumed** by [user] \u2014 pump away!",
-        "paused_notice_message": "\u23f8\ufe0f [mention], the session is paused \u2014 hang tight until the operator resumes.",
+        "pause_message": "⏸️ **Session paused** by [user] — pumps are off and commands are disabled until the operator resumes.",
+        "resume_message": "▶️ **Session resumed** by [user] — pump away!",
+        "paused_notice_message": "⏸️ [mention], the session is paused — hang tight until the operator resumes.",
         "pause_embed": true,
-        "pause_title": "\u23f8 Paused",
+        "pause_title": "⏸ Paused",
         "output_headers": true,
         "rich_output": true,
         "capacity_ranges": [
@@ -5537,7 +5807,7 @@
             "max": 20,
             "dice": 6,
             "sides": 6,
-            "announce": "\ud83c\udf88 [operator] is barely inflated \u2014 you can do better than that!",
+            "announce": "🎈 [operator] is barely inflated — you can do better than that!",
             "milestone": "",
             "image": "",
             "cooldowns": {
@@ -5565,8 +5835,8 @@
             "max": 40,
             "dice": 4,
             "sides": 6,
-            "announce": "\ud83d\udca8 [operator] is filling out nicely, the first signs of bloating begin to appear.",
-            "milestone": "**MILESTONE:** \ud83d\udca8 [operator]'s belly starts to round out and press outward slightly. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+            "announce": "💨 [operator] is filling out nicely, the first signs of bloating begin to appear.",
+            "milestone": "**MILESTONE:** 💨 [operator]'s belly starts to round out and press outward slightly. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
             "image": "",
             "cooldowns": {
               "inflate": {
@@ -5594,8 +5864,8 @@
             "max": 60,
             "dice": 4,
             "sides": 6,
-            "announce": "\ud83c\udf88 [operator]'s belly is taut and pressurised, curves stretching tighter.",
-            "milestone": "**MILESTONE:** \ud83c\udf88 Halfway there \u2014 [operator]'s middle is firm and noticeably swollen. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+            "announce": "🎈 [operator]'s belly is taut and pressurised, curves stretching tighter.",
+            "milestone": "**MILESTONE:** 🎈 Halfway there — [operator]'s middle is firm and noticeably swollen. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
             "image": "",
             "cooldowns": {
               "pump": {
@@ -5623,8 +5893,8 @@
             "max": 80,
             "dice": 2,
             "sides": 4,
-            "announce": "\ud83c\udf88 [operator]'s belly is round, tight, and visibly swollen.",
-            "milestone": "**MILESTONE:** \ud83c\udf88 [operator] is seriously swollen now \u2014 the pressure is constant and building. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+            "announce": "🎈 [operator]'s belly is round, tight, and visibly swollen.",
+            "milestone": "**MILESTONE:** 🎈 [operator] is seriously swollen now — the pressure is constant and building. ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
             "image": "",
             "cooldowns": {
               "squeeze": {
@@ -5654,8 +5924,8 @@
             "max": 90,
             "dice": 2,
             "sides": 4,
-            "announce": "\u26a0\ufe0f [operator] 's belly is stretched dangerously tight, groaning under the strain.",
-            "milestone": "**MILESTONE:** \u26a0\ufe0f [operator]'s gut is straining hard \u2014 one bold roll could tip them over! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+            "announce": "⚠️ [operator] 's belly is stretched dangerously tight, groaning under the strain.",
+            "milestone": "**MILESTONE:** ⚠️ [operator]'s gut is straining hard — one bold roll could tip them over! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
             "image": "",
             "cooldowns": {
               "tease": {
@@ -5684,8 +5954,8 @@
             "max": 100,
             "dice": 2,
             "sides": 4,
-            "announce": "\ud83d\udea8 [operator]'s belly is at the absolute brink, creaking and ready to pop''.",
-            "milestone": "**MILESTONE:** \ud83d\udea8 The edge! [operator] has reached maximum capacity and can't take much more! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]\n",
+            "announce": "🚨 [operator]'s belly is at the absolute brink, creaking and ready to pop''.",
+            "milestone": "**MILESTONE:** 🚨 The edge! [operator] has reached maximum capacity and can't take much more! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]\n",
             "image": "",
             "cooldowns": {
               "topup": {
@@ -5714,8 +5984,8 @@
             "max": 110,
             "dice": 2,
             "sides": 4,
-            "announce": "\ud83d\udea8 [operator] is at the absolute brink, creaking and ready to pop. Any minute now!",
-            "milestone": "**MILESTONE:** \ud83d\udea8 [operator] is going to pop at any second! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
+            "announce": "🚨 [operator] is at the absolute brink, creaking and ready to pop. Any minute now!",
+            "milestone": "**MILESTONE:** 🚨 [operator] is going to pop at any second! ([capacity]%)\n[capacity_bar]\n\n[custom_commands]",
             "image": "",
             "cooldowns": {
               "topup": {
@@ -5740,7 +6010,7 @@
             "is_end": true,
             "enabled": true,
             "end_only": false,
-            "final_message": "\ud83d\udca5 **BOOOOM!!**\nCongratulations! [operator] has popped!\n\n[off_message]"
+            "final_message": "💥 **BOOOOM!!**\nCongratulations! [operator] has popped!\n\n[off_message]"
           }
         ],
         "always_on_enabled": true,
@@ -5825,7 +6095,7 @@
             "post_actions": [
               {
                 "type": "message",
-                "message": "\ud83c\udfb0 **PumpRoulette** complete!"
+                "message": "🎰 **PumpRoulette** complete!"
               }
             ],
             "actions": [
@@ -5842,7 +6112,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udd34 **BIG HIT!** +20s pump! (Capacity now [capacity]%)\n[next_round]"
+                    "message": "🎰 **Round [current_loop]/[total_loops]** — 🔴 **BIG HIT!** +20s pump! (Capacity now [capacity]%)\n[next_round]"
                   }
                 ],
                 "miss_actions": [
@@ -5854,13 +6124,13 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udfb0 **Round [current_loop]/[total_loops]** \u2014 \ud83d\udfe2 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]"
+                    "message": "🎰 **Round [current_loop]/[total_loops]** — 🟢 lucky, only +5s. (Capacity now [capacity]%)\n[next_round]"
                   }
                 ]
               },
               {
                 "type": "notify",
-                "message": "\ud83c\udfb0 [user] added [secs]s to [device] \u00b7 Roulette [current_loop]/[total_loops]"
+                "message": "🎰 [user] added [secs]s to [device] · Roulette [current_loop]/[total_loops]"
               }
             ]
           },
@@ -5897,11 +6167,11 @@
             "actions": [
               {
                 "type": "message",
-                "message": "\ud83d\udcc8 **20%** \u2014 [owner] is starting to fill out."
+                "message": "📈 **20%** — [owner] is starting to fill out."
               },
               {
                 "type": "notify",
-                "message": "\ud83d\udcc8 20% reached"
+                "message": "📈 20% reached"
               }
             ],
             "post_actions": []
@@ -5913,11 +6183,11 @@
             "actions": [
               {
                 "type": "message",
-                "message": "\ud83d\udcc8 **Halfway.** [owner] is at [capacity]% \u2014 no going back now."
+                "message": "📈 **Halfway.** [owner] is at [capacity]% — no going back now."
               },
               {
                 "type": "notify",
-                "message": "\ud83d\udcc8 Halfway \u2014 [capacity]%"
+                "message": "📈 Halfway — [capacity]%"
               },
               {
                 "type": "fire",
@@ -5935,11 +6205,11 @@
             "actions": [
               {
                 "type": "message",
-                "message": "\ud83d\ude33 **70%** \u2014 things are getting tight."
+                "message": "😳 **70%** — things are getting tight."
               },
               {
                 "type": "notify",
-                "message": "\ud83d\ude33 70% \u2014 getting tight"
+                "message": "😳 70% — getting tight"
               }
             ],
             "post_actions": []
@@ -5951,11 +6221,11 @@
             "actions": [
               {
                 "type": "message",
-                "message": "\ud83d\udea8 **90%!** [owner] is nearly at capacity."
+                "message": "🚨 **90%!** [owner] is nearly at capacity."
               },
               {
                 "type": "notify",
-                "message": "\ud83d\udea8 90% \u2014 nearly there"
+                "message": "🚨 90% — nearly there"
               }
             ],
             "post_actions": []
@@ -5965,26 +6235,26 @@
           {
             "name": "Mercy",
             "title": "Mercy or More?",
-            "body": "[owner] is at [capacity]% \u2014 the room decides.",
+            "body": "[owner] is at [capacity]% — the room decides.",
             "duration": 60,
             "repeat_every": 0,
             "options": [
               {
-                "label": "Mercy \u2014 let them breathe",
+                "label": "Mercy — let them breathe",
                 "fallback": true,
                 "actions": [
                   {
                     "type": "message",
-                    "message": "\ud83d\udd4a The room shows mercy. No pump this round."
+                    "message": "🕊 The room shows mercy. No pump this round."
                   },
                   {
                     "type": "notify",
-                    "message": "\ud83d\udd4a Mercy \u2014 [capacity]%"
+                    "message": "🕊 Mercy — [capacity]%"
                   }
                 ]
               },
               {
-                "label": "More \u2014 keep going",
+                "label": "More — keep going",
                 "fallback": false,
                 "actions": [
                   {
@@ -5995,11 +6265,11 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83d\ude08 The room votes MORE \u2014 [secs]s! (now [capacity]%)"
+                    "message": "😈 The room votes MORE — [secs]s! (now [capacity]%)"
                   },
                   {
                     "type": "notify",
-                    "message": "\ud83d\ude08 The room voted MORE \u00b7 [command_overlay_desc]"
+                    "message": "😈 The room voted MORE · [command_overlay_desc]"
                   }
                 ]
               }
@@ -6024,11 +6294,11 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83d\udc22 Slow and steady \u2014 [secs]s."
+                    "message": "🐢 Slow and steady — [secs]s."
                   },
                   {
                     "type": "notify",
-                    "message": "\ud83d\udc22 Slow and steady \u00b7 [command_overlay_desc]"
+                    "message": "🐢 Slow and steady · [command_overlay_desc]"
                   }
                 ]
               },
@@ -6044,11 +6314,11 @@
                   },
                   {
                     "type": "message",
-                    "message": "\u26a1 Short and sharp \u2014 [secs]s."
+                    "message": "⚡ Short and sharp — [secs]s."
                   },
                   {
                     "type": "notify",
-                    "message": "\u26a1 Short and sharp \u00b7 [command_overlay_desc]"
+                    "message": "⚡ Short and sharp · [command_overlay_desc]"
                   }
                 ]
               }
@@ -6064,7 +6334,7 @@
             "metric": "total",
             "max_entries": 3,
             "required_entries": 1,
-            "title": "\ud83c\udfc1 Roll-off!",
+            "title": "🏁 Roll-off!",
             "body": "Press **Enter Challenge**, roll, and the highest total takes it.",
             "allow_reroll": false,
             "reroll_count": 1,
@@ -6078,7 +6348,7 @@
             "win_actions": [
               {
                 "type": "message",
-                "message": "\ud83c\udfc1 **[winner]** takes it with **[winner_score]**!"
+                "message": "🏁 **[winner]** takes it with **[winner_score]**!"
               },
               {
                 "type": "fire",
@@ -6088,13 +6358,13 @@
               },
               {
                 "type": "notify",
-                "message": "\ud83c\udfc1 [winner] won the roll-off"
+                "message": "🏁 [winner] won the roll-off"
               }
             ],
             "no_winner_actions": [
               {
                 "type": "message",
-                "message": "\ud83c\udfc1 Nobody entered \u2014 the wheel spins on."
+                "message": "🏁 Nobody entered — the wheel spins on."
               }
             ]
           },
@@ -6108,8 +6378,8 @@
             "metric": "total",
             "max_entries": 0,
             "required_entries": 1,
-            "title": "\ud83d\udfe9 Word Race!",
-            "body": "Press **Enter Challenge** for your own private grid. Everyone races the **same** hidden word \u2014 fewer guesses wins, and a tie goes to whoever got there first. \ud83d\udfe9 right letter, right place \u00b7 \ud83d\udfe8 right letter, wrong place.",
+            "title": "🟩 Word Race!",
+            "body": "Press **Enter Challenge** for your own private grid. Everyone races the **same** hidden word — fewer guesses wins, and a tie goes to whoever got there first. 🟩 right letter, right place · 🟨 right letter, wrong place.",
             "allow_reroll": false,
             "reroll_count": 1,
             "roll_specs": [],
@@ -6118,7 +6388,7 @@
             "win_actions": [
               {
                 "type": "message",
-                "message": "\ud83d\udfe9 **[winner]** took the Word Race with **[winner_score]** to spare!"
+                "message": "🟩 **[winner]** took the Word Race with **[winner_score]** to spare!"
               },
               {
                 "type": "fire",
@@ -6128,13 +6398,13 @@
               },
               {
                 "type": "notify",
-                "message": "\ud83d\udfe9 [winner] won the Word Race"
+                "message": "🟩 [winner] won the Word Race"
               }
             ],
             "no_winner_actions": [
               {
                 "type": "message",
-                "message": "\ud83d\udfe9 Nobody cracked it \u2014 the word lives to fight another day."
+                "message": "🟩 Nobody cracked it — the word lives to fight another day."
               }
             ]
           }
@@ -6143,7 +6413,7 @@
           {
             "name": "TeamPush",
             "type": "teamwork",
-            "title": "\ud83e\udd1d Team Push",
+            "title": "🤝 Team Push",
             "body": "Everyone holding banked volume can cash it in together.",
             "duration": 60,
             "confirm": "all",
@@ -6158,17 +6428,17 @@
               },
               {
                 "type": "message",
-                "message": "\ud83e\udd1d The team cashed in **[total_bonus_secs]s**!"
+                "message": "🤝 The team cashed in **[total_bonus_secs]s**!"
               },
               {
                 "type": "notify",
-                "message": "\ud83e\udd1d Team push \u00b7 [command_overlay_desc]"
+                "message": "🤝 Team push · [command_overlay_desc]"
               }
             ]
           }
         ],
-        "event_in_process_message": "\u23f3 [event] is already running.",
-        "event_cooldown_message": "\u23f3 [event] is on cooldown \u2014 [cooldown]s left.",
+        "event_in_process_message": "⏳ [event] is already running.",
+        "event_cooldown_message": "⏳ [event] is on cooldown — [cooldown]s left.",
         "minigames": [
           {
             "id": "mg:38259041",
@@ -6193,7 +6463,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83d\udca5 **[user]** busted out with **[score]**. Womp womp.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "💥 **[user]** busted out with **[score]**. Womp womp.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               },
@@ -6209,7 +6479,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83d\ude05 **[user]** banked **[score]** \u2014 a little reward!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "😅 **[user]** banked **[score]** — a little reward!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               },
@@ -6225,13 +6495,13 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83d\udd25 **[user]** cashed out a huge **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "🔥 **[user]** cashed out a huge **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               }
             ],
             "luck": null,
-            "intro": "\ud83c\udfb0 **[user]** steps up to **Push Your Luck** \u2014 \ud83d\udca8 Pump for points or \ud83c\udfe6 Bank it![cmd_remain_note]",
+            "intro": "🎰 **[user]** steps up to **Push Your Luck** — 💨 Pump for points or 🏦 Bank it![cmd_remain_note]",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []
@@ -6258,7 +6528,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\u274c **[user]** fumbled at round **[score]**.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "❌ **[user]** fumbled at round **[score]**.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               },
@@ -6274,7 +6544,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83d\udc4f **[user]** reached round **[score]** \u2014 nice!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "👏 **[user]** reached round **[score]** — nice!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               },
@@ -6290,7 +6560,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "🏆 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               },
@@ -6306,7 +6576,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udfc6 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "🏆 **[user]** crushed it to round **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               },
@@ -6322,13 +6592,13 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udfc6 **[user]** got a PERFECT SCORE **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "🏆 **[user]** got a PERFECT SCORE **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               }
             ],
             "luck": null,
-            "intro": "\ud83e\udde0 **[user]** takes on **Simon** \u2014 memorize the sequence, then repeat it![cmd_remain_note] ",
+            "intro": "🧠 **[user]** takes on **Simon** — memorize the sequence, then repeat it![cmd_remain_note] ",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []
@@ -6355,7 +6625,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83d\udca5 **[user]** popped a balloon and walked away with the bare minimum.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "💥 **[user]** popped a balloon and walked away with the bare minimum.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               },
@@ -6371,7 +6641,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udf88 **[user]** cashed out **[score]** \u2014 nice haul!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "🎈 **[user]** cashed out **[score]** — nice haul!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               },
@@ -6387,7 +6657,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "🎉 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               },
@@ -6403,13 +6673,13 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udf89 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "🎉 **[user]** cleaned up with **[score]**!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               }
             ],
             "luck": null,
-            "intro": "\ud83c\udf88 **[user]** plays **Don't Pop It** \u2014 reveal safe cells for points, or cash out before you hit a balloon![cmd_remain_note]",
+            "intro": "🎈 **[user]** plays **Don't Pop It** — reveal safe cells for points, or cash out before you hit a balloon![cmd_remain_note]",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []
@@ -6434,7 +6704,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83d\udc80 **[user]** got swept by the bot in rock, paper, scissors.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "💀 **[user]** got swept by the bot in rock, paper, scissors.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               },
@@ -6450,7 +6720,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83d\ude05 **[user]** fought to **[score]** round(s) but lost the match.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "😅 **[user]** fought to **[score]** round(s) but lost the match.\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               },
@@ -6466,13 +6736,13 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udfc6 **[user]** BEAT the bot! **+[secs]s** added to the pump timer!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
+                    "message": "🏆 **[user]** BEAT the bot! **+[secs]s** added to the pump timer!\n**[secs]** seconds have been added to the pump timer, and will increase [operator]'s volume by **+ [secs2capacity]%**"
                   }
                 ]
               }
             ],
             "luck": null,
-            "intro": "\u270a\u270b\u270c\ufe0f **[user]** challenges the bot to **Rock-Paper-Scissors** \u2014 first to 3![cmd_remain_note]",
+            "intro": "✊✋✌️ **[user]** challenges the bot to **Rock-Paper-Scissors** — first to 3![cmd_remain_note]",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []
@@ -6497,7 +6767,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udfb0 no match \u2014 better luck next pull, **[user]** - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+                    "message": "🎰 no match — better luck next pull, **[user]** - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
                   }
                 ]
               },
@@ -6513,7 +6783,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udfb0 **[user]** hit a pair \u2014 small win! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+                    "message": "🎰 **[user]** hit a pair — small win! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
                   }
                 ]
               },
@@ -6529,13 +6799,13 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udfb0\ud83c\udf89 **JACKPOT!** **[user]** hit three of a kind! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+                    "message": "🎰🎉 **JACKPOT!** **[user]** hit three of a kind! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
                   }
                 ]
               }
             ],
             "luck": null,
-            "intro": "\ud83c\udfb0 **[user]** pulls the lever\u2026[cmd_remain_note]",
+            "intro": "🎰 **[user]** pulls the lever…[cmd_remain_note]",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []
@@ -6558,7 +6828,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udccf **[user]** lost the hand. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+                    "message": "🃏 **[user]** lost the hand. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
                   }
                 ]
               },
@@ -6574,7 +6844,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udccf **[user]** pushed \u2014 a wash. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+                    "message": "🃏 **[user]** pushed — a wash. [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
                   }
                 ]
               },
@@ -6590,7 +6860,7 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udccf **[user]** beat the dealer! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+                    "message": "🃏 **[user]** beat the dealer! - [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
                   }
                 ]
               },
@@ -6606,20 +6876,20 @@
                   },
                   {
                     "type": "message",
-                    "message": "\ud83c\udccf\ud83c\udca1 **BLACKJACK!** **[user] dominated the dealer!** \u2014 [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
+                    "message": "🃏🂡 **BLACKJACK!** **[user] dominated the dealer!** — [secs] seconds have been added to the pump timer, and will increase [operator]'s volume by +[secs2capacity]% - Current Capacity: [capacity]% Remaining Pump Timer: [timer]s"
                   }
                 ]
               }
             ],
             "luck": null,
-            "intro": "\ud83c\udccf **[user]** sits down at the blackjack table\u2026[cmd_remain_note]",
+            "intro": "🃏 **[user]** sits down at the blackjack table…[cmd_remain_note]",
             "intro_embed": false,
             "intro_title": "",
             "start_events": []
           }
         ],
         "resume_embed": true,
-        "resume_title": "\u25b6 Resumed"
+        "resume_title": "▶ Resumed"
       },
       "golive": {
         "intro_enabled": true,
@@ -6641,6 +6911,622 @@
       "notify_overlay": "dfdefnotify",
       "pause_overlay": "Pause",
       "pristine": true
+    },
+    {
+      "name": "DiscoFlate Versus",
+      "mode": "multi",
+      "width": 1920,
+      "height": 1080,
+      "groups": [
+        "Intro",
+        "Round Intro",
+        "Main",
+        "Result",
+        "Intro Video",
+        "Round Video",
+        "Pause"
+      ],
+      "hidden_groups": [],
+      "intro_groups": [
+        "Intro",
+        "Intro Video"
+      ],
+      "overlays": [
+        {
+          "id": "bvIntroTitle",
+          "label": "VERSUS title",
+          "kind": "text",
+          "media": "",
+          "x": 0.1,
+          "y": 0.34,
+          "w": 0.8,
+          "mode": "hold",
+          "seconds": 5,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": true,
+          "group": "Intro",
+          "z": 0,
+          "opacity": 100,
+          "delay": 0,
+          "size": 0.16,
+          "color": "#ffffff",
+          "font": "bold",
+          "bg": "",
+          "text": "VERSUS",
+          "slide_in": false,
+          "slide_in_dir": "right",
+          "slide_in_secs": 0.45
+        },
+        {
+          "id": "bvIntroWho",
+          "label": "Both players",
+          "kind": "text",
+          "media": "",
+          "x": 0.1,
+          "y": 0.52,
+          "w": 0.8,
+          "mode": "hold",
+          "seconds": 5,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": true,
+          "group": "Intro",
+          "z": 0,
+          "opacity": 100,
+          "delay": 0,
+          "size": 0.065,
+          "color": "#ffffff",
+          "font": "bold",
+          "bg": "",
+          "text": "[multi_me_name]  vs  [multi_peer_name]",
+          "slide_in": false,
+          "slide_in_dir": "right",
+          "slide_in_secs": 0.45
+        },
+        {
+          "id": "bvIntroCost",
+          "label": "Countdown",
+          "kind": "text",
+          "media": "",
+          "x": 0.1,
+          "y": 0.63,
+          "w": 0.8,
+          "mode": "hold",
+          "seconds": 5,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": true,
+          "group": "Intro",
+          "z": 0,
+          "opacity": 100,
+          "delay": 0,
+          "size": 0.055,
+          "color": "#f4a828",
+          "font": "bold",
+          "bg": "",
+          "text": "starting in [intro_timer]",
+          "slide_in": false,
+          "slide_in_dir": "right",
+          "slide_in_secs": 0.45
+        },
+        {
+          "id": "bvRoundName",
+          "label": "Round name (big)",
+          "kind": "text",
+          "media": "",
+          "x": 0.05,
+          "y": 0.39,
+          "w": 0.9,
+          "mode": "hold",
+          "seconds": 5,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": true,
+          "group": "Round Intro",
+          "z": 0,
+          "opacity": 100,
+          "delay": 0,
+          "size": 0.155,
+          "color": "#ffffff",
+          "font": "bold",
+          "bg": "",
+          "text": "[multi_round_name]",
+          "slide_in": false,
+          "slide_in_dir": "right",
+          "slide_in_secs": 0.45
+        },
+        {
+          "id": "bvRoundTo",
+          "label": "Round target",
+          "kind": "text",
+          "media": "",
+          "x": 0.05,
+          "y": 0.565,
+          "w": 0.9,
+          "mode": "hold",
+          "seconds": 5,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": true,
+          "group": "Round Intro",
+          "z": 0,
+          "opacity": 100,
+          "delay": 0,
+          "size": 0.052,
+          "color": "#f4a828",
+          "font": "bold",
+          "bg": "",
+          "text": "first to [multi_round_target]%",
+          "slide_in": false,
+          "slide_in_dir": "right",
+          "slide_in_secs": 0.45
+        },
+        {
+          "id": "bvSoloGauge",
+          "label": "Your gauge",
+          "kind": "capacity_gauge",
+          "media": "",
+          "x": 0.014,
+          "y": 0.14,
+          "w": 0.72,
+          "mode": "hold",
+          "seconds": 5,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": true,
+          "group": "Main",
+          "z": 0,
+          "opacity": 100,
+          "delay": 0,
+          "slide_in": false,
+          "slide_in_dir": "left",
+          "slide_in_secs": 0.45,
+          "orient": "v",
+          "size": 0.035
+        },
+        {
+          "id": "bvSoloTimer",
+          "label": "Your pump timer",
+          "kind": "pump_timer",
+          "media": "",
+          "x": 0.008,
+          "y": 0.914,
+          "w": 0.32,
+          "mode": "hold",
+          "seconds": 5,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": true,
+          "group": "Main",
+          "z": 0,
+          "opacity": 100,
+          "delay": 0,
+          "size": 0.028,
+          "color": "#ffffff",
+          "font": "bold",
+          "bg": "",
+          "text": "",
+          "slide_in": false,
+          "slide_in_dir": "right",
+          "slide_in_secs": 0.45
+        },
+        {
+          "id": "bvSoloLabel",
+          "label": "Your label",
+          "kind": "text",
+          "media": "",
+          "x": 0.008,
+          "y": 0.872,
+          "w": 0.32,
+          "mode": "hold",
+          "seconds": 5,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": true,
+          "group": "Main",
+          "z": 0,
+          "opacity": 100,
+          "delay": 0,
+          "size": 0.03,
+          "color": "#ffffff",
+          "font": "bold",
+          "bg": "",
+          "text": "[multi_me_name] · [multi_my_pct]% of [multi_my_target]%",
+          "slide_in": false,
+          "slide_in_dir": "right",
+          "slide_in_secs": 0.45
+        },
+        {
+          "id": "bvResult",
+          "label": "Spin result card",
+          "kind": "text",
+          "media": "",
+          "x": 0.18,
+          "y": 0.42,
+          "w": 0.64,
+          "mode": "timed",
+          "seconds": 4,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": false,
+          "group": "Result",
+          "z": 0,
+          "opacity": 100,
+          "delay": 0,
+          "size": 0.085,
+          "color": "#f4a828",
+          "font": "bold",
+          "bg": "",
+          "text": "🎡  [multi_chosen_name]   +[multi_roll]%",
+          "slide_in": true,
+          "slide_in_dir": "left",
+          "slide_in_secs": 0.35
+        },
+        {
+          "id": "bvDuel",
+          "label": "Duel result card",
+          "kind": "text",
+          "media": "",
+          "x": 0.18,
+          "y": 0.42,
+          "w": 0.64,
+          "mode": "timed",
+          "seconds": 4,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": false,
+          "group": "Result",
+          "z": 0,
+          "opacity": 100,
+          "delay": 0,
+          "size": 0.085,
+          "color": "#f4a828",
+          "font": "bold",
+          "bg": "",
+          "text": "🪊📄✂️  [multi_duel_loser_name]   +[var:duel_pct]%",
+          "slide_in": true,
+          "slide_in_dir": "left",
+          "slide_in_secs": 0.35
+        },
+        {
+          "id": "bvDraw",
+          "label": "Duel draw card",
+          "kind": "text",
+          "media": "",
+          "x": 0.18,
+          "y": 0.42,
+          "w": 0.64,
+          "mode": "timed",
+          "seconds": 3,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": false,
+          "group": "Result",
+          "z": 0,
+          "opacity": 100,
+          "delay": 0,
+          "size": 0.085,
+          "color": "#9fb3c8",
+          "font": "bold",
+          "bg": "",
+          "text": "🤝  Draw — nobody pays",
+          "slide_in": true,
+          "slide_in_dir": "left",
+          "slide_in_secs": 0.35
+        },
+        {
+          "id": "bvOutcome",
+          "label": "Match result card",
+          "kind": "text",
+          "media": "",
+          "x": 0.18,
+          "y": 0.42,
+          "w": 0.64,
+          "mode": "timed",
+          "seconds": 8,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": false,
+          "group": "Result",
+          "z": 0,
+          "opacity": 100,
+          "delay": 0,
+          "size": 0.075,
+          "color": "#f4a828",
+          "font": "bold",
+          "bg": "",
+          "text": "🏁  [multi_winner] takes it\n[multi_loser] — [multi_end_why]",
+          "slide_in": true,
+          "slide_in_dir": "left",
+          "slide_in_secs": 0.35
+        },
+        {
+          "id": "bvVidIntro",
+          "label": "Intro video",
+          "kind": "media",
+          "media": "",
+          "x": 0.0,
+          "y": 0.0,
+          "w": 1.0,
+          "mode": "once",
+          "seconds": 0,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": false,
+          "group": "Intro Video",
+          "z": 50,
+          "opacity": 100,
+          "delay": 0,
+          "size": 0.16,
+          "color": "#ffffff",
+          "font": "bold",
+          "bg": "",
+          "text": "",
+          "slide_in": false,
+          "slide_in_dir": "right",
+          "slide_in_secs": 0.45,
+          "h": 1.0
+        },
+        {
+          "id": "bvVidR1a",
+          "label": "Round 1 · first video",
+          "kind": "media",
+          "media": "",
+          "x": 0.0,
+          "y": 0.0,
+          "w": 1.0,
+          "mode": "once",
+          "seconds": 0,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": false,
+          "group": "Round Video",
+          "z": 50,
+          "opacity": 100,
+          "delay": 0,
+          "size": 0.16,
+          "color": "#ffffff",
+          "font": "bold",
+          "bg": "",
+          "text": "",
+          "slide_in": false,
+          "slide_in_dir": "right",
+          "slide_in_secs": 0.45,
+          "h": 1.0
+        },
+        {
+          "id": "bvVidR1b",
+          "label": "Round 1 · second video",
+          "kind": "media",
+          "media": "",
+          "x": 0.0,
+          "y": 0.0,
+          "w": 1.0,
+          "mode": "once",
+          "seconds": 0,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": false,
+          "group": "Round Video",
+          "z": 50,
+          "opacity": 100,
+          "delay": 0,
+          "size": 0.16,
+          "color": "#ffffff",
+          "font": "bold",
+          "bg": "",
+          "text": "",
+          "slide_in": false,
+          "slide_in_dir": "right",
+          "slide_in_secs": 0.45,
+          "h": 1.0
+        },
+        {
+          "id": "bvVidR2",
+          "label": "Round 2 · video",
+          "kind": "media",
+          "media": "",
+          "x": 0.0,
+          "y": 0.0,
+          "w": 1.0,
+          "mode": "once",
+          "seconds": 0,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": false,
+          "group": "Round Video",
+          "z": 50,
+          "opacity": 100,
+          "delay": 0,
+          "size": 0.16,
+          "color": "#ffffff",
+          "font": "bold",
+          "bg": "",
+          "text": "",
+          "slide_in": false,
+          "slide_in_dir": "right",
+          "slide_in_secs": 0.45,
+          "h": 1.0
+        },
+        {
+          "id": "bvNotify",
+          "label": "Notification",
+          "kind": "text",
+          "media": "",
+          "x": 0.025555555555555554,
+          "y": 0.905,
+          "w": 0.44,
+          "mode": "timed",
+          "seconds": 2,
+          "layer": "notify",
+          "rot": 0,
+          "flash": 0,
+          "visible": false,
+          "group": "Main",
+          "z": 20,
+          "opacity": 100,
+          "delay": 0,
+          "size": 0.038,
+          "color": "#ffffff",
+          "font": "bold",
+          "bg": "#1d4ed8E6",
+          "align": "left",
+          "text": "[command_overlay_desc]",
+          "fade_out": 0.9,
+          "anim": false,
+          "fade_in": 0,
+          "slide_in": true,
+          "slide_in_dir": "left",
+          "slide_in_secs": 0.25,
+          "slide_out": true,
+          "slide_out_dir": "bottom",
+          "slide_out_secs": 0.9
+        },
+        {
+          "id": "bvPauseBg",
+          "label": "Pause backdrop",
+          "kind": "solid",
+          "media": "",
+          "x": 0.0,
+          "y": 0.0,
+          "w": 1.0,
+          "mode": "hold",
+          "seconds": 5,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": false,
+          "group": "Pause",
+          "z": 900,
+          "opacity": 100,
+          "delay": 0,
+          "h": 1.0,
+          "color": "#000000"
+        },
+        {
+          "id": "bvPauseTxt",
+          "label": "Pause message",
+          "kind": "text",
+          "media": "",
+          "x": 0.1,
+          "y": 0.45,
+          "w": 0.8,
+          "mode": "hold",
+          "seconds": 5,
+          "layer": "",
+          "rot": 0,
+          "flash": 0,
+          "visible": false,
+          "group": "Pause",
+          "z": 901,
+          "opacity": 100,
+          "delay": 0,
+          "size": 0.06,
+          "color": "#ffffff",
+          "font": "bold",
+          "bg": "",
+          "align": "center",
+          "text": "⏸  [multi_host_name] vs [multi_guest_name]\nback in a moment"
+        }
+      ],
+      "golive": {
+        "intro_enabled": true,
+        "stages": [
+          {
+            "group": "Intro",
+            "seconds": 15
+          },
+          {
+            "group": "Intro Video",
+            "seconds": 0,
+            "actions": [
+              {
+                "type": "overlay",
+                "overlay": "bvVidIntro",
+                "mode": "once"
+              }
+            ]
+          }
+        ],
+        "seconds": 15,
+        "scene_group": "Intro",
+        "after_group": "Main",
+        "announce": "",
+        "announce_every": 0,
+        "announce_image": "",
+        "hold_commands": true,
+        "blackout": true
+      },
+      "gameplay": {
+        "commands": [],
+        "owner_commands": [],
+        "modes": [],
+        "broadcasts": [],
+        "prizes": [],
+        "chat_buttons": [],
+        "events": [],
+        "capacity_events": [],
+        "polls": [],
+        "competitions": [],
+        "bonus_rounds": [],
+        "minigames": [],
+        "cooldown_seconds": 0,
+        "rich_output": true,
+        "output_headers": false,
+        "listener_message_on": "🎪 **[multi_host_name]** vs **[multi_guest_name]** — we're on.\n[multi_host_name] **[multi_host_capacity]%** · [multi_guest_name] **[multi_guest_capacity]%**",
+        "listener_on_embed": true,
+        "listener_on_title": "🎪 The match is on",
+        "listener_message_off": "🏁 That's the match. **[multi_host_name]** [multi_host_capacity]% · **[multi_guest_name]** [multi_guest_capacity]%",
+        "listener_off_embed": true,
+        "listener_off_title": "🏁 Match over",
+        "capacity_message": "📊 **[multi_host_name]** [multi_host_capacity]%  ·  **[multi_guest_name]** [multi_guest_capacity]%\n[capacity_bar]",
+        "capacity_embed": true,
+        "capacity_title": "📊 Where we're at",
+        "pumptimer_message": "⏱️ **[multi_host_name]** [multi_host_pump_timer]s left  ·  **[multi_guest_name]** [multi_guest_pump_timer]s left",
+        "pumptimer_embed": true,
+        "pumptimer_title": "⏱️ Pumps",
+        "pump_message": "💨 **+[secs2capacity]%** — [multi_host_name] **[multi_host_capacity]%** · [multi_guest_name] **[multi_guest_capacity]%**",
+        "pump_embed": false,
+        "pump_title": "",
+        "cooldown_message": "",
+        "cooldown_embed": false,
+        "cooldown_title": "",
+        "pause_message": "⏸️ **Paused** by [user] — both pumps are off until whoever paused resumes.",
+        "pause_embed": true,
+        "pause_title": "⏸️ Paused",
+        "resume_message": "▶️ **Back on** — [multi_host_name] vs [multi_guest_name].",
+        "resume_embed": true,
+        "resume_title": "▶️ Resumed",
+        "paused_notice_message": "⏸️ [mention], the match is paused — hang tight.",
+        "activation_off_notice": false,
+        "auto_report": {
+          "enabled": true,
+          "seconds": 120,
+          "message": "📊 **[multi_host_name]** [multi_host_capacity]%  ·  **[multi_guest_name]** [multi_guest_capacity]%",
+          "embed": true,
+          "title": "📊 Scoreboard"
+        }
+      },
+      "notify_overlay": "bvNotify",
+      "pause_overlay": "Pause",
+      "input": "operators"
     }
   ],
   "scene_globals": [],
@@ -6666,6 +7552,37 @@
   "pause_overlay": "Pause",
   "notify_overlay": "dfdefnotify",
   "resume_embed": true,
-  "resume_title": "\u25b6 Resumed",
-  "templates_removed": []
+  "resume_title": "▶ Resumed",
+  "templates_removed": [],
+  "mp_end": {
+    "max_capacity": 0,
+    "actions": [
+      {
+        "type": "stop_devices"
+      },
+      {
+        "type": "message",
+        "style": "embed",
+        "title": "🏁 Match over",
+        "message": "🏁 **[multi_winner]** takes it.\n**[multi_loser]** — [multi_end_why].\n[multi_host_name] **[multi_host_capacity]%** · [multi_guest_name] **[multi_guest_capacity]%**"
+      },
+      {
+        "type": "scene_group_kill",
+        "group": "Main",
+        "fade_out": 0.4
+      },
+      {
+        "type": "overlay",
+        "overlay": "bvOutcome",
+        "mode": "timed",
+        "seconds": 8,
+        "fade_in": 0.3,
+        "fade_out": 0.6
+      },
+      {
+        "type": "wait",
+        "seconds": 8
+      }
+    ]
+  }
 }
