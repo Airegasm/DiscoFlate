@@ -2786,6 +2786,10 @@ class BotManager:
                     continue
                 if not await self._run_round(rnd):
                     return           # the reason is already logged and said
+            # OVERTIME. The rounds ran out with nobody at the ceiling, which
+            # at these stakes is the minority case but never zero.
+            if await self._run_sudden():
+                return
             self._link_notes.append("every round is done")
             await self._link_say("🏁 **That's every round.**")
             return
@@ -2796,6 +2800,36 @@ class BotManager:
             self._link_notes.append(f"rounds stopped: {e}")
         finally:
             self._rounds_task = None
+
+    async def _run_sudden(self) -> bool:
+        """Sudden Death — overtime, run only if the rounds ended undecided.
+
+        Deliberately NOT "turn both pumps on and wait". That decides nothing:
+        whoever is closer to the ceiling reaches it first, so the loser is
+        already fixed the moment overtime begins. This keeps playing a GAME
+        that can land on either player, so the one behind can still catch up.
+
+        It is a round with NO clear condition — it simply loops. Every pass
+        puts percent on somebody, so the ceiling always arrives; the pass cap
+        is only there because a block that can draw every time (rock-paper-
+        scissors can) would otherwise be a hung match rather than a long one.
+
+        Returns True if it ran, so the caller doesn't also announce a tidy
+        finish to a match that just went to overtime.
+        """
+        s = self.link
+        if s is None or s.state != mp.S_MATCH or s.conceded:
+            return False
+        rows = (self._mp_cfg().get("mp_sudden") or {}).get("actions") or []
+        if not rows:
+            return False                      # not set up; end the normal way
+        self._link_notes.append("sudden death")
+        await self._run_round({"name": "Sudden Death", "until": "count",
+                               "count": mp_games.ROUND_CAP,
+                               "actions": rows, "_i": len(
+                                   mp_games.rounds_in_order(
+                                       self._mp_cfg().get("mp_rounds") or []))})
+        return True
 
     async def _run_round(self, rnd: dict) -> bool:
         """One band: open it, then loop its Action until it clears.

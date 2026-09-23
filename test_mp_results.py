@@ -35,6 +35,10 @@ def shipped():
     return cfg
 
 
+SHIP = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                   "default_config.json"), encoding="utf-8"))
+bot = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "discord_bot.py"), encoding="utf-8").read()
 CFG = shipped()
 SCENE = CFG["scenes"][0]
 ACTS = {a["name"]: a for a in CFG["mp_actions"]}
@@ -166,6 +170,32 @@ ok(pg in GROUPS or pg in CARDS,
 ok(len(GROUPS.get(pg) or []) >= 2,
    "…with something to cover the picture AND something that says why")
 
+# ---- Sudden Death: overtime that is a CONTEST, not a countdown ------------- #
+SUD = SHIP["mp_sudden"]
+ok(SUD.get("actions"), "sudden death ships with something to play")
+kinds = [r.get("type") for r in walk(SUD["actions"])]
+ok("mp_action" in kinds,
+   "…and it is a GAME. 'Both pumps on until someone pops' decides nothing — "
+   "whoever is closer to the ceiling gets there first, so the loser is fixed "
+   "before overtime even starts")
+ok(not [r for r in walk(SUD["actions"]) if r.get("type") == "fire"
+        and str(r.get("multi_who") or "") in ("both", "me", "peer")],
+   "…and it never just fires at a fixed person")
+ok("max_capacity" not in SUD and "count" not in SUD and "until" not in SUD,
+   "it has NO clear condition — it loops, and the End Condition is the only "
+   "way out")
+
+drv = bot[bot.index("async def _run_sudden"):]
+drv = drv[:drv.index("async def _run_round")]
+ok("ROUND_CAP" in drv,
+   "a pass cap survives anyway: a block that can draw every time (RPS can) "
+   "would be a hung match rather than a long one")
+ok("s.conceded" in drv and "S_MATCH" in drv,
+   "…and it is skipped entirely if the match already resolved")
+ok("_run_round(" in drv,
+   "it reuses the round runner, so the per-pass ceiling check applies to "
+   "overtime too rather than being a second implementation")
+
 # ---- the End Condition can actually run ------------------------------------ #
 # the SHIPPED block, not the schema default — content lives in default_config
 END = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -198,8 +228,6 @@ ok("[multi_winner]" in txt and "[multi_loser]" in txt,
 # Action you haven't written, a video you haven't made — none of them should
 # stop a match, and none should announce your homework on the stream.
 import re
-bot = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                        "discord_bot.py"), encoding="utf-8").read()
 i = bot.index('body = rnd.get("actions")')
 blk = bot[i:i + 700]
 ok("return True" in blk.split("if not body:")[1][:400],
@@ -335,9 +363,7 @@ for nm, a in ACTS.items():
 
 ok(config_store.DEFAULTS["mp_end"]["max_capacity"] == 0,
    "the SCHEMA default is still off — a lose-at number is the author's call")
-shipped = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                      "default_config.json"), encoding="utf-8"))
-ok(shipped["mp_end"]["max_capacity"] == 100,
+ok(SHIP["mp_end"]["max_capacity"] == 100,
    "…and the shipped kit is authored against 100, which is what makes the "
    "numbers in it readable")
 

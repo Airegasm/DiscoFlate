@@ -316,6 +316,7 @@ def _public_state(engine: Engine, botmgr: BotManager) -> dict:
         "multiplayer": cfg.get("multiplayer", {}),
         "mp_actions": cfg.get("mp_actions", []),
         "mp_rounds": cfg.get("mp_rounds", []),
+        "mp_sudden": cfg.get("mp_sudden", {}),
         "mp_end": cfg.get("mp_end", {}),
         "scene_by_mode": cfg.get("scene_by_mode", {}),
         "vendors_set": _mask_vendors(cfg.get("vendors", {})),
@@ -1162,7 +1163,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                    "templates_removed": list,
                    "vendors": dict, "allow": dict, "server_channels": dict,
                    "multiplayer": dict, "mp_actions": list, "mp_rounds": list,
-                   "mp_end": dict}
+                   "mp_end": dict, "mp_sudden": dict}
 
     async def set_config(request):
         await guard(request)
@@ -1202,7 +1203,7 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
                     "listen_targets", "anon_user_label", "output_headers", "rich_output",
                     "templates", "templates_removed",
                     "allow_dms", "server_channels", "silence_onoff_log",
-                    "multiplayer", "mp_actions", "mp_rounds", "mp_end", "scene_by_mode",
+                    "multiplayer", "mp_actions", "mp_rounds", "mp_end", "mp_sudden", "scene_by_mode",
                     "mock_calibration_seconds_to_100",
                     "always_on_enabled", "always_on_commands",
                     "event_in_process_message", "event_cooldown_message", "broadcasts",

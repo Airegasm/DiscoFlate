@@ -7453,5 +7453,19 @@
         "seconds": 8
       }
     ]
+  },
+  "mp_sudden": {
+    "actions": [
+      {
+        "type": "message",
+        "style": "embed",
+        "title": "⚔ Sudden Death",
+        "message": "Nobody cracked. **[multi_host_name] [multi_host_capacity]%** · **[multi_guest_name] [multi_guest_capacity]%**\nIt runs until somebody reaches **[multi_max]%**."
+      },
+      {
+        "type": "mp_action",
+        "action": "MultiRPS"
+      }
+    ]
   }
 }

@@ -331,7 +331,8 @@ const pbox = { console, mpLoaded: false, mpCfg: null,
                cleanMpActions: () => [{ name: 'A' }],
                cleanMpRounds: () => [{ name: 'R' }],
                cleanActionRows: rows => rows || [],
-               mpEnd: { max_capacity: 9999, actions: [{ type: 'message' }] } };
+               mpEnd: { max_capacity: 9999, actions: [{ type: 'message' }] },
+               mpSudden: { actions: [{ type: 'mp_action' }] } };
 pbox.window = pbox;
 vm.createContext(pbox);
 vm.runInContext(html.slice(pStart, html.indexOf('async function mpSave()', pStart)), pbox);
@@ -345,6 +346,8 @@ ok(pay.mp_actions.length === 1 && pay.mp_rounds.length === 1,
 ok(pay.multiplayer.peer_bot_name === 'D', '…and the multiplayer block');
 // The End Condition is always last and always sent — it is how a match ends.
 ok(pay.mp_end && pay.mp_end.actions.length === 1, '…and the End Condition');
+ok(pay.mp_sudden && Array.isArray(pay.mp_sudden.actions),
+   '…and Sudden Death, which is pinned beside it');
 ok(pay.mp_end.max_capacity === 999,
    '…with the lose-at capacity clamped to 999, so a typo cannot set a target '
    + 'nobody could ever reach and a match that could never end');

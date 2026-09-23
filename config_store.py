@@ -367,6 +367,16 @@ DEFAULTS = {
     # usually want), both = everyone must reach it, trailer = same as both but
     # reads more clearly in a co-op round.
     "mp_rounds": [],
+    # SUDDEN DEATH — overtime, when the rounds ran out with nobody at the
+    # ceiling. Deliberately NOT "turn both pumps on and wait": that decides
+    # nothing, it just counts down to a result already fixed by whoever was
+    # closer. It keeps playing a GAME that can land on either player, so the
+    # trailing one can still catch up.
+    #
+    # It has no clear condition. It loops until the End Condition fires, which
+    # it always eventually does because every pass puts percent on somebody.
+    "mp_sudden": {"actions": []},
+
     # THE END CONDITION — always last, never one of the rounds.
     #
     # A match needs a way to be over that isn't "the rounds ran out". Two

@@ -1221,6 +1221,7 @@
         over to the next round. "Do a roulette process, wait 15s, repeat until somebody hits 25%" is one round;
         the next band is the next round.</div>
       <div id="mpRndList"></div>
+      <div id="mpSuddenBox" style="margin-top:10px"></div>
       <div id="mpEndBox" style="margin-top:10px"></div>
       <div class="row" style="gap:8px;margin-top:8px">
         <button onclick="mpRndAdd()">+ New Round</button>
@@ -5224,6 +5225,38 @@ let mpRounds = [];
 let mpRndOpen = new Set();
 let mpEnd = {max_capacity: 0, actions: []};
 let mpEndOpen = false;
+let mpSudden = {actions: []};
+let mpSuddenOpen = false;
+
+// SUDDEN DEATH — overtime, when the rounds ran out with nobody at the ceiling.
+// Deliberately not "turn both pumps on and wait": that decides nothing, it
+// counts down to a result already fixed by whoever was closer. It keeps
+// playing a game that can land on either player, and loops until the End
+// Condition fires.
+function renderMpSudden(){
+  const box=$('#mpSuddenBox'); if(!box) return;
+  const n=(mpSudden.actions||[]).length;
+  box.innerHTML =
+    `<details class="dev" style="flex-direction:column;align-items:stretch;border-color:var(--accent)" `+
+      `${mpSuddenOpen?'open':''} ontoggle="mpSuddenOpen=this.open">`+
+    `<summary class="row" style="gap:8px;align-items:center;cursor:pointer">`+
+      `<span class="name">⚔ Sudden Death</span>`+
+      `<span class="tag">${n?`${n} action${n===1?'':'s'}`:'not set up — skipped'}</span>`+
+      `<span class="muted" style="margin-left:auto">overtime</span>`+
+    `</summary>`+
+    `<div style="padding:8px 2px 2px">`+
+      `<div class="hint" style="margin:0 0 8px">Runs only if every round finished and <b>nobody reached the ceiling</b>. `+
+        `It has no target and no count — it <b>loops</b>, and the End Condition is the only way out.<br>`+
+        `Put a <b>game</b> in it, not a pump. "Both pumps on until someone pops" decides nothing: whoever is closer `+
+        `to the ceiling gets there first, so the loser is already fixed before overtime starts. A game that can land `+
+        `on <i>either</i> of you is what gives the one behind a way back.</div>`+
+      actionsSection('Runs over and over until somebody hits the ceiling',
+                     'mpSudden.actions', 'renderMpSudden', mpSudden.actions||[],
+                     `{type:'mp_action',action:''}`,
+                     'Every pass puts percent on somebody, so the ceiling always arrives.')+
+    `</div></details>`;
+}
+async function saveMpSudden(){ await saveCfg({mp_sudden: mpSudden}); }
 
 // THE END CONDITION — always last, never one of the rounds.
 //
@@ -5265,7 +5298,7 @@ function renderMpEnd(){
 async function saveMpEnd(){ await saveCfg({mp_end: mpEnd}); }
 
 function renderMpRounds(){
-  renderMpEnd();
+  renderMpSudden(); renderMpEnd();
   const box=$('#mpRndList'); if(!box) return;
   if(!mpRounds.length){
     box.innerHTML='<div class="muted">No rounds yet — add one to build the show. '+
@@ -5416,6 +5449,7 @@ let mpLoaded = false;
 function mpPayload(){
   if(!mpLoaded) return {};
   const out = {mp_actions: cleanMpActions(), mp_rounds: cleanMpRounds(),
+               mp_sudden: {actions: cleanActionRows(mpSudden.actions)},
                mp_end: {max_capacity: Math.max(0, Math.min(999, +mpEnd.max_capacity||0)),
                         actions: cleanActionRows(mpEnd.actions)}};
   if(mpCfg){
@@ -8514,6 +8548,11 @@ function applyState(st, full){
     try{ mpApply(st); }catch(e){}
     mpActions = Array.isArray(st.mp_actions) ? JSON.parse(JSON.stringify(st.mp_actions)) : [];
     mpRounds = Array.isArray(st.mp_rounds) ? JSON.parse(JSON.stringify(st.mp_rounds)) : [];
+    {
+      const sd = st.mp_sudden || {};
+      mpSudden = {actions: Array.isArray(sd.actions)
+                    ? JSON.parse(JSON.stringify(sd.actions)) : []};
+    }
     {
       const e = st.mp_end || {};
       mpEnd = {max_capacity: +e.max_capacity||0,
