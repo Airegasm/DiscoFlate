@@ -1440,6 +1440,18 @@
         <li><b>bot_network</b> — protocol traffic only. No humans needed, nothing from the game ever appears there, and nothing typed there ever reaches the game. Needs <b>View Channel, Send Messages, Read Message History</b>.</li>
         <li><b>broadcast</b> — the venue: narration, commands, the audience. Needs <b>View Channel, Send Messages, Embed Links</b>. Make it a <b>voice</b> channel if you want cameras; in a text channel nobody is on camera, by Discord's rules rather than ours.</li>
       </ul>
+      <div class="hint" style="margin-top:8px;max-width:860px"><b>You have almost certainly never had to grant any of these.</b> Discord gives
+        all four to <code>@everyone</code> by default, so in an ordinary channel they are simply already on — which is why embeds and
+        history "just work" and the Preflight list sits there green without you doing anything.<br>
+        They are checked for the case where somebody has <b>taken one away</b>: a locked-down channel, a restricted role, a private
+        stage. That failure is silent and bewildering, so the check names it rather than leaving you guessing:
+        <ul style="line-height:1.7;padding-left:22px;margin:6px 0 0">
+          <li><b>Embed Links</b> is Discord's worst-named permission — nothing to do with URLs. It governs <b>rich cards</b>: the
+            invite, the Ready check, the duel, the blackjack table, every result. Without it those messages do not post at all.</li>
+          <li><b>Read Message History</b> is the one that matters most on <b>bot_network</b>. That channel <i>is</i> the protocol's log,
+            so an install that drops out mid-match reads back what it missed and catches up. Without it a blip desyncs the match
+            silently, where with it reconnecting is free.</li>
+        </ul></div>
       <div class="hint" style="margin-top:8px;max-width:860px">They don't have to be in the same server — bot_network in a private two-person server and broadcast in the public one is the nicer arrangement. But then <b>both bots need inviting to both servers</b>, and somebody always forgets one. The <b>Preflight</b> list on the Multiplayer tab names exactly which check failed rather than leaving you at a silent dead end.</div>
 
       <h3 style="margin:14px 0 6px">Safety is the hardware's job</h3>
@@ -1558,6 +1570,10 @@
             <tr><td><code>[multi_roll]</code></td><td>the last <b>mp_roll</b> total — spend it as a <b>percent</b> in a fire row (seconds are refused over the wire; they're a different amount of inflation on every rig)</td></tr>
             <tr><td><code>[multi_roll_dice]</code> <code>[multi_roll_faces]</code> <code>[multi_roll_max]</code></td><td>what was rolled (<code>1d7</code>), the individual faces, and the best possible total — for narrating a roll properly</td></tr>
             <tr><td><code>[multi_odds]</code></td><td>the last spin's odds, already worded. Uneven odds are announced automatically: a wheel the audience can't see is indistinguishable from a rigged one.</td></tr>
+            <tr><td><code>[multi_simon_loser]</code> / <code>[multi_simon_loser_name]</code> / <code>[multi_simon_who]</code></td><td>who got less far through the sequence. <code>[multi_simon_who]</code> is <code>me</code>, <code>peer</code>, <code>both</code> (neither remembered a single pad) or empty on a level round.</td></tr>
+            <tr><td><code>[multi_simon_my_score]</code> / <code>[multi_simon_peer_score]</code> / <code>[multi_simon_length]</code></td><td>how many pads each recalled before their first mistake, and how long the sequence was — scored as a correct <b>prefix</b>, so five of seven beats four of seven.</td></tr>
+            <tr><td><code>[multi_ttt_loser]</code> / <code>[multi_ttt_loser_name]</code> / <code>[multi_ttt_who]</code></td><td>who lost the board. <code>[multi_ttt_who]</code> is <code>me</code>, <code>peer</code>, or <code>both</code> on a draw.</td></tr>
+            <tr><td><code>[multi_ttt_draw]</code></td><td><code>1</code> when the board drew. <b>A draw is meant to cost you both</b> — tic tac toe is solved, so perfect play draws, and that is what walks two careful players into the ceiling instead of stalling there forever.</td></tr>
             <tr><td><code>[multi_cards_loser]</code> / <code>[multi_cards_loser_name]</code> / <code>[multi_cards_winner]</code></td><td>who paid the last <b>blackjack</b> hand, and who didn't. Empty on a push or when the house took both.</td></tr>
             <tr><td><code>[multi_cards_who]</code></td><td><code>me</code>, <code>peer</code>, <code>both</code> — or empty on a push. <code>both</code> is a real outcome: if you both bust or both lose to the dealer, the house cleaned up and you <i>both</i> pay.</td></tr>
             <tr><td><code>[multi_cards_margin]</code></td><td>how far apart the two hands finished, so a stake can scale on it — losing 20-to-19 a scratch, losing 20-to-0 a beating. Makes every card cost something instead of only the final flip.</td></tr>
@@ -1956,6 +1972,10 @@ esphome dashboard config/</code></pre>
             <tr><td><code>[multi_roll]</code></td><td>the last <b>mp_roll</b> total — spend it as a <b>percent</b> in a fire row (seconds are refused over the wire; they're a different amount of inflation on every rig)</td></tr>
             <tr><td><code>[multi_roll_dice]</code> <code>[multi_roll_faces]</code> <code>[multi_roll_max]</code></td><td>what was rolled (<code>1d7</code>), the individual faces, and the best possible total — for narrating a roll properly</td></tr>
             <tr><td><code>[multi_odds]</code></td><td>the last spin's odds, already worded. Uneven odds are announced automatically: a wheel the audience can't see is indistinguishable from a rigged one.</td></tr>
+            <tr><td><code>[multi_simon_loser]</code> / <code>[multi_simon_loser_name]</code> / <code>[multi_simon_who]</code></td><td>who got less far through the sequence. <code>[multi_simon_who]</code> is <code>me</code>, <code>peer</code>, <code>both</code> (neither remembered a single pad) or empty on a level round.</td></tr>
+            <tr><td><code>[multi_simon_my_score]</code> / <code>[multi_simon_peer_score]</code> / <code>[multi_simon_length]</code></td><td>how many pads each recalled before their first mistake, and how long the sequence was — scored as a correct <b>prefix</b>, so five of seven beats four of seven.</td></tr>
+            <tr><td><code>[multi_ttt_loser]</code> / <code>[multi_ttt_loser_name]</code> / <code>[multi_ttt_who]</code></td><td>who lost the board. <code>[multi_ttt_who]</code> is <code>me</code>, <code>peer</code>, or <code>both</code> on a draw.</td></tr>
+            <tr><td><code>[multi_ttt_draw]</code></td><td><code>1</code> when the board drew. <b>A draw is meant to cost you both</b> — tic tac toe is solved, so perfect play draws, and that is what walks two careful players into the ceiling instead of stalling there forever.</td></tr>
             <tr><td><code>[multi_cards_loser]</code> / <code>[multi_cards_loser_name]</code> / <code>[multi_cards_winner]</code></td><td>who paid the last <b>blackjack</b> hand, and who didn't. Empty on a push or when the house took both.</td></tr>
             <tr><td><code>[multi_cards_who]</code></td><td><code>me</code>, <code>peer</code>, <code>both</code> — or empty on a push. <code>both</code> is a real outcome: if you both bust or both lose to the dealer, the house cleaned up and you <i>both</i> pay.</td></tr>
             <tr><td><code>[multi_cards_margin]</code></td><td>how far apart the two hands finished, so a stake can scale on it — losing 20-to-19 a scratch, losing 20-to-0 a beating. Makes every card cost something instead of only the final flip.</td></tr>
@@ -6881,6 +6901,8 @@ function actGist(a){
   if(t==='mp_action') return `run "${s(a.action)||'—'}"`;
   if(t==='mp_tell') return `tell their bot: run "${s(a.action)||'—'}"`;
   if(t==='mp_cards') return `blackjack · both hands face up · waits ${a.seconds??45}s`;
+  if(t==='mp_simon') return `simon · ${a.length??3} pads, +${a.grow??1} each pass`;
+  if(t==='mp_ttt') return `tic tac toe · a draw costs BOTH · waits ${a.seconds??60}s`;
   if(t==='mp_duel'){ const n=(a.options||[]).length;
     return `${s(a.title)||'duel'} · ${n} move${n===1?'':'s'} · both pick · waits ${a.seconds??30}s`; }
   if(t==='mp_choice'){ const n=(a.options||[]).length;
@@ -6938,7 +6960,8 @@ function actionRow(base, rr, j, a, condLabels){
   // The three multiplayer rows are offered only in multiplayer mode — a solo
   // block has nobody to spin between, and a type you can pick but never run is
   // worse than one that isn't listed.
-  const MP_ROWS = ['mp_action','mp_tell','mp_spin','mp_roll','mp_choice','mp_duel','mp_cards'];
+  const MP_ROWS = ['mp_action','mp_tell','mp_spin','mp_roll','mp_choice','mp_duel',
+                   'mp_cards','mp_simon','mp_ttt'];
   const inMulti = (typeof appMode==='function') && appMode()==='multi';
   const typeSel = `<select onchange="${T('type')}=this.value;${rr}();scheduleSave()">`+
     (inMulti?MP_ROWS:[]).concat(
@@ -7012,6 +7035,16 @@ function actionRow(base, rr, j, a, condLabels){
         (missing?`<option selected>${esc(cur)} (missing)</option>`:'')+
       `</select></label>`+
       `<span class="muted" style="align-self:center">runs another Multiplayer Action here. Wrap it in a <b>repeat</b> to do it N times — that is how a round becomes "four passes, a video, four more".</span>`;
+  }
+  if(typ==='mp_simon'){
+    fields += `<label class="field">Pads <input type="number" min="1" max="12" step="1" value="${a.length??3}" style="width:80px" title="how long the FIRST sequence is" onchange="${T('length')}=+this.value||3;scheduleSave()"></label>`+
+      `<label class="field">+ per pass <input type="number" min="0" max="4" step="1" value="${a.grow??1}" style="width:90px" title="how much longer each pass gets. This is what ends the round without tuning a stake — memory fails on its own." onchange="${T('grow')}=+this.value||0;scheduleSave()"></label>`+
+      `<label class="field">Deadline <input type="number" min="15" max="300" step="5" value="${a.seconds??45}" style="width:90px" onchange="${T('seconds')}=+this.value||45;scheduleSave()"></label>`+
+      `<span class="muted" style="flex:1 1 100%;min-width:0">A sequence is shown, hidden, then you both reproduce it. Scored as a correct <b>prefix</b>, not right-or-wrong — five of seven beats four of seven. It <b>escalates itself</b>, so the round ends without a stake needing to force it, and memory goes first the more inflated you are. Publishes <code>[multi_simon_loser]</code> and <code>[multi_simon_who]</code>.</span>`;
+  }
+  if(typ==='mp_ttt'){
+    fields += `<label class="field">Deadline <input type="number" min="20" max="300" step="10" value="${a.seconds??60}" style="width:90px" onchange="${T('seconds')}=+this.value||60;scheduleSave()"></label>`+
+      `<span class="muted" style="flex:1 1 100%;min-width:0">For <b>Sudden Death</b>. Tic tac toe is solved — perfect play always draws — and that is the mechanism, not the flaw: <b>a draw costs you both</b>, so playing perfectly still walks you into the ceiling. The only escape from the shared damage is to try to <i>win</i>, which means leaving perfect play, which is how you lose. The game is who cracks first.<br>X alternates each pass, because X can force at least a draw. Publishes <code>[multi_ttt_who]</code> — <code>me</code>, <code>peer</code> or <code>both</code> on a draw.</span>`;
   }
   if(typ==='mp_cards'){
     fields += `<label class="field">Deadline <input type="number" min="15" max="300" step="5" value="${a.seconds??45}" style="width:90px" title="seconds. A hand nobody finishes simply STANDS as it is — a round must not stall on someone who walked away." onchange="${T('seconds')}=+this.value||45;scheduleSave()"></label>`+
@@ -7765,6 +7798,10 @@ function cleanActionRows(arr){
       if(a.values && typeof a.values==='object') o.values=a.values;
       return o; }
     if(t==='mp_cards'){ o.seconds=Math.max(15,Math.min(300,+a.seconds||45)); return o; }
+    if(t==='mp_simon'){ o.seconds=Math.max(15,Math.min(300,+a.seconds||45));
+      o.length=Math.max(1,Math.min(12,+a.length||3));
+      o.grow=Math.max(0,Math.min(4,+a.grow||0)); return o; }
+    if(t==='mp_ttt'){ o.seconds=Math.max(20,Math.min(300,+a.seconds||60)); return o; }
     if(t==='mp_duel'){ o.message=a.message||''; o.title=s(a.title);
       o.seconds=Math.max(5,Math.min(180,+a.seconds||30));
       o.options=(Array.isArray(a.options)?a.options:[]).map(op=>({

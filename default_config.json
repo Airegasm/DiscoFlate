@@ -685,6 +685,146 @@
           "seconds": 10
         }
       ]
+    },
+    {
+      "name": "MultiSimon",
+      "actions": [
+        {
+          "type": "mp_simon",
+          "length": 3,
+          "grow": 1,
+          "seconds": 45
+        },
+        {
+          "type": "var",
+          "variable": "sim",
+          "operation": "set",
+          "value": "10"
+        },
+        {
+          "type": "if",
+          "match": "all",
+          "conditions": [
+            {
+              "left": "[multi_simon_who]",
+              "op": "==",
+              "right": "both"
+            }
+          ],
+          "actions": [
+            {
+              "type": "notify",
+              "message": "🧠 Neither of you had one — **+[var:sim]%** each"
+            },
+            {
+              "type": "fire",
+              "fire_mode": "add",
+              "fill_pct": "([var:sim]) * [multi_scale]",
+              "multi_who": "both",
+              "block_during": false
+            }
+          ],
+          "else_actions": [
+            {
+              "type": "if",
+              "match": "all",
+              "conditions": [
+                {
+                  "left": "[multi_simon_loser_name]",
+                  "op": "!=",
+                  "right": ""
+                }
+              ],
+              "actions": [
+                {
+                  "type": "notify",
+                  "message": "🧠 [multi_simon_loser_name] takes **+[var:sim]%**"
+                },
+                {
+                  "type": "fire",
+                  "fire_mode": "add",
+                  "fill_pct": "([var:sim]) * [multi_scale]",
+                  "multi_who": "loser",
+                  "block_during": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "wait",
+          "seconds": 8
+        }
+      ]
+    },
+    {
+      "name": "MultiTicTacToe",
+      "actions": [
+        {
+          "type": "mp_ttt",
+          "seconds": 60
+        },
+        {
+          "type": "var",
+          "variable": "ttt",
+          "operation": "set",
+          "value": "8"
+        },
+        {
+          "type": "if",
+          "match": "all",
+          "conditions": [
+            {
+              "left": "[multi_ttt_draw]",
+              "op": "!=",
+              "right": ""
+            }
+          ],
+          "actions": [
+            {
+              "type": "notify",
+              "message": "🤝 A draw — **+[var:ttt]%** each"
+            },
+            {
+              "type": "fire",
+              "fire_mode": "add",
+              "fill_pct": "([var:ttt]) * [multi_scale]",
+              "multi_who": "both",
+              "block_during": false
+            }
+          ],
+          "else_actions": [
+            {
+              "type": "if",
+              "match": "all",
+              "conditions": [
+                {
+                  "left": "[multi_ttt_loser_name]",
+                  "op": "!=",
+                  "right": ""
+                }
+              ],
+              "actions": [
+                {
+                  "type": "notify",
+                  "message": "⚔ [multi_ttt_loser_name] takes **+[var:ttt]%**"
+                },
+                {
+                  "type": "fire",
+                  "fire_mode": "add",
+                  "fill_pct": "([var:ttt]) * [multi_scale]",
+                  "multi_who": "loser",
+                  "block_during": false
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "wait",
+          "seconds": 5
+        }
+      ]
     }
   ],
   "mp_rounds": [
@@ -794,6 +934,39 @@
         {
           "type": "mp_action",
           "action": "MultiBlackjack"
+        }
+      ]
+    },
+    {
+      "name": "Round 4",
+      "until": "count",
+      "count": 6,
+      "done_message": "🧠 **Round 4** done.",
+      "spread_bet": {
+        "enabled": true,
+        "stake": 12,
+        "seconds": 45
+      },
+      "intro": [
+        {
+          "type": "scene_group",
+          "group": "Round Intro",
+          "fade_in": 0.35
+        },
+        {
+          "type": "wait",
+          "seconds": 2
+        },
+        {
+          "type": "scene_group_kill",
+          "group": "Round Intro",
+          "fade_out": 0.6
+        }
+      ],
+      "actions": [
+        {
+          "type": "mp_action",
+          "action": "MultiSimon"
         }
       ]
     }
@@ -7572,11 +7745,11 @@
         "type": "message",
         "style": "embed",
         "title": "⚔ Sudden Death",
-        "message": "Nobody cracked. **[multi_host_name] [multi_host_capacity]%** · **[multi_guest_name] [multi_guest_capacity]%**\nIt runs until somebody reaches **[multi_max]%**."
+        "message": "Nobody cracked. **[multi_host_name] [multi_host_capacity]%** · **[multi_guest_name] [multi_guest_capacity]%**\nTic tac toe — and **a draw costs you both**. It runs until somebody reaches **[multi_max]%**."
       },
       {
         "type": "mp_action",
-        "action": "MultiRPS"
+        "action": "MultiTicTacToe"
       }
     ]
   }

@@ -246,6 +246,51 @@ r = g.cards_outcome([10, 9], [10, 8], [10, 10, 4], H, G)
 ok(r["loser"] == G and r["dealer"] == 24,
    "when the dealer busts, both survive and it is decided between the players")
 
+# ---- simon: memory that escalates itself ------------------------------------ #
+R, Y, GR, BL = g.SIMON_PADS
+ok(g.simon_sequence(4, picks=[0, 1, 2, 3]) == [R, Y, GR, BL], "a sequence is injectable")
+ok(len(g.simon_sequence(99)) == g.SIMON_MAX, "…and capped: nobody recalls 99 pads")
+ok(len(g.simon_sequence(0)) == 1, "…and never empty, which would be a free round")
+
+ok(g.simon_score([R, Y, BL], [R, Y, GR, BL]) == 2,
+   "scored as a correct PREFIX — you got two before the mistake")
+ok(g.simon_score([R, Y, GR], [R, Y, GR]) == 3, "…all of it when it is all right")
+ok(g.simon_score([], [R, Y]) == 0, "…and nothing for not answering")
+ok(g.simon_score([R, Y, GR, BL], [R, Y]) == 2,
+   "…and never more than the sequence, however many extra pads are mashed")
+
+r = g.simon_outcome([R, Y], [R], [R, Y, GR], A, B)
+ok(r["loser"] == B, "further through the sequence wins")
+ok(g.simon_outcome([R], [R], [R, Y], A, B)["push"], "level is a push")
+r = g.simon_outcome([Y], [GR], [R, Y], A, B)
+ok(r["both"] and not r["loser"],
+   "neither remembered a single pad → they BOTH pay, same as both busting")
+ok(g.simon_outcome([R, Y], [R], [R, Y, GR], A, B)["length"] == 3,
+   "…and it reports how long the sequence was, so a stake can scale on it")
+
+# ---- tic tac toe: the draws are the point ----------------------------------- #
+# Solved games always draw. That is the mechanism, not the flaw: a draw hits
+# BOTH players, so perfect play still walks you into the ceiling, and the only
+# escape is to try to win — which means leaving perfect play.
+M = {A: "x", B: "o"}
+ok(g.ttt_winner(g.ttt_new()) == "", "an empty board has no winner")
+ok(g.ttt_winner(["x", "x", "x", "", "o", "o", "", "", ""]) == "x", "a row wins")
+ok(g.ttt_winner(["x", "o", "", "x", "o", "", "", "o", ""]) == "o", "…a column wins")
+ok(g.ttt_winner(["x", "o", "o", "", "x", "", "", "", "x"]) == "x", "…a diagonal wins")
+ok(g.ttt_winner(["", "", "", "", "", "", "", "", ""]) == "", "…and blanks never line up")
+
+r = g.ttt_outcome(["x", "x", "x", "", "o", "o", "", "", ""], M)
+ok(r["winner"] == A and r["loser"] == B and r["over"], "a win names both seats")
+full = ["x", "o", "x", "x", "o", "o", "o", "x", "x"]
+ok(g.ttt_full(full) and g.ttt_outcome(full, M)["draw"],
+   "a full board with no line is a DRAW — which is what costs them both")
+r = g.ttt_outcome(full, M)
+ok(not r["winner"] and not r["loser"],
+   "…and a draw names nobody, so a fire aimed at the loser hits nobody and the "
+   "block has to pay them both deliberately")
+ok(not g.ttt_outcome(["x", "", "", "", "o", "", "", "", ""], M)["over"],
+   "a game in progress is not over")
+
 # ---- the end condition ------------------------------------------------------ #
 # Always last, never one of the rounds. Three things trigger it — a concession,
 # reaching the lose-at capacity, or somebody going off air — and all three are

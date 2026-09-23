@@ -424,6 +424,122 @@ class MpSpreadView(discord.ui.View):
         return cb
 
 
+class MpSimonView(discord.ui.View):
+    """Four pads, both players, same sequence.
+
+    The sequence is shown once, then hidden, and both reproduce it from
+    memory. Scored as a correct PREFIX rather than right-or-wrong: five of
+    seven is a real result and should beat four of seven.
+    """
+
+    def __init__(self, bot, uids: dict, names: dict, target: list, timeout: float):
+        super().__init__(timeout=max(15.0, float(timeout)))
+        self.bot = bot
+        self.uids = {k: str(v or "") for k, v in uids.items()}
+        self.names = dict(names)
+        self.target = list(target)
+        self.answers = {"me": [], "peer": []}
+        self.done = asyncio.Event()
+        self.message = None
+        for pad in mp_games.SIMON_PADS:
+            b = discord.ui.Button(label=pad, style=discord.ButtonStyle.secondary)
+            b.callback = self._press(pad)
+            self.add_item(b)
+
+    def _side(self, uid: str) -> str:
+        for side, want in self.uids.items():
+            if want and str(uid) == want:
+                return side
+        return ""
+
+    def progress(self) -> str:
+        """How many pads each has entered — never WHICH ones. Showing the
+        pads would let the slower player copy the faster one's answer."""
+        return " · ".join(
+            f"**{self.names.get(k, k)}** {len(self.answers[k])}/{len(self.target)}"
+            for k in ("me", "peer"))
+
+    def _press(self, pad: str):
+        async def cb(interaction: discord.Interaction):
+            side = self._side(interaction.user.id)
+            if not side or len(self.answers[side]) >= len(self.target):
+                await _ignore(interaction)
+                return
+            self.answers[side].append(pad)
+            if all(len(self.answers[k]) >= len(self.target) for k in ("me", "peer")):
+                self.done.set()
+            try:
+                await interaction.response.edit_message(
+                    embed=self.bot._mp_card("🧠 Simon", self.progress()), view=self)
+            except Exception:  # noqa: BLE001
+                pass
+        return cb
+
+
+class MpTttView(discord.ui.View):
+    """A 3x3 board of buttons — the one real game that fits Discord natively.
+
+    Turn-based, and a turn is enforced: pressing out of turn is ignored. X
+    alternates each game, because X can force at least a draw and fixing it
+    would hand one player the deciding round.
+    """
+
+    def __init__(self, bot, uids: dict, names: dict, marks: dict, first: str,
+                 timeout: float):
+        super().__init__(timeout=max(20.0, float(timeout)))
+        self.bot = bot
+        self.uids = {k: str(v or "") for k, v in uids.items()}
+        self.names = dict(names)
+        self.marks = dict(marks)                     # side -> "x"/"o"
+        self.board = mp_games.ttt_new()
+        self.turn = first
+        self.done = asyncio.Event()
+        self.message = None
+        for i in range(9):
+            b = discord.ui.Button(label="\u200b", row=i // 3,
+                                  style=discord.ButtonStyle.secondary)
+            b.callback = self._press(i)
+            self.add_item(b)
+
+    def _side(self, uid: str) -> str:
+        for side, want in self.uids.items():
+            if want and str(uid) == want:
+                return side
+        return ""
+
+    def caption(self) -> str:
+        if self.done.is_set():
+            return "—"
+        return (f"**{self.names.get(self.turn, self.turn)}** to play "
+                f"({self.marks.get(self.turn, '').upper()})")
+
+    def _press(self, i: int):
+        async def cb(interaction: discord.Interaction):
+            side = self._side(interaction.user.id)
+            if side != self.turn or self.board[i] or self.done.is_set():
+                await _ignore(interaction)      # not your turn, or taken
+                return
+            mark = self.marks.get(side, "x")
+            self.board[i] = mark
+            btn = self.children[i]
+            btn.label = mark.upper()
+            btn.disabled = True
+            btn.style = (discord.ButtonStyle.primary if mark == "x"
+                         else discord.ButtonStyle.danger)
+            self.turn = "peer" if side == "me" else "me"
+            if mp_games.ttt_winner(self.board) or mp_games.ttt_full(self.board):
+                for c in self.children:
+                    c.disabled = True
+                self.done.set()
+            try:
+                await interaction.response.edit_message(
+                    embed=self.bot._mp_card("⚔ Sudden Death", self.caption()),
+                    view=self)
+            except Exception:  # noqa: BLE001
+                pass
+        return cb
+
+
 class MpCardsView(discord.ui.View):
     """Blackjack at a two-seat table. Both hands FACE UP, one dealer, one
     hidden hole card, and both players acting at once.
@@ -2668,6 +2784,116 @@ class BotManager:
                 xc.update(sub)
         return True
 
+    def _mp_seats(self):
+        s = self.link
+        ctx = self._mp_ctx()
+        return (s, ctx,
+                {"me": s.link.owner, "peer": s.link.peer_owner},
+                {"me": ctx.get("multi_me_name") or "You",
+                 "peer": ctx.get("multi_peer_name") or "Opponent"})
+
+    async def _mp_simon_row(self, a: dict, xc: dict) -> bool:
+        """Show a sequence, hide it, and see who gets further from memory.
+
+        Each pass is one pad longer than the last, so the round ends on its
+        own: memory fails, and it fails sooner the more inflated you are.
+        """
+        s, ctx, uids, names = self._mp_seats()
+        grow = int(float(mp_games._num(a.get("grow")) or 1))
+        base = int(float(mp_games._num(a.get("length")) or 3))
+        n = base + grow * int(float(mp_games._num(xc.get("multi_round_pass")) or 1) - 1)
+        target = mp_games.simon_sequence(n)
+        show = max(2.0, float(mp_games._num(a.get("show")) or 1.0) * len(target))
+        secs = mp_games.choice_deadline(a.get("seconds"))
+
+        shown = " ".join(target)
+        msg = await self._link_say(
+            shown, embed=self._mp_card("🧠 Watch…", f"# {shown}\n-# memorise it"))
+        await asyncio.sleep(show)
+
+        view = MpSimonView(self, uids, names, target, secs)
+        self._register_view(view)
+        # The sequence is REPLACED, not posted again below — leaving it on
+        # screen would make this a typing test rather than a memory one.
+        try:
+            if msg is not None:
+                await msg.edit(content=view.progress(),
+                               embed=self._mp_card("🧠 Simon", view.progress()),
+                               view=view)
+                view.message = msg
+        except Exception:  # noqa: BLE001
+            view.message = await self._link_say(
+                view.progress(), embed=self._mp_card("🧠 Simon", view.progress()),
+                view=view)
+        try:
+            await asyncio.wait_for(view.done.wait(), timeout=secs + 5)
+        except asyncio.TimeoutError:
+            pass
+
+        r = mp_games.simon_outcome(view.answers["me"], view.answers["peer"],
+                                   target, s.link.me, s.link.peer)
+        nm = {s.link.me: names["me"], s.link.peer: names["peer"]}
+        if r["both"]:
+            head = "🧠 **Neither of you had a single pad.**"
+        elif r["push"]:
+            head = f"🤝 Both got {r['scores'][s.link.me]:g} of {len(target)} — push."
+        else:
+            head = (f"🧠 **{nm[r['loser']]}** pays — "
+                    f"{r['scores'][s.link.me]:g} vs {r['scores'][s.link.peer]:g} "
+                    f"of {len(target)}.")
+        await self._link_say(f"{head}\nIt was: {shown}",
+                             embed=self._mp_card("🧠 Simon", f"{head}\nIt was: {shown}"))
+        xc.update({
+            "multi_simon_loser": r["loser"],
+            "multi_simon_loser_name": nm.get(r["loser"], ""),
+            "multi_simon_length": str(len(target)),
+            "multi_simon_my_score": f"{r['scores'][s.link.me]:g}",
+            "multi_simon_peer_score": f"{r['scores'][s.link.peer]:g}",
+            "multi_simon_who": ("both" if r["both"] else
+                                "" if not r["loser"] else
+                                ("me" if r["loser"] == s.link.me else "peer")),
+        })
+        return True
+
+    async def _mp_ttt_row(self, a: dict, xc: dict) -> bool:
+        """Tic tac toe. A DRAW costs both, which is the whole point: perfect
+        play always draws, so it still walks you into the ceiling, and the
+        only escape is to try to win — which is how you lose."""
+        s, ctx, uids, names = self._mp_seats()
+        # X alternates: X can force at least a draw, so fixing it would hand
+        # one player the deciding round.
+        n = int(float(mp_games._num(xc.get("multi_round_pass")) or 1))
+        first = "me" if n % 2 else "peer"
+        marks = {first: "x", ("peer" if first == "me" else "me"): "o"}
+        secs = mp_games.choice_deadline(a.get("seconds"))
+        view = MpTttView(self, uids, names, marks, first, secs)
+        self._register_view(view)
+        view.message = await self._link_say(
+            view.caption(), embed=self._mp_card("⚔ Sudden Death", view.caption()),
+            view=view)
+        try:
+            await asyncio.wait_for(view.done.wait(), timeout=secs + 5)
+        except asyncio.TimeoutError:
+            pass
+
+        ids = {"me": s.link.me, "peer": s.link.peer}
+        r = mp_games.ttt_outcome(view.board, {ids[k]: v for k, v in marks.items()})
+        nm = {s.link.me: names["me"], s.link.peer: names["peer"]}
+        if r["draw"] or not r["over"]:
+            head = "🤝 **A draw — and a draw costs you both.**"
+        else:
+            head = f"⚔ **{nm.get(r['loser'], 'nobody')}** pays."
+        await self._link_say(head, embed=self._mp_card("⚔ Sudden Death", head))
+        xc.update({
+            "multi_ttt_loser": r["loser"],
+            "multi_ttt_loser_name": nm.get(r["loser"], ""),
+            "multi_ttt_draw": "1" if (r["draw"] or not r["over"]) else "",
+            "multi_ttt_who": ("both" if (r["draw"] or not r["over"]) else
+                              "" if not r["loser"] else
+                              ("me" if r["loser"] == s.link.me else "peer")),
+        })
+        return True
+
     async def _mp_cards_row(self, a: dict, xc: dict) -> bool:
         """Blackjack, two seats, one dealer. BLOCKS until both stand or bust.
 
@@ -2857,6 +3083,10 @@ class BotManager:
             return await self._mp_choice_row(a, xc)
         if typ == mp_games.T_CARDS:
             return await self._mp_cards_row(a, xc)
+        if typ == mp_games.T_SIMON:
+            return await self._mp_simon_row(a, xc)
+        if typ == mp_games.T_TTT:
+            return await self._mp_ttt_row(a, xc)
         if typ == mp_games.T_DUEL:
             return await self._mp_duel_row(a, xc)
         if typ == mp_games.T_RUN:

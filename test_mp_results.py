@@ -170,6 +170,52 @@ ok(pg in GROUPS or pg in CARDS,
 ok(len(GROUPS.get(pg) or []) >= 2,
    "…with something to cover the picture AND something that says why")
 
+# ---- the whole kit hangs together ------------------------------------------ #
+# Four rounds, then overtime, then the ending. Every reference in it resolves.
+ACT_NAMES = {a["name"] for a in SHIP["mp_actions"]}
+ok([r["name"] for r in SHIP["mp_rounds"]]
+   == ["Round 1", "Round 2", "Round 3", "Round 4"], "four rounds ship, in order")
+
+blocks = ([("round " + r["name"], r.get("actions"), r.get("intro")) for r in SHIP["mp_rounds"]]
+          + [("sudden death", SHIP["mp_sudden"]["actions"], None),
+             ("end condition", SHIP["mp_end"]["actions"], None)]
+          + [("action " + a["name"], a["actions"], None) for a in SHIP["mp_actions"]])
+for label, body, intro in blocks:
+    for r in list(walk(body)) + list(walk(intro)):
+        if r.get("type") == "mp_action":
+            ok(r.get("action") in ACT_NAMES,
+               f"{label} calls Action {r.get('action')!r}, which exists")
+        if r.get("type") in ("overlay", "update_overlay_text"):
+            ok(r.get("overlay") in CARDS, f"{label} calls overlay {r.get('overlay')!r}")
+        if r.get("type") in ("scene_group", "scene_group_kill"):
+            ok(r.get("group") in GROUPS, f"{label} plays group {r.get('group')!r}")
+        if r.get("type") == "fire":
+            ok("[multi_scale]" in str(r.get("fill_pct")),
+               f"{label}'s stake is ceiling-relative")
+
+# each round escalates in KIND, not just in number: luck, bluff, judgement,
+# memory — then nerve in overtime
+kinds = []
+for r in SHIP["mp_rounds"]:
+    called = [x.get("action") for x in walk(r["actions"]) if x.get("type") == "mp_action"]
+    kinds += called
+ok(kinds == ["MultiRoulette", "MultiRPS", "MultiBlackjack", "MultiSimon"],
+   "the rounds run luck → bluff → judgement → memory, in that order")
+sud = [x.get("action") for x in walk(SHIP["mp_sudden"]["actions"])
+       if x.get("type") == "mp_action"]
+ok(sud == ["MultiTicTacToe"], "…and overtime is nerve")
+
+# the three games that can end with NOBODY beaten must still cost somebody,
+# or a round resolves to nothing
+for nm, flag in (("MultiBlackjack", "multi_cards_who"),
+                 ("MultiSimon", "multi_simon_who"),
+                 ("MultiTicTacToe", "multi_ttt_draw")):
+    a = next(x for x in SHIP["mp_actions"] if x["name"] == nm)
+    txt = json.dumps(a, ensure_ascii=False)
+    ok(flag in txt, f"{nm} branches on its shared-loss case")
+    ok('"multi_who": "both"' in txt,
+       f"…and {nm} really does fire at BOTH when nobody won")
+
 # ---- the spread bet is wired, and settled in the RIGHT ORDER --------------- #
 for r in SHIP["mp_rounds"]:
     sb = r.get("spread_bet") or {}

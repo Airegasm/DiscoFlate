@@ -963,6 +963,24 @@ ok(!/id="mpiTakeSplit"/.test(sandbox.modals[0].innerHTML),
    'no split box unless the host offered one — you cannot re-tune their rig');
 sandbox.mpRender({ mode: 'multi', state: 'idle', preflight: [] });
 
+// ---- the permission help says WHY, not just WHAT ---------------------------
+// All four are granted to @everyone by default, so an operator has probably
+// never had to set one and will not recognise the failure when one is revoked.
+{
+  const two = html.slice(html.indexOf('The two channels'),
+                         html.indexOf('Fair races between unequal pumps'));
+  ok(/never had to grant/.test(two),
+     'it says these are on by default, so nobody hunts for a setting they '
+     + 'already have');
+  ok(/worst-named/.test(two) && /nothing to do with URLs/.test(two),
+     'Embed Links is explained: it governs rich CARDS, not links');
+  ok(/do not post at all/.test(two),
+     '…and that losing it means the cards silently never appear');
+  ok(/protocol.s log/.test(two) && /catches up/.test(two),
+     'Read Message History is explained: bot_network IS the log, which is what '
+     + 'makes reconnecting free');
+}
+
 // ---- the placeholder list is duplicated ON PURPOSE, so guard the copy -----
 // It appears in "Placeholders & examples" and again in the Multiplayer help
 // section, so you don't have to leave the page you're reading. Two copies of a

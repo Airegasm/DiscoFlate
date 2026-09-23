@@ -29,6 +29,8 @@ T_ROLL = "mp_roll"
 T_CHOICE = "mp_choice"
 T_DUEL = "mp_duel"
 T_CARDS = "mp_cards"
+T_SIMON = "mp_simon"
+T_TTT = "mp_ttt"
 T_RUN = "mp_action"          # run a named Multiplayer Action inline
 T_TELL = "mp_tell"           # ask the OTHER bot to run one of its own
 RUN_DEPTH = 4                # an Action that runs itself must not spiral
@@ -481,6 +483,102 @@ def cards_outcome(a_cards, b_cards, dealer, a="a", b="b") -> dict:
         out["push"] = True
     else:
         out["loser"] = b if sa > sb else a
+    return out
+
+
+# ---- simon: memory, and it escalates itself --------------------------------- #
+#
+# A sequence is shown, hidden, and both players reproduce it. Each pass is one
+# longer than the last, so the round needs no stake tuning to end — memory
+# fails on its own, and it fails sooner the more inflated you are.
+#
+# Scored as a correct PREFIX, not right-or-wrong. Getting five of seven is a
+# real result and should beat four of seven; all-or-nothing would throw away
+# most of what happened and turn a memory game into a coin flip.
+
+SIMON_PADS = ("🔴", "🟡", "🟢", "🔵")
+SIMON_MAX = 12
+
+
+def simon_sequence(length, picks=None) -> list:
+    n = int(min(SIMON_MAX, max(1, int(_num(length) or 1))))
+    feed = list(picks or [])
+    out = []
+    for i in range(n):
+        if i < len(feed):
+            out.append(SIMON_PADS[int(feed[i]) % len(SIMON_PADS)])
+        else:
+            out.append(random.choice(SIMON_PADS))
+    return out
+
+
+def simon_score(answer, target) -> int:
+    """How far they got before the first mistake."""
+    n = 0
+    for got, want in zip(list(answer or []), list(target or [])):
+        if got != want:
+            break
+        n += 1
+    return n
+
+
+def simon_outcome(a_ans, b_ans, target, a="a", b="b") -> dict:
+    """Further through the sequence wins. Level is a push; both at zero means
+    neither remembered a single pad, and they both pay."""
+    sa, sb = simon_score(a_ans, target), simon_score(b_ans, target)
+    out = {"scores": {a: sa, b: sb}, "length": len(list(target or [])),
+           "loser": "", "both": False, "push": False}
+    if sa == 0 and sb == 0:
+        out["both"] = True
+    elif sa == sb:
+        out["push"] = True
+    else:
+        out["loser"] = b if sa > sb else a
+    return out
+
+
+# ---- tic tac toe: the draws are the point ----------------------------------- #
+#
+# Sudden death only. Tic tac toe is SOLVED — perfect play always draws — which
+# looks fatal for a decider and is actually the mechanism: a draw hits BOTH
+# players, so perfect play still walks you into the ceiling. The only way out
+# of the shared damage is to try to win, which means leaving perfect play,
+# which is how you lose. The game is not the board, it is who cracks first.
+
+TTT_LINES = ((0, 1, 2), (3, 4, 5), (6, 7, 8),      # rows
+             (0, 3, 6), (1, 4, 7), (2, 5, 8),      # columns
+             (0, 4, 8), (2, 4, 6))                 # diagonals
+
+
+def ttt_new() -> list:
+    return [""] * 9
+
+
+def ttt_winner(board) -> str:
+    b = list(board or []) + [""] * 9
+    for i, j, k in TTT_LINES:
+        if b[i] and b[i] == b[j] == b[k]:
+            return b[i]
+    return ""
+
+
+def ttt_full(board) -> bool:
+    return all(str(c).strip() for c in (list(board or []) + [""] * 9)[:9])
+
+
+def ttt_outcome(board, marks: dict) -> dict:
+    """`marks` maps player id -> "x"/"o". A draw names nobody and costs both."""
+    w = ttt_winner(board)
+    out = {"winner": "", "loser": "", "draw": False, "over": False}
+    if w:
+        for who, mark in (marks or {}).items():
+            if mark == w:
+                out["winner"] = who
+            else:
+                out["loser"] = who
+        out["over"] = True
+    elif ttt_full(board):
+        out["draw"] = out["over"] = True
     return out
 
 
