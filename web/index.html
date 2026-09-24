@@ -7849,6 +7849,15 @@ function cleanActionRows(arr){
       target:(a.target||'').trim()||null, command:(a.command||'').trim()||null,
       if_option:(a.if_option>0)?+a.if_option:null};
     if(t==='message'){ o.message=a.message||''; if((a.as||'')==='owner') o.as='owner'; }   // only message rows speak
+    // Rows whose ONE defining field had no clause here, so every save quietly
+    // dropped it and left a row that ran nothing. A minigame row losing its
+    // `minigame` is what stopped !agsimon and friends working: the command
+    // still existed, the row still existed, and it pointed at no game.
+    if(t==='minigame'){ o.minigame=s(a.minigame||a.game); }
+    if(t==='camera'){ o.op=s(a.op)||'freeze'; }
+    if(t==='notify'){ o.message=a.message||''; }
+    if(t==='snapshot'){ o.caption=a.caption||''; }
+    if(t==='award'){ o.amount=(a.amount==null||a.amount==='')?null:+a.amount; }
     // multiplayer: who a row acts on, kept on EVERY row type that can carry it
     if((a.multi_who||'').trim()) o.multi_who=(a.multi_who||'').trim();
     if(t==='mp_spin'){ o.message=a.message||''; o.announce_odds=a.announce_odds!==false;

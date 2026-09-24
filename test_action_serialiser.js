@@ -66,6 +66,26 @@ for (const t of ['overlay','update_overlay_text','overlay_kill','start_timer','s
   ok(!threw, `${t} serialises — it used to throw "${threw}" and take the whole save with it`);
 }
 
+// ---- the ONE field that defines a row must survive --------------------------
+// A row whose defining field is dropped still exists, still runs, and does
+// NOTHING. That is what stopped the minigames: !agsimon kept its minigame row,
+// the row pointed at no game, and every save re-wrote it that way.
+for (const [t, f, v, want] of [
+    ['minigame', 'minigame', 'mg:abc123', 'mg:abc123'],
+    ['camera',   'op',       'freeze',    'freeze'],
+    ['notify',   'message',  'hello',     'hello'],
+    ['snapshot', 'caption',  'a caption', 'a caption'],
+    ['award',    'amount',   12,          12]]) {
+  const [o] = box.cleanActionRows([{ type: t, [f]: v }]);
+  ok(o[f] === want,
+     `a ${t} row keeps its ${f} — without it the row runs nothing, silently`);
+}
+// a minigame row written by an older build used `game`; both must be accepted
+{
+  const [o] = box.cleanActionRows([{ type: 'minigame', game: 'mg:old' }]);
+  ok(o.minigame === 'mg:old', 'an older `game` field is migrated, not dropped');
+}
+
 // and it must keep the values, not just survive
 const [ov] = box.cleanActionRows([{ type:'overlay', overlay:'bvOutcome', mode:'timed',
                                     seconds:8, fade_in:0.3, fade_out:0.6 }]);
