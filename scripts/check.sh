@@ -116,3 +116,4 @@ if [ -x scripts/sync-android.sh ]; then
 fi
 
 echo "✓ all checks passed"
+node test_action_serialiser.js

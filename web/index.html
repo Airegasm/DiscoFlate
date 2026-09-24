@@ -7828,6 +7828,13 @@ function delPoll(i){
 function cleanActionRows(arr){
   // seconds may be a number OR a placeholder string ("[winner_score]").
   const secs = s => (typeof s==='string'&&s.includes('['))?s : ((s>0)?+s:null);
+  // The overlay/timer clauses below call s() to coerce a field to a string. It
+  // was never defined HERE — only inside the gist helper — so serialising any
+  // block containing an `overlay`, `update_overlay_text`, `overlay_kill`,
+  // `start_timer` or `stop_timer` row threw ReferenceError. gatherConfig() then
+  // died before it built a payload, so the save vanished with NO error at all
+  // and the badge just retried forever.
+  const s = v => String(v==null ? '' : v);
   return (arr||[]).map(a=>{
     const t=a.type||'message';
     const o={type:t,

@@ -1,6 +1,6 @@
 {
-  "version": "4.0.0",
-  "versionCode": 200,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v4.0.0/discoflate-v4.0.0.apk",
-  "notes": "DiscoFlate v4.0.0 — 🤝 Multiplayer: two installs, two bots, two pumps, one match (NOT yet person-to-person tested — solo is unaffected). Plus: Go Live no longer holds a pre-show when no camera is running, and edits to Go Live stopped being eaten by a background refresh."
+  "version": "3.90.2",
+  "versionCode": 192,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.90.2/discoflate-v3.90.2.apk",
+  "notes": "DiscoFlate v3.90.2 — 🟩 Word Race ships ready to run, the Chat buttons that never fired now work, and the update check shows a headline instead of the whole changelog."
 }
