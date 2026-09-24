@@ -72,6 +72,7 @@ if command -v node >/dev/null; then
   node test_panel_boot.js
   echo "→ multiplayer panel behaviour …"
 node test_golive_scope.js
+node test_save_race.js
   node test_multiplayer_ui.js
 fi
 

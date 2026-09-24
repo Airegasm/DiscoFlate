@@ -8922,7 +8922,11 @@ function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;'
 function showToDom(sc, st, force){
   sc = sc||{}; st = st||{};
   const g = sc.golive || st.golive || {};
-  const free = el => el && (force || document.activeElement!==el);
+  // `force` is an explicit reload (you switched scene). Otherwise never write
+  // over a field the operator is in, NOR over one whose edit has not reached
+  // the server yet — losing an unsaved Go Live announcement to a routine poll
+  // is exactly the clobber this guard exists for.
+  const free = el => el && (force || (document.activeElement!==el && !savePending()));
   const set=(id,v)=>{ const el=$(id); if(free(el)){
     if(el.type==='checkbox') el.checked=!!v; else el.value=(v??''); } };
   set('#glEnabled', g.intro_enabled);
@@ -8930,7 +8934,8 @@ function showToDom(sc, st, force){
   set('#glAnnounce', g.announce||'');
   set('#glEvery', g.announce_every??0); set('#glImage', g.announce_image||'');
   // stages, with the pre-stages shape folded in so old configs still work
-  if(force || !document.querySelector('#glStages select:focus, #glStages input:focus')){
+  if(force || (!savePending()
+               && !document.querySelector('#glStages select:focus, #glStages input:focus'))){
     glStages = Array.isArray(g.stages) && g.stages.length
       ? g.stages.map(r=>({group:(r&&r.group)||'', seconds:Math.max(0,parseInt((r&&r.seconds)||0,10)||0)}))
       : [{group:g.scene_group||'', seconds:Math.max(0,parseInt(g.seconds??15,10)||0)}];
@@ -9139,8 +9144,19 @@ async function sceneSwitchSave(){
     saveBadge(true);
   }catch(e){ saveBadge(false); toastMsg('⚠ could not switch scene: '+e.message); }
 }
+// TRUE while an edit is on its way to the server: the debounce is armed, or a
+// POST is in flight. Nothing may re-hydrate a field from /api/state during
+// that window — the server's copy is OLDER than what is on screen, so writing
+// it back silently eats the edit and then SAVES the eaten value.
+let saveInFlight = 0;
+function savePending(){ return saveT != null || saveInFlight > 0; }
+
 async function doSave(){
   saveT = null;
+  saveInFlight++;
+  try{ return await _doSave(); } finally { saveInFlight--; }
+}
+async function _doSave(){
   if(pendingRev > 0){                 // a rev-bumping call is in flight — wait
     saveT = setTimeout(doSave, 300);  // for its response so we save with the
     return;                           // fresh rev instead of 409ing against it
