@@ -9150,7 +9150,18 @@ async function sceneSwitchSave(){
 // that window — the server's copy is OLDER than what is on screen, so writing
 // it back silently eats the edit and then SAVES the eaten value.
 let saveInFlight = 0;
-function savePending(){ return saveT != null || saveInFlight > 0; }
+let savePendingSince = 0;
+// A save is "pending" only for a WINDOW. A failed save retries every 3s
+// forever, so a permanent `saveT` would freeze hydration permanently — one
+// unreachable server and the whole panel silently goes stale, which is worse
+// than the clobber this guard exists to prevent. Ten seconds covers a
+// debounce plus a slow round trip; past that, the server wins again.
+const SAVE_PENDING_MS = 10000;
+function savePending(){
+  if(saveT == null && saveInFlight <= 0){ savePendingSince = 0; return false; }
+  if(!savePendingSince) savePendingSince = Date.now();
+  return (Date.now() - savePendingSince) < SAVE_PENDING_MS;
+}
 
 async function doSave(){
   saveT = null;

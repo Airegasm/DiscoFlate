@@ -17,10 +17,10 @@ const html = fs.readFileSync(path.join(__dirname, 'web', 'index.html'), 'utf8');
 // ---- the guard exists, and covers BOTH halves of the window ---------------
 ok(/function savePending\(\)/.test(html), 'there is one test for "an edit is in flight"');
 const sp = html.slice(html.indexOf('function savePending()'),
-                      html.indexOf('function savePending()') + 120);
-ok(/saveT != null/.test(sp),
+                      html.indexOf('async function doSave()'));
+ok(/saveT/.test(sp),
    '…covering the DEBOUNCE: the 400ms before the POST even starts');
-ok(/saveInFlight > 0/.test(sp),
+ok(/saveInFlight/.test(sp),
    '…and the POST itself, which is the longer half of the window');
 
 // ---- doSave marks itself in flight, and always unmarks ---------------------
@@ -48,6 +48,18 @@ const stages = std.slice(std.indexOf('glStages = Array.isArray') - 300,
 ok(/savePending\(\)/.test(stages),
    'the intro stages are guarded too — the seconds live there, and they were '
    + 'being lost the same way');
+
+// ---- the guard must not become a deadlock ---------------------------------
+// A failed save retries every 3s forever, so a permanent `saveT` would freeze
+// hydration permanently: one unreachable server and the whole panel silently
+// goes stale, which is worse than the clobber the guard exists to prevent.
+const sp2 = html.slice(html.indexOf('let savePendingSince'),
+                       html.indexOf('async function doSave()'));
+ok(/SAVE_PENDING_MS/.test(sp2), 'the pending state is bounded by a window');
+ok(/Date\.now\(\) - savePendingSince\) < SAVE_PENDING_MS/.test(sp2),
+   '…measured from when it STARTED, so a retry loop cannot extend it forever');
+ok(/savePendingSince = 0/.test(sp2),
+   '…and reset once nothing is in flight, so the window starts fresh each time');
 
 console.log(`${P} passed, ${F.length} failed`);
 F.forEach(f => console.log('  FAIL:', f));
