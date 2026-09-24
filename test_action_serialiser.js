@@ -95,6 +95,48 @@ ok(ov.fade_in === 0.3 && ov.fade_out === 0.6, '…and its fades');
 const [ut] = box.cleanActionRows([{ type:'update_overlay_text', overlay:'bvDuel', text:'+5%' }]);
 ok(ut.overlay === 'bvDuel' && ut.text === '+5%', 'update_overlay_text keeps both fields');
 
+// ---- SELF-MAINTAINING: every field the editor writes must survive ----------
+// The two bugs above were both "the editor writes a field, the serialiser
+// doesn't know about it". Rather than list the types by hand — which is how
+// they were missed — read the editor itself: for each `typ==='X'` block,
+// collect the T('field') writes, then prove each one round-trips.
+//
+// Add a row type with a new field and forget the serialiser, and this fails.
+{
+  const map = {};
+  const re = /if\(typ==='([a-z_]+)'\)\{([\s\S]{0,2600}?)\n  \}/g;
+  let m;
+  while ((m = re.exec(html))) {
+    const fields = [...new Set([...m[2].matchAll(/T\('([a-z_]+)'\)/g)].map(x => x[1]))];
+    if (fields.length) map[m[1]] = [...new Set((map[m[1]] || []).concat(fields))];
+  }
+  ok(Object.keys(map).length > 10,
+     'the editor-field map is readable: ' + Object.keys(map).length + ' types');
+
+  // values chosen to survive clamping, so a clamp is never mistaken for a drop
+  const val = { announce_odds:false, dice:2, sides:6, luck:5, seconds:60, length:4,
+    grow:2, block_during:false, charges:3, amount:7, iterations:3, max_iterations:9,
+    scope:'user', operation:'set', mode:'fixed', style:'embed', as:'owner',
+    fire_mode:'add', award_type:'command', capacity_op:'add' };
+  const skip = new Set(['freeze','deadline','label','target','default']);  // stored elsewhere
+  const dropped = [];
+  for (const [t, fields] of Object.entries(map)) {
+    const row = { type: t };
+    fields.forEach(f => { row[f] = (f in val) ? val[f] : 'X_' + f; });
+    let out;
+    try { [out] = box.cleanActionRows([row]); }
+    catch (e) { dropped.push(`${t}: THREW ${e.message}`); continue; }
+    for (const f of fields) {
+      if (skip.has(f)) continue;
+      const v = out[f];
+      if (v === undefined || v === null || v === '') dropped.push(`${t}.${f}`);
+    }
+  }
+  ok(dropped.length === 0,
+     'every field the row editor writes survives serialisation — a dropped one '
+     + 'is a row that runs nothing, silently: ' + dropped.join(', '));
+}
+
 console.log(`${P} passed, ${F.length} failed`);
 F.forEach(f => console.log('  FAIL:', f));
 process.exit(F.length ? 1 : 0);
