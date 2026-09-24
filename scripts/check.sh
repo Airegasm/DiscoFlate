@@ -31,6 +31,7 @@ $PY test_mp_gate.py
 $PY test_mp_results.py
 $PY test_mp_golive.py
 $PY test_standby.py
+$PY test_intro_nocam.py
 
 # Every new [placeholder] has to reach the Help table, or it exists only for
 # whoever wrote it. Multiplayer publishes a lot of them, so this is checked

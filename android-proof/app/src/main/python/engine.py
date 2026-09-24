@@ -79,6 +79,9 @@ class Engine:
         # token -> a notification waiting on a minigame to finish
         self._notify_pending: dict[str, dict] = {}
         self.pause_overlay_cb = None    # app.py: cover/uncover the stream on pause
+        # app.py: is a virtual camera actually running? An intro with no
+        # picture to hold is dead air, so the pre-show is skipped without one.
+        self.camera_live_cb = None
         self._runs: list = []            # live action-block cancel flags
         # Action blocks parked mid-run waiting on ONE player: token -> where to
         # pick up. Nothing global is paused — everyone else's commands, the
@@ -1408,6 +1411,25 @@ class Engine:
         g = self.golive()
         if not g.get("intro_enabled"):
             self._intro_pending = False   # begin immediately: picture goes live
+            return False
+        # NO CAMERA, NO PRE-SHOW. An intro exists to hold the PICTURE while
+        # something plays over it. With no virtual camera running there is no
+        # picture to hold, so the hold is pure dead air: commands stay blocked
+        # and the activation message waits behind a countdown nobody can see.
+        #
+        # The announcement still goes out — that part was never about the
+        # camera — and then the session starts immediately.
+        if self.camera_live_cb is not None and not self.camera_live_cb():
+            self._intro_pending = False
+            msg = (g.get("announce") or "").strip()
+            img = (g.get("announce_image") or "").strip() or None
+            if (msg or img) and announce_cb:
+                try:
+                    await announce_cb(self.render(msg), img)
+                except Exception as e:  # noqa: BLE001 — never block go-live
+                    self._log("error", f"intro announcement failed: {e}")
+            self._log("bot", "no camera running — skipping the pre-show hold; "
+                             "the session starts now")
             return False
         self._intro_stages = self.intro_stages()
         self._intro_stage = -1

@@ -590,6 +590,10 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             return "intro"
         return "live"
     vcam.gate_cb = _picture_gate
+    # An intro holds the PICTURE. With no camera there is nothing to hold, so
+    # the pre-show is skipped and the session starts immediately — the
+    # announcement still goes out.
+    engine.camera_live_cb = lambda: bool((vcam.status() or {}).get("running"))
     net["vcam"] = vcam
     # live game state for stage widgets (capacity gauge / pump timer);
     # camera.py throttles how often it calls this

@@ -2196,6 +2196,7 @@ function applyModeVis(){
   // the tab itself. Leaving a dead toggle visible is worse than leaving it out.
   const tgl=document.querySelector('#modeTgl');
   if(tgl) tgl.style.display = on ? '' : 'none';
+  mpWarnBanner(m === 'multi');
   // There is no Multiplayer tab any more — the header RUNS the match, so the
   // header is what has to go. These are shown by mpRender() on mode, and a
   // build without multiplayer is forced to solo server-side; hiding them here
@@ -9230,6 +9231,33 @@ async function refresh(){
     }
   }catch(e){
     if(++refreshFails >= 3) offlineBanner(true);   // server gone — say so
+  }
+}
+// MULTIPLAYER IS UNPROVEN. Every piece of it is tested headlessly, and none
+// of it has run between two real people on real Discord. That is not a
+// footnote in a help page — somebody switching into it needs telling before
+// they build a show on it, so it sits across the top for as long as they are
+// in multiplayer. Not dismissible: it describes a standing state, not an
+// event, and it goes away by leaving multiplayer.
+function mpWarnBanner(on){
+  let el=$('#mpWarnBanner');
+  if(on && !el){
+    el=document.createElement('div'); el.id='mpWarnBanner';
+    el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9997;'+
+      'background:var(--warn);color:#2a1d00;font-weight:800;text-align:center;'+
+      'padding:10px 14px;line-height:1.45;font-size:.95rem;'+
+      'box-shadow:0 2px 10px rgba(0,0,0,.45)';
+    el.innerHTML='⚠ MULTIPLAYER IS NOT PERSON-TO-PERSON TESTED YET — '+
+      'every part of it works against test doubles, but no two real installs '+
+      'have played a match on real Discord. Expect rough edges for a day or '+
+      'two.<br><span style="font-weight:600;font-size:.88rem">'+
+      'Solo is unaffected — flip <b>Multi</b> back off in the header.</span>';
+    document.body.appendChild(el);
+    document.body.style.paddingTop='58px';
+  }
+  if(el){
+    el.style.display = on ? '' : 'none';
+    document.body.style.paddingTop = on ? '58px' : '';
   }
 }
 function offlineBanner(on){

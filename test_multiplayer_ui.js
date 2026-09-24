@@ -549,7 +549,10 @@ const vStart = html.indexOf('function mpAvailable(){');
 const vEnd = html.indexOf('\nfunction ', html.indexOf('function applyModeVis(){'));
 ok(vStart > 0 && vEnd > vStart, 'one visibility switch rather than one per page');
 const clx = () => ({ add() {}, remove() {}, toggle() {}, contains: () => false });
-const vbox = { console, lastState: { mode: 'solo' } };
+// the banner lives outside this slice; record what it was asked for so the
+// mode switch can be checked without pulling the whole panel in
+const vbox = { console, lastState: { mode: 'solo' }, warned: [] };
+vbox.mpWarnBanner = on => vbox.warned.push(!!on);
 vbox.els = [{ getAttribute: () => 'solo', style: {}, classList: clx() },
             { getAttribute: () => 'multi', style: {}, classList: clx() }];
 vbox.document = { querySelectorAll: sel => (sel === '[data-mode]' ? vbox.els : []),
@@ -558,17 +561,23 @@ vbox.window = vbox;
 vm.createContext(vbox);
 vm.runInContext(html.slice(vStart, vEnd), vbox);
 vbox.applyModeVis();
+ok(vbox.warned[vbox.warned.length - 1] === false,
+   'solo shows no multiplayer warning');
 ok(vbox.els[0].style.display === '' && vbox.els[1].style.display === 'none',
    'in solo, multiplayer cards are hidden');
 vbox.lastState = { mode: 'multi' };
 vbox.applyModeVis();
 ok(vbox.els[0].style.display === 'none' && vbox.els[1].style.display === '',
    '…and the other way round in multiplayer');
+ok(vbox.warned[vbox.warned.length - 1] === true,
+   '…and switching INTO multiplayer raises the "not tested yet" warning');
 vbox.lastState = { mode: 'multi', multiplayer_enabled: false };
 vbox.applyModeVis();
 ok(vbox.els[0].style.display === '' && vbox.els[1].style.display === 'none',
    'a build without multiplayer shows the solo half even when the stored mode '
    + 'says multi — the toggle that would get you out is hidden');
+ok(vbox.warned[vbox.warned.length - 1] === false,
+   '…and a build WITHOUT multiplayer shows no warning about it either');
 ok(vbox.mpAvailable() === false, 'the gate reads the flag');
 vbox.lastState = { mode: 'solo' };
 ok(vbox.mpAvailable() === true,
@@ -986,6 +995,33 @@ sandbox.mpRender({ mode: 'multi', state: 'idle', preflight: [] });
   ok(/none of them\s*\n?\s*fires a pump on its own|fires a pump on its own/.test(mp),
      'and that a game decides who lost while a separate fire spends it — which '
      + 'is what lets a stake change without touching the game');
+}
+
+// ---- the "not tested yet" banner -------------------------------------------
+// Multiplayer is tested only against test doubles. Somebody switching into it
+// needs telling BEFORE they build a show on it.
+{
+  const b = html.slice(html.indexOf('function mpWarnBanner('),
+                       html.indexOf('function offlineBanner('));
+  ok(/position:fixed/.test(b) && /top:0/.test(b),
+     'the warning sits across the top, not buried in a help page');
+  ok(/NOT PERSON-TO-PERSON TESTED/.test(b),
+     '…and says the specific thing that is true: no two real installs have '
+     + 'played a match');
+  ok(/Solo is unaffected/.test(b),
+     '…and that solo is fine, so it does not read as "the app is broken"');
+  ok(/Multi<\/b> back off/.test(b), '…and how to get out of it');
+  ok(!/dismiss|close|✕/i.test(b),
+     'it is NOT dismissible: it describes a standing state, and it goes away '
+     + 'by leaving multiplayer');
+  ok(/paddingTop/.test(b),
+     '…and it makes room for itself rather than covering the header');
+
+  const vis = html.slice(html.indexOf('function applyModeVis()'),
+                         html.indexOf('function pushGameplay('));
+  ok(/mpWarnBanner\(m === 'multi'\)/.test(vis),
+     'it is driven by the MODE, so switching in shows it and switching out '
+     + 'hides it');
 }
 
 // ---- the red dot on System, and clearing it --------------------------------
