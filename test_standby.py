@@ -77,6 +77,28 @@ ok("min(W / max(1, w), H / max(1, h))" in st,
    "the card is CONTAINED, not cropped — a standby card is a whole design, and "
    "losing its edges is worse than a letterbox")
 
+# ---- the shipped default: NAMED, not shipped -------------------------------- #
+# data/ is git-ignored, so everyone else gets the name, no file, and the text.
+import json as _j
+_d = _j.load(open(os.path.join(HERE, "default_config.json"), encoding="utf-8"))
+ok(_d.get("standby_image"), "a standby card is named in the shipped config")
+ok("/" not in str(_d["standby_image"]),
+   "…by bare NAME, resolved against the media library — never a path off one "
+   "machine")
+ok(str(_d.get("standby_text") or "").strip(),
+   "…and the TEXT is still set, because that is what everyone without the "
+   "file actually sees")
+
+# The resolver lives in discord_bot; app.py calls it on every camera frame, so
+# it has to be imported there. It wasn't, which was a NameError per frame.
+_app = open(os.path.join(HERE, "app.py"), encoding="utf-8").read()
+ok("_resolve_img" in _app.split("\n")[0:80][0] or "import" in _app,
+   "app.py exists")
+imports = [l for l in _app.split("\n") if l.startswith("from discord_bot import")]
+ok(imports and "_resolve_img" in imports[0],
+   "app.py IMPORTS _resolve_img — it calls it on the camera gate, and a bare "
+   "reference there is a NameError on every frame")
+
 print(f"{P} passed, {len(F)} failed")
 for f in F:
     print("  FAIL:", f)

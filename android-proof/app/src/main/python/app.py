@@ -39,7 +39,7 @@ import pumpdirect_import
 import kasa_legacy as kasa
 import device_control
 from engine import Engine
-from discord_bot import BotManager
+from discord_bot import BotManager, _resolve_img
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WEB_DIR = os.environ.get("DISCOFLATE_WEB_DIR") or os.path.join(HERE, "web")
