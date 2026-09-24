@@ -1,6 +1,6 @@
 {
-  "version": "3.90.2",
-  "versionCode": 192,
-  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v3.90.2/discoflate-v3.90.2.apk",
-  "notes": "DiscoFlate v3.90.2 — 🟩 Word Race ships ready to run, the Chat buttons that never fired now work, and the update check shows a headline instead of the whole changelog."
+  "version": "4.0.1",
+  "versionCode": 201,
+  "apk_url": "https://github.com/Airegasm/DiscoFlate/releases/download/v4.0.1/discoflate-v4.0.1.apk",
+  "notes": "DiscoFlate v4.0.1 — fixes two long-standing save bugs: an overlay row in any action block silently killed the whole save, and minigame/camera/notify/snapshot/award rows lost their defining field every time you saved. Plus 🤝 Multiplayer (new, not yet person-to-person tested — solo is unaffected)."
 }
