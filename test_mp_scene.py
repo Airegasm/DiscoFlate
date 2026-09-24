@@ -9,6 +9,7 @@ seeds — or a group called "Intro" resolving to the wrong half of the app.
 The kit SEEDS once and is then yours to edit, so these read it from a fresh
 config the way a real install would.
 """
+import json
 import os
 import sys
 
@@ -194,9 +195,11 @@ kit = {"scenes": [], "mp_actions": [], "mp_rounds": [], "templates_removed": []}
 ok(config_store.seed_versus(kit) > 0, "the versus kit seeds on a fresh config")
 ok([sc["name"] for sc in kit["scenes"]] == [config_store.VERSUS_SCENE_NAME],
    "…the scene")
-ok({a["name"] for a in kit["mp_actions"]} == {"MultiRoulette", "MultiRPS"},
-   "…the Actions it runs")
-ok(len(kit["mp_rounds"]) >= 2, "…and the Rounds that sequence them")
+ok({a["name"] for a in kit["mp_actions"]}
+   == {"MultiRoulette", "MultiRPS", "MultiBlackjack", "MultiSimon",
+       "MultiTicTacToe"},
+   "…every Action it runs — all five games, not just the first two")
+ok(len(kit["mp_rounds"]) == 4, "…and all four Rounds that sequence them")
 ok(not kit["scenes"][0].get("builtin")
    and not any(a.get("builtin") for a in kit["mp_actions"])
    and not any(r.get("builtin") for r in kit["mp_rounds"]),
@@ -212,7 +215,8 @@ rm = {"scenes": [], "mp_actions": [], "mp_rounds": [],
       "templates_removed": [config_store.VERSUS_SEED_ID, "mp_multiroulette"]}
 config_store.seed_versus(rm)
 ok(not rm["scenes"], "a deleted scene stays deleted")
-ok([a["name"] for a in rm["mp_actions"]] == ["MultiRPS"],
+ok("MultiRoulette" not in [a["name"] for a in rm["mp_actions"]]
+   and len(rm["mp_actions"]) == 4,
    "…and so does a deleted Action, while the rest still arrives")
 
 ok(config_store.VERSUS_SCENE_NAME not in config_store.SHIPPED_SCENE_NAMES,
@@ -251,6 +255,28 @@ card = [o for o in ovs if o["id"] == ov["overlay"]][0]
 ok("[multi_chosen_name]" in card["text"] and "[multi_roll]" in card["text"],
    "…and that card shows who and how much")
 ok(card.get("group") in groups, "…in a group the scene knows about")
+
+# ---- EVERYTHING shipped must carry a seed id -------------------------------- #
+# seed_versus copies only items with a `_tpl_id`: it is the key that makes
+# "seed once, and a deleted one stays deleted" work. An item without one is
+# not seeded LOUDLY — it is skipped in silence, so it never reaches any
+# install and nothing says why. Three Actions and two Rounds shipped that way.
+_raw = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                   "default_config.json"), encoding="utf-8"))
+for _k in ("mp_actions", "mp_rounds"):
+    for _x in _raw[_k]:
+        ok(str(_x.get("_tpl_id") or "").strip(),
+           f"{_k[3:-1]} {_x.get('name')!r} carries a _tpl_id, or it is never seeded")
+_ids = [x.get("_tpl_id") for x in _raw["mp_actions"] + _raw["mp_rounds"]]
+ok(len(_ids) == len(set(_ids)), "…and every id is unique, or one masks another")
+
+# the proof that matters: a clean install really does get all of it
+_f = {"scenes": [], "mp_actions": [], "mp_rounds": [], "templates_removed": []}
+config_store.seed_versus(_f)
+ok([a["name"] for a in _f["mp_actions"]] == [a["name"] for a in _raw["mp_actions"]],
+   "a fresh install gets every shipped Action")
+ok([r["name"] for r in _f["mp_rounds"]] == [r["name"] for r in _raw["mp_rounds"]],
+   "…and every shipped Round")
 
 # ---- the shipped MultiRPS --------------------------------------------------- #
 RPS = [a for a in cfg["mp_actions"] if a["name"] == "MultiRPS"]

@@ -684,7 +684,8 @@
           "type": "wait",
           "seconds": 10
         }
-      ]
+      ],
+      "_tpl_id": "mp_multiblackjack"
     },
     {
       "name": "MultiSimon",
@@ -755,7 +756,8 @@
           "type": "wait",
           "seconds": 8
         }
-      ]
+      ],
+      "_tpl_id": "mp_multisimon"
     },
     {
       "name": "MultiTicTacToe",
@@ -824,7 +826,8 @@
           "type": "wait",
           "seconds": 5
         }
-      ]
+      ],
+      "_tpl_id": "mp_multittt"
     }
   ],
   "mp_rounds": [
@@ -935,7 +938,8 @@
           "type": "mp_action",
           "action": "MultiBlackjack"
         }
-      ]
+      ],
+      "_tpl_id": "mp_vs_r3"
     },
     {
       "name": "Round 4",
@@ -968,7 +972,8 @@
           "type": "mp_action",
           "action": "MultiSimon"
         }
-      ]
+      ],
+      "_tpl_id": "mp_vs_r4"
     }
   ],
   "mode": "solo",
