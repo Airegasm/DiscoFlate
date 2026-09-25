@@ -562,8 +562,9 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
 
     def _picture_gate() -> str:
         """What the camera is allowed to send, asked fresh every frame:
-          'off'   — session isn't LIVE: a genuinely black screen, no overlays
-                    at all, so you can start the camera and get set up first
+          'off'   — a genuinely black screen with only the standby card. Now
+                    reserved for a deliberate hold; starting the camera is not
+                    one (see below)
           'intro' — LIVE with the pre-show running: black picture, and only
                     what the intro plays; the scene's always-on overlays wait
           'live'  — the real picture and every overlay
@@ -577,7 +578,14 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             if (want != getattr(vcam, "_standby_text", None)
                     or img != getattr(vcam, "_standby_image", None)):
                 vcam.set_standby(want, img)
-            return "off"
+            # Starting the camera is SETUP, not a hold. You get your own
+            # picture and the scene's main look immediately, so the shot can be
+            # framed against the overlays that will really be on screen rather
+            # than against a card. camera_start() has already mounted them and
+            # already skips the intro, pause and hidden groups — so what lands
+            # here is the Main set and nothing else. The pre-show still runs at
+            # go-live; this only changes what the camera shows BEFORE that.
+            return "live"
         # 'pending' matters: LIVE flips on BEFORE start_intro runs, and the ON
         # message + its [!command]s post to Discord in between. Without this
         # the room went out for those seconds, every single go-live.

@@ -1,8 +1,13 @@
 """The standby card: an image, or the line, never a blank frame.
 
-Anyone who picks your virtual camera before you go LIVE sees this. A black
-rectangle reads as a broken camera, which is why the text exists at all — so
-an image that fails to load must fall back to the TEXT, not to nothing.
+A black rectangle reads as a broken camera, which is why the text exists at
+all — so an image that fails to load must fall back to the TEXT, not to
+nothing.
+
+Note what the card is NOT, as of v4.0.2: it is no longer what you get for
+merely starting the camera. Starting the camera is setup, and setup wants your
+own picture and the scene's Main look, not a card. See the gate section at the
+bottom.
 """
 import os
 import sys
@@ -98,6 +103,35 @@ imports = [l for l in _app.split("\n") if l.startswith("from discord_bot import"
 ok(imports and "_resolve_img" in imports[0],
    "app.py IMPORTS _resolve_img — it calls it on the camera gate, and a bare "
    "reference there is a NameError on every frame")
+
+# ---- starting the camera is SETUP, not a hold ------------------------------- #
+# Asked for directly: "when i start the virtual webcam, I don't want to see the
+# STARTING NOW or any intro overlays - just webcam and the Main resolved first
+# overlay set of the scene". The overlays were already mounted by
+# camera_start(); the only thing standing in the way was this gate returning
+# 'off', which paints black + the card and composites nothing.
+_gate = _app.split("def _picture_gate()", 1)
+ok(len(_gate) == 2, "app.py still has a _picture_gate")
+_body = _gate[1].split("vcam.gate_cb", 1)[0]
+_notlive = _body.split('if not cfg0.get("listener_enabled"):', 1)
+ok(len(_notlive) == 2, "…with a branch for the session not being LIVE")
+_branch = _notlive[1].split("return", 1)[1].split("\n", 1)[0] if len(_notlive) == 2 else ""
+ok('"live"' in _branch,
+   "camera up but not LIVE renders the real picture and the mounted overlays")
+ok('"off"' not in _branch,
+   "…and specifically NOT 'off', which would black it and draw the card")
+
+# The intro is unaffected — this changed what happens BEFORE go-live only.
+ok('return "intro"' in _body,
+   "the pre-show still blacks the picture at go-live")
+
+# And the camera must never mount the intro's own groups at start, or 'no intro
+# overlays' would be false the moment the picture was let through.
+_start = _app.split("async def camera_start", 1)[1].split("async def ", 1)[0]
+ok("_group_is_intro" in _start,
+   "camera_start skips intro groups, so what shows at setup is the Main set")
+ok("_group_is_pause" in _start and "_group_hidden" in _start,
+   "…and skips pause and hidden groups too")
 
 print(f"{P} passed, {len(F)} failed")
 for f in F:
