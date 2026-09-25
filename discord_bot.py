@@ -3503,7 +3503,8 @@ class BotManager:
                 "notes": list(self._link_notes)[-12:],
                 # This rig's own seconds-to-100%. The invite popup shows it
                 # beside the host's and lets the guest correct it before
-                # accepting — every target in the match is paced from it.
+                # accepting. It does NOT affect the finish line — it only says
+                # how long this pump runs per percent.
                 "calibration": self._mp_calibration(),
                 **st}
 

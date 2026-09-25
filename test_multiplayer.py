@@ -99,22 +99,13 @@ ok(not hasattr(mp, "Ceiling"), "the ceiling gate is gone, not merely unset")
 ok(not hasattr(mp.Session(mp.Link("1"), net="n", cast="c"), "ceiling"),
    "…and no session carries one")
 
-# ---- pacing: two different pumps, one fair race ---------------------------- #
-ok(abs(mp.fill_rate(60) - 1.6667) < 0.001, "rate from calibration")
-ok(mp.fill_rate(0) == 0.0 and mp.fill_rate(None) == 0.0, "bad calibration = 0, not infinity")
-
-p = mp.compensate(150, {"A": 60, "B": 120})
-ok(p["ok"], "compensation works with both calibrations")
-ok(abs(p["targets"]["A"] - 150) < 0.01, "fastest pump keeps the base target")
-ok(abs(p["targets"]["B"] - 75) < 0.01, "slower pump's finish line comes down")
-ok(max(p["targets"].values()) <= 150 + 1e-9, "nobody is pushed past the consented number")
-ta = p["targets"]["A"] / p["rates"]["A"]
-tb = p["targets"]["B"] / p["rates"]["B"]
-ok(abs(ta - tb) < 0.001, "both targets take the same pumping time")
-
-p2 = mp.compensate(150, {"A": 60, "B": 0})
-ok(not p2["ok"] and "uncalibrated" in p2["why"], "missing calibration is flagged")
-ok(p2["targets"] == {"A": 150, "B": 150}, "uncompensated falls back to equal targets")
+# ---- one finish line, not two ---------------------------------------------- #
+# Percent is rig-independent, so pump speed cannot move anyone's finish line.
+# A rate-scaled handicap lived here until v4.0.2: it dropped the SLOWER rig's
+# line (a 900s pump lost at 33% while a 300s pump played to 100%), which is
+# precisely the rig-power advantage percent exists to abolish.
+ok(not hasattr(mp, "compensate"), "no pace compensation exists")
+ok(not hasattr(mp, "fill_rate"), "…nor the rate maths to rebuild one from")
 
 # ---- role, channels, dead heats -------------------------------------------- #
 ok(mp.decide_role("100", "200", "host", "guest") == "host", "stated preferences win")
@@ -215,8 +206,9 @@ made = bus.settle(T, )
 bus.post(A.offer(T, game="Race to N%", base_target=150, sid="m7k2"))
 made = bus.settle(T)
 ok(B.state == mp.S_INVITED, "guest is holding an invite")
-ok(abs(B.invite["targets"]["200"] - 75) < 0.01, "guest's finish line is compensated DOWN")
-ok("75%" in B.invite["cost"], "the estimate quotes the compensated number, not the base")
+ok(B.invite["targets"] == {"100": 150.0, "200": 150.0},
+   "both finish lines are the base number, however unequal the pumps")
+ok("150%" in B.invite["cost"], "…and the estimate quotes that one shared number")
 ok(A.link.sid == "m7k2" and A.is_host, "host owns the sid")
 
 bus.post(B.respond(T, True, video=True))
@@ -297,7 +289,8 @@ ok(B2.state != mp.S_INVITED, "a channel mismatch never becomes a match")
 ok("broadcast mismatch" in notes(made), "…and both operators are told WHICH channel")
 ok(A2.state == mp.S_ADVERTISED and not A2.link.sid, "the host stands down")
 
-# an uncompensated race must SAY SO rather than pretend it's even
+# a missing calibration changes NOTHING about the race — it only means this
+# rig can't say how many seconds a hit costs it
 A9 = mp.Session(mp.Link("100", name="Curtis-bot"), peer_name="Dave-bot",
                 net="net1", cast="cast1", calibration=60)
 B9 = mp.Session(mp.Link("200", name="Dave-bot"), peer_name="Curtis-bot",
@@ -306,9 +299,10 @@ bus9 = Bus(A9, B9)
 bus9.post(A9.start_advertising(T)); bus9.post(B9.start_advertising(T)); bus9.settle(T)
 made = bus9.post(A9.offer(T, game="Race", base_target=150, sid="unp1"))
 got = bus9.settle(T)
-ok(not A9.paced and "unpaced" in notes([made]), "the host flags an unpaced race")
-ok(B9.invite["targets"] == {"100": 150, "200": 150}, "uncompensated = everyone gets the base")
-ok("⚠ unpaced" in notes(got), "…and the guest is warned BEFORE accepting")
+ok(B9.invite["targets"] == {"100": 150.0, "200": 150.0},
+   "an uncalibrated peer races to the same number as everyone else")
+ok("unpaced" not in notes([made]) and "unpaced" not in notes(got),
+   "…and nobody is warned about a handicap that no longer exists")
 
 # rows outside a match are refused, not quietly dropped
 lone = mp.Session(mp.Link("200", name="Dave-bot"), peer_name="Curtis-bot",
@@ -533,7 +527,7 @@ b.post(o); b.settle(T)
 ok(H.calibration == 60.0, "the host's pump moves to the SAME midpoint")
 ok(H.cal_before == 40.0, "…and remembers its own too")
 ok(abs(H.targets["301"] - H.targets["302"]) < 1e-9,
-   "equal pumps need no handicap, so the two finish lines are re-paced level")
+   "the two finish lines stay level, as they were before the split")
 
 # …and it is match-scoped
 back = H.abort(T, "done")

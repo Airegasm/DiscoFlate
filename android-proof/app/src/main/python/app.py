@@ -621,8 +621,10 @@ def build_app(engine: Engine, botmgr: BotManager, net: dict | None = None) -> we
             out["peer_capacity"] = round(float(lk0.peer_cap or 0), 1)
             out["multi"] = {"me": lk0.player or "You",
                             "peer": lk0.peer_player or lk0.link.peer_name or "Opponent",
-                            "my_target": (lk0.targets or {}).get(lk0.link.me),
-                            "peer_target": (lk0.targets or {}).get(lk0.link.peer),
+                            # One line for both — see multiplayer.py's
+                            # "one finish line, not two".
+                            "my_target": (lk0.targets or {}).get(lk0.link.me) or lk0.end_max,
+                            "peer_target": (lk0.targets or {}).get(lk0.link.peer) or lk0.end_max,
                             "live": lk0.state in ("match", "settling")}
         return out
     vcam.state_cb = _vcam_state

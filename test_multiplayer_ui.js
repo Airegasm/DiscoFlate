@@ -170,22 +170,22 @@ const LIVE = { mode: 'multi', state: 'match', peer_online: true, peer_name: 'Dav
                me: '100', peer: '200', player: 'Curtis', peer_player: 'Dave',
                role: 'host', capacity: 63.4, peer_capacity: 41,
                preflight: [], notes: ['fired 10% ✓'],
-               race: { game: 'Race to N%', targets: { '100': 150, '200': 75 } } };
+               race: { game: 'Race to N%', targets: { '100': 150, '200': 150 } } };
 sandbox.mpRender(LIVE);
 ok(els.mpMatch.innerHTML.includes('Curtis') && els.mpMatch.innerHTML.includes('Dave'),
    'both racers are named by PLAYER, not by bot');
-ok(els.mpMatch.innerHTML.includes('63% of 150%') && els.mpMatch.innerHTML.includes('41% of 75%'),
-   'each meter reads against that racer’s own line');
-ok(/width:42%/.test(els.mpMatch.innerHTML) && /width:55%/.test(els.mpMatch.innerHTML),
-   'the bars are scaled to each line, so the compensated racer is not made to look behind');
+ok(els.mpMatch.innerHTML.includes('63% of 150%') && els.mpMatch.innerHTML.includes('41% of 150%'),
+   'both meters read against the one shared line');
+ok(/width:42%/.test(els.mpMatch.innerHTML) && /width:27%/.test(els.mpMatch.innerHTML),
+   'the bars share a scale, so the one further along looks further along');
 ok(els.mpMatch.innerHTML.includes('watch it in Discord'), 'the panel says where the match actually is');
 ok(els.mpAbortBtn.style.display === '' && els.mpInviteBtn.style.display === 'none',
    'abort is the only thing offered mid-match');
 ok(els.mpNotes.innerHTML.includes('fired 10% ✓'), 'the link log renders');
 
 sandbox.mpRender({ ...LIVE, paced: false });
-ok(els.mpMatch.innerHTML.includes('not pace-compensated'),
-   'an unpaced race is flagged while it runs, not only at the invite');
+ok(!/pace|unpaced/i.test(els.mpMatch.innerHTML),
+   'a stale paced flag raises no warning — pump speed cannot handicap a race in %');
 
 sandbox.mpRender({ ...LIVE, race: { ...LIVE.race, done: true, why: '2.10s vs 3.40s' } });
 ok(els.mpMatch.innerHTML.includes('finished') && els.mpMatch.innerHTML.includes('2.10s vs 3.40s'),
@@ -271,7 +271,7 @@ card = openInvite({ ...INV, invite: { ...INV.invite, cap: 0, paced: false,
                                       why: 'uncalibrated: 200' } });
 ok(/you lose at <b>100%<\/b>/.test(card),
    'a cap that did not travel falls back to 100, never to blank');
-ok(/unpaced/.test(card), 'an unpaced race is still flagged');
+ok(!/unpaced/.test(card), 'and an uncalibrated peer is not warned about a handicap that cannot exist');
 card = openInvite({ ...INV, invite: { ...INV.invite, venue: {} } });
 ok(/not set/.test(card),
    'a venue that did not travel says so rather than rendering an empty line');

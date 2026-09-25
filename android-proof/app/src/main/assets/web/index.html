@@ -1560,13 +1560,14 @@
         <b>Mock is unavailable in a match.</b> Devices not firing while the other player's do is a silent cheat, not a test mode.</div>
 
       <h3 style="margin:14px 0 6px">Splitting the difference</h3>
-      <div class="hint" style="margin-top:0;max-width:860px">Your two pumps almost certainly fill at different speeds, and every target in a
-        match is paced from that. The invite carries <b>both</b> numbers: the host's, and yours — and yours is <b>editable</b> in the popup,
-        because a stale figure is a handicap you never agreed to and that is the last moment to fix it.<br>
-        The host may tick <b>Offer to split the difference</b>. If you take it, both pumps run the <b>halfway</b> speed for this match and the
-        two finish lines become the same number, since equal pumps need no handicap. It is an offer both sides have to agree to — you cannot
-        re-tune someone else's rig on your own — and it is <b>match-scoped</b>: both rigs go back to their own calibration when the match ends,
-        however it ends, including after a crash.</div>
+      <div class="hint" style="margin-top:0;max-width:860px">Your two pumps almost certainly fill at different speeds, and it
+        <b>does not matter to the match</b>. Everything here is measured in percent: +10% is +10% on any rig, you both lose at the same
+        number, and a fast pump buys you nothing. All a difference changes is how long your own motor runs to deliver a hit.<br>
+        The invite still carries <b>both</b> calibrations — the host's and yours, yours <b>editable</b> in the popup — so each side can see
+        what a hit will cost in its own seconds. The host may tick <b>Offer to split the difference</b>: take it and both pumps run the
+        <b>halfway</b> speed, purely so the pumping <i>feels</i> the same on both ends. It is an offer both sides have to agree to — you
+        cannot re-tune someone else's rig on your own — and it is <b>match-scoped</b>: both rigs go back to their own calibration when the
+        match ends, however it ends, including after a crash.</div>
 
       <h3 style="margin:14px 0 6px">How a match ends — the End Condition</h3>
       <div class="hint" style="margin-top:0;max-width:860px">A match needs a way to be over that isn't "the rounds ran out". The
@@ -5714,7 +5715,6 @@ function mpInviteeModal(st){
       `<div class="tag">${esc(inv.cost||'no estimate given')}</div>`+
       `<div class="tag">played in ${where('cast')} · protocol on ${where('net')}</div>`+
       `<div class="tag">you lose at <b>${esc(String(inv.cap||100))}%</b></div>`+
-      (inv.paced===false?`<div class="tag" style="color:var(--warn)">⚠ unpaced — ${esc(inv.why||'a calibration is missing')}</div>`:'')+
     `</div></div>`+
     `<div class="row" style="gap:8px;margin-top:10px;align-items:flex-end">`+
       `<label class="field" style="min-width:150px">Their pump<input value="${esc(String(inv.cal||'—'))}" disabled></label>`+
@@ -5722,8 +5722,8 @@ function mpInviteeModal(st){
         `<input type="number" id="mpiMyCal" min="1" step="1" value="${esc(String(st.calibration||''))}"></label>`+
       `<span class="muted">seconds to 100%</span>`+
     `</div>`+
-    `<div class="hint" style="margin:4px 0 0">Every target is paced from <b>your</b> number — fix it here if it's `+
-      `out of date, because this is the last moment it can be corrected.</div>`+
+    `<div class="hint" style="margin:4px 0 0">Pump speed does <b>not</b> affect the match — you both lose at the same `+
+      `percentage. This only decides how long your own pump runs per hit, and it's the last moment to correct it.</div>`+
     (inv.split?`<label class="row" style="gap:8px;margin-top:10px"><input type="checkbox" id="mpiTakeSplit" style="width:auto"> `+
       `<b>Split the difference</b> <span class="muted">— they've offered: both pumps run the halfway speed for `+
       `this match, and go back to their own when it ends.</span></label>`:'')+
@@ -5907,7 +5907,6 @@ function mpRender(st){
         mpLane(st.player||'you', st.capacity, mine)+
         mpLane(st.peer_player||st.peer_name||'your opponent', st.peer_capacity, theirs)+
         (st.spent ? `<div class="tag">${Math.round(st.spent)}% of your match budget spent</div>` : '')+
-        (st.paced===false ? `<div class="tag" style="color:var(--warn)">⚠ this race is not pace-compensated — the lines are equal, the pumps aren't</div>` : '')+
         (r.why ? `<div class="tag">${esc(r.why)}</div>` : '')+
         `</div></div>`+
         `<div class="hint" style="margin-top:6px">It runs itself from here — <b>watch it in Discord.</b></div>`;

@@ -270,48 +270,17 @@ class Link:
             self.mark_seen(self.peer, self.sid, snap.get("last_seq") or 0)
 
 
-# ---- pacing: making two different pumps a fair race ------------------------ #
-# % fixes how MUCH. It does nothing about how FAST. A rig that fills 100% in
-# 60s reaches any finish line twice as quickly as one that takes 120s, so the
-# handshake carries each primary pump's calibration and the host compensates.
-
-def fill_rate(cal_seconds_to_100) -> float:
-    """Percent per second for a pump calibrated to reach 100% in N seconds.
-    Returns 0.0 for a missing or nonsensical calibration — callers treat that
-    as 'cannot compensate' rather than as an infinitely fast pump."""
-    cal = _num(cal_seconds_to_100)
-    if cal is None or cal <= 0:
-        return 0.0
-    return 100.0 / cal
-
-
-def compensate(base_target: float, cals: dict) -> dict:
-    """Per-install finish lines that all take the SAME pumping time.
-
-    `cals` maps install/bot id -> calibration_seconds_to_100.
-
-    Time to reach a target is target/rate, so equal time means targets scale
-    with rate. We reference the FASTEST pump, which means every adjusted target
-    is <= base_target: the slow player's line comes DOWN rather than the fast
-    player's going UP. That matters for consent — the invite's cost estimate is
-    what the guest agreed to, so compensation must never push anyone past it.
-
-    Returns {"targets": {id: pct}, "rates": {id: pct_per_sec},
-             "ok": bool, "why": str}. ok=False means at least one calibration
-    is missing, everyone gets base_target, and the match should SAY SO rather
-    than pretend the race is even.
-    """
-    base = _num(base_target) or 0.0
-    rates = {str(k): fill_rate(v) for k, v in (cals or {}).items()}
-    if not rates:
-        return {"targets": {}, "rates": {}, "ok": False, "why": "no calibrations"}
-    missing = [k for k, r in rates.items() if r <= 0]
-    if missing:
-        return {"targets": {k: base for k in rates}, "rates": rates, "ok": False,
-                "why": f"uncalibrated: {', '.join(sorted(missing))}"}
-    fastest = max(rates.values())
-    targets = {k: base * (r / fastest) for k, r in rates.items()}
-    return {"targets": targets, "rates": rates, "ok": True, "why": ""}
+# ---- one finish line, not two ---------------------------------------------- #
+# Percent is the whole point: +10% is +10% on any rig, so a 900s pump and a
+# 300s pump take the SAME number of percentage points to reach the same line.
+# Damage here is dealt by game outcomes measured in percent, never by how fast
+# a motor runs, so pump speed cannot decide the match and there is nothing to
+# compensate for. Calibration still crosses in the invite — but only so each
+# side can SHOW what a hit will cost in its own seconds, and so the two can
+# agree to meet in the middle if they want the pumping to FEEL the same.
+# (A rate-scaled "pace compensation" lived here until v4.0.2. It handed the
+#  slower rig a lower finish line, which is exactly the rig-power advantage
+#  percent exists to abolish. Do not bring it back.)
 
 
 # ---- the lifecycle --------------------------------------------------------- #
@@ -464,7 +433,7 @@ class Session:
         self.capacity = 0.0                        # mine, refreshed by the adapter
         self.peer_cal = 0
         self.split_offer = False   # host offered to meet in the middle
-        self.base_target = 0.0     # the uncompensated line, kept to re-pace on
+        self.base_target = 0.0     # the shared finish line, in percent
         # What this pump was calibrated at BEFORE a split-the-difference. The
         # split is match-scoped: the rig goes back to its own number when the
         # match ends, however it ends.
@@ -495,8 +464,8 @@ class Session:
         self.game = ""
         self.input = "operators"
         self.cost = ""
-        self.targets = {}                          # install id → compensated %
-        self.paced = True                          # False → uncompensated, SAY SO
+        self.targets = {}                          # install id → finish line %
+                                                   # (always the same number for both)
         self.phase = ""
         self.round = 0
         self.tick = 0
@@ -565,7 +534,7 @@ class Session:
                 if self.peer_channels else [],
                 "game": self.game, "input": self.input, "cost": self.cost,
                 "phase": self.phase, "round": self.round,
-                "targets": dict(self.targets), "paced": self.paced,
+                "targets": dict(self.targets),
                 "capacity": self.capacity, "peer_capacity": self.peer_cap,
 
                 "invite": dict(self.invite), "why": self.last_why}
@@ -638,16 +607,12 @@ class Session:
         self.ready_me = self.ready_peer = False
         self.last_why = ""
 
-        pace = compensate(base_target, {self.link.me: self.calibration,
-                                        self.link.peer: self.peer_cal}) \
-            if _num(base_target) else {"targets": {}, "ok": True, "why": ""}
-        self.targets = pace.get("targets") or {}
-        self.paced = bool(pace.get("ok"))
-        mine = self.targets.get(self.link.me, base_target)
+        # ONE line, the same number for both. Percent is rig-independent, so
+        # the finish line never needs adjusting for whose pump is quicker.
+        mine = self.base_target
+        self.targets = {self.link.me: mine, self.link.peer: mine} if mine else {}
         self.cost = str(cost or cost_line(game, rounds=rounds, max_pct=max_pct,
-                                          target=self.targets.get(self.link.peer, base_target)))
-        if not self.paced and pace.get("why"):
-            out.notes.append(f"unpaced race: {pace['why']}")
+                                          target=mine))
 
         self._expires = now + float(ttl)
         self._sent_at = now
@@ -659,7 +624,6 @@ class Session:
         # settle in a second.
         return self._emit(out, T_INVITE, game=self.game, input=self.input,
                           cost=self.cost, ttl=float(ttl), targets=self.targets,
-                          paced=self.paced, why=pace.get("why", ""),
                           mine=mine, host=self.player, bot=self.link.name,
                           cal=self.calibration, scene=str(scene or ""),
                           split=self.split_offer,
@@ -741,7 +705,6 @@ class Session:
         self.input = str(self.invite.get("input") or "operators")
         self.cost = str(self.invite.get("cost") or "")
         self.targets = dict(self.invite.get("targets") or {})
-        self.paced = bool(self.invite.get("paced", True))
         self.ready_me = self.ready_peer = False
         self.invite = {}
         self._expires = now + LINK_TTL
@@ -1170,8 +1133,6 @@ class Session:
                        "input": str(env.get("input") or "operators"),
                        "cost": str(env.get("cost") or ""),
                        "targets": dict(env.get("targets") or {}),
-                       "paced": bool(env.get("paced", True)),
-                       "why": str(env.get("why") or ""),
                        "target": (env.get("targets") or {}).get(self.link.me),
                        # who is asking, where it will be played, and on what terms
                        "host": str(env.get("host") or "") or self.peer_player,
@@ -1192,8 +1153,6 @@ class Session:
         out.dirty = True
         out.notes.append(f"invited to {self.invite['game'] or 'a match'}: "
                          f"{self.invite['cost'] or 'no estimate given'}")
-        if not self.invite["paced"]:
-            out.notes.append(f"⚠ unpaced — {self.invite['why'] or 'calibration missing'}")
         return out
 
     def _on_accept(self, env: dict, now: float, out: Out) -> Out:
@@ -1222,14 +1181,8 @@ class Session:
             out.cal = mid
             out.notes.append(f"split the difference: both pumps set to {mid:g}s "
                              f"to 100% (was {float(_num(was) or 0):g} here)")
-            # Equal pumps need no compensation. Re-pace so the two finish lines
-            # are the same number as well — leaving the old split targets would
-            # keep handicapping a difference that no longer exists.
-            if self.base_target:
-                pace = compensate(self.base_target,
-                                  {self.link.me: mid, self.link.peer: mid})
-                self.targets = pace.get("targets") or self.targets
-                self.paced = bool(pace.get("ok"))
+            # Only the FEEL changes: both pumps now take the same wall-clock
+            # time per percent. The finish line was already identical.
         self.link.state = S_LINKED
         self._expires = now + LINK_TTL
         out.dirty = True
@@ -1347,7 +1300,7 @@ class Session:
         snap = self.link.snapshot()
         snap.update({"game": self.game, "input": self.input, "cost": self.cost,
                      "phase": self.phase, "round": self.round, "tick": self.tick,
-                     "targets": self.targets, "paced": self.paced,
+                     "targets": self.targets,
                      # A split-the-difference outlives a crash: without this the
                      # rig would come back still tuned to the other person's
                      # match, with nothing left that knows what it used to be.
@@ -1369,7 +1322,6 @@ class Session:
         self.round = int(_num(snap.get("round")) or 0)
         self.tick = int(_num(snap.get("tick")) or 0)
         self.targets = dict(snap.get("targets") or {})
-        self.paced = bool(snap.get("paced", True))
         self.ready_me = bool(snap.get("ready_me"))
         self.ready_peer = bool(snap.get("ready_peer"))
         self.end_max = float(_num(snap.get("end_max")) or 0)

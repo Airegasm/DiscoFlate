@@ -251,10 +251,13 @@ def placeholders(session, chosen="", extra=None) -> dict:
     me, peer = s.link.me, s.link.peer
     caps = {me: float(s.capacity or 0), peer: float(s.peer_cap or 0)}
     names = {me: s.player or "you", peer: s.peer_player or s.link.peer_name or "your opponent"}
+    # The same line for both — percent is rig-independent, so there is only
+    # ever one number here. Falls back to the lose-at capacity, which is what
+    # actually ends the match.
     tgts = {}
     for k in (me, peer):
         v = _num((s.targets or {}).get(k))
-        tgts[k] = float(v) if v is not None else 0.0
+        tgts[k] = float(v) if v is not None else float(s.end_max or 0)
 
     lead = ""
     if caps[me] != caps[peer]:

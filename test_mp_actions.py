@@ -39,7 +39,7 @@ def sess(cap=0.0, peer_cap=0.0, targets=None, role=mp.ROLE_HOST):
     s.peer_player = "Dave"
     s.link.bind(PEER, "act1", role, state=mp.S_MATCH)
     s.capacity, s.peer_cap = cap, peer_cap
-    s.targets = targets or {ME: 150.0, PEER: 75.0}
+    s.targets = targets or {ME: 150.0, PEER: 150.0}   # always equal
     return s
 
 
@@ -117,12 +117,15 @@ ok(ph["multi_me_name"] == "Curtis" and ph["multi_peer_name"] == "Dave",
 ok(ph["multi_chosen"] == PEER and ph["multi_chosen_name"] == "Dave", "the spin's pick")
 ok(ph["multi_other"] == ME and ph["multi_other_name"] == "Curtis", "and who it missed")
 ok(ph["multi_my_pct"] == "60" and ph["multi_peer_pct"] == "30", "both meters")
-ok(ph["multi_my_target"] == "150" and ph["multi_peer_target"] == "75",
-   "each racer's own compensated line")
+ok(ph["multi_my_target"] == "150" and ph["multi_peer_target"] == "150",
+   "one finish line, the same number for both")
 ok(ph["multi_leader_name"] == "Curtis" and ph["multi_trailer_name"] == "Dave",
    "leader and trailer by raw capacity")
-ok(ph["multi_my_frac"] == "40" and ph["multi_peer_frac"] == "40",
-   "…but the FRACTION of your own line is what says who's really winning")
+ok(ph["multi_my_frac"] == "40" and ph["multi_peer_frac"] == "20",
+   "the fraction is how close to losing you are — 60 and 30 of a shared 150")
+ok((ph["multi_my_frac"] > ph["multi_peer_frac"])
+   == (float(ph["multi_my_pct"]) > float(ph["multi_peer_pct"])),
+   "…and with one line it can never disagree with raw capacity about who leads")
 ok(ph["multi_host_name"] == "Curtis" and ph["multi_guest_name"] == "Dave",
    "host/guest names for a block that cares which seat someone is in")
 
